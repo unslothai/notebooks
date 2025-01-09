@@ -216,9 +216,7 @@ def update_notebook_sections(
                             installation = installation_steps_kaggle
                         else:
                             installation = installation_steps
-                        notebook_content["cells"][i + 1]["source"] = [
-                            f"{line}" for line in installation.splitlines()
-                        ]
+                        notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
                         i += 1
 
