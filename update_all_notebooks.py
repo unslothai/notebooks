@@ -52,8 +52,12 @@ Some other links:
 <div class="align-center">
   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-  <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
+  <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+
+  Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 </div>"""
+
+text_for_last_cell_ollama = text_for_last_cell_gguf.replace("Now, ", "You can also ", 1)
 
 text_for_last_cell_non_gguf = """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/u54VK8m8tk) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 
@@ -72,7 +76,9 @@ Some other links:
 <div class="align-center">
   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
   <a href="https://discord.gg/u54VK8m8tk"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-<a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+  <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+
+ Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 </div>"""
 
 naming_mapping = {"mistral": ["pixtral"]}
@@ -164,6 +170,7 @@ def update_notebook_sections(
         i = 0 if news_markdown_index == -1 else news_markdown_index
 
         is_gguf = False
+        is_ollama = False
 
         while i < len(notebook_content["cells"]):
             cell = notebook_content["cells"][i]
@@ -171,7 +178,9 @@ def update_notebook_sections(
             if cell["cell_type"] == "markdown":
                 source_str = "".join(cell["source"]).strip()
 
-                if "gguf" in source_str:
+                if "### Ollama Support" in source_str:
+                    is_ollama = True
+                elif "gguf" in source_str:
                     is_gguf = True
 
                 # if source_str == "# General":
@@ -208,7 +217,7 @@ def update_notebook_sections(
                         else:
                             installation = installation_steps
                         notebook_content["cells"][i + 1]["source"] = [
-                            f"{line}\n" for line in installation.splitlines()
+                            f"{line}" for line in installation.splitlines()
                         ]
                         updated = True
                         i += 1
@@ -218,12 +227,16 @@ def update_notebook_sections(
         # Add text to the last cell
         if notebook_content["cells"]:
             last_cell = notebook_content["cells"][-1]
-            text_for_last_cell = (
-                text_for_last_cell_gguf if is_gguf else text_for_last_cell_non_gguf
-            )
+            if is_ollama:
+                text_for_last_cell = text_for_last_cell_ollama
+            elif is_gguf:
+                text_for_last_cell = text_for_last_cell_gguf
+            else:
+                text_for_last_cell = text_for_last_cell_non_gguf
+
             if last_cell["cell_type"] == "markdown":
                 last_cell["source"].extend(
-                    [f"\n{line}\n" for line in text_for_last_cell.splitlines()]
+                    [f"{line}\n" for line in text_for_last_cell.splitlines()]
                 )
             else:
                 notebook_content["cells"].append(
