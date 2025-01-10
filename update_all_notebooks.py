@@ -20,14 +20,16 @@ To install Unsloth on your own computer, follow the installation instructions on
 You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)"""
 
 installation_content = """%%capture
-!pip install --upgrade --force-reinstall --no-cache-dir --no-deps unsloth unsloth_zoo"""
+!pip install unsloth
+# Also get the latest nightly Unsloth!
+!pip install --force-reinstall --no-cache-dir --no-deps git+https://github.com/unslothai/unsloth.git"""
 
 installation_kaggle_content = """%%capture
 # Kaggle is slow - you'll have to wait 5 minutes for it to install.
 !pip install pip3-autoremove
 !pip-autoremove torch torchvision torchaudio -y
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu121
-!pip install --upgrade --force-reinstall --no-cache-dir --no-deps unsloth unsloth_zoo"""
+!pip install unsloth"""
 
 new_announcement_content_non_vlm = """**[NEW] We've fixed many bugs in Phi-4** which greatly increases Phi-4's accuracy. See our [blogpost](https://unsloth.ai/blog/phi4)
 
