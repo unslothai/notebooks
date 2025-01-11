@@ -85,7 +85,11 @@ Some other links:
  Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 </div>"""
 
-naming_mapping = {"mistral": ["pixtral"]}
+naming_mapping = {
+    "mistral": ["pixtral", "mistral"],
+    "other notebooks": ["TinyLlama"],
+    "llama": ["Llama"]
+}
 
 
 def copy_folder(source_path, new_name, destination_path=None, replace=False):
@@ -109,6 +113,36 @@ def copy_folder(source_path, new_name, destination_path=None, replace=False):
 
 def is_path_contains_any(file_path, words):
     return any(re.search(word, file_path, re.IGNORECASE) for word in words)
+
+def extract_version_from_row(row):
+    """Extracts the version number from a row string for sorting."""
+    match = re.search(r"\| (.*?) \|", row)  # Match content between first "|" and " |"
+    if match:
+        model_name = match.group(1)
+        return extract_version(model_name)
+    else:
+        return (0, 0)
+
+def extract_version(model_name):
+    """Extracts the version number for sorting.
+
+    Handles cases like:
+        - Phi 3 Medium
+        - Phi 3.5 Mini
+        - Phi 4
+    Returns a tuple of (major version, minor version) for proper sorting.
+    Returns (0, 0) if no version is found.
+    """
+    match = re.search(r"(\d+(\.\d+)?)", model_name)
+    if match:
+        version_str = match.group(1)
+        if "." in version_str:
+            major, minor = version_str.split(".")
+            return (int(major), int(minor))
+        else:
+            return (int(version_str), 0)
+    else:
+        return (0, 0)
 
 
 def update_notebook_sections(
@@ -346,7 +380,23 @@ def update_readme(
         notebook_name = os.path.basename(path)
         is_kaggle = is_path_contains_any(path.lower(), ["kaggle"])
 
-        section_name = "Other notebooks"
+        section_name = "Other notebooks"  # Default to Other Notebooks
+
+        # Prioritize "Other Notebooks" section
+        if is_path_contains_any(path.lower(), naming_mapping["other notebooks"]):
+            section_name = "Other notebooks"
+        else:
+            for sect in sections:
+                if sect.lower() == "other notebooks":
+                    continue  # Skip "Other Notebooks" as it's already handled
+
+                check = naming_mapping.get(sect.lower(), [])
+                if not check:
+                    check = [sect.lower()]
+
+                if is_path_contains_any(path.lower(), check):
+                    section_name = sect
+                    break
 
         if is_kaggle:
             link = f"[Open in Kaggle]({base_url_kaggle}{path}"
@@ -357,19 +407,22 @@ def update_readme(
                 link += ")"
         else:
             link = f"[Open in Colab]({base_url_colab}{path})"
+        
         parts = notebook_name.replace(".ipynb", "").split("-")
+        
         if is_kaggle:
-            model = parts[1].replace("_", " ")
+            model = parts[1].replace("_", " ") if len(parts) > 1 else ""
+            type_ = parts[2].replace("_", " ") if len(parts) > 2 else ""
         else:
             model = parts[0].replace("_", " ")
+            type_ = parts[1].replace("_", " ") if len(parts) > 1 else ""
 
-        for sect in sections:
-            check = [sect.lower()]
-            check.extend(naming_mapping.get(sect.lower(), []))
-            if is_path_contains_any(path.lower(), check):
-                section_name = sect
-                break
-        type_ = parts[-1].replace("_", " ")
+        # Add space before version number only if concatenated to the first word
+        model_parts = model.split(" ", 1)  # Split into two parts at the first space
+        if len(model_parts) > 1:
+            model_parts[0] = re.sub(r"([A-Za-z])(\d)", r"\1 \2", model_parts[0])  # Apply regex to the first part only
+            model = " ".join(model_parts)  # Rejoin the parts
+
         if is_path_contains_any(path.lower(), ["vision"]):
             type_ = f"**{type_}**"
 
@@ -395,7 +448,14 @@ def update_readme(
     else:
         notebook_data.sort(key=lambda x: (list_models.index(x["section"]), x["type"]))
 
+    for section in sections:
+        sections[section]["Colab"]["rows"] = []
+        sections[section]["Kaggle"]["rows"] = []
+
     for data in notebook_data:
+        version = extract_version(data["model"])
+        data["sort_key"] = (list_models.index(data["section"]), version)
+
         if is_path_contains_any(data["path"].lower(), ["kaggle"]):
             sections[data["section"]]["Kaggle"]["rows"].append(
                 f"| {data['model']} | {data['type']} | {data['link']}\n"
@@ -404,6 +464,10 @@ def update_readme(
             sections[data["section"]]["Colab"]["rows"].append(
                 f"| {data['model']} | {data['type']} | {data['link']}\n"
             )
+
+    for section in sections:
+        sections[section]["Colab"]["rows"].sort(key=lambda x: extract_version_from_row(x), reverse=True)
+        sections[section]["Kaggle"]["rows"].sort(key=lambda x: extract_version_from_row(x), reverse=True)
 
     try:
         with open(readme_path, "r", encoding="utf-8") as f:
