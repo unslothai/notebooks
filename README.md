@@ -110,9 +110,9 @@ You can also view our [Kaggle notebooks here](https://github.com/unslothai/noteb
 ### Other notebooks Notebooks
 | Model | Type | Colab Link |
 | --- | --- | --- |
-| Sesame CSM 1B | TTS | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Sesame_CSM_1B-TTS.ipynb) |
 | CodeForces cot Finetune for Reasoning on CodeForces | Reasoning | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
 | Unsloth | Studio | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb) |
+| Sesame CSM | TTS | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Sesame_CSM_(1B)-TTS.ipynb) |
 
 # 📒 Kaggle Notebooks
 <details>
@@ -211,9 +211,9 @@ You can also view our [Kaggle notebooks here](https://github.com/unslothai/noteb
 ### Other notebooks Notebooks
 | Model | Type | Kaggle Link |
 | --- | --- | --- |
-| Kaggle Sesame CSM 1B | TTS | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Sesame_CSM_1B-TTS.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle CodeForces cot Finetune for Reasoning on CodeForces | Reasoning | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Unsloth | Studio | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Unsloth_Studio.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Sesame CSM | TTS | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Sesame_CSM_(1B)-TTS.ipynb&accelerator=nvidiaTeslaT4) |
 
 </details>
 
