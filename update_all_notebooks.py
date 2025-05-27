@@ -3,9 +3,29 @@ import json
 import os
 import re
 import shutil
+import subprocess
 from datetime import datetime
 from glob import glob
 
+def get_current_git_branch():
+    try:
+        # Run the git command to get the current branch name
+        # '--abbrev-ref HEAD' gives the branch name (e.g., 'main', 'feature/new-feature')
+        # 'STDOUT' captures standard output, 'STDERR' redirects error output
+        branch_name = subprocess.check_output(
+            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+            stderr=subprocess.STDOUT
+        ).strip().decode('utf-8')
+        return branch_name
+    except subprocess.CalledProcessError as e:
+        print(f"Error getting Git branch: {e}")
+        print(f"Command output: {e.output.decode('utf-8')}")
+        return None
+    except FileNotFoundError:
+        print("Error: 'git' command not found. Make sure Git is installed and in your PATH.")
+        return None
+
+current_branch = get_current_git_branch()
 # =======================================================
 # GENERAL ANNOUNCEMENTS (THE VERY TOP)
 # =======================================================
@@ -852,8 +872,8 @@ def update_readme(
         base_url_colab = "https://colab.research.google.com/github/unslothai/unsloth/blob/main/nb/"
         base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/unsloth/blob/main/nb/"
     else:
-        base_url_colab = "https://colab.research.google.com/github/unslothai/notebooks/blob/main/"
-        base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/"
+        base_url_colab = f"https://colab.research.google.com/github/unslothai/notebooks/blob/{current_branch}/"
+        base_url_kaggle = f"https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/{current_branch}/"
 
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
     paths = [x.replace("\\", "/") for x in paths]
