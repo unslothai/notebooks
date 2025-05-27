@@ -870,8 +870,8 @@ def update_readme(
     kaggle_accelerator="nvidiaTeslaT4",
 ):
     if args.to_main_repo:
-        base_url_colab = "https://colab.research.google.com/github/unslothai/unsloth/blob/main/nb/"
-        base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/unsloth/blob/main/nb/"
+        base_url_colab = "https://colab.research.google.com/github/unslothai/notebooks/blob/main/"
+        base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/"
     else:
         base_url_colab = f"https://colab.research.google.com/github/unslothai/notebooks/blob/{current_branch}/"
         base_url_kaggle = f"https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/{current_branch}/"
@@ -999,7 +999,7 @@ def update_readme(
         content_after = readme_content[end_index:] 
 
         temp = (
-            "(https://github.com/unslothai/unsloth/nb/#-kaggle-notebooks).\n\n"
+            "(https://github.com/unslothai/notebooks/nb/#-kaggle-notebooks).\n\n"
             if args.to_main_repo
             else "(https://github.com/unslothai/notebooks/#-kaggle-notebooks).\n\n"
         )
