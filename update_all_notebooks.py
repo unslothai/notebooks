@@ -67,9 +67,21 @@ if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth
 else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
-    !pip install --no-deps bitsandbytes accelerate xformers==0.0.29.post3 peft trl==0.15.2 triton cut_cross_entropy unsloth_zoo
+    !pip install --no-deps bitsandbytes accelerate xformers==0.0.29.post3 peft trl triton cut_cross_entropy unsloth_zoo
     !pip install sentencepiece protobuf "datasets>=3.4.1" huggingface_hub hf_transfer
-    !pip install --no-deps unsloth"""
+    !pip install --no-deps unsloth
+!pip uninstall unsloth unsloth_zoo -y
+!pip install --upgrade --force-reinstall --no-deps unsloth unsloth_zoo
+# !pip install --no-deps git+https://github.com/unslothai/unsloth.git@nightly
+# !pip install --no-deps git+https://github.com/unslothai/unsloth_zoo.git@nightly
+
+!rm -rf unsloth_compiled_cache
+!rm -rf torch_compile_debug
+import os
+os.environ["UNSLOTH_ENABLE_LOGGING"] = "0"
+os.environ["UNSLOTH_COMPILE_DEBUG"] = "0"
+!pip install --upgrade --no-deps trl transformers
+"""
 
 installation_kaggle_content = """%%capture
 !pip install pip3-autoremove
