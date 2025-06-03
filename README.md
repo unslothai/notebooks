@@ -25,48 +25,48 @@ You can also view our [Kaggle notebooks here](https://github.com/unslothai/noteb
 | Phi 4 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Phi_4_(14B)-GRPO.ipynb) |
 | Llama3.1 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3.1_(8B)-GRPO.ipynb) |
 | Meta Synthetic Data Llama3.1 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Meta-Synthetic-Data-Llama3.1_(8B).ipynb) |
+| Gemma3 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Gemma3_(1B)-GRPO.ipynb) |
 | Qwen3 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen3_(4B)-GRPO.ipynb) |
 | Meta Synthetic Data Llama3 2 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Meta_Synthetic_Data_Llama3_2_(3B).ipynb) |
-| Gemma3 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Gemma3_(1B)-GRPO.ipynb) |
 | Qwen2.5 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2.5_(3B)-GRPO.ipynb) |
-| DeepSeek R1 0528 Qwen3 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/DeepSeek_R1_0528_Qwen3_(8B)-GRPO.ipynb) |
+| DeepSeek R1 0528 Qwen3 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb) |
 | Mistral v0.3 | GRPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_v0.3_(7B)-GRPO.ipynb) |
 
 ### Gemma Notebooks
 | Model | Type | Colab Link |
 | --- | --- | --- |
 | Gemma3 |  | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Gemma3_(4B).ipynb) |
-| Gemma2 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Gemma2_(9B)-Alpaca.ipynb) |
 | Gemma2 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Gemma2_(2B)-Alpaca.ipynb) |
+| Gemma2 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Gemma2_(9B)-Alpaca.ipynb) |
 | CodeGemma | Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/CodeGemma_(7B)-Conversational.ipynb) |
 
 ### Llama Notebooks
 | Model | Type | Colab Link |
 | --- | --- | --- |
-| Llama3.2 | Vision | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3.2_(11B)-Vision.ipynb) |
 | Llama3.2 | Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb) |
+| Llama3.2 | Vision | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3.2_(11B)-Vision.ipynb) |
 | Llama3.2 | RAFT | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3.2_(1B)-RAFT.ipynb) |
-| Llama3.1 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3.1_(8B)-Alpaca.ipynb) |
 | Llama3.1 | Inference | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3.1_(8B)-Inference.ipynb) |
-| Llama3 | ORPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3_(8B)-ORPO.ipynb) |
-| Llama3 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3_(8B)-Alpaca.ipynb) |
-| Llama3 | Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3_(8B)-Conversational.ipynb) |
+| Llama3.1 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3.1_(8B)-Alpaca.ipynb) |
 | Llama3 | Ollama | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3_(8B)-Ollama.ipynb) |
-| Llasa TTS | TTS | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llasa_TTS_(1B).ipynb) |
+| Llama3 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3_(8B)-Alpaca.ipynb) |
+| Llama3 | ORPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3_(8B)-ORPO.ipynb) |
+| Llama3 | Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llama3_(8B)-Conversational.ipynb) |
 | TinyLlama | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/TinyLlama_(1.1B)-Alpaca.ipynb) |
+| Llasa TTS | TTS | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llasa_TTS_(1B).ipynb) |
 | Llasa TTS | TTS | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Llasa_TTS_(3B).ipynb) |
 
 ### Mistral Notebooks
 | Model | Type | Colab Link |
 | --- | --- | --- |
-| Mistral v0.3 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_v0.3_(7B)-Alpaca.ipynb) |
-| Mistral v0.3 | CPT | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_v0.3_(7B)-CPT.ipynb) |
 | Mistral v0.3 | Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_v0.3_(7B)-Conversational.ipynb) |
-| Mistral | Text Completion | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_(7B)-Text_Completion.ipynb) |
-| Mistral Small | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_Small_(22B)-Alpaca.ipynb) |
-| Zephyr | DPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Zephyr_(7B)-DPO.ipynb) |
-| Mistral Nemo | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_Nemo_(12B)-Alpaca.ipynb) |
+| Mistral v0.3 | CPT | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_v0.3_(7B)-CPT.ipynb) |
+| Mistral v0.3 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_v0.3_(7B)-Alpaca.ipynb) |
 | Pixtral | Vision | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Pixtral_(12B)-Vision.ipynb) |
+| Zephyr | DPO | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Zephyr_(7B)-DPO.ipynb) |
+| Mistral Small | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_Small_(22B)-Alpaca.ipynb) |
+| Mistral Nemo | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_Nemo_(12B)-Alpaca.ipynb) |
+| Mistral | Text Completion | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Mistral_(7B)-Text_Completion.ipynb) |
 
 ### Orpheus Notebooks
 | Model | Type | Colab Link |
@@ -88,13 +88,13 @@ You can also view our [Kaggle notebooks here](https://github.com/unslothai/noteb
 ### Qwen Notebooks
 | Model | Type | Colab Link |
 | --- | --- | --- |
-| Qwen3 | Reasoning Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen3_(14B)-Reasoning-Conversational.ipynb) |
 | Qwen3 |  | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen3_(14B).ipynb) |
+| Qwen3 | Reasoning Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen3_(14B)-Reasoning-Conversational.ipynb) |
 | Qwen3 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen3_(14B)-Alpaca.ipynb) |
 | Qwen2.5 Coder | Tool Calling | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |
-| Qwen2.5 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2.5_(7B)-Alpaca.ipynb) |
-| Qwen2.5 Coder | Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2.5_Coder_(14B)-Conversational.ipynb) |
 | Qwen2.5 VL | Vision | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2.5_VL_(7B)-Vision.ipynb) |
+| Qwen2.5 Coder | Conversational | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2.5_Coder_(14B)-Conversational.ipynb) |
+| Qwen2.5 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2.5_(7B)-Alpaca.ipynb) |
 | Qwen2 VL | Vision | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2_VL_(7B)-Vision.ipynb) |
 | Qwen2 | Alpaca | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Qwen2_(7B)-Alpaca.ipynb) |
 
@@ -111,8 +111,8 @@ You can also view our [Kaggle notebooks here](https://github.com/unslothai/noteb
 ### Other notebooks Notebooks
 | Model | Type | Colab Link |
 | --- | --- | --- |
-| Sesame CSM | TTS | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Sesame_CSM_(1B)-TTS.ipynb) |
 | Unsloth | Studio | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Unsloth_Studio.ipynb) |
+| Sesame CSM | TTS | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Sesame_CSM_(1B)-TTS.ipynb) |
 | CodeForces cot Finetune for Reasoning on CodeForces | Reasoning | [Open in Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/new-distill-notebook/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
 
 # 📒 Kaggle Notebooks
@@ -125,35 +125,35 @@ You can also view our [Kaggle notebooks here](https://github.com/unslothai/noteb
 | Model | Type | Kaggle Link |
 | --- | --- | --- |
 | Kaggle Phi 4 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Phi_4_(14B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Meta Synthetic Data Llama3.1 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Meta-Synthetic-Data-Llama3.1_(8B).ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llama3.1 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3.1_(8B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Meta Synthetic Data Llama3.1 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Meta-Synthetic-Data-Llama3.1_(8B).ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Gemma3 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Gemma3_(1B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Meta Synthetic Data Llama3 2 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Meta_Synthetic_Data_Llama3_2_(3B).ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Qwen3 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen3_(4B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Qwen2.5 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen2.5_(3B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle DeepSeek R1 0528 Qwen3 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-DeepSeek_R1_0528_Qwen3_(8B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle DeepSeek R1 0528 Qwen3 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Mistral v0.3 | GRPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_v0.3_(7B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Gemma Notebooks
 | Model | Type | Kaggle Link |
 | --- | --- | --- |
 | Kaggle Gemma3 |  | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Gemma3_(4B).ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Gemma2 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Gemma2_(2B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Gemma2 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Gemma2_(9B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Gemma2 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Gemma2_(2B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle CodeGemma | Conversational | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-CodeGemma_(7B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Llama Notebooks
 | Model | Type | Kaggle Link |
 | --- | --- | --- |
-| Kaggle Llama3.2 | Conversational | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3.2_(1B_and_3B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llama3.2 | Vision | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3.2_(11B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Llama3.2 | Conversational | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3.2_(1B_and_3B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llama3.2 | RAFT | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3.2_(1B)-RAFT.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Llama3.1 | Inference | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3.1_(8B)-Inference.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llama3.1 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3.1_(8B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Llama3.1 | Inference | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3.1_(8B)-Inference.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Llama3 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3_(8B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llama3 | Ollama | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3_(8B)-Ollama.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llama3 | Conversational | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3_(8B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llama3 | ORPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3_(8B)-ORPO.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Llama3 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llama3_(8B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llasa TTS | TTS | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llasa_TTS_(3B).ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle TinyLlama | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-TinyLlama_(1.1B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Llasa TTS | TTS | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Llasa_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4) |
@@ -161,14 +161,14 @@ You can also view our [Kaggle notebooks here](https://github.com/unslothai/noteb
 ### Mistral Notebooks
 | Model | Type | Kaggle Link |
 | --- | --- | --- |
-| Kaggle Mistral v0.3 | CPT | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_v0.3_(7B)-CPT.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Mistral v0.3 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_v0.3_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Mistral v0.3 | Conversational | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_v0.3_(7B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Mistral Small | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_Small_(22B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Mistral Nemo | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_Nemo_(12B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Mistral v0.3 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_v0.3_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Mistral v0.3 | CPT | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_v0.3_(7B)-CPT.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Mistral | Text Completion | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_(7B)-Text_Completion.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Zephyr | DPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Zephyr_(7B)-DPO.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Pixtral | Vision | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Pixtral_(12B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Mistral Nemo | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_Nemo_(12B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Zephyr | DPO | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Zephyr_(7B)-DPO.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Mistral Small | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Mistral_Small_(22B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Orpheus Notebooks
 | Model | Type | Kaggle Link |
@@ -190,11 +190,11 @@ You can also view our [Kaggle notebooks here](https://github.com/unslothai/noteb
 ### Qwen Notebooks
 | Model | Type | Kaggle Link |
 | --- | --- | --- |
-| Kaggle Qwen3 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen3_(14B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Qwen3 |  | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen3_(14B).ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Qwen3 | Reasoning Conversational | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen3_(14B)-Reasoning-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| Kaggle Qwen2.5 Coder | Conversational | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen2.5_Coder_(14B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Qwen3 |  | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen3_(14B).ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Qwen3 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen3_(14B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Qwen2.5 | Alpaca | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen2.5_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| Kaggle Qwen2.5 Coder | Conversational | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen2.5_Coder_(14B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Qwen2.5 Coder | Tool Calling | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Qwen2.5 VL | Vision | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen2.5_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
 | Kaggle Qwen2 VL | Vision | [Open in Kaggle](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/new-distill-notebook/nb/Kaggle-Qwen2_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
