@@ -412,6 +412,10 @@ def extract_model_info_refined(filename, architecture_mapping, known_types_order
     if type_ == "Synthetic Data" or type_ == "GRPO LoRA":
         type_ = "GRPO"
 
+    if "kaggle" in name.lower():
+        # Remove "kaggle" from the name
+        name = name.replace("Kaggle", "").strip()
+
     return {'name': name,
             'size': size,
             'type': type_,
@@ -566,6 +570,7 @@ def update_notebook_sections(
         is_gguf = False
         is_ollama = False
         is_gemma3 = is_path_contains_any(notebook_path.lower(), ["gemma3"])
+        is_vision = is_path_contains_any(notebook_path.lower(), ["vision"])
 
         while i < len(notebook_content["cells"]):
             cell = notebook_content["cells"][i]
@@ -690,7 +695,7 @@ def update_notebook_sections(
                 text_for_last_cell = text_for_last_cell_ollama
             elif is_gguf:
                 text_for_last_cell = text_for_last_cell_gguf
-            elif is_gemma3:
+            elif is_gemma3 and not is_vision: # Vision cannot be transformed to GGUF yet
                 text_for_last_cell = text_for_last_cell_gemma3
             else:
                 text_for_last_cell = text_for_last_cell_non_gguf
@@ -984,7 +989,7 @@ def update_readme(
         with open(readme_path, "r", encoding="utf-8") as f:
             readme_content = f.read()
 
-        start_marker = "# 📒 Fine-tuning Notebooks"
+        start_marker = "<!-- START OF EDITING -->"
         start_index = readme_content.find(start_marker)
         if start_index == -1:
             raise ValueError(f"Start marker '{start_marker}' not found in README.")
@@ -1007,7 +1012,7 @@ def update_readme(
             else "(https://github.com/unslothai/notebooks/#-kaggle-notebooks).\n\n"
         )
 
-        colab_updated_notebooks_links = "\nBelow are our notebooks for Google Colab categorized by model. You can view our [Kaggle notebooks here](https://github.com/unslothai/notebooks/#-kaggle-notebooks).<br>Use our guided notebooks to prep data, train, evaluate, and save your model. View our main [GitHub repo here](https://github.com/unslothai/unsloth).)\n"
+        colab_updated_notebooks_links = "\n"
 
         kaggle_updated_notebooks_links = (
             "# 📒 Kaggle Notebooks\n"
