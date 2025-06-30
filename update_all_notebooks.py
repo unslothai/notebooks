@@ -891,7 +891,7 @@ def update_readme(
     for arch in unique_architectures:
         if arch not in list_models:
             list_models.append(arch)
-    list_models.append('Other notebooks') 
+    list_models.append('Other') 
 
     sections = {}
     for section in list_models:
