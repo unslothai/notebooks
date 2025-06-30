@@ -233,7 +233,7 @@ installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip
 
 new_announcement = """Unsloth now supports Text-to-Speech (TTS) models. Read our [guide here](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning).
 
-Read our **[Qwen3 Guide](https://docs.unsloth.ai/basics/qwen3-how-to-run-and-fine-tune)** and check out our new **[Dynamic 2.0](https://docs.unsloth.ai/basics/unsloth-dynamic-2.0-ggufs)** quants which outperforms other quantization methods!
+Read our **[Gemma 3N Guide](https://docs.unsloth.ai/basics/gemma-3n-how-to-run-and-fine-tune)** and check out our new **[Dynamic 2.0](https://docs.unsloth.ai/basics/unsloth-dynamic-2.0-ggufs)** quants which outperforms other quantization methods!
 
 Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks)."""
 
@@ -699,7 +699,7 @@ def update_notebook_sections(
                 text_for_last_cell = text_for_last_cell_ollama
             elif is_gguf:
                 text_for_last_cell = text_for_last_cell_gguf
-            elif is_gemma3 and not is_vision: # Vision cannot be transformed to GGUF yet
+            elif is_gemma3 and not is_vision and is_gguf: # Vision cannot be transformed to GGUF yet
                 text_for_last_cell = text_for_last_cell_gemma3
             else:
                 text_for_last_cell = text_for_last_cell_non_gguf
