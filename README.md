@@ -78,101 +78,103 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 ### GRPO Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Phi 4** **(14B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Phi_4_(14B)-GRPO.ipynb) |
-| **Llama3.1** **(8B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb) |
-| **Meta Synthetic Data Llama3.1** **(8B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Meta-Synthetic-Data-Llama3.1_(8B).ipynb) |
-| **Qwen3** **(4B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-GRPO.ipynb) |
-| **Meta Synthetic Data Llama3 2** **(3B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Meta_Synthetic_Data_Llama3_2_(3B).ipynb) |
-| **Gemma3** **(1B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(1B)-GRPO.ipynb) |
-| **Qwen2.5** **(3B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_(3B)-GRPO.ipynb) |
-| **DeepSeek R1 0528 Qwen3** **(8B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb) |
-| **Mistral v0.3** **(7B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_v0.3_(7B)-GRPO.ipynb) |
+| **Phi 4** **(14B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Phi_4_(14B)-GRPO.ipynb) |
+| **Llama3.1** **(8B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3.1_(8B)-GRPO.ipynb) |
+| **Meta Synthetic Data Llama3.1** **(8B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Meta-Synthetic-Data-Llama3.1_(8B).ipynb) |
+| **Qwen3** **(4B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen3_(4B)-GRPO.ipynb) |
+| **Meta Synthetic Data Llama3 2** **(3B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Meta_Synthetic_Data_Llama3_2_(3B).ipynb) |
+| **Gemma3** **(1B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Gemma3_(1B)-GRPO.ipynb) |
+| **Qwen2.5** **(3B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen2.5_(3B)-GRPO.ipynb) |
+| **DeepSeek R1 0528 Qwen3** **(8B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb) |
+| **Mistral v0.3** **(7B)** | GRPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Mistral_v0.3_(7B)-GRPO.ipynb) |
 
 ### Gemma Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **CodeGemma** **(7B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/CodeGemma_(7B)-Conversational.ipynb) |
-| **Gemma3** **(4B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(4B)-Vision.ipynb) |
-| **Gemma3** **(4B)** |  | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(4B).ipynb) |
-| **Gemma3N** **(4B)** | Multimodal | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3N_(4B)-Conversational.ipynb) |
-| **Gemma2** **(9B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma2_(9B)-Alpaca.ipynb) |
-| **Gemma2** **(2B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma2_(2B)-Alpaca.ipynb) |
+| **CodeGemma** **(7B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/CodeGemma_(7B)-Conversational.ipynb) |
+| **Gemma3** **(4B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Gemma3_(4B)-Vision.ipynb) |
+| **Gemma3** **(4B)** |  | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Gemma3_(4B).ipynb) |
+| **Gemma3N** **(4B)** | Multimodal | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Gemma3N_(4B)-Conversational.ipynb) |
+| **Gemma2** **(9B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Gemma2_(9B)-Alpaca.ipynb) |
+| **Gemma2** **(2B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Gemma2_(2B)-Alpaca.ipynb) |
 
 ### Llama Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Llama3.2** **(11B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb) |
-| **Llama3.2** **(1B and 3B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb) |
-| **Llama3.2** **(1B)** | RAFT | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B)-RAFT.ipynb) |
-| **Llama3.1** **(8B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-Alpaca.ipynb) |
-| **Llama3.1** **(8B)** | Inference | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-Inference.ipynb) |
-| **Llasa TTS** **(3B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llasa_TTS_(3B).ipynb) |
-| **Llama3** **(8B)** | ORPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-ORPO.ipynb) |
-| **Llama3** **(8B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Alpaca.ipynb) |
-| **Llama3** **(8B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Conversational.ipynb) |
-| **Llama3** **(8B)** | Ollama | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb) |
-| **TinyLlama** **(1.1B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/TinyLlama_(1.1B)-Alpaca.ipynb) |
-| **Llasa TTS** **(1B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llasa_TTS_(1B).ipynb) |
+| **Llama3.2** **(11B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3.2_(11B)-Vision.ipynb) |
+| **Llama3.2** **(1B and 3B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb) |
+| **Llama3.2** **(1B)** | RAFT | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3.2_(1B)-RAFT.ipynb) |
+| **Llama3.1** **(8B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3.1_(8B)-Alpaca.ipynb) |
+| **Llama3.1** **(8B)** | Inference | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3.1_(8B)-Inference.ipynb) |
+| **Llasa TTS** **(3B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llasa_TTS_(3B).ipynb) |
+| **Llama3** **(8B)** | ORPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3_(8B)-ORPO.ipynb) |
+| **Llama3** **(8B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3_(8B)-Alpaca.ipynb) |
+| **Llama3** **(8B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3_(8B)-Conversational.ipynb) |
+| **Llama3** **(8B)** | Ollama | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llama3_(8B)-Ollama.ipynb) |
+| **TinyLlama** **(1.1B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/TinyLlama_(1.1B)-Alpaca.ipynb) |
+| **Llasa TTS** **(1B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Llasa_TTS_(1B).ipynb) |
 
 ### Mistral Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Mistral Small** **(22B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_Small_(22B)-Alpaca.ipynb) |
-| **Mistral Nemo** **(12B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_Nemo_(12B)-Alpaca.ipynb) |
-| **Pixtral** **(12B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Pixtral_(12B)-Vision.ipynb) |
-| **Mistral** **(7B)** | Text Completion | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_(7B)-Text_Completion.ipynb) |
-| **Zephyr** **(7B)** | DPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Zephyr_(7B)-DPO.ipynb) |
-| **Mistral v0.3** **(7B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_v0.3_(7B)-Alpaca.ipynb) |
-| **Mistral v0.3** **(7B)** | CPT | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_v0.3_(7B)-CPT.ipynb) |
-| **Mistral v0.3** **(7B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_v0.3_(7B)-Conversational.ipynb) |
+| **Mistral Small** **(22B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Mistral_Small_(22B)-Alpaca.ipynb) |
+| **Mistral Nemo** **(12B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Mistral_Nemo_(12B)-Alpaca.ipynb) |
+| **Pixtral** **(12B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Pixtral_(12B)-Vision.ipynb) |
+| **Mistral** **(7B)** | Text Completion | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Mistral_(7B)-Text_Completion.ipynb) |
+| **Zephyr** **(7B)** | DPO | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Zephyr_(7B)-DPO.ipynb) |
+| **Mistral v0.3** **(7B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Mistral_v0.3_(7B)-Alpaca.ipynb) |
+| **Mistral v0.3** **(7B)** | CPT | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Mistral_v0.3_(7B)-CPT.ipynb) |
+| **Mistral v0.3** **(7B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Mistral_v0.3_(7B)-Conversational.ipynb) |
 
 ### Orpheus Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Orpheus** **(3B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Orpheus_(3B)-TTS.ipynb) |
+| **Orpheus** **(3B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Orpheus_(3B)-TTS.ipynb) |
 
 ### Oute Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Oute TTS** **(1B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Oute_TTS_(1B).ipynb) |
+| **Oute TTS** **(1B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Oute_TTS_(1B).ipynb) |
 
 ### Phi Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Phi 4**  | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Phi_4-Conversational.ipynb) |
-| **Phi 3.5 Mini**  | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Phi_3.5_Mini-Conversational.ipynb) |
-| **Phi 3 Medium**  | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Phi_3_Medium-Conversational.ipynb) |
+| **Phi 4**  | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Phi_4-Conversational.ipynb) |
+| **Phi 3.5 Mini**  | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Phi_3.5_Mini-Conversational.ipynb) |
+| **Phi 3 Medium**  | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Phi_3_Medium-Conversational.ipynb) |
 
 ### Qwen Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Qwen3** **(14B)** | Reasoning Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(14B)-Reasoning-Conversational.ipynb) |
-| **Qwen3** **(14B)** |  | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(14B).ipynb) |
-| **Qwen3** **(14B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(14B)-Alpaca.ipynb) |
-| **Qwen2.5 Coder** **(1.5B)** | Tool Calling | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |
-| **Qwen2.5** **(7B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_(7B)-Alpaca.ipynb) |
-| **Qwen2.5 Coder** **(14B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(14B)-Conversational.ipynb) |
-| **Qwen2.5 VL** **(7B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_VL_(7B)-Vision.ipynb) |
-| **Qwen2 VL** **(7B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_VL_(7B)-Vision.ipynb) |
-| **Qwen2** **(7B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_(7B)-Alpaca.ipynb) |
+| **Qwen3** **(14B)** | Reasoning Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen3_(14B)-Reasoning-Conversational.ipynb) |
+| **Qwen3** **(14B)** |  | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen3_(14B).ipynb) |
+| **Qwen3** **(14B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen3_(14B)-Alpaca.ipynb) |
+| **Qwen2.5 Coder** **(1.5B)** | Tool Calling | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |
+| **Qwen2.5** **(7B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen2.5_(7B)-Alpaca.ipynb) |
+| **Qwen2.5 Coder** **(14B)** | Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen2.5_Coder_(14B)-Conversational.ipynb) |
+| **Qwen2.5 VL** **(7B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen2.5_VL_(7B)-Vision.ipynb) |
+| **Qwen2 VL** **(7B)** | Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen2_VL_(7B)-Vision.ipynb) |
+| **Qwen2** **(7B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Qwen2_(7B)-Alpaca.ipynb) |
 
 ### Spark Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Spark TTS** **(0 5B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Spark_TTS_(0_5B).ipynb) |
+| **Spark TTS** **(0 5B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Spark_TTS_(0_5B).ipynb) |
 
 ### Whisper Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Whisper**  |  | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Whisper.ipynb) |
+| **Whisper**  |  | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Whisper.ipynb) |
 
 ### Other Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Magistral** **(24B)** | Reasoning Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Magistral_(24B)-Reasoning-Conversational.ipynb) |
-| **Sesame CSM** **(1B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Sesame_CSM_(1B)-TTS.ipynb) |
-| **Unsloth**  | Studio | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb) |
-| **CodeForces cot Finetune for Reasoning on CodeForces**  | Reasoning | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
+| **Magistral** **(24B)** | Reasoning Conversational | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Magistral_(24B)-Reasoning-Conversational.ipynb) |
+| **Lfm2** **(1.2B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Lfm2_(1.2B)-Alpaca.ipynb) |
+| **Sesame CSM** **(1B)** | TTS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Sesame_CSM_(1B)-TTS.ipynb) |
+| **Falcon H1** **(0.5B)** | Alpaca | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Falcon_H1_(0.5B)-Alpaca.ipynb) |
+| **Unsloth**  | Studio | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Unsloth_Studio.ipynb) |
+| **CodeForces cot Finetune for Reasoning on CodeForces**  | Reasoning | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/feat/liquid_notebooks/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
 
 # 📒 Kaggle Notebooks
 <details>
@@ -183,101 +185,103 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 ### GRPO Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Phi 4** **(14B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Phi_4_(14B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
-| **Meta Synthetic Data Llama3.1** **(8B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Meta-Synthetic-Data-Llama3.1_(8B).ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3.1** **(8B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.1_(8B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
-| **Gemma3** **(1B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(1B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
-| **Meta Synthetic Data Llama3 2** **(3B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Meta_Synthetic_Data_Llama3_2_(3B).ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen3** **(4B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(4B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen2.5** **(3B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_(3B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
-| **DeepSeek R1 0528 Qwen3** **(8B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb&accelerator=nvidiaTeslaT4) |
-| **Mistral v0.3** **(7B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Mistral_v0.3_(7B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **Phi 4** **(14B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Phi_4_(14B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **Meta Synthetic Data Llama3.1** **(8B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Meta-Synthetic-Data-Llama3.1_(8B).ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3.1** **(8B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3.1_(8B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **Gemma3** **(1B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Gemma3_(1B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **Meta Synthetic Data Llama3 2** **(3B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Meta_Synthetic_Data_Llama3_2_(3B).ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen3** **(4B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen3_(4B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen2.5** **(3B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen2.5_(3B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **DeepSeek R1 0528 Qwen3** **(8B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **Mistral v0.3** **(7B)** | GRPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Mistral_v0.3_(7B)-GRPO.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Gemma Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **CodeGemma** **(7B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeGemma_(7B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Gemma3** **(4B)** |  | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(4B).ipynb&accelerator=nvidiaTeslaT4) |
-| **Gemma3** **(4B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(4B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
-| **Gemma3N** **(4B)** | Multimodal | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3N_(4B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Gemma2** **(2B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma2_(2B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **Gemma2** **(9B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma2_(9B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **CodeGemma** **(7B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-CodeGemma_(7B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Gemma3** **(4B)** |  | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Gemma3_(4B).ipynb&accelerator=nvidiaTeslaT4) |
+| **Gemma3** **(4B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Gemma3_(4B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
+| **Gemma3N** **(4B)** | Multimodal | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Gemma3N_(4B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Gemma2** **(2B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Gemma2_(2B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Gemma2** **(9B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Gemma2_(9B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Llama Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Llama3.2** **(1B and 3B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.2_(1B_and_3B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3.2** **(11B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.2_(11B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3.2** **(1B)** | RAFT | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.2_(1B)-RAFT.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3.1** **(8B)** | Inference | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.1_(8B)-Inference.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3.1** **(8B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.1_(8B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llasa TTS** **(3B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llasa_TTS_(3B).ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3** **(8B)** | Ollama | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3_(8B)-Ollama.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3** **(8B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3_(8B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3** **(8B)** | ORPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3_(8B)-ORPO.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llama3** **(8B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3_(8B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **TinyLlama** **(1.1B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-TinyLlama_(1.1B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **Llasa TTS** **(1B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llasa_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3.2** **(1B and 3B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3.2_(1B_and_3B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3.2** **(11B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3.2_(11B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3.2** **(1B)** | RAFT | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3.2_(1B)-RAFT.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3.1** **(8B)** | Inference | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3.1_(8B)-Inference.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3.1** **(8B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3.1_(8B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llasa TTS** **(3B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llasa_TTS_(3B).ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3** **(8B)** | Ollama | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3_(8B)-Ollama.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3** **(8B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3_(8B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3** **(8B)** | ORPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3_(8B)-ORPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llama3** **(8B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llama3_(8B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **TinyLlama** **(1.1B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-TinyLlama_(1.1B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Llasa TTS** **(1B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Llasa_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Mistral Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Mistral Small** **(22B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Mistral_Small_(22B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **Mistral Nemo** **(12B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Mistral_Nemo_(12B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **Pixtral** **(12B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Pixtral_(12B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
-| **Mistral** **(7B)** | Text Completion | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Mistral_(7B)-Text_Completion.ipynb&accelerator=nvidiaTeslaT4) |
-| **Zephyr** **(7B)** | DPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Zephyr_(7B)-DPO.ipynb&accelerator=nvidiaTeslaT4) |
-| **Mistral v0.3** **(7B)** | CPT | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Mistral_v0.3_(7B)-CPT.ipynb&accelerator=nvidiaTeslaT4) |
-| **Mistral v0.3** **(7B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Mistral_v0.3_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **Mistral v0.3** **(7B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Mistral_v0.3_(7B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Mistral Small** **(22B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Mistral_Small_(22B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Mistral Nemo** **(12B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Mistral_Nemo_(12B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Pixtral** **(12B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Pixtral_(12B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
+| **Mistral** **(7B)** | Text Completion | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Mistral_(7B)-Text_Completion.ipynb&accelerator=nvidiaTeslaT4) |
+| **Zephyr** **(7B)** | DPO | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Zephyr_(7B)-DPO.ipynb&accelerator=nvidiaTeslaT4) |
+| **Mistral v0.3** **(7B)** | CPT | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Mistral_v0.3_(7B)-CPT.ipynb&accelerator=nvidiaTeslaT4) |
+| **Mistral v0.3** **(7B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Mistral_v0.3_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Mistral v0.3** **(7B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Mistral_v0.3_(7B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Orpheus Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Orpheus** **(3B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Orpheus_(3B)-TTS.ipynb&accelerator=nvidiaTeslaT4) |
+| **Orpheus** **(3B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Orpheus_(3B)-TTS.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Oute Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Oute TTS** **(1B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Oute_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4) |
+| **Oute TTS** **(1B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Oute_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Phi Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Phi 4**  | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Phi_4-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Phi 3.5 Mini**  | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Phi_3.5_Mini-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Phi 3 Medium**  | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Phi_3_Medium-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Phi 4**  | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Phi_4-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Phi 3.5 Mini**  | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Phi_3.5_Mini-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Phi 3 Medium**  | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Phi_3_Medium-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Qwen Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Qwen3** **(14B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(14B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen3** **(14B)** |  | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(14B).ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen3** **(14B)** | Reasoning Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(14B)-Reasoning-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen2.5 Coder** **(14B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_Coder_(14B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen2.5** **(7B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen2.5 Coder** **(1.5B)** | Tool Calling | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen2.5 VL** **(7B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen2 VL** **(7B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
-| **Qwen2** **(7B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen3** **(14B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen3_(14B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen3** **(14B)** |  | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen3_(14B).ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen3** **(14B)** | Reasoning Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen3_(14B)-Reasoning-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen2.5 Coder** **(14B)** | Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen2.5_Coder_(14B)-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen2.5** **(7B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen2.5_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen2.5 Coder** **(1.5B)** | Tool Calling | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen2.5 VL** **(7B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen2.5_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen2 VL** **(7B)** | Vision | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen2_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4) |
+| **Qwen2** **(7B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Qwen2_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Spark Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Spark TTS** **(0 5B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Spark_TTS_(0_5B).ipynb&accelerator=nvidiaTeslaT4) |
+| **Spark TTS** **(0 5B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Spark_TTS_(0_5B).ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Whisper Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Whisper**  |  | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Whisper.ipynb&accelerator=nvidiaTeslaT4) |
+| **Whisper**  |  | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Whisper.ipynb&accelerator=nvidiaTeslaT4) |
 
 ### Other Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **Magistral** **(24B)** | Reasoning Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Magistral_(24B)-Reasoning-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
-| **Sesame CSM** **(1B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Sesame_CSM_(1B)-TTS.ipynb&accelerator=nvidiaTeslaT4) |
-| **CodeForces cot Finetune for Reasoning on CodeForces**  | Reasoning | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4) |
-| **Unsloth**  | Studio | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Unsloth_Studio.ipynb&accelerator=nvidiaTeslaT4) |
+| **Magistral** **(24B)** | Reasoning Conversational | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Magistral_(24B)-Reasoning-Conversational.ipynb&accelerator=nvidiaTeslaT4) |
+| **Lfm2** **(1.2B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Lfm2_(1.2B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **Sesame CSM** **(1B)** | TTS | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Sesame_CSM_(1B)-TTS.ipynb&accelerator=nvidiaTeslaT4) |
+| **Falcon H1** **(0.5B)** | Alpaca | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Falcon_H1_(0.5B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4) |
+| **CodeForces cot Finetune for Reasoning on CodeForces**  | Reasoning | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4) |
+| **Unsloth**  | Studio | [![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/liquid_notebooks/nb/Kaggle-Unsloth_Studio.ipynb&accelerator=nvidiaTeslaT4) |
 
 </details>
 
