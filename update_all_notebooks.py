@@ -106,7 +106,7 @@ else:
     try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
     except: get_numpy = "numpy"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-    except: is_tesla_t4 = False
+    except: is_t4 = False
     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
     !uv pip install -qqq --upgrade \
         unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
@@ -118,7 +118,7 @@ installation_grpo_kaggle_content = """%%capture
 try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-except: is_tesla_t4 = False
+except: is_t4 = False
 get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
 !uv pip install -qqq --upgrade \
     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
@@ -139,7 +139,7 @@ else:
     try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
     except: get_numpy = "numpy"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-    except: is_tesla_t4 = False
+    except: is_t4 = False
     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
     !uv pip install -qqq --upgrade \
         unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
@@ -151,7 +151,7 @@ installation_grpo_synthetic_data_content = """%%capture
 try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-except: is_tesla_t4 = False
+except: is_t4 = False
 get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
 !uv pip install -qqq --upgrade \
     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
@@ -253,6 +253,25 @@ installation_tool_calling_kaggle_content = installation_kaggle_content + """\n!p
 # =======================================================
 installation_sesame_csm_content = installation_content + """\n!pip install transformers==4.52.3"""
 installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.52.3"""
+
+# =======================================================
+# Llama Vision Notebook
+# =======================================================
+installation_llama_vision_content = installation_content + """\n!pip install transformers==4.53.2"""
+installation_llama_vision_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.53.2"""
+
+# =======================================================
+# Gemma3N Notebook
+# =======================================================
+gemma3n_extra_content = """\
+
+!pip install transformers==4.53.2
+!pip install --no-deps unsloth==2025.7.11
+import torch; torch._dynamo.config.recompile_limit = 64;
+"""
+installation_gemma3n_content = installation_content + gemma3n_extra_content
+installation_gemma3n_kaggle_content = installation_kaggle_content + gemma3n_extra_content
+
 
 # =======================================================
 # SGLang Notebook
@@ -644,6 +663,7 @@ def update_notebook_sections(
         is_gguf = False
         is_ollama = False
         is_gemma3 = is_path_contains_any(notebook_path.lower(), ["gemma3"])
+        is_llama = is_path_contains_any(notebook_path.lower(), ["llama"])
         is_vision = is_path_contains_any(notebook_path.lower(), ["vision"])
 
         while i < len(notebook_content["cells"]):
@@ -764,6 +784,21 @@ def update_notebook_sections(
                                 installation = installation_gpt_oss_kaggle_content
                             else:
                                 installation = installation_gpt_oss_content
+
+                        # Llama Vision INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["llama"]) and is_vision:
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_llama_vision_kaggle_content
+                            else:
+                                installation = installation_llama_vision_content
+
+                        # Gemma3N INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["gemma3n"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_gemma3n_kaggle_content
+                            else:
+                                installation = installation_gemma3n_content
+
 
                         notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
