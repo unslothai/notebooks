@@ -257,14 +257,14 @@ installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip
 # =======================================================
 # Llama Vision Notebook
 # =======================================================
-installation_llama_vision_content = installation_content + """\n!pip install transformers==4.52.3"""
-installation_llama_vision_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.52.3"""
+installation_llama_vision_content = installation_content + """\n!pip install transformers==4.53.2"""
+installation_llama_vision_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.53.2"""
 
 # =======================================================
 # Gemma3N Notebook
 # =======================================================
-installation_gemma3n_content = installation_content + """\n!pip install transformers==4.52.3"""
-installation_gemma3n_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.52.3"""
+installation_gemma3n_content = installation_content + """\n!pip install transformers==4.53.2"""
+installation_gemma3n_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.53.2"""
 
 # =======================================================
 # SGLang Notebook
