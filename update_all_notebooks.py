@@ -62,12 +62,14 @@ general_announcement_content_meta = general_announcement_content_meta[0] + "\n\n
 # =======================================================
 
 installation_content = """%%capture
-import os
+import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth
 else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
-    !pip install --no-deps bitsandbytes accelerate xformers==0.0.29.post3 peft trl triton cut_cross_entropy unsloth_zoo
+    import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)
+    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")
+    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
     !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
     !pip install --no-deps unsloth"""
 
@@ -76,9 +78,9 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 !pip install pip3-autoremove
-!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu124
+!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
 !pip install unsloth
-!pip install --upgrade transformers==4.53.2 "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
+!pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
 """
 
 # =======================================================
@@ -88,38 +90,40 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 installation_grpo_content = """%%capture
 import os
 if "COLAB_" not in "".join(os.environ.keys()):
+    # If you're not in Colab, just use pip install or uv pip install
     !pip install unsloth vllm
 else:
-    # [NOTE] Do the below ONLY in Colab! Use [[pip install unsloth vllm]]
-    !pip install --no-deps unsloth vllm==0.8.5.post1"""
+    pass # For Colab / Kaggle, we need extra instructions hidden below \\/"""
 
 installation_extra_grpo_content = r"""#@title Colab Extra Install { display-mode: "form" }
 %%capture
 import os
+!pip install --upgrade -qqq uv
 if "COLAB_" not in "".join(os.environ.keys()):
+    # If you're not in Colab, just use pip install!
     !pip install unsloth vllm
 else:
-    !pip install --no-deps unsloth vllm==0.8.5.post1
-    # [NOTE] Do the below ONLY in Colab! Use [[pip install unsloth vllm]]
-    # Skip restarting message in Colab
-    import sys, re, requests; modules = list(sys.modules.keys())
-    for x in modules: sys.modules.pop(x) if "PIL" in x or "google" in x else None
-    !pip install --no-deps bitsandbytes accelerate xformers==0.0.29.post3 peft trl triton cut_cross_entropy unsloth_zoo
-    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
-    
-    # vLLM requirements - vLLM breaks Colab due to reinstalling numpy
-    f = requests.get("https://raw.githubusercontent.com/vllm-project/vllm/refs/heads/main/requirements/common.txt").content
-    with open("vllm_requirements.txt", "wb") as file:
-        file.write(re.sub(rb"(transformers|numpy|xformers)[^\n]{1,}\n", b"", f))
-    !pip install -r vllm_requirements.txt"""
+    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
+    except: get_numpy = "numpy"
+    try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
+    except: is_t4 = False
+    get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+    !uv pip install -qqq --upgrade \
+        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
+    !uv pip install -qqq {get_triton}"""
 
 
 installation_grpo_kaggle_content = """%%capture
-!pip install pip3-autoremove
-!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu124
-!pip install unsloth vllm
-!pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
-# !pip install --upgrade transformers==4.52.3"""
+!pip install --upgrade -qqq uv
+try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
+except: get_numpy = "numpy"
+try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
+except: is_t4 = False
+get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+!uv pip install -qqq --upgrade \
+    unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
+!uv pip install -qqq {get_triton}
+!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0."""
 
 # =======================================================
 # Meta Synthetic Data Kit Notebook
@@ -127,21 +131,33 @@ installation_grpo_kaggle_content = """%%capture
 
 installation_synthetic_data_content = """%%capture
 import os
+!pip install --upgrade -qqq uv
 if "COLAB_" not in "".join(os.environ.keys()):
-    !pip install unsloth vllm==0.8.5.post1
-    !pip install synthetic-data-kit==0.0.3
+    # If you're not in Colab, just use pip install!
+    !pip install unsloth vllm synthetic-data-kit==0.0.3
 else:
-    # [NOTE] Do the below ONLY in Colab! Use [[pip install unsloth vllm]]
-    !pip install --no-deps unsloth vllm==0.8.5.post1
-    !pip install synthetic-data-kit==0.0.3
-"""
+    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
+    except: get_numpy = "numpy"
+    try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
+    except: is_t4 = False
+    get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+    !uv pip install -qqq --upgrade \
+        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
+    !uv pip install -qqq {get_triton}
+    !uv pip install synthetic-data-kit==0.0.3"""
 
 installation_grpo_synthetic_data_content = """%%capture
-!pip install pip3-autoremove
-!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu124
-!pip install unsloth vllm==0.8.5.post1
-# !pip install --upgrade transformers==4.52.3
-!pip install synthetic-data-kit==0.0.3"""
+!pip install --upgrade -qqq uv
+try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
+except: get_numpy = "numpy"
+try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
+except: is_t4 = False
+get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+!uv pip install -qqq --upgrade \
+    unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
+!uv pip install -qqq {get_triton}
+!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0
+!uv pip install synthetic-data-kit==0.0.3"""
 
 # =======================================================
 # Orpheus Notebook
@@ -166,6 +182,22 @@ installation_spark_content = installation_content + """\n!git clone https://gith
 !pip install omegaconf einx"""
 installation_spark_kaggle_content = installation_kaggle_content + """\n!git clone https://github.com/SparkAudio/Spark-TTS
 !pip install omegaconf einx"""
+
+# =======================================================
+# GPT OSS Notebook
+# =======================================================
+installation_gpt_oss_content = r"""%%capture
+# We're installing the latest Torch, Triton, OpenAI's Triton kernels, Transformers and Unsloth!
+!pip install --upgrade -qqq uv
+try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
+except: get_numpy = "numpy"
+!uv pip install -qqq \
+    "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers>=4.55.3" \
+    "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
+    "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
+    git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels"""
+
+installation_gpt_oss_kaggle_content = installation_gpt_oss_content
 
 # =======================================================
 # Oute Notebook
@@ -194,17 +226,11 @@ os.remove("/content/OuteTTS/outetts/__init__.py")
 # Llasa Notebook
 # =======================================================
 
-installation_llasa_content = """%%capture
+# Llasa Need Unsloth==2025.4.1, Transformers==4.48 to running stable, and trl ==0.15.2
+installation_llasa_content = re.sub(r'\bunsloth\b(==[\d\.]*)?', 'unsloth==2025.4.1', installation_content)
+installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', installation_llasa_content)
 
-# Note Llasa needs unsloth==2025.4.1 and transformers==4.48 to be stable!
-import os
-if "COLAB_" not in "".join(os.environ.keys()):
-    !pip install unsloth==2025.4.1
-else:
-    # Do this only in Colab notebooks! Otherwise use pip install unsloth
-    !pip install --no-deps bitsandbytes accelerate xformers==0.0.29.post3 peft trl==0.15.2 triton cut_cross_entropy unsloth_zoo
-    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth==2025.4.1
+installation_llasa_content += """\
 
 !pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
 !pip install transformers==4.48 omegaconf
@@ -229,6 +255,25 @@ installation_sesame_csm_content = installation_content + """\n!pip install trans
 installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.52.3"""
 
 # =======================================================
+# Llama Vision Notebook
+# =======================================================
+installation_llama_vision_content = installation_content + """\n!pip install transformers==4.53.2"""
+installation_llama_vision_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.53.2"""
+
+# =======================================================
+# Gemma3N Notebook
+# =======================================================
+gemma3n_extra_content = """\
+
+!pip install transformers==4.53.2
+!pip install --no-deps unsloth==2025.7.11
+import torch; torch._dynamo.config.recompile_limit = 64;
+"""
+installation_gemma3n_content = installation_content + gemma3n_extra_content
+installation_gemma3n_kaggle_content = installation_kaggle_content + gemma3n_extra_content
+
+
+# =======================================================
 # SGLang Notebook
 # =======================================================
 installation_sglang_content = """%%capture
@@ -244,7 +289,9 @@ installation_sglang_kaggle_content = installation_sglang_content
 # NEWS (WILL KEEP CHANGING THIS)
 # =======================================================
 
-new_announcement = """Unsloth now supports Text-to-Speech (TTS) models. Read our [guide here](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning).
+new_announcement = """**NEW** Unsloth now supports training the new **gpt-oss** model from OpenAI! You can start finetune gpt-oss for free with our **[Colab notebook](https://x.com/UnslothAI/status/1953896997867729075)**!
+
+Unsloth now supports Text-to-Speech (TTS) models. Read our [guide here](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning).
 
 Read our **[Gemma 3N Guide](https://docs.unsloth.ai/basics/gemma-3n-how-to-run-and-fine-tune)** and check out our new **[Dynamic 2.0](https://docs.unsloth.ai/basics/unsloth-dynamic-2.0-ggufs)** quants which outperforms other quantization methods!
 
@@ -254,7 +301,7 @@ Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/a
 # LAST BLOCK CLOSE STATEMENT
 # =======================================================
 
-text_for_last_cell_gguf = """Now, use the `model-unsloth.gguf` file or `model-unsloth-Q4_K_M.gguf` file in llama.cpp or a UI based system like Jan or Open WebUI. You can install Jan [here](https://github.com/janhq/jan) and Open WebUI [here](https://github.com/open-webui/open-webui)
+text_for_last_cell_gguf = """Now, use the `model-unsloth.gguf` file or `model-unsloth-Q4_K_M.gguf` file in llama.cpp.
 
 And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 
@@ -323,6 +370,9 @@ ARCHITECTURE_MAPPING = {
     'spark': 'Spark',
     'orpheus': 'Orpheus',
 
+    # gpt oss
+    'gpt oss': 'GPT-OSS',
+
     # Linear Attention
     'falcon' : 'Linear Attention',
     'liquid' : 'Linear Attention',
@@ -371,6 +421,10 @@ KNOWN_TYPES_ORDERED = [
     'VL',                   
     'RAFT'
 ]
+
+FIRST_MAPPING_NAME = {
+    "gpt-oss-(20B)-Fine-tuning" : "GPT_OSS_(20B)-Fine-tuning",
+}
 
 def extract_model_info_refined(filename, architecture_mapping, known_types_ordered):
     if not filename.endswith(".ipynb"):
@@ -609,6 +663,7 @@ def update_notebook_sections(
         is_gguf = False
         is_ollama = False
         is_gemma3 = is_path_contains_any(notebook_path.lower(), ["gemma3"])
+        is_llama = is_path_contains_any(notebook_path.lower(), ["llama"])
         is_vision = is_path_contains_any(notebook_path.lower(), ["vision"])
 
         while i < len(notebook_content["cells"]):
@@ -722,6 +777,28 @@ def update_notebook_sections(
                                 installation = installation_sglang_kaggle_content
                             else:
                                 installation = installation_sglang_content
+                                
+                        # GPT OSS INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_gpt_oss_kaggle_content
+                            else:
+                                installation = installation_gpt_oss_content
+
+                        # Llama Vision INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["llama"]) and is_vision:
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_llama_vision_kaggle_content
+                            else:
+                                installation = installation_llama_vision_content
+
+                        # Gemma3N INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["gemma3n"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_gemma3n_kaggle_content
+                            else:
+                                installation = installation_gemma3n_content
+
 
                         notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
@@ -986,14 +1063,17 @@ def update_readme(
         elif architecture and architecture in list_models:
              section_name = architecture
         link_base = base_url_kaggle if is_kaggle else base_url_colab
-        if is_kaggle:
-            link_text = "[![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)]"
-        else:
-            link_text = "[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)]"
         link_url = f"{link_base}{path}"
-        if is_kaggle and kaggle_accelerator:
-             link_url += f"&accelerator={kaggle_accelerator}"
-        link = f"{link_text}({link_url})"
+
+        if is_kaggle:
+            image_src = "https://kaggle.com/static/images/open-in-kaggle.svg"
+            image_alt = "Open in Kaggle"
+            if kaggle_accelerator:
+                link_url += f"&accelerator={kaggle_accelerator}"
+        else:
+            image_src = "https://colab.research.google.com/assets/colab-badge.svg"
+            image_alt = "Open In Colab"
+        link = f'<a href="{link_url}" target="_blank" rel="noopener noreferrer"><img src="{image_src}" alt="{image_alt}"></a>'
 
         notebook_data.append(
             {
