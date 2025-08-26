@@ -255,6 +255,18 @@ installation_sesame_csm_content = installation_content + """\n!pip install trans
 installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.52.3"""
 
 # =======================================================
+# Llama Vision Notebook
+# =======================================================
+installation_llama_vision_content = installation_content + """\n!pip install transformers==4.52.3"""
+installation_llama_vision_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.52.3"""
+
+# =======================================================
+# Gemma3N Notebook
+# =======================================================
+installation_gemma3n_content = installation_content + """\n!pip install transformers==4.52.3"""
+installation_gemma3n_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.52.3"""
+
+# =======================================================
 # SGLang Notebook
 # =======================================================
 installation_sglang_content = """%%capture
@@ -644,6 +656,7 @@ def update_notebook_sections(
         is_gguf = False
         is_ollama = False
         is_gemma3 = is_path_contains_any(notebook_path.lower(), ["gemma3"])
+        is_llama = is_path_contains_any(notebook_path.lower(), ["llama"])
         is_vision = is_path_contains_any(notebook_path.lower(), ["vision"])
 
         while i < len(notebook_content["cells"]):
@@ -764,6 +777,21 @@ def update_notebook_sections(
                                 installation = installation_gpt_oss_kaggle_content
                             else:
                                 installation = installation_gpt_oss_content
+
+                        # Llama Vision INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["llama"]) and is_vision:
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_llama_vision_kaggle_content
+                            else:
+                                installation = installation_llama_vision_content
+
+                        # Gemma3N INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["gemma3n"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_gemma3n_kaggle_content
+                            else:
+                                installation = installation_gemma3n_content
+
 
                         notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
