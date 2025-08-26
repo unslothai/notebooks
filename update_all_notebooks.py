@@ -264,6 +264,7 @@ installation_llama_vision_kaggle_content = installation_kaggle_content + """\n!p
 # Gemma3N Notebook
 # =======================================================
 gemma3n_extra_content = """\
+
 !pip install transformers==4.53.2
 !pip install --no-deps unsloth==2025.7.11
 try:
