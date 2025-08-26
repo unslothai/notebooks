@@ -267,12 +267,7 @@ gemma3n_extra_content = """\
 
 !pip install transformers==4.53.2
 !pip install --no-deps unsloth==2025.7.11
-try:
-    import unsloth
-    import torch
-    torch._dynamo.config.recompile_limit = 64
-except:
-    pass
+import torch; torch._dynamo.config.recompile_limit = 64;
 """
 installation_gemma3n_content = installation_content + gemma3n_extra_content
 installation_gemma3n_kaggle_content = installation_kaggle_content + gemma3n_extra_content
