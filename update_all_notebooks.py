@@ -84,10 +84,9 @@ else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
     import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)
     xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")
-    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy 
+    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
     !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" 
-    !pip install "unsloth[base] @ git+https://github.com/unslothai/unsloth" 
+    !pip install --no-deps unsloth
 """
 installation_content = update_or_append_pip_install(
     installation_content,
@@ -95,17 +94,16 @@ installation_content = update_or_append_pip_install(
     PIN_TRANSFORMERS,
 )
 
-
 installation_kaggle_content = """%%capture
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 !pip install pip3-autoremove
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
-!pip install "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" 
-!pip install "unsloth[base] @ git+https://github.com/unslothai/unsloth" 
-!pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
+!pip install unsloth
+!pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
 """
+
 installation_kaggle_content = update_or_append_pip_install(
     installation_kaggle_content,
     "transformers",
@@ -138,11 +136,9 @@ else:
     except: is_t4 = False
     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
     !uv pip install -qqq --upgrade \
-        {get_vllm} {get_numpy} torchvision bitsandbytes xformers
-    !uv pip install -qqq {get_triton}
-    !uv pip install "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" 
-    !uv pip install "unsloth[base] @ git+https://github.com/unslothai/unsloth" 
-"""
+        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
+    !uv pip install -qqq {get_triton}"""
+
 installation_extra_grpo_content = update_or_append_pip_install(
     installation_extra_grpo_content,
     "transformers",
@@ -201,7 +197,7 @@ try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvid
 except: is_t4 = False
 get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
 !uv pip install -qqq --upgrade \
-    unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
+    unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
 !uv pip install -qqq {get_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0
 !uv pip install synthetic-data-kit==0.0.3"""
