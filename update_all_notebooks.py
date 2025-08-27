@@ -84,9 +84,12 @@ else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
     import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)
     xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")
-    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
+    # !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
+    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy 
     !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth
+    # !pip install --no-deps unsloth
+    !pip install "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
+    !pip install "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
 """
 installation_content = update_or_append_pip_install(
     installation_content,
