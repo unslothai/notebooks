@@ -25,6 +25,17 @@ def get_current_git_branch():
         print("Error: 'git' command not found. Make sure Git is installed and in your PATH.")
         return None
 
+
+def update_or_append_pip_install(base_content, package_name, new_install_line):
+    pattern = re.compile(rf"^!(uv )?pip install .*?{package_name}.*$", re.MULTILINE)
+
+    updated_content, substitutions_count = pattern.subn(new_install_line, base_content)
+
+    if substitutions_count == 0:
+        return base_content.strip() + "\n" + new_install_line
+    else:
+        return updated_content
+
 current_branch = get_current_git_branch()
 # =======================================================
 # GENERAL ANNOUNCEMENTS (THE VERY TOP)
@@ -57,6 +68,10 @@ general_announcement_content_hf_course = (
 general_announcement_content_meta = general_announcement_content.split(announcement_separation)
 general_announcement_content_meta = general_announcement_content_meta[0] + "\n\n" + '<a href="https://github.com/meta-llama/synthetic-data-kit"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/meta%20round%20logo.png" width="137"></a>' + general_announcement_content_meta[1]
 
+# CONSTANT
+PIN_TRANSFORMERS = "!pip install transformers==4.55.4"
+SPACES = " " * 4
+
 # =======================================================
 # INSTALLATION (MANY OF THIS IS SPECIFIC TO ONE OF THE NOTEBOOKS)
 # =======================================================
@@ -71,7 +86,14 @@ else:
     xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")
     !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
     !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth"""
+    !pip install --no-deps unsloth
+"""
+installation_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    PIN_TRANSFORMERS,
+)
+
 
 installation_kaggle_content = """%%capture
 import os
@@ -80,8 +102,13 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 !pip install pip3-autoremove
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
 !pip install unsloth
-!pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
+!pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
 """
+installation_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "transformers",
+    PIN_TRANSFORMERS,
+)
 
 # =======================================================
 # GRPO Notebook
@@ -109,8 +136,14 @@ else:
     except: is_t4 = False
     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
     !uv pip install -qqq --upgrade \
-        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
-    !uv pip install -qqq {get_triton}"""
+        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
+    !uv pip install -qqq {get_triton}
+"""
+installation_extra_grpo_content = update_or_append_pip_install(
+    installation_extra_grpo_content,
+    "transformers",
+    PIN_TRANSFORMERS,
+)
 
 
 installation_grpo_kaggle_content = """%%capture
@@ -121,9 +154,14 @@ try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvid
 except: is_t4 = False
 get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
 !uv pip install -qqq --upgrade \
-    unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
+    unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
 !uv pip install -qqq {get_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0."""
+installation_grpo_kaggle_content = update_or_append_pip_install(
+    installation_grpo_kaggle_content,
+    "transformers",
+    PIN_TRANSFORMERS,
+)
 
 # =======================================================
 # Meta Synthetic Data Kit Notebook
@@ -142,9 +180,14 @@ else:
     except: is_t4 = False
     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
     !uv pip install -qqq --upgrade \
-        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers transformers
+        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
     !uv pip install -qqq {get_triton}
     !uv pip install synthetic-data-kit==0.0.3"""
+installation_synthetic_data_content = update_or_append_pip_install(
+    installation_synthetic_data_content,
+    "transformers",
+    PIN_TRANSFORMERS,
+)
 
 installation_grpo_synthetic_data_content = """%%capture
 !pip install --upgrade -qqq uv
@@ -158,6 +201,11 @@ get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", 
 !uv pip install -qqq {get_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0
 !uv pip install synthetic-data-kit==0.0.3"""
+installation_grpo_synthetic_data_content = update_or_append_pip_install(
+    installation_grpo_synthetic_data_content,
+    "transformers",
+    PIN_TRANSFORMERS,
+)
 
 # =======================================================
 # Orpheus Notebook
@@ -196,6 +244,11 @@ except: get_numpy = "numpy"
     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
     "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
     git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels"""
+installation_gpt_oss_content = update_or_append_pip_install(
+    installation_gpt_oss_content,
+    "transformers",
+    PIN_TRANSFORMERS,
+)
 
 installation_gpt_oss_kaggle_content = installation_gpt_oss_content
 
@@ -212,6 +265,7 @@ os.remove("/content/OuteTTS/outetts/__init__.py")
 !pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
+
 installation_oute_kaggle_content = installation_kaggle_content + """\n!pip install omegaconf einx
 !rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
 import os
@@ -233,11 +287,21 @@ installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', insta
 installation_llasa_content += """\
 
 !pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
-!pip install transformers==4.48 omegaconf
+!pip install omegaconf
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
+installation_llasa_content = update_or_append_pip_install(
+    installation_llasa_content,
+    "transformers",
+    "!pip install transformers==4.48",
+)
 
 installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
-!pip install transformers==4.48 omegaconf\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
+!pip install omegaconf\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
+installation_llasa_kaggle_content = update_or_append_pip_install(
+    installation_llasa_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.48",
+)
 
 # =======================================================
 # Tool Calling Notebook
@@ -251,26 +315,49 @@ installation_tool_calling_kaggle_content = installation_kaggle_content + """\n!p
 # =======================================================
 # Sesame CSM Notebook
 # =======================================================
-installation_sesame_csm_content = installation_content + """\n!pip install transformers==4.52.3"""
-installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.52.3"""
+installation_sesame_csm_content = installation_content
+installation_sesame_csm_content = update_or_append_pip_install(
+    installation_sesame_csm_content,
+    "transformers",
+    "!pip install transformers==4.52.3",
+)
+
+installation_sesame_csm_kaggle_content = installation_kaggle_content
+installation_sesame_csm_kaggle_content = update_or_append_pip_install(
+    installation_sesame_csm_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.52.3",
+)
 
 # =======================================================
 # Llama Vision Notebook
 # =======================================================
-installation_llama_vision_content = installation_content + """\n!pip install transformers==4.53.2"""
-installation_llama_vision_kaggle_content = installation_kaggle_content + """\n!pip install transformers==4.53.2"""
+installation_llama_vision_content = installation_content
+installation_llama_vision_content = update_or_append_pip_install(
+    installation_llama_vision_content,
+    "transformers",
+    "!pip install transformers==4.53.2",
+)
+
+installation_llama_vision_kaggle_content = installation_kaggle_content
+installation_llama_vision_kaggle_content = update_or_append_pip_install(
+    installation_llama_vision_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.53.2",
+)
 
 # =======================================================
 # Gemma3N Notebook
 # =======================================================
 gemma3n_extra_content = """\
 
-!pip install transformers==4.53.2
-!pip install --no-deps unsloth==2025.7.11
 import torch; torch._dynamo.config.recompile_limit = 64;
 """
-installation_gemma3n_content = installation_content + gemma3n_extra_content
-installation_gemma3n_kaggle_content = installation_kaggle_content + gemma3n_extra_content
+installation_gemma3n_content = installation_content 
+installation_gemma3n_content += gemma3n_extra_content
+
+installation_gemma3n_kaggle_content = installation_kaggle_content
+installation_gemma3n_kaggle_content += gemma3n_extra_content
 
 
 # =======================================================
