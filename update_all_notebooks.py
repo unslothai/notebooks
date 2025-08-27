@@ -88,8 +88,8 @@ else:
     !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy 
     !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
     # !pip install --no-deps unsloth
-    !pip install "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
-    !pip install "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
+    !pip install "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" 
+    !pip install "unsloth[base] @ git+https://github.com/unslothai/unsloth" 
 """
 installation_content = update_or_append_pip_install(
     installation_content,
