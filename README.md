@@ -57,7 +57,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 
 | Model                  | Notebook Link                                                                                                                                                                            |
 | -------------------  | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ModernBERT-large**  | [![Open In Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/bert_classification.ipynb)  |
+| **ModernBERT-large**  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/bert_classification.ipynb)  |
 
 ### Specific use-case Notebooks
 | Usecase             | Model                         | Notebook Link |
