@@ -91,6 +91,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 ### GPT-OSS Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **(A100) gpt oss** **(120B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/gpt-oss-(120B)_A100-Fine-tuning.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **gpt oss** **(20B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/gpt-oss-(20B)-Fine-tuning.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **GPT OSS BNB** **(20B)** | Inference | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/GPT_OSS_BNB_(20B)-Inference.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **GPT OSS MXFP4** **(20B)** | Inference | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/GPT_OSS_MXFP4_(20B)-Inference.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -119,6 +120,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 ### Llama Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **(A100) Llama3.3** **(70B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/Llama3.3_(70B)_A100-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Llama3.2** **(11B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/Llama3.2_(11B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Llama3.2** **(1B and 3B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Llama3.2** **(1B)** | RAFT | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/Llama3.2_(1B)-RAFT.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -164,6 +166,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 ### Qwen Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **(A100) Qwen3** **(32B)** | Reasoning Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/Qwen3_(32B)_A100-Reasoning-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3** **(4B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/Qwen3_(4B)-Instruct.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3** **(4B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/Qwen3_(4B)-Thinking.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3** **(14B)** | Reasoning Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/a100_gpus/nb/Qwen3_(14B)-Reasoning-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -217,6 +220,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 ### GPT-OSS Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **(A100) gpt oss** **(120B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-gpt-oss-(120B)_A100-Fine-tuning.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **GPT OSS BNB** **(20B)** | Inference | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-GPT_OSS_BNB_(20B)-Inference.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **gpt oss** **(20B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-gpt-oss-(20B)-Fine-tuning.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **GPT OSS MXFP4** **(20B)** | Inference | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-GPT_OSS_MXFP4_(20B)-Inference.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
@@ -245,6 +249,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 ### Llama Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **(A100) Llama3.3** **(70B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-Llama3.3_(70B)_A100-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Llama3.2** **(1B and 3B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-Llama3.2_(1B_and_3B)-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Llama3.2** **(11B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-Llama3.2_(11B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Llama3.2** **(1B)** | RAFT | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-Llama3.2_(1B)-RAFT.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
@@ -290,6 +295,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 ### Qwen Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **(A100) Qwen3** **(32B)** | Reasoning Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-Qwen3_(32B)_A100-Reasoning-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3** **(14B)** | Alpaca | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-Qwen3_(14B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3** **(4B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-Qwen3_(4B)-Thinking.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3** **(4B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/feat/a100_gpus/nb/Kaggle-Qwen3_(4B)-Instruct.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
