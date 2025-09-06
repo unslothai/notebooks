@@ -384,13 +384,15 @@ installation_sglang_kaggle_content = installation_sglang_content
 # =======================================================
 
 new_announcement = """
-🎉 **Huge News!** Google Colab now has A100 80GB GPUs available. Train massive models faster than ever! We've prepared several notebooks to get you started right away:
+🎉 **News!** Google Colab now has A100 80GB GPUs available. Train massive models faster than ever! We've prepared several notebooks to get you started right away:
 
-[Link to Notebook 1]
+* **[gpt-oss 120B](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(120B)_A100-Fine-tuning.ipynb)**
 
-[Link to Notebook 2]
+* **[Llama 3.3 70B](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.3_(70B)_A100-Conversational.ipynb)**
 
-[Link to Notebook 3]
+* **[Gemma 3 27B](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(27B)_A100-Conversational.ipynb)**
+
+* **[Qwen 3 32B](https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(32B)_A100-Reasoning-Conversational.ipynb&accelerator=nvidiaTeslaT4)**
 
 **NEW** Unsloth now supports training the new **gpt-oss** model from OpenAI! You can start finetune gpt-oss for free with our **[Colab notebook](https://x.com/UnslothAI/status/1953896997867729075)**!
 
