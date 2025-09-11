@@ -7,6 +7,12 @@ import subprocess
 from datetime import datetime
 from glob import glob
 
+DONT_UPDATE_EXCEPTIONS = [
+    'Falcon_H1-Alpaca.ipynb',
+    'Liquid_LFM2-Conversational.ipynb',
+    'Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb', # Daniel's?
+]
+
 def get_current_git_branch():
     try:
         # Run the git command to get the current branch name
@@ -1119,6 +1125,11 @@ def main():
     notebook_pattern = "*.ipynb"
 
     notebook_files = glob(os.path.join(notebook_directory, notebook_pattern))
+    print(f"Found {len(notebook_files)} notebooks")
+    # filter out the DONT_UPDATE_EXCEPTIONS
+    notebook_files = [x for x in notebook_files if os.path.basename(x) not in DONT_UPDATE_EXCEPTIONS]
+    print(f"Filtered out {len(DONT_UPDATE_EXCEPTIONS)} notebooks")
+    print(f"Remaining {len(notebook_files)} notebooks")
 
     if not notebook_files:
         print(
@@ -1401,9 +1412,21 @@ def copy_and_update_notebooks(
     """Copies notebooks from template_dir to destination_dir, updates them, and renames them."""
     template_notebooks = glob(os.path.join(template_dir, "*.ipynb"))
 
+    temp_location = os.path.join(destination_dir, ".temp_backup")
     if os.path.exists(destination_dir):
-        shutil.rmtree(destination_dir)
-    os.makedirs(destination_dir, exist_ok=True)
+        if os.path.exists(temp_location):
+            shutil.rmtree(temp_location)
+        os.makedirs(temp_location, exist_ok=True)
+        # Move everything currently in destination_dir into .temp_backup
+        for entry in os.listdir(destination_dir):
+            if entry == ".temp_backup":
+                continue
+            if entry not in DONT_UPDATE_EXCEPTIONS:
+                continue
+            src_path = os.path.join(destination_dir, entry)
+            shutil.move(src_path, temp_location)
+    else:
+        os.makedirs(destination_dir, exist_ok=True)
 
     for template_notebook_path in template_notebooks:
         notebook_name = os.path.basename(template_notebook_path)
@@ -1442,6 +1465,20 @@ def copy_and_update_notebooks(
             installation_kaggle,
             new_announcement,
         )
+
+    # Move Exceptions back to destination_dir from temp_location
+    for entry in DONT_UPDATE_EXCEPTIONS:
+        src_path = os.path.join(temp_location, entry)
+        dst_path = os.path.join(destination_dir, entry)
+        if os.path.exists(src_path):
+            # shutil.rmtree(dst_path)
+            shutil.move(src_path, dst_path)
+            print(f"Moved '{entry}' back to '{dst_path}'")
+        else:
+            print(f"Warning: '{entry}' not found in '{temp_location}'")
+    
+    # finally remove the temp_location
+    shutil.rmtree(temp_location)
 
 def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -> list[str]:
     nb_abs = os.path.abspath(nb)
