@@ -35,12 +35,11 @@
 # 
 # # ### Unsloth
 # 
-# `FastModel` supports loading nearly any model now! This includes Vision and Text models!
 
 # In[2]:
 
 
-from unsloth import FastModel
+from unsloth import FastLanguageModel
 import torch
 
 fourbit_models = [
@@ -58,7 +57,7 @@ fourbit_models = [
     "unsloth/orpheus-3b-0.1-ft-unsloth-bnb-4bit" # [NEW] We support TTS models!
 ] # More models at https://huggingface.co/unsloth
 
-model, tokenizer = FastModel.from_pretrained(
+model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Qwen3-4B-Thinking-2507",
     max_seq_length = 2048, # Choose any for long context!
     load_in_4bit = True,  # 4 bit quantization to reduce memory
@@ -73,7 +72,7 @@ model, tokenizer = FastModel.from_pretrained(
 # In[3]:
 
 
-model = FastModel.get_peft_model(
+model = FastLanguageModel.get_peft_model(
     model,
     r = 32, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",

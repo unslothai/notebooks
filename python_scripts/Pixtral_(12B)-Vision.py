@@ -155,7 +155,7 @@ FastVisionModel.for_training(model) # Enable for training!
 trainer = SFTTrainer(
     model = model,
     tokenizer = tokenizer,
-    data_collator = UnslothVisionDataCollator(model, tokenizer), # Must use!
+    data_collator = UnslothVisionDataCollator(model, tokenizer, resize = 512), # Must use!
     train_dataset = dataset,
     args = SFTConfig(
         per_device_train_batch_size = 1, # Reduce to 1 to make Pixtral fit!

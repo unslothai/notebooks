@@ -397,7 +397,6 @@ if False:
 # In[ ]:
 
 
-from google.colab import userdata
 # Merge to 16bit
 if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
 if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")

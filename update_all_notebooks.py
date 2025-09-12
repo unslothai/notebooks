@@ -408,7 +408,7 @@ installation_llama_vision_content = installation_content
 installation_llama_vision_content = update_or_append_pip_install(
     installation_llama_vision_content,
     "transformers",
-    "!pip install transformers==4.53.2",
+    PIN_TRANSFORMERS,
 )
 installation_llama_vision_content = update_or_append_pip_install(
     installation_llama_vision_content,
@@ -421,7 +421,7 @@ installation_llama_vision_kaggle_content = installation_kaggle_content
 installation_llama_vision_kaggle_content = update_or_append_pip_install(
     installation_llama_vision_kaggle_content,
     "transformers",
-    "!pip install transformers==4.53.2",
+    PIN_TRANSFORMERS,
 )
 installation_llama_vision_kaggle_content = update_or_append_pip_install(
     installation_llama_vision_kaggle_content,
