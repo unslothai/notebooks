@@ -311,7 +311,6 @@ training_args = GRPOConfig(
     lr_scheduler_type = "cosine",
     optim = "adamw_8bit",
     logging_steps = 1,
-    log_completions = True,
     per_device_train_batch_size = 1,
     gradient_accumulation_steps = 2, # Increase to 4 for smoother training
     num_generations = 4, # Decrease if out of memory
@@ -340,7 +339,7 @@ training_args = GRPOConfig(
 # | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
 # 
 
-# In[ ]:
+# In[15]:
 
 
 trainer = GRPOTrainer(
@@ -361,13 +360,16 @@ trainer.train()
 # 
 # We'll use the best hyperparameters for inference on Gemma: `top_p=0.95`, `top_k=64`, and `temperature=1.0`.
 
-# In[ ]:
+# In[25]:
 
 
 FastVisionModel.for_inference(model)  # Enable for inference!
 
 image = dataset[100]["decoded_image"]
-instruction = dataset[100]["question"]
+instruction = (
+    f"{dataset[100]["question"]}, provide your reasoning between {REASONING_START} and {REASONING_END} "
+    f"and then your final answer between {SOLUTION_START} and (put a float here) {SOLUTION_END}"
+)
 
 messages = [
     {
@@ -397,18 +399,18 @@ result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
-# In[ ]:
+# In[18]:
 
 
 model.save_pretrained("lora_model")  # Local saving
-processor.save_pretrained("lora_model")
+tokenizer.save_pretrained("lora_model")
 # model.push_to_hub("your_name/lora_model", token = "...") # Online saving
 # processor.push_to_hub("your_name/lora_model", token = "...") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
-# In[ ]:
+# In[27]:
 
 
 if False:
@@ -423,14 +425,17 @@ if False:
 FastVisionModel.for_inference(model)  # Enable for inference!
 
 sample = dataset[1]
-image = sample["image"].convert("RGB")
+image = sample["decoded_image"].convert("RGB")
 messages = [
     {
         "role": "user",
         "content": [
             {
                 "type": "text",
-                "text": sample["text"],
+                "text": (
+                    f"{sample["question"]}, provide your reasoning between {REASONING_START} and {REASONING_END} "
+                    f"and then your final answer between {SOLUTION_START} and (put a float here) {SOLUTION_END}"
+                )
             },
             {
                 "type": "image",
@@ -438,8 +443,8 @@ messages = [
         ],
     },
 ]
-input_text = processor.apply_chat_template(messages, add_generation_prompt=True)
-inputs = processor(
+input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+inputs = tokenizer(
     image,
     input_text,
     add_special_tokens=False,
@@ -448,25 +453,25 @@ inputs = processor(
 
 from transformers import TextStreamer
 
-text_streamer = TextStreamer(processor.tokenizer, skip_prompt=True)
-_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
-                   use_cache=True, temperature = 1.0, top_p = 0.95, top_k = 64)
+text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
+                        use_cache=True, temperature = 1.0, top_p = 0.95, top_k = 64)
 
 
 # ### Saving to float16 for VLLM
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
-# In[ ]:
+# In[28]:
 
 
 # Select ONLY 1 to save! (Both not needed!)
 
 # Save locally to 16bit
-if False: model.save_pretrained_merged("unsloth_finetune", processor,)
+if False: model.save_pretrained_merged("unsloth_finetune", tokenizer,)
 
 # To export and save to your Hugging Face account
-if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", processor, token = "PUT_HERE")
+if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "PUT_HERE")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!

@@ -66,7 +66,7 @@ max_seq_length = 16384 # Must be this long for VLMs
 lora_rank = 16 # Larger rank = smarter, but slower
 
 model, tokenizer = FastVisionModel.from_pretrained(
-    model_name ="keithdrexel/Qwen2.5-VL-7B-Instruct-4bit-BNB-LanguageOnly",
+    model_name ="unsloth/Qwen2.5-VL-7B-Instruct",
     max_seq_length = max_seq_length,
     load_in_4bit = True, # False for LoRA 16bit
     fast_inference = True, # Enable vLLM fast inference
@@ -107,7 +107,6 @@ model = FastVisionModel.get_peft_model(
 
 
 from datasets import load_dataset
-from trl import GRPOConfig, GRPOTrainer
 import torch
 
 dataset = load_dataset("AI4Math/MathVista",split="testmini")
@@ -126,7 +125,6 @@ def is_numeric_answer(example):
     return False
 
 dataset = dataset.filter(is_numeric_answer) #
-
 
 
 # We also resize the images to be 512 by 512 pixels to make the images managable in context length. We also convert them to RGB so they are compatible with TRL's trainer!
@@ -165,9 +163,6 @@ SOLUTION_START = "<SOLUTION>"
 SOLUTION_END = "</SOLUTION>"
 
 def make_conversation(example):
-    # Define placeholder constants if they are not defined globally
-
-
     # The user's text prompt
     text_content = (
         f"{example['question']}, provide your reasoning between {REASONING_START} and {REASONING_END} "
@@ -190,8 +185,7 @@ def make_conversation(example):
 
 train_dataset = dataset.map(make_conversation)
 
-#Am reformatting dataset like this because decoded_images are the actual images
-#The "image": example["decoded_image"] does not properly format the dataset correctly
+#We reformatting dataset like this because decoded_images are the actual images
 
 # 1. Remove the original 'image' column
 train_dataset = train_dataset.remove_columns("image")
@@ -293,6 +287,7 @@ print(outputs[0].outputs[0].text)
 
 
 from trl import GRPOConfig, GRPOTrainer
+
 training_args = GRPOConfig(
     learning_rate = 5e-6,
     adam_beta1 = 0.9,
@@ -302,7 +297,6 @@ training_args = GRPOConfig(
     lr_scheduler_type = "cosine",
     optim = "adamw_8bit",
     logging_steps = 1,
-    log_completions = True,
     per_device_train_batch_size = 1,
     gradient_accumulation_steps = 2, # Increase to 4 for smoother training
     num_generations = 4, # Decrease if out of memory
@@ -415,43 +409,6 @@ if False:
 if False:
     model.push_to_hub("hf/model", token = "")
     tokenizer.push_to_hub("hf/model", token = "")
-
-
-# ### GGUF / llama.cpp Conversion
-# To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
-# 
-# Some supported quant methods (full list on our [Wiki page](https://github.com/unslothai/unsloth/wiki#gguf-quantization-options)):
-# * `q8_0` - Fast conversion. High resource use, but generally acceptable.
-# * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
-# * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
-# 
-# [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-
-# In[ ]:
-
-
-# Save to 8bit Q8_0
-if False: model.save_pretrained_gguf("model", tokenizer,)
-# Remember to go to https://huggingface.co/settings/tokens for a token!
-# And change hf to your username!
-if False: model.push_to_hub_gguf("hf/model", tokenizer, token = "")
-
-# Save to 16bit GGUF
-if False: model.save_pretrained_gguf("model", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("hf/model", tokenizer, quantization_method = "f16", token = "")
-
-# Save to q4_k_m GGUF
-if False: model.save_pretrained_gguf("model", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("hf/model", tokenizer, quantization_method = "q4_k_m", token = "")
-
-# Save to multiple GGUF options - much faster if you want multiple!
-if False:
-    model.push_to_hub_gguf(
-        "hf/model", # Change hf to your username!
-        tokenizer,
-        quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
-    )
 
 
 # Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!

@@ -565,32 +565,32 @@ TYPE_MAPPING = {
 }
 
 KNOWN_TYPES_ORDERED = [
-    'Tool Calling',          
-    'Text Completion',       
-    'Synthetic Data',        
+    'Tool Calling',
+    'Text Completion',
+    'Synthetic Data',
     'Reasoning Conversational',
-    'Vision GRPO'
-    'GRPO LoRA',             
-    
+    'Vision GRPO',  # Multi-word types should come first
+    'GRPO LoRA',
+
     'Conversational',
     'Alpaca',
     'Vision',
     'Reasoning',
     'Completion',
-    'Finetune',             
-    'Studio',               
-    'Coder',                
-    'Inference',            
-    'Ollama',               
+    'Finetune',
+    'Studio',
+    'Coder',
+    'Inference',
+    'Ollama',
     'Audio',
-    
+
     'ORPO',
     'GRPO',
     'DPO',
     'CPT',
-    'TTS',                  
+    'TTS',
     'LoRA',
-    'VL',                   
+    'VL',
     'RAFT'
 ]
 
