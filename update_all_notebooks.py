@@ -162,7 +162,8 @@ else:
     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
     !uv pip install -qqq --upgrade \
         unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
-    !uv pip install -qqq {get_triton}"""
+    !uv pip install -qqq {get_triton}
+"""
 
 installation_extra_grpo_content = update_or_append_pip_install(
     installation_extra_grpo_content,
@@ -174,6 +175,7 @@ installation_extra_grpo_content = update_or_append_pip_install(
     "trl",
     UV_PIN_TRL,
 )
+installation_extra_grpo_content += "\n!uv pip install --no-deps --force-reinstall --no-cache-dir git+https://github.com/unslothai/unsloth.git git+https://github.com/unslothai/unsloth_zoo.git"
 
 
 installation_grpo_kaggle_content = """%%capture

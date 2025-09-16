@@ -53,6 +53,7 @@
 #     get_ipython().system('uv pip install -qqq {get_triton}')
 # get_ipython().system('uv pip install transformers==4.55.4')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
+# get_ipython().system('uv pip install --no-deps --force-reinstall --no-cache-dir git+https://github.com/unslothai/unsloth.git git+https://github.com/unslothai/unsloth_zoo.git')
 # 
 # 
 # # ### Unsloth
