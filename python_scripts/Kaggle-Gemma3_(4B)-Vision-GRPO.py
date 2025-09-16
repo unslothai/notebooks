@@ -33,24 +33,43 @@
 get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\nget_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")\n!uv pip install -qqq --upgrade     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers\n!uv pip install -qqq {get_triton}\n!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.\n!uv pip install transformers==4.55.4\n!uv pip install --no-deps trl==0.22.2\n')
 
 
-# Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!
-
 # In[ ]:
 
 
-from unsloth import FastVisionModel
+from unsloth import FastVisionModel # FastLanguageModel for LLMs
 import torch
-max_seq_length = 16384 # Must be this long for VLMs
-lora_rank = 16 # Larger rank = smarter, but slower
+
+# 4bit pre quantized models we support for 4x faster downloading + no OOMs.
+fourbit_models = [
+    "unsloth/Llama-3.2-11B-Vision-Instruct-bnb-4bit", # Llama 3.2 vision support
+    "unsloth/Llama-3.2-11B-Vision-bnb-4bit",
+    "unsloth/Llama-3.2-90B-Vision-Instruct-bnb-4bit", # Can fit in a 80GB card!
+    "unsloth/Llama-3.2-90B-Vision-bnb-4bit",
+
+    "unsloth/Pixtral-12B-2409-bnb-4bit",              # Pixtral fits in 16GB!
+    "unsloth/Pixtral-12B-Base-2409-bnb-4bit",         # Pixtral base model
+
+    "unsloth/Qwen2-VL-2B-Instruct-bnb-4bit",          # Qwen2 VL support
+    "unsloth/Qwen2-VL-7B-Instruct-bnb-4bit",
+    "unsloth/Qwen2-VL-72B-Instruct-bnb-4bit",
+
+    "unsloth/llava-v1.6-mistral-7b-hf-bnb-4bit",      # Any Llava variant works!
+    "unsloth/llava-1.5-7b-hf-bnb-4bit",
+] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastVisionModel.from_pretrained(
-    model_name ="keithdrexel/Qwen2.5-VL-7B-Instruct-4bit-BNB-LanguageOnly",
-    max_seq_length = max_seq_length,
-    load_in_4bit = True, # False for LoRA 16bit
-    fast_inference = True, # Enable vLLM fast inference
-    gpu_memory_utilization = 0.8, # Reduce if out of memory
-    unsloth_vllm_standby=True, # use this for memory efficient GRPO training
+    "unsloth/gemma-3-4b-it",
+    load_in_4bit = True, # Use 4bit to reduce memory use. False for 16bit LoRA.
+    use_gradient_checkpointing = "unsloth", # True or "unsloth" for long context
 )
+
+
+# We now add LoRA adapters for parameter efficient fine-tuning, allowing us to train only 1% of all model parameters efficiently.
+# 
+# **[NEW]** We also support fine-tuning only the vision component, only the language component, or both. Additionally, you can choose to fine-tune the attention modules, the MLP layers, or both!
+
+# In[ ]:
+
 
 model = FastVisionModel.get_peft_model(
     model,
@@ -71,14 +90,8 @@ model = FastVisionModel.get_peft_model(
 )
 
 
-# <a name="Train"></a>
-# ### Train the model
-# 
-# Now set up GRPO Trainer and all configurations!
-
-# ### Data Prep
 # <a name="Data"></a>
-# 
+# ### Data Prep
 # AI4Math/MathVista is a dataset that involves using images to solve logic and math problems, for this notebook, it will only be math problems with numeric answers for simpilicity.
 
 # In[ ]:
@@ -91,7 +104,23 @@ import torch
 dataset = load_dataset("AI4Math/MathVista",split="testmini")
 
 
-# We filter the dataset to keep only float or numeric answers
+# Let us see what our data looks like
+
+# In[ ]:
+
+
+dataset["decoded_image"][5] 
+
+
+# In[ ]:
+
+
+dataset["question"][5], dataset["answer"][5]
+
+
+# The image of our data is a part of the math problem.
+# 
+# To make the rewarding easy later on, let us filter only the numeric answer so that we can create reward function that gives score if reward is float or not.
 
 # In[ ]:
 
@@ -104,7 +133,6 @@ def is_numeric_answer(example):
     return False
 
 dataset = dataset.filter(is_numeric_answer) #
-
 
 
 # We also resize the images to be 512 by 512 pixels to make the images managable in context length. We also convert them to RGB so they are compatible with TRL's trainer!
@@ -145,7 +173,6 @@ SOLUTION_END = "</SOLUTION>"
 def make_conversation(example):
     # Define placeholder constants if they are not defined globally
 
-
     # The user's text prompt
     text_content = (
         f"{example['question']}, provide your reasoning between {REASONING_START} and {REASONING_END} "
@@ -168,7 +195,7 @@ def make_conversation(example):
 
 train_dataset = dataset.map(make_conversation)
 
-#Am reformatting dataset like this because decoded_images are the actual images
+#We reformatting dataset like this because decoded_images are the actual images
 #The "image": example["decoded_image"] does not properly format the dataset correctly
 
 # 1. Remove the original 'image' column
@@ -203,7 +230,6 @@ train_dataset = train_dataset.map(
 # Reward functions
 def formatting_reward_func(completions,**kwargs):
     import re
-    print("test")
     thinking_pattern = f'{REASONING_START}(.*?){REASONING_END}'
     answer_pattern = f'{SOLUTION_START}(.*?){SOLUTION_END}'
 
@@ -240,28 +266,6 @@ def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[floa
 train_dataset[0]["prompt"]
 
 
-# <a name="Inference"></a>
-# ### Inference
-# Now let's try the model on the hundredth sample of the train dataset without training.
-# 
-
-# In[ ]:
-
-
-from vllm import SamplingParams
-sampling_params = SamplingParams(
-    temperature = 1.0,
-    top_k = 50,
-    max_tokens = 1024,
-)
-
-outputs = model.fast_generate(
-    {"prompt": train_dataset[100]["prompt"], "multi_modal_data": {"image": train_dataset[100]["image"]}},
-    sampling_params
-    )
-print(outputs[0].outputs[0].text)
-
-
 # <a name="Train"></a>
 # ### Train the model
 # 
@@ -271,6 +275,7 @@ print(outputs[0].outputs[0].text)
 
 
 from trl import GRPOConfig, GRPOTrainer
+
 training_args = GRPOConfig(
     learning_rate = 5e-6,
     adam_beta1 = 0.9,
@@ -293,7 +298,7 @@ training_args = GRPOConfig(
     max_steps = 60,
     save_steps = 60,
     max_grad_norm = 0.1,
-    report_to = "wandb", # Can use Weights & Biases
+    report_to = "none", # Can use Weights & Biases
     output_dir = "outputs",
 )
 
@@ -326,116 +331,118 @@ trainer.train()
 
 # <a name="Inference"></a>
 # ### Inference
+# Let's run the model! You can modify the instruction and input—just leave the output blank.
 # 
-# 
-
-# And now with the LoRA we just trained with GRPO - we first save the LoRA first!
+# We'll use the best hyperparameters for inference on Gemma: `top_p=0.95`, `top_k=64`, and `temperature=1.0`.
 
 # In[ ]:
 
 
-model.save_lora("grpo_lora")
+FastVisionModel.for_inference(model)  # Enable for inference!
 
+image = dataset[100]["decoded_image"]
+instruction = dataset[100]["question"]
 
-# 
+messages = [
+    {
+        "role": "user",
+        "content": [{"type": "image"}, {"type": "text", "text": instruction}],
+    }
+]
 
-# In[ ]:
+input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+inputs = tokenizer(
+    image,
+    input_text,
+    add_special_tokens=False,
+    return_tensors="pt",
+).to("cuda")
 
+from transformers import TextStreamer
 
-from vllm import SamplingParams
-sampling_params = SamplingParams(
-    temperature = 1.0,
-    top_k = 50,
-    max_tokens = 1024,
-)
-
-outputs = model.fast_generate(
-    {"prompt": train_dataset[100]["prompt"], "multi_modal_data": {"image": train_dataset[100]["image"]}},
-    sampling_params,
-    lora_request = model.load_lora("grpo_lora"))
-print(outputs[0].outputs[0].text)
-
-
-# Verify LoRA is actually trained!
-
-# In[ ]:
-
-
-from safetensors import safe_open
-
-tensors = {}
-with safe_open("grpo_lora/adapter_model.safetensors", framework = "pt") as f:
-    # Verify both A and B are non zero
-    for key in f.keys():
-        tensor = f.get_tensor(key)
-        n_zeros = (tensor == 0).sum() / tensor.numel()
-        assert(n_zeros.item() != tensor.numel())
+text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
+                        use_cache=True, temperature = 1.0, top_p = 0.95, top_k = 64)
 
 
 # <a name="Save"></a>
+# ### Saving, loading finetuned models
+# To save the final model as LoRA adapters, use Hugging Face’s `push_to_hub` for online saving, or `save_pretrained` for local storage.
+# 
+# **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
+
+# In[ ]:
+
+
+model.save_pretrained("lora_model")  # Local saving
+processor.save_pretrained("lora_model")
+# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
+# processor.push_to_hub("your_name/lora_model", token = "...") # Online saving
+
+
+# Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
+
+# In[ ]:
+
+
+if False:
+    from unsloth import FastVisionModel
+
+    model, processor = FastVisionModel.from_pretrained(
+        model_name="lora_model",  # YOUR MODEL YOU USED FOR TRAINING
+        load_in_4bit=True,  # Set to False for 16bit LoRA
+    )
+    FastVisionModel.for_inference(model)  # Enable for inference!
+
+FastVisionModel.for_inference(model)  # Enable for inference!
+
+sample = dataset[1]
+image = sample["image"].convert("RGB")
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "text",
+                "text": sample["text"],
+            },
+            {
+                "type": "image",
+            },
+        ],
+    },
+]
+input_text = processor.apply_chat_template(messages, add_generation_prompt=True)
+inputs = processor(
+    image,
+    input_text,
+    add_special_tokens=False,
+    return_tensors="pt",
+).to("cuda")
+
+from transformers import TextStreamer
+
+text_streamer = TextStreamer(processor.tokenizer, skip_prompt=True)
+_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
+                   use_cache=True, temperature = 1.0, top_p = 0.95, top_k = 64)
+
+
 # ### Saving to float16 for VLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
 # In[ ]:
 
 
-# Merge to 16bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")
+# Select ONLY 1 to save! (Both not needed!)
 
-# Merge to 4bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_4bit", token = "")
+# Save locally to 16bit
+if False: model.save_pretrained_merged("unsloth_finetune", processor,)
 
-# Just LoRA adapters
-if False:
-    model.save_pretrained("model")
-    tokenizer.save_pretrained("model")
-if False:
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
+# To export and save to your Hugging Face account
+if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", processor, token = "PUT_HERE")
 
 
-# ### GGUF / llama.cpp Conversion
-# To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
-# 
-# Some supported quant methods (full list on our [Wiki page](https://github.com/unslothai/unsloth/wiki#gguf-quantization-options)):
-# * `q8_0` - Fast conversion. High resource use, but generally acceptable.
-# * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
-# * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
-# 
-# [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-
-# In[ ]:
-
-
-# Save to 8bit Q8_0
-if False: model.save_pretrained_gguf("model", tokenizer,)
-# Remember to go to https://huggingface.co/settings/tokens for a token!
-# And change hf to your username!
-if False: model.push_to_hub_gguf("hf/model", tokenizer, token = "")
-
-# Save to 16bit GGUF
-if False: model.save_pretrained_gguf("model", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("hf/model", tokenizer, quantization_method = "f16", token = "")
-
-# Save to q4_k_m GGUF
-if False: model.save_pretrained_gguf("model", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("hf/model", tokenizer, quantization_method = "q4_k_m", token = "")
-
-# Save to multiple GGUF options - much faster if you want multiple!
-if False:
-    model.push_to_hub_gguf(
-        "hf/model", # Change hf to your username!
-        tokenizer,
-        quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
-    )
-
-
-# Now, use the `model-unsloth.gguf` file or `model-unsloth-Q4_K_M.gguf` file in llama.cpp.
-# 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other links:
