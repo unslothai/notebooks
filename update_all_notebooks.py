@@ -175,7 +175,7 @@ installation_extra_grpo_content = update_or_append_pip_install(
     "trl",
     UV_PIN_TRL,
 )
-installation_extra_grpo_content += "\n!uv pip install --no-deps --force-reinstall --no-cache-dir git+https://github.com/unslothai/unsloth.git git+https://github.com/unslothai/unsloth_zoo.git"
+installation_extra_grpo_content += "\n!pip install --no-deps --force-reinstall --no-cache-dir git+https://github.com/unslothai/unsloth.git git+https://github.com/unslothai/unsloth_zoo.git"
 
 
 installation_grpo_kaggle_content = """%%capture
