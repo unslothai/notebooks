@@ -36,22 +36,6 @@ get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM
 # In[ ]:
 
 
-def is_numeric_answer(example):
-  try:
-    float(example["answer"])
-    return True
-  except:
-    return False
-
-dataset = dataset.filter(is_numeric_answer) #
-
-
-
-# We also resize the images to be 512 by 512 pixels to make the images managable in context length. We also convert them to RGB so they are compatible with TRL's trainer!
-
-# In[ ]:
-
-
 # Filter have big images
 def resize_images(example):
     image = example["decoded_image"]
