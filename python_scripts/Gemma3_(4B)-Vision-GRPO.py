@@ -25,32 +25,37 @@
 # Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
 # 
 
-# ### Installation
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
-
-
+# # ### Installation
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
+# 
+# 
+# # In[ ]:
+# 
+# 
 # #@title Colab Extra Install { display-mode: "form" }
-# %%capture
+# get_ipython().run_line_magic('%capture', '')
 # import os
-# !pip install --upgrade -qqq uv
+# get_ipython().system('pip install --upgrade -qqq uv')
 # if "COLAB_" not in "".join(os.environ.keys()):
 #     # If you're not in Colab, just use pip install!
-#     !pip install unsloth vllm
+#     get_ipython().system('pip install unsloth vllm')
 # else:
 #     try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 #     except: get_numpy = "numpy"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
 #     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
-#     !uv pip install -qqq --upgrade \
-#         unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
-#     !uv pip install -qqq {get_triton}
-# !uv pip install transformers==4.55.4
-# !uv pip install --no-deps trl==0.22.2
+#     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers')
+#     get_ipython().system('uv pip install -qqq {get_triton}')
+# get_ipython().system('uv pip install transformers==4.55.4')
+# get_ipython().system('uv pip install --no-deps trl==0.22.2')
+# 
+# 
+# # ### Unsloth
 
 # In[ ]:
 

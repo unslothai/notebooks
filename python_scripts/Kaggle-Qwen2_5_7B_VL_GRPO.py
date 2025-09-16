@@ -33,44 +33,6 @@
 get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\nget_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")\n!uv pip install -qqq --upgrade     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers\n!uv pip install -qqq {get_triton}\n!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.\n!uv pip install transformers==4.55.4\n!uv pip install --no-deps trl==0.22.2\n')
 
 
-# Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!
-
-# In[ ]:
-
-
-from unsloth import FastVisionModel
-import torch
-max_seq_length = 16384 # Must be this long for VLMs
-lora_rank = 16 # Larger rank = smarter, but slower
-
-model, tokenizer = FastVisionModel.from_pretrained(
-    model_name ="keithdrexel/Qwen2.5-VL-7B-Instruct-4bit-BNB-LanguageOnly",
-    max_seq_length = max_seq_length,
-    load_in_4bit = True, # False for LoRA 16bit
-    fast_inference = True, # Enable vLLM fast inference
-    gpu_memory_utilization = 0.8, # Reduce if out of memory
-    unsloth_vllm_standby=True, # use this for memory efficient GRPO training
-)
-
-model = FastVisionModel.get_peft_model(
-    model,
-    finetune_vision_layers     = False, # False if not finetuning vision layers
-    finetune_language_layers   = True, # False if not finetuning language layers
-    finetune_attention_modules = True, # False if not finetuning attention layers
-    finetune_mlp_modules       = True, # False if not finetuning MLP layers
-
-    r = 16,           # The larger, the higher the accuracy, but might overfit
-    lora_alpha = 16,  # Recommended alpha == r at least
-    lora_dropout = 0,
-    bias = "none",
-    random_state = 3407,
-    use_rslora = False,  # We support rank stabilized LoRA
-    loftq_config = None, # And LoftQ
-    use_gradient_checkpointing = "unsloth", # Reduces memory usage
-    # target_modules = "all-linear", # Optional now! Can specify a list if needed
-)
-
-
 # <a name="Train"></a>
 # ### Train the model
 # 

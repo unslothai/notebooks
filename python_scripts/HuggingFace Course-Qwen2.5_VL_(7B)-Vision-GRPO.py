@@ -59,8 +59,6 @@
 # 
 # # ### Unsloth
 
-# Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!
-
 # In[ ]:
 
 
@@ -363,8 +361,6 @@ trainer.train()
 model.save_lora("grpo_lora")
 
 
-# 
-
 # In[ ]:
 
 
@@ -459,6 +455,8 @@ if False:
         token = "",
     )
 
+
+# Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!
 
 # Now, use the `model-unsloth.gguf` file or `model-unsloth-Q4_K_M.gguf` file in llama.cpp.
 # 
