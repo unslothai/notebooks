@@ -59,7 +59,7 @@
 # 
 # # ### Unsloth
 
-# In[ ]:
+# In[3]:
 
 
 from unsloth import FastVisionModel # FastLanguageModel for LLMs
@@ -94,7 +94,7 @@ model, tokenizer = FastVisionModel.from_pretrained(
 # 
 # **[NEW]** We also support fine-tuning only the vision component, only the language component, or both. Additionally, you can choose to fine-tune the attention modules, the MLP layers, or both!
 
-# In[ ]:
+# In[4]:
 
 
 model = FastVisionModel.get_peft_model(
@@ -120,7 +120,7 @@ model = FastVisionModel.get_peft_model(
 # ### Data Prep
 # AI4Math/MathVista is a dataset that involves using images to solve logic and math problems, for this notebook, it will only be math problems with numeric answers for simpilicity.
 
-# In[ ]:
+# In[5]:
 
 
 from datasets import load_dataset
@@ -132,13 +132,13 @@ dataset = load_dataset("AI4Math/MathVista",split="testmini")
 
 # Let us see what our data looks like
 
-# In[ ]:
+# In[6]:
 
 
-dataset["decoded_image"][5] 
+dataset["decoded_image"][5]
 
 
-# In[ ]:
+# In[7]:
 
 
 dataset["question"][5], dataset["answer"][5]
@@ -148,7 +148,7 @@ dataset["question"][5], dataset["answer"][5]
 # 
 # To make the rewarding easy later on, let us filter only the numeric answer so that we can create reward function that gives score if reward is float or not.
 
-# In[ ]:
+# In[8]:
 
 
 def is_numeric_answer(example):
@@ -163,7 +163,7 @@ dataset = dataset.filter(is_numeric_answer) #
 
 # We also resize the images to be 512 by 512 pixels to make the images managable in context length. We also convert them to RGB so they are compatible with TRL's trainer!
 
-# In[ ]:
+# In[9]:
 
 
 # Filter have big images
@@ -187,7 +187,7 @@ dataset = dataset.map(convert_to_rgb)
 
 # This is the conversational template that is needed to collate the dataset
 
-# In[ ]:
+# In[10]:
 
 
 # Define the delimiter variables for clarity and easy modification
@@ -234,7 +234,7 @@ train_dataset = train_dataset.rename_column("decoded_image", "image")
 
 # Applying Chat Template across the entire dataset
 
-# In[ ]:
+# In[11]:
 
 
 train_dataset = train_dataset.map(
@@ -250,7 +250,7 @@ train_dataset = train_dataset.map(
 
 # We use a basic formatting functions to see if reasoning starts and ends as well as if the answers were written correctly.
 
-# In[ ]:
+# In[12]:
 
 
 # Reward functions
@@ -286,7 +286,7 @@ def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[floa
 
 # Here is the first example prompt in the dataset
 
-# In[ ]:
+# In[13]:
 
 
 train_dataset[0]["prompt"]
@@ -297,7 +297,7 @@ train_dataset[0]["prompt"]
 # 
 # Now set up GRPO Trainer and all configurations!
 
-# In[ ]:
+# In[14]:
 
 
 from trl import GRPOConfig, GRPOTrainer
