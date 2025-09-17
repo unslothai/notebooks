@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 22.4" width="200" height="22.4">
+  <linearGradient id="b" x2="0" y2="100%">
+    <stop offset="0" stop-color="#fff" stop-opacity=".7"/>
+    <stop offset="1" stop-opacity=".7"/>
+  </linearGradient>
+  <clipPath id="a">
+    <rect width="200" height="22.4" rx="3" fill="#fff"/>
+  </clipPath>
+  <path d="M0 0h200v22.4H0z" fill="#525252"/>
+  <path d="M0 0h63v22.4H0z" fill="#f0ab00"/>
+  <path d="M63 0h137v22.4H63z" fill="#525252"/>
+  <g clip-path="url(#a)">
+    <path d="M63 0h137v22.4H63z" fill="url(#b)"/>
+    <path d="M0 0h63v22.4H0z" fill="#f0ab00"/>
+  </g>
+  
+  <!-- 放大30%的AMD Logo (原scale 0.025 → 新scale 0.0325) -->
+  <g transform="translate(20, 1.5) scale(0.025)">
+    <path d="M781.824 389.845333l66.517333 66.56h109.056v109.098667L1024 632.064V389.845333zM85.333333 406.186667l-85.333333 211.626666h55.850667l15.786666-41.898666H166.4l17.408 41.898666h57.088L146.432 406.186667z m179.584 0v211.413333h52.821334v-131.925333l57.088 66.645333h8.021333l57.088-66.389333v131.882666h52.821333V406.186667H446.72l-67.925333 78.72L310.912 406.186667z m268.074667 0v211.626666h87.765333c84.437333 0 122.88-44.629333 122.88-105.472 0-58.026667-39.978667-106.154667-117.205333-106.154666z m52.778667 38.826666h33.792c49.92 0 69.546667 30.336 69.546666 66.986667 0 31.061333-15.872 67.072-68.949333 67.072h-34.389333z m-468.693334 11.648l33.749334 82.432H85.674667z m731.178667 13.098667l-68.437333 68.394667v96h95.829333l68.437333-68.565334h-95.829333z" fill="#fff"/>
+  </g>
+  
+  <!-- 右侧文字调整大小和位置以适应新高度 -->
+  <g fill="#fff" text-anchor="middle" font-family="Roboto,Noto,sans-serif" font-size="9">
+    <text x="131.5" y="14">Open in AMD Cloud</text>
+  </g>
+</svg>
+    
