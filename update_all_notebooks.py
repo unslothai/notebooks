@@ -6,6 +6,14 @@ import shutil
 import subprocess
 from datetime import datetime
 from glob import glob
+from nbconvert import PythonExporter
+import nbformat
+
+DONT_UPDATE_EXCEPTIONS = [
+    'Falcon_H1-Alpaca.ipynb',
+    'Liquid_LFM2-Conversational.ipynb',
+    'Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb', # Daniel's?
+]
 
 def get_current_git_branch():
     try:
@@ -73,6 +81,9 @@ general_announcement_content_meta = general_announcement_content_meta[0] + "\n\n
 # CONSTANT
 PIN_TRANSFORMERS = "!pip install transformers==4.55.4"
 UV_PIN_TRANSFORMERS = PIN_TRANSFORMERS.replace("pip", "uv pip")
+
+PIN_TRL = "!pip install --no-deps trl==0.22.2"
+UV_PIN_TRL = PIN_TRL.replace("pip", "uv pip")
 SPACES = " " * 4
 
 # =======================================================
@@ -96,6 +107,11 @@ installation_content = update_or_append_pip_install(
     "transformers",
     PIN_TRANSFORMERS,
 )
+installation_content = update_or_append_pip_install(
+    installation_content,
+    "trl",
+    PIN_TRL,
+)
 
 installation_kaggle_content = """%%capture
 import os
@@ -111,6 +127,11 @@ installation_kaggle_content = update_or_append_pip_install(
     installation_kaggle_content,
     "transformers",
     PIN_TRANSFORMERS,
+)
+installation_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "trl",
+    PIN_TRL,
 )
 
 # =======================================================
@@ -138,7 +159,7 @@ else:
     except: get_numpy = "numpy"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+    get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm<=0.10.2", "triton")
     !uv pip install -qqq --upgrade \
         unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
     !uv pip install -qqq {get_triton}"""
@@ -147,6 +168,11 @@ installation_extra_grpo_content = update_or_append_pip_install(
     installation_extra_grpo_content,
     "transformers",
     UV_PIN_TRANSFORMERS,
+)
+installation_extra_grpo_content = update_or_append_pip_install(
+    installation_extra_grpo_content,
+    "trl",
+    UV_PIN_TRL,
 )
 
 
@@ -158,15 +184,22 @@ try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm<=0.10.2", "triton")
 !uv pip install -qqq --upgrade \
     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
 !uv pip install -qqq {get_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0."""
+
 installation_grpo_kaggle_content = update_or_append_pip_install(
     installation_grpo_kaggle_content,
     "transformers",
     UV_PIN_TRANSFORMERS,
+)
+
+installation_grpo_kaggle_content = update_or_append_pip_install(
+    installation_grpo_kaggle_content,
+    "trl",
+    UV_PIN_TRL,
 )
 
 # =======================================================
@@ -184,15 +217,22 @@ else:
     except: get_numpy = "numpy"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+    get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm<=0.10.2", "triton")
     !uv pip install -qqq --upgrade \
         unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
     !uv pip install -qqq {get_triton}
     !uv pip install synthetic-data-kit==0.0.3"""
+
 installation_synthetic_data_content = update_or_append_pip_install(
     installation_synthetic_data_content,
     "transformers",
     UV_PIN_TRANSFORMERS,
+)
+
+installation_synthetic_data_content = update_or_append_pip_install(
+    installation_synthetic_data_content,
+    "trl",
+    UV_PIN_TRL,
 )
 
 installation_grpo_synthetic_data_content = """%%capture
@@ -201,7 +241,7 @@ try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm<=0.10.2", "triton")
 !uv pip install -qqq --upgrade \
     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
 !uv pip install -qqq {get_triton}
@@ -211,6 +251,11 @@ installation_grpo_synthetic_data_content = update_or_append_pip_install(
     installation_grpo_synthetic_data_content,
     "transformers",
     UV_PIN_TRANSFORMERS,
+)
+installation_grpo_synthetic_data_content = update_or_append_pip_install(
+    installation_grpo_synthetic_data_content,
+    "trl",
+    UV_PIN_TRL,
 )
 
 # =======================================================
@@ -254,6 +299,11 @@ installation_gpt_oss_content = update_or_append_pip_install(
     installation_gpt_oss_content,
     "transformers",
     UV_PIN_TRANSFORMERS,
+)
+installation_gpt_oss_content = update_or_append_pip_install(
+    installation_gpt_oss_content,
+    "trl",
+    UV_PIN_TRL,
 )
 
 installation_gpt_oss_kaggle_content = installation_gpt_oss_content
@@ -309,6 +359,11 @@ installation_llasa_kaggle_content = update_or_append_pip_install(
     "transformers",
     "!pip install transformers==4.48",
 )
+installation_llasa_kaggle_content = update_or_append_pip_install(
+    installation_llasa_kaggle_content,
+    "trl",
+    PIN_TRL,
+)
 
 # =======================================================
 # Tool Calling Notebook
@@ -328,12 +383,22 @@ installation_sesame_csm_content = update_or_append_pip_install(
     "transformers",
     "!pip install transformers==4.52.3",
 )
+installation_sesame_csm_content = update_or_append_pip_install(
+    installation_sesame_csm_content,
+    "trl",
+    PIN_TRL
+)
 
 installation_sesame_csm_kaggle_content = installation_kaggle_content
 installation_sesame_csm_kaggle_content = update_or_append_pip_install(
     installation_sesame_csm_kaggle_content,
     "transformers",
     "!pip install transformers==4.52.3",
+)
+installation_sesame_csm_kaggle_content = update_or_append_pip_install(
+    installation_sesame_csm_kaggle_content,
+    "trl",
+    PIN_TRL
 )
 
 # =======================================================
@@ -343,14 +408,25 @@ installation_llama_vision_content = installation_content
 installation_llama_vision_content = update_or_append_pip_install(
     installation_llama_vision_content,
     "transformers",
-    "!pip install transformers==4.53.2",
+    PIN_TRANSFORMERS,
 )
+installation_llama_vision_content = update_or_append_pip_install(
+    installation_llama_vision_content,
+    "trl",
+    PIN_TRL
+)
+
 
 installation_llama_vision_kaggle_content = installation_kaggle_content
 installation_llama_vision_kaggle_content = update_or_append_pip_install(
     installation_llama_vision_kaggle_content,
     "transformers",
-    "!pip install transformers==4.53.2",
+    PIN_TRANSFORMERS,
+)
+installation_llama_vision_kaggle_content = update_or_append_pip_install(
+    installation_llama_vision_kaggle_content,
+    "trl",
+    PIN_TRL
 )
 
 # =======================================================
@@ -384,6 +460,8 @@ installation_sglang_kaggle_content = installation_sglang_content
 # =======================================================
 
 new_announcement = """
+[Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) is now supported! Train Qwen2.5-VL, Gemma 3 etc. with GSPO or GRPO.
+
 Introducing Unsloth [Standby for RL](https://docs.unsloth.ai/basics/memory-efficient-rl): GRPO is now faster, uses 30% less memory with 2x longer context.
 
 Gpt-oss fine-tuning now supports 8× longer context with 0 accuracy loss. [Read more](https://docs.unsloth.ai/basics/long-context-gpt-oss-training)
@@ -493,6 +571,7 @@ KNOWN_TYPES_ORDERED = [
     'Text Completion',       
     'Synthetic Data',        
     'Reasoning Conversational',
+    'Vision GRPO',
     'GRPO LoRA',             
     
     'Conversational',
@@ -519,6 +598,7 @@ KNOWN_TYPES_ORDERED = [
 
 FIRST_MAPPING_NAME = {
     "gpt-oss-(20B)-Fine-tuning" : "GPT_OSS_(20B)-Fine-tuning",
+    "Qwen2_5_7B_VL_GRPO" : "Qwen2.5_(7B)-VL-GRPO",
 }
 
 def extract_model_info_refined(filename, architecture_mapping, known_types_ordered):
@@ -1051,6 +1131,11 @@ def main():
     notebook_pattern = "*.ipynb"
 
     notebook_files = glob(os.path.join(notebook_directory, notebook_pattern))
+    print(f"Found {len(notebook_files)} notebooks")
+    # filter out the DONT_UPDATE_EXCEPTIONS
+    notebook_files = [x for x in notebook_files if os.path.basename(x) not in DONT_UPDATE_EXCEPTIONS]
+    print(f"Filtered out {len(DONT_UPDATE_EXCEPTIONS)} notebooks")
+    print(f"Remaining {len(notebook_files)} notebooks")
 
     if not notebook_files:
         print(
@@ -1333,9 +1418,21 @@ def copy_and_update_notebooks(
     """Copies notebooks from template_dir to destination_dir, updates them, and renames them."""
     template_notebooks = glob(os.path.join(template_dir, "*.ipynb"))
 
+    temp_location = os.path.join(destination_dir, ".temp_backup")
     if os.path.exists(destination_dir):
-        shutil.rmtree(destination_dir)
-    os.makedirs(destination_dir, exist_ok=True)
+        if os.path.exists(temp_location):
+            shutil.rmtree(temp_location)
+        os.makedirs(temp_location, exist_ok=True)
+        # Move everything currently in destination_dir into .temp_backup
+        for entry in os.listdir(destination_dir):
+            if entry == ".temp_backup":
+                continue
+            if entry not in DONT_UPDATE_EXCEPTIONS:
+                continue
+            src_path = os.path.join(destination_dir, entry)
+            shutil.move(src_path, temp_location)
+    else:
+        os.makedirs(destination_dir, exist_ok=True)
 
     for template_notebook_path in template_notebooks:
         notebook_name = os.path.basename(template_notebook_path)
@@ -1375,6 +1472,20 @@ def copy_and_update_notebooks(
             new_announcement,
         )
 
+    # Move Exceptions back to destination_dir from temp_location
+    for entry in DONT_UPDATE_EXCEPTIONS:
+        src_path = os.path.join(temp_location, entry)
+        dst_path = os.path.join(destination_dir, entry)
+        if os.path.exists(src_path):
+            # shutil.rmtree(dst_path)
+            shutil.move(src_path, dst_path)
+            print(f"Moved '{entry}' back to '{dst_path}'")
+        else:
+            print(f"Warning: '{entry}' not found in '{temp_location}'")
+    
+    # finally remove the temp_location
+    shutil.rmtree(temp_location)
+
 def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -> list[str]:
     nb_abs = os.path.abspath(nb)
     original_template_abs = os.path.abspath(original_template)
@@ -1387,6 +1498,54 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
 
     only_in_nb = files_in_nb - files_in_original_template
     return sorted(list(only_in_nb))
+
+
+def remove_unwanted_section(script_content):
+    start_marker = "# ### Installation"
+    end_marker = "# ### Unsloth"
+
+    start_index = script_content.find(start_marker)
+    end_index = script_content.find(end_marker)
+
+    if start_index != -1 and end_index != -1 and start_index < end_index:
+        before_section = script_content[:start_index]
+        section_to_comment = script_content[start_index:end_index]
+        after_section = script_content[end_index:]
+
+        lines = section_to_comment.split('\n')
+        commented_lines = [f"# {line}" for line in lines]
+        commented_section = '\n'.join(commented_lines)
+        return before_section + commented_section + after_section
+    else:
+        return script_content
+
+def convert_notebook_to_script(notebook_path: str, output_path: str):
+    exporter = PythonExporter()
+    with open(notebook_path, 'r', encoding='utf-8') as f:
+        notebook_content = nbformat.read(f, as_version=4)
+
+    (body, resources) = exporter.from_notebook_node(notebook_content)
+
+    body = remove_unwanted_section(body)
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(body)
+
+    print(f"Converted {notebook_path} to {output_path}")
+
+def convert_folder(input_folder: str, output_folder: str):
+    if os.path.exists(output_folder):
+        shutil.rmtree(output_folder)
+
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    for filename in os.listdir(input_folder):
+        if filename.endswith('.ipynb'):
+            notebook_path = os.path.join(input_folder, filename)
+            script_filename = filename.replace('.ipynb', '.py')
+            output_path = os.path.join(output_folder, script_filename)
+            convert_notebook_to_script(notebook_path, output_path)
 
 
 if __name__ == "__main__":
@@ -1405,6 +1564,11 @@ if __name__ == "__main__":
         "--reverse",
         action="store_true",
         help="If true, instead of checking from original_template to nb, it will check nb to original_template instead"
+    )
+    parser.add_argument(
+        "--disable_convert_to_script",
+        action="store_true",
+        help="If true, it will not convert the notebooks to scripts",
     )
     args = parser.parse_args()
 
@@ -1454,3 +1618,6 @@ if __name__ == "__main__":
         KNOWN_TYPES_ORDERED,
         type_order
     )
+
+    if not args.disable_convert_to_script:
+        convert_folder("nb", "python_scripts")
