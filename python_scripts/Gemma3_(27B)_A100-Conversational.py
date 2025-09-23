@@ -334,7 +334,7 @@ tokenizer.save_pretrained("gemma-3")
 if False:
     from unsloth import FastModel
     model, tokenizer = FastModel.from_pretrained(
-        model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        model_name = "gemma-3", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 2048,
         load_in_4bit = True,
     )

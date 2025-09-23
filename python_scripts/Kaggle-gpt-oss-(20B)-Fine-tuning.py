@@ -39,7 +39,7 @@
 
 # We're about to demonstrate the power of the new OpenAI GPT-OSS 20B model through a finetuning example. To use our `MXFP4` inference example, use this [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/GPT_OSS_MXFP4_(20B)-Inference.ipynb) instead.
 
-# In[2]:
+# In[1]:
 
 
 from unsloth import FastLanguageModel
@@ -67,7 +67,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 
 # We now add LoRA adapters for parameter efficient finetuning - this allows us to only efficiently train 1% of all parameters.
 
-# In[3]:
+# In[2]:
 
 
 model = FastLanguageModel.get_peft_model(
@@ -163,7 +163,7 @@ _ = model.generate(**inputs, max_new_tokens = 64, streamer = TextStreamer(tokeni
 
 # The `HuggingFaceH4/Multilingual-Thinking` dataset will be utilized as our example. This dataset, available on Hugging Face, contains reasoning chain-of-thought examples derived from user questions that have been translated from English into four other languages. It is also the same dataset referenced in OpenAI's [cookbook](https://cookbook.openai.com/articles/gpt-oss/fine-tune-transfomers) for fine-tuning. The purpose of using this dataset is to enable the model to learn and develop reasoning capabilities in these four distinct languages.
 
-# In[7]:
+# In[3]:
 
 
 def formatting_prompts_func(examples):
@@ -179,7 +179,7 @@ dataset
 
 # To format our dataset, we will apply our version of the GPT OSS prompt
 
-# In[8]:
+# In[4]:
 
 
 from unsloth.chat_templates import standardize_sharegpt
@@ -189,7 +189,7 @@ dataset = dataset.map(formatting_prompts_func, batched = True,)
 
 # Let's take a look at the dataset, and check what the 1st example shows
 
-# In[9]:
+# In[5]:
 
 
 print(dataset[0]['text'])
@@ -197,11 +197,80 @@ print(dataset[0]['text'])
 
 # What is unique about GPT-OSS is that it uses OpenAI [Harmony](https://github.com/openai/harmony) format which support conversation structures, reasoning output, and tool calling.
 
+# Before training, let us test how many data that the model was able to think in french. Let's create some helper function for this. Remember that the dataset only change the thinking part, not the answer. Hence, our function will also detect only the thinking part
+
+# In[6]:
+
+
+import langid
+import re
+
+def detect_analysis(text: str) -> str:
+    pattern = r"<\|start\|>assistant<\|channel\|>analysis<\|message\|>([\s\S]*?)(?:<\|end\|>|<\|start\|>|\Z)"
+    match = re.search(pattern, text, re.DOTALL) # re.DOTALL lets '.' match newlines
+    if match:
+        analysis_content = match.group(1).strip()
+        lang, _ = langid.classify(analysis_content)
+        return lang
+    else:
+        return "en"
+
+sample_dataset_french = dataset.filter(lambda x: x["reasoning_language"] == "French")[0]
+print(f"Example dataset : {sample_dataset_french['text']}")
+print(f"Detected thinking language : {detect_analysis(sample_dataset_french['text'])}")
+
+
+# Let's do an inference on 30 samples, since we did not really have to wait until it generate the answer, we will terminate the inference until after 32 tokens were generated
+
+# In[8]:
+
+
+sample_dataset_french = dataset.filter(lambda x: x["reasoning_language"] == "French").shuffle(seed=42).select(range(30))
+
+from tqdm import tqdm
+french_correct = 0
+language_type_result = []
+all_result = []
+for i in tqdm(range(len(sample_dataset_french))):
+    messages = sample_dataset_french[i]['messages']
+    inputs = tokenizer.apply_chat_template(
+        messages,
+        add_generation_prompt = True,
+        return_tensors = "pt",
+        return_dict = True,
+        reasoning_effort = "low", 
+    ).to(model.device)
+
+    result = model.generate(**inputs, max_new_tokens = 32) # We only need a short generation
+    tokenized_result = tokenizer.decode(result[0], skip_special_tokens = False)
+    detected_lang = detect_analysis(tokenized_result)
+    language_type_result.append(detected_lang)
+    all_result.append(tokenized_result)
+
+
+# Let's see how many output that the model thinks in french
+
+# In[10]:
+
+
+print(f"Amount of french thinking : {sum([1 if lang == 'fr' else 0 for lang in language_type_result])}")
+
+
+# Okay, so every output seems be thinking in English instead, lets try see one such example
+
+# In[13]:
+
+
+analysis_start = all_result[5].find("<|start|>assistant<|channel|>analysis<|message|>")
+analysis_end = all_result[5].find("<|end|>", analysis_start)
+print(f"Extracted analysis : {all_result[5][analysis_start:analysis_end]}")
+
+
 # <a name="Train"></a>
 # ### Train the model
 # Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 
-# In[10]:
+# In[7]:
 
 
 from trl import SFTConfig, SFTTrainer
@@ -214,8 +283,8 @@ trainer = SFTTrainer(
         gradient_accumulation_steps = 4,
         warmup_steps = 5,
         # num_train_epochs = 1, # Set this for 1 full training run.
-        max_steps = 30,
-        learning_rate = 2e-4,
+        max_steps = 60,
+        learning_rate = 5e-4,
         logging_steps = 1,
         optim = "adamw_8bit",
         weight_decay = 0.01,
@@ -229,12 +298,12 @@ trainer = SFTTrainer(
 
 # We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes and lower loss as well!
 
-# In[ ]:
+# In[8]:
 
 
 from unsloth.chat_templates import train_on_responses_only
 
-gpt_oss_kwargs = dict(instruction_part = "<|start|>user<|message|>", response_part="<|start|>assistant<|channel|>final<|message|>")
+gpt_oss_kwargs = dict(instruction_part = "<|start|>user<|message|>", response_part="<|start|>assistant<|channel|>analysis<|message|>")
 
 trainer = train_on_responses_only(
     trainer,
@@ -244,7 +313,7 @@ trainer = train_on_responses_only(
 
 # Let's verify masking the instruction part is done! Let's print the 100th row again.
 
-# In[ ]:
+# In[16]:
 
 
 tokenizer.decode(trainer.train_dataset[100]["input_ids"])
@@ -252,13 +321,13 @@ tokenizer.decode(trainer.train_dataset[100]["input_ids"])
 
 # Now let's print the masked out example - you should see only the answer is present:
 
-# In[ ]:
+# In[17]:
 
 
 tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
 
 
-# In[ ]:
+# In[18]:
 
 
 # @title Show current memory stats
@@ -271,13 +340,13 @@ print(f"{start_gpu_memory} GB of memory reserved.")
 
 # Let's train the model! To resume a training run, set `trainer.train(resume_from_checkpoint = True)`
 
-# In[12]:
+# In[9]:
 
 
 trainer_stats = trainer.train()
 
 
-# In[13]:
+# In[20]:
 
 
 # @title Show final memory and time stats
@@ -297,9 +366,54 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 
 # <a name="Inference"></a>
 # ### Inference
-# Let's run the model! You can change the instruction and input - leave the output blank!
+# Let's do an inference on 30 samples again and see whether the number changing
 
-# In[14]:
+# In[10]:
+
+
+sample_dataset_french = dataset.filter(lambda x: x["reasoning_language"] == "French").shuffle(seed=42).select(range(30))
+
+from tqdm import tqdm
+
+french_correct = 0
+language_type_result = []
+all_result = []
+for i in tqdm(range(len(sample_dataset_french))):
+    messages = sample_dataset_french[i]['messages']
+    inputs = tokenizer.apply_chat_template(
+        messages,
+        add_generation_prompt = True,
+        return_tensors = "pt",
+        return_dict = True,
+        reasoning_effort = "low", 
+    ).to(model.device)
+
+    result = model.generate(**inputs, max_new_tokens = 32) # We only need a short generation
+    tokenized_result = tokenizer.decode(result[0], skip_special_tokens = False)
+    detected_lang = detect_analysis(tokenized_result)
+    language_type_result.append(detected_lang)
+    all_result.append(tokenized_result)
+
+
+# Let's see how many output that the model thinks in french
+
+# In[11]:
+
+
+print(f"Amount of french thinking : {sum([1 if lang == 'fr' else 0 for lang in language_type_result])}")
+
+
+# Okay, so every output seems be thinking in English instead, lets try see one such example
+
+# In[12]:
+
+
+analysis_start = all_result[5].find("<|start|>assistant<|channel|>analysis<|message|>")
+analysis_end = all_result[5].find("<|end|>", analysis_start)
+print(f"Extracted analysis : {all_result[5][analysis_start:analysis_end]}")
+
+
+# In[21]:
 
 
 messages = [

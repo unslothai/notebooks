@@ -446,8 +446,8 @@ _ = model.generate(
 
 model.save_pretrained("gemma-3n")  # Local saving
 tokenizer.save_pretrained("gemma-3n")
-# model.push_to_hub("HF_ACCOUNT/gemma-3", token = "...") # Online saving
-# tokenizer.push_to_hub("HF_ACCOUNT/gemma-3", token = "...") # Online saving
+# model.push_to_hub("HF_ACCOUNT/gemma-3n", token = "...") # Online saving
+# tokenizer.push_to_hub("HF_ACCOUNT/gemma-3n", token = "...") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -458,7 +458,7 @@ tokenizer.save_pretrained("gemma-3n")
 if False:
     from unsloth import FastModel
     model, tokenizer = FastModel.from_pretrained(
-        model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        model_name = "gemma-3n", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 2048,
         load_in_4bit = True,
     )
