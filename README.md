@@ -317,7 +317,6 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | **Qwen2.5 VL** **(7B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen2 VL** **(7B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen2** **(7B)** | Alpaca | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Qwen2.5-Coder (1.5B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Qwen2.5-Coder-(1.5B)-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### Spark Notebooks
 | Model | Type | Notebook Link |
