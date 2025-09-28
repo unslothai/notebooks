@@ -38,6 +38,18 @@
 # # In[ ]:
 # 
 # 
+# # Let's start our distributed runtime
+# get_ipython().run_line_magic('load_ext', 'nbdistributed')
+# get_ipython().run_line_magic('dist_init', '-n 2')
+# import time
+# 
+# time.sleep(5)
+# get_ipython().run_line_magic('dist_status', '')
+# 
+# 
+# # In[ ]:
+# 
+# 
 # get_ipython().run_cell_magic('capture', '', '!uv pip install --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo\n!uv pip install --force-reinstall --no-deps git+https://github.com/unslothai/unsloth\n')
 # 
 # 

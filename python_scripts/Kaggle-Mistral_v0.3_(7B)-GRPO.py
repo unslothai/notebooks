@@ -35,6 +35,18 @@
 # get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\nget_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")\n!uv pip install -qqq --upgrade     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers\n!uv pip install -qqq {get_triton}\n!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.\n!uv pip install transformers==4.55.4\n!uv pip install --no-deps trl==0.22.2\n')
 # 
 # 
+# # In[ ]:
+# 
+# 
+# # Let's start our distributed runtime
+# get_ipython().run_line_magic('load_ext', 'nbdistributed')
+# get_ipython().run_line_magic('dist_init', '-n 2')
+# import time
+# 
+# time.sleep(5)
+# get_ipython().run_line_magic('dist_status', '')
+# 
+# 
 # # ### Unsloth
 
 # Load up `unsloth/mistral-7b-instruct-v0.3-bnb-4bit`, and set parameters

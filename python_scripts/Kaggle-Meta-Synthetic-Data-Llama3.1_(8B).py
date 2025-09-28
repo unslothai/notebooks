@@ -37,253 +37,267 @@
 # get_ipython().run_cell_magic('capture', '', '!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\nget_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")\n!uv pip install -qqq --upgrade     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers\n!uv pip install -qqq {get_triton}\n!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0\n!uv pip install synthetic-data-kit==0.0.3\n!uv pip install transformers==4.55.4\n!uv pip install --no-deps trl==0.22.2\n')
 # 
 # 
-# # ### Synthetic-data-kit
-# 
-# # In[3]:
+# # In[ ]:
 # 
 # 
-# # Load and run the model using vllm
-# # we prepend "nohup" and postpend "&" to make the Colab cell run in background
-# get_ipython().system(' nohup python -m vllm.entrypoints.openai.api_server                    --model unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit                    --trust-remote-code                    --dtype half                    --quantization bitsandbytes                    --max-model-len 10000                    --tensor-parallel-size 1                    --gpu-memory-utilization 0.7                    --enable-chunked-prefill                    --port 8000                    > vllm.log &')
+# # Let's start our distributed runtime
+# get_ipython().run_line_magic('load_ext', 'nbdistributed')
+# get_ipython().run_line_magic('dist_init', '-n 2')
+# import time
 # 
-# 
-# # In[4]:
-# 
-# 
-# # tail vllm logs. Check server has been started correctly
-# get_ipython().system('while ! grep -q "Application startup complete" vllm.log; do tail -n 1 vllm.log; sleep 5; done')
-# 
-# 
-# # Optional: Function to check if vllm server is running. Change False to True and run cell
-# 
-# # In[6]:
-# 
-# 
-# if False:
-#   def is_vllm_server_running(api_base_url=None):
-#       """Simply check if VLLM server is running and reachable."""
-#       print(api_base_url)
-#       try:
-#           response = requests.get(f"{api_base_url}/models", timeout=2)
-#           return response.status_code == 200
-#       except:
-#           return False
-#   is_running = is_vllm_server_running("http://localhost:8000/v1")
-#   if is_running:
-#       print(f"VLLM server is running.")
-#   else:
-#       print(f"VLLM server is not available.")
-# 
-# 
-# # Create data directories
-# 
-# # In[5]:
-# 
-# 
-# get_ipython().system('mkdir -p data/{pdf,html,youtube,docx,ppt,txt,output,generated,cleaned,final}')
-# 
-# 
-# # ### Ingest source file
-# # 
-# # Ingest source file "https://ai.meta.com/blog/llama-4-multimodal-intelligence/" . Can also use pdf, docx, ppt and youtube video
-# 
-# # In[6]:
-# 
-# 
-# from synthetic_data_kit.core.ingest import process_file
-# import os
-# 
-# # Set variables directly
-# doc_source = "https://ai.meta.com/blog/llama-4-multimodal-intelligence/"
-# output_dir = "data/output"
-# name = None  # Let the process determine the filename automatically
-# config = ctx.config if 'ctx' in locals() else None  # Use ctx if available, otherwise None
-# 
-# try:
-#     # Call process_file directly
-#     output_path = process_file(doc_source, output_dir, name, config)
-#     print(f"Text successfully extracted to {output_path}")
-# except Exception as e:
-#     print(f"Error: {e}")
-# 
-# 
-# # ### Generate QA pairs
-# # 
-# # Generate QA pairs with the help of vllm and Llama-3.1-8B-Instruct-unsloth-bnb-4bit.
-# # set num_pairs to the number of required pairs
-# 
-# # In[9]:
-# 
-# 
-# from synthetic_data_kit.core.create import process_file
-# import os
-# import requests
-# import json
-# 
-# # Set parameters
-# input_file = "data/output/ai_meta_com.txt"
-# output_dir = "data/generated"
-# config_path = ctx.config_path if 'ctx' in locals() else None  # Use ctx if available
-# api_base = "http://localhost:8000/v1"  # Default VLLM API endpoint
-# model = "unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit"
-# content_type = "qa"
-# num_pairs = 10
-# verbose = False
-# 
-# # Read the content of the input file
-# with open(input_file, 'r') as f:
-#     text_content = f.read()
-# 
-# 
-# print("\nGenerating QA pairs...")
-# try:
-#     # Call process_file directly with all parameters
-#     output_path = process_file(
-#         input_file,
-#         output_dir,
-#         config_path,
-#         api_base,
-#         model,
-#         content_type,
-#         num_pairs,
-#         verbose
-#     )
-# 
-#     if output_path:
-#         print(f"Content saved to {output_path}")
-# 
-#         # Additionally, print the content of the generated file
-#         try:
-#             with open(output_path, 'r') as f:
-#                 output_content = f.read()
-#             print("\nGenerated content (first 500 chars):")
-#             print(output_content[:500] + "..." if len(output_content) > 500 else output_content)
-#         except Exception as e:
-#             print(f"Could not read generated file: {e}")
-#     else:
-#         print("No output was generated")
-# except Exception as e:
-#     print(f"Error: {e}")
-# 
-# 
-# # ### Curate Data Pairs
-# 
-# # In[10]:
-# 
-# 
-# from synthetic_data_kit.core.curate import curate_qa_pairs
-# 
-# # Set all parameters directly
-# input_file = "data/generated/ai_meta_com_qa_pairs.json"
-# cleaned_dir = "data/cleaned"
-# base_name = os.path.splitext(os.path.basename(input_file))[0]
-# output = os.path.join(cleaned_dir, f"{base_name}_cleaned.json")
-# 
-# threshold = None  # Use default threshold
-# config_path = ctx.config_path if 'ctx' in locals() else None  # Use ctx if available
-# verbose = False
-# 
-# print("\nCurating generated pairs...")
-# 
-# try:
-#     # Call curate_qa_pairs directly
-#     result_path = curate_qa_pairs(
-#         input_file,
-#         output,
-#         threshold,
-#         api_base,
-#         model,
-#         config_path,
-#         verbose
-#     )
-# 
-#     print(f"Cleaned content saved to {result_path}")
-# 
-#     # Display the content of the cleaned file
-#     try:
-#         with open(result_path, 'r') as f:
-#             output_content = f.read()
-#         print("\nGenerated content (first 500 chars):")
-#         print(output_content[:500] + "..." if len(output_content) > 500 else output_content)
-#     except Exception as e:
-#         print(f"Could not read cleaned file: {e}")
-# except Exception as e:
-#     print(f"Error: {e}")
-# 
-# 
-# # ### Save to chatML format
-# 
-# # In[11]:
-# 
-# 
-# from synthetic_data_kit.core.save_as import convert_format
-# import os
-# import json
-# 
-# # Set all parameters directly
-# input_file = "data/cleaned/ai_meta_com_qa_pairs_cleaned.json"
-# format_type = "ft"  # OpenAI fine-tuning format
-# storage_format = "json"  # Default storage format
-# 
-# # Set up output path
-# final_dir = "data/final"
-# #os.makedirs(final_dir, exist_ok=True)
-# base_name = os.path.splitext(os.path.basename(input_file))[0]
-# 
-# # Determine output file path
-# if storage_format == "hf":
-#     output_path = os.path.join(final_dir, f"{base_name}_{format_type}_hf")
-# else:
-#     if format_type == "jsonl":
-#         output_path = os.path.join(final_dir, f"{base_name}.jsonl")
-#     else:
-#         output_path = os.path.join(final_dir, f"{base_name}_{format_type}.json")
-# 
-# # Load config if available
-# config = ctx.config if 'ctx' in locals() else None
-# 
-# try:
-#     # Call convert_format directly
-#     result_path = convert_format(
-#         input_file,
-#         output_path,
-#         format_type,
-#         config,
-#         storage_format=storage_format
-#     )
-# 
-#     print(f"Converted to {format_type} format and saved to {result_path}")
-# 
-#     # Display the content of the converted file
-#     try:
-#         if os.path.isfile(result_path):
-#             with open(result_path, 'r') as f:
-#                 output_content = f.read()
-#             print("\nConverted content (first 500 chars):")
-#             print(output_content[:500] + "..." if len(output_content) > 500 else output_content)
-#         else:
-#             # For HF datasets, it's a directory
-#             print(f"\nSaved as HF dataset directory at {result_path}")
-#             if os.path.exists(os.path.join(result_path, "dataset_info.json")):
-#                 with open(os.path.join(result_path, "dataset_info.json"), 'r') as f:
-#                     info = json.load(f)
-#                 print(f"Dataset info: {info}")
-#     except Exception as e:
-#         print(f"Could not read converted file: {e}")
-# 
-# except Exception as e:
-#     print(f"Error: {e}")
-# 
-# 
-# # In[12]:
-# 
-# 
-# # kill vllm server. Takes around 5 seconds.
-# print("Attempting to terminate the VLLM server")
-# get_ipython().system('pkill -f "vllm.entrypoints.openai.api_server"')
+# time.sleep(5)
+# get_ipython().run_line_magic('dist_status', '')
 # 
 # 
 # # ### Unsloth
+
+# ### Synthetic-data-kit
+
+# In[3]:
+
+
+# Load and run the model using vllm
+# we prepend "nohup" and postpend "&" to make the Colab cell run in background
+get_ipython().system(' nohup python -m vllm.entrypoints.openai.api_server                    --model unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit                    --trust-remote-code                    --dtype half                    --quantization bitsandbytes                    --max-model-len 10000                    --tensor-parallel-size 1                    --gpu-memory-utilization 0.7                    --enable-chunked-prefill                    --port 8000                    > vllm.log &')
+
+
+# In[4]:
+
+
+# tail vllm logs. Check server has been started correctly
+get_ipython().system('while ! grep -q "Application startup complete" vllm.log; do tail -n 1 vllm.log; sleep 5; done')
+
+
+# Optional: Function to check if vllm server is running. Change False to True and run cell
+
+# In[6]:
+
+
+if False:
+  def is_vllm_server_running(api_base_url=None):
+      """Simply check if VLLM server is running and reachable."""
+      print(api_base_url)
+      try:
+          response = requests.get(f"{api_base_url}/models", timeout=2)
+          return response.status_code == 200
+      except:
+          return False
+  is_running = is_vllm_server_running("http://localhost:8000/v1")
+  if is_running:
+      print(f"VLLM server is running.")
+  else:
+      print(f"VLLM server is not available.")
+
+
+# Create data directories
+
+# In[5]:
+
+
+get_ipython().system('mkdir -p data/{pdf,html,youtube,docx,ppt,txt,output,generated,cleaned,final}')
+
+
+# ### Ingest source file
+# 
+# Ingest source file "https://ai.meta.com/blog/llama-4-multimodal-intelligence/" . Can also use pdf, docx, ppt and youtube video
+
+# In[6]:
+
+
+from synthetic_data_kit.core.ingest import process_file
+import os
+
+# Set variables directly
+doc_source = "https://ai.meta.com/blog/llama-4-multimodal-intelligence/"
+output_dir = "data/output"
+name = None  # Let the process determine the filename automatically
+config = ctx.config if 'ctx' in locals() else None  # Use ctx if available, otherwise None
+
+try:
+    # Call process_file directly
+    output_path = process_file(doc_source, output_dir, name, config)
+    print(f"Text successfully extracted to {output_path}")
+except Exception as e:
+    print(f"Error: {e}")
+
+
+# ### Generate QA pairs
+# 
+# Generate QA pairs with the help of vllm and Llama-3.1-8B-Instruct-unsloth-bnb-4bit.
+# set num_pairs to the number of required pairs
+
+# In[9]:
+
+
+from synthetic_data_kit.core.create import process_file
+import os
+import requests
+import json
+
+# Set parameters
+input_file = "data/output/ai_meta_com.txt"
+output_dir = "data/generated"
+config_path = ctx.config_path if 'ctx' in locals() else None  # Use ctx if available
+api_base = "http://localhost:8000/v1"  # Default VLLM API endpoint
+model = "unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit"
+content_type = "qa"
+num_pairs = 10
+verbose = False
+
+# Read the content of the input file
+with open(input_file, 'r') as f:
+    text_content = f.read()
+
+
+print("\nGenerating QA pairs...")
+try:
+    # Call process_file directly with all parameters
+    output_path = process_file(
+        input_file,
+        output_dir,
+        config_path,
+        api_base,
+        model,
+        content_type,
+        num_pairs,
+        verbose
+    )
+
+    if output_path:
+        print(f"Content saved to {output_path}")
+
+        # Additionally, print the content of the generated file
+        try:
+            with open(output_path, 'r') as f:
+                output_content = f.read()
+            print("\nGenerated content (first 500 chars):")
+            print(output_content[:500] + "..." if len(output_content) > 500 else output_content)
+        except Exception as e:
+            print(f"Could not read generated file: {e}")
+    else:
+        print("No output was generated")
+except Exception as e:
+    print(f"Error: {e}")
+
+
+# ### Curate Data Pairs
+
+# In[10]:
+
+
+from synthetic_data_kit.core.curate import curate_qa_pairs
+
+# Set all parameters directly
+input_file = "data/generated/ai_meta_com_qa_pairs.json"
+cleaned_dir = "data/cleaned"
+base_name = os.path.splitext(os.path.basename(input_file))[0]
+output = os.path.join(cleaned_dir, f"{base_name}_cleaned.json")
+
+threshold = None  # Use default threshold
+config_path = ctx.config_path if 'ctx' in locals() else None  # Use ctx if available
+verbose = False
+
+print("\nCurating generated pairs...")
+
+try:
+    # Call curate_qa_pairs directly
+    result_path = curate_qa_pairs(
+        input_file,
+        output,
+        threshold,
+        api_base,
+        model,
+        config_path,
+        verbose
+    )
+
+    print(f"Cleaned content saved to {result_path}")
+
+    # Display the content of the cleaned file
+    try:
+        with open(result_path, 'r') as f:
+            output_content = f.read()
+        print("\nGenerated content (first 500 chars):")
+        print(output_content[:500] + "..." if len(output_content) > 500 else output_content)
+    except Exception as e:
+        print(f"Could not read cleaned file: {e}")
+except Exception as e:
+    print(f"Error: {e}")
+
+
+# ### Save to chatML format
+
+# In[11]:
+
+
+from synthetic_data_kit.core.save_as import convert_format
+import os
+import json
+
+# Set all parameters directly
+input_file = "data/cleaned/ai_meta_com_qa_pairs_cleaned.json"
+format_type = "ft"  # OpenAI fine-tuning format
+storage_format = "json"  # Default storage format
+
+# Set up output path
+final_dir = "data/final"
+#os.makedirs(final_dir, exist_ok=True)
+base_name = os.path.splitext(os.path.basename(input_file))[0]
+
+# Determine output file path
+if storage_format == "hf":
+    output_path = os.path.join(final_dir, f"{base_name}_{format_type}_hf")
+else:
+    if format_type == "jsonl":
+        output_path = os.path.join(final_dir, f"{base_name}.jsonl")
+    else:
+        output_path = os.path.join(final_dir, f"{base_name}_{format_type}.json")
+
+# Load config if available
+config = ctx.config if 'ctx' in locals() else None
+
+try:
+    # Call convert_format directly
+    result_path = convert_format(
+        input_file,
+        output_path,
+        format_type,
+        config,
+        storage_format=storage_format
+    )
+
+    print(f"Converted to {format_type} format and saved to {result_path}")
+
+    # Display the content of the converted file
+    try:
+        if os.path.isfile(result_path):
+            with open(result_path, 'r') as f:
+                output_content = f.read()
+            print("\nConverted content (first 500 chars):")
+            print(output_content[:500] + "..." if len(output_content) > 500 else output_content)
+        else:
+            # For HF datasets, it's a directory
+            print(f"\nSaved as HF dataset directory at {result_path}")
+            if os.path.exists(os.path.join(result_path, "dataset_info.json")):
+                with open(os.path.join(result_path, "dataset_info.json"), 'r') as f:
+                    info = json.load(f)
+                print(f"Dataset info: {info}")
+    except Exception as e:
+        print(f"Could not read converted file: {e}")
+
+except Exception as e:
+    print(f"Error: {e}")
+
+
+# In[12]:
+
+
+# kill vllm server. Takes around 5 seconds.
+print("Attempting to terminate the VLLM server")
+get_ipython().system('pkill -f "vllm.entrypoints.openai.api_server"')
+
+
+# ### Unsloth
 
 # In[16]:
 

@@ -35,6 +35,18 @@
 # get_ipython().run_cell_magic('capture', '', '!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\n!uv pip install -qqq --upgrade --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128\n!uv pip install -qqq \\\n    "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers>=4.55.3" \\\n    "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n    "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n    git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels\n!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers\n!uv pip install --no-deps trl==0.22.2\n')
 # 
 # 
+# # In[ ]:
+# 
+# 
+# # Let's start our distributed runtime
+# get_ipython().run_line_magic('load_ext', 'nbdistributed')
+# get_ipython().run_line_magic('dist_init', '-n 2')
+# import time
+# 
+# time.sleep(5)
+# get_ipython().run_line_magic('dist_status', '')
+# 
+# 
 # # ### Unsloth
 
 # We're about to demonstrate the power of the new OpenAI GPT-OSS 20B model through a finetuning example. To use our `MXFP4` inference example, use this [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/GPT_OSS_MXFP4_(20B)-Inference.ipynb) instead.

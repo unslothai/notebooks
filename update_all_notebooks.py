@@ -120,6 +120,9 @@ import os
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
 !pip install unsloth
 !pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
+!pip install "git+https://github.com/Erland366/unsloth.git@feat/distributed_with_lock"
+!pip install "git+https://github.com/Erland366/unsloth-zoo.git@feat/distributed_with_lock"
+!pip install git+https://github.com/Erland366/nbdistributed.git 
 """
 
 installation_kaggle_content = update_or_append_pip_install(
@@ -988,7 +991,38 @@ def update_notebook_sections(
 
                         notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
-                        # TODO: Remove after GRPO numpy bug fixed! 
+
+                        # Add distributed computing cell after installation for Kaggle notebooks
+                        if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                            # Check if distributed cell already exists
+                            distributed_cell_exists = False
+                            for check_cell in notebook_content["cells"]:
+                                if check_cell["cell_type"] == "code":
+                                    cell_source = "".join(check_cell["source"])
+                                    if "%load_ext nbdistributed" in cell_source:
+                                        distributed_cell_exists = True
+                                        break
+
+                            if not distributed_cell_exists:
+                                kaggle_distributed_cell = {
+                                    "cell_type": "code",
+                                    "execution_count": None,
+                                    "metadata": {},
+                                    "outputs": [],
+                                    "source": [
+                                        "# Let's start our distributed runtime\n",
+                                        "%load_ext nbdistributed\n",
+                                        "%dist_init -n 2\n",
+                                        "import time\n",
+                                        "\n",
+                                        "time.sleep(5)\n",
+                                        "%dist_status\n"
+                                    ]
+                                }
+                                notebook_content["cells"].insert(i + 2, kaggle_distributed_cell)
+                                updated = True
+
+                        # TODO: Remove after GRPO numpy bug fixed!
                         # Error: ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
                         if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                             i += 2

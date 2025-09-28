@@ -34,7 +34,19 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.55.4\n!pip install --no-deps trl==0.22.2\n!pip install omegaconf einx\n!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS\nimport os\nos.remove("/content/OuteTTS/outetts/models/gguf_model.py")\nos.remove("/content/OuteTTS/outetts/interface.py")\nos.remove("/content/OuteTTS/outetts/__init__.py")\n!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy\n!pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.55.4\n!pip install "git+https://github.com/Erland366/unsloth.git@feat/distributed_with_lock"\n!pip install "git+https://github.com/Erland366/unsloth-zoo.git@feat/distributed_with_lock"\n!pip install git+https://github.com/Erland366/nbdistributed.git\n!pip install --no-deps trl==0.22.2\n!pip install omegaconf einx\n!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS\nimport os\nos.remove("/content/OuteTTS/outetts/models/gguf_model.py")\nos.remove("/content/OuteTTS/outetts/interface.py")\nos.remove("/content/OuteTTS/outetts/__init__.py")\n!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy\n!pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
+# 
+# 
+# # In[ ]:
+# 
+# 
+# # Let's start our distributed runtime
+# get_ipython().run_line_magic('load_ext', 'nbdistributed')
+# get_ipython().run_line_magic('dist_init', '-n 2')
+# import time
+# 
+# time.sleep(5)
+# get_ipython().run_line_magic('dist_status', '')
 # 
 # 
 # # ### Unsloth

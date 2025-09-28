@@ -29,13 +29,27 @@
 # Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
 # 
 
-# ### Installation
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('capture', '', '!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\nget_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")\n!uv pip install -qqq --upgrade     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers\n!uv pip install -qqq {get_triton}\n!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0\n!uv pip install synthetic-data-kit==0.0.3\n!uv pip install transformers==4.55.4\n!uv pip install --no-deps trl==0.22.2\n')
-
+# # ### Installation
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', '!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\nget_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")\n!uv pip install -qqq --upgrade     unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers\n!uv pip install -qqq {get_triton}\n!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0\n!uv pip install synthetic-data-kit==0.0.3\n!uv pip install transformers==4.55.4\n!uv pip install --no-deps trl==0.22.2\n')
+# 
+# 
+# # In[ ]:
+# 
+# 
+# # Let's start our distributed runtime
+# get_ipython().run_line_magic('load_ext', 'nbdistributed')
+# get_ipython().run_line_magic('dist_init', '-n 2')
+# import time
+# 
+# time.sleep(5)
+# get_ipython().run_line_magic('dist_status', '')
+# 
+# 
+# # ### Unsloth
 
 # ## Primary Goal
 # Our goal is to make Llama 3.2 3B understand the "Byte Latent Transformer: Patches Scale Better Than Tokens" [research paper](https://ai.meta.com/research/publications/byte-latent-transformer-patches-scale-better-than-tokens/) that was published in December 2024.
