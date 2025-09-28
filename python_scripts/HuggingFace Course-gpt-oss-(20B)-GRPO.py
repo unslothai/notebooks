@@ -39,287 +39,666 @@
 # 
 # # ### Unsloth
 
-# We're also introducing how you can do `GSPO` inside of Unsloth as well!
+# # Goal: Make faster kernels with Reinforcement Learning
 # 
-# The goal of this notebook is to make a vision language model solve maths problems via reinforcement learning given an image input like below:
+# Our goal is to make a faster matrix multiplication kernel by doing RL on GTP-OSS 20B with Unsloth.
 # 
-# <img src="https://raw.githubusercontent.com/lupantech/MathVista/main/assets/our_new_3_datasets.png" alt="Alt text" height="256">
+# <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Matrix_multiplication_qtl1.svg/500px-Matrix_multiplication_qtl1.svg.png" height=200 />
+# 
+# You will learn how to:
+# 1. Counteract **reward hacking** like cheating, caching, laziness.
+# 2. Timing and correctness of kernels and time limits.
+# 3. Making good **reward functions**
+# 4. How to seriously do RL to make optimized CUDA kernels
 
-# In[ ]:
+# In[2]:
 
 
-from unsloth import FastVisionModel
+from unsloth import FastLanguageModel
 import torch
-max_seq_length = 16384 # Must be this long for VLMs
-lora_rank = 16 # Larger rank = smarter, but slower
-
-model, tokenizer = FastVisionModel.from_pretrained(
-    model_name = "unsloth/Qwen2.5-VL-7B-Instruct",
+max_seq_length = 800 # Can increase for longer RL output
+lora_rank = 4 # Larger rank = smarter, but slower
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = "unsloth/gpt-oss-20b",
     max_seq_length = max_seq_length,
     load_in_4bit = True, # False for LoRA 16bit
-    fast_inference = True, # Enable vLLM fast inference
-    gpu_memory_utilization = 0.8, # Reduce if out of memory
+    offload_embedding = True, # Reduces VRAM by 1GB
 )
 
 
-# In Unsloth, we share vLLM's weights directly, reducing VRAM usage by > 50%. vLLM also does not yet support LoRA on the vision layers, so we can only add them on the language layers. Vision GRPO still works though!
+# We now add some small amount of LoRA weights to GPT-OSS so we only need to train those, instead of training on the full model.
 
-# In[ ]:
+# In[3]:
 
 
-model = FastVisionModel.get_peft_model(
+model = FastLanguageModel.get_peft_model(
     model,
-    finetune_vision_layers     = False, # False if not finetuning vision layers
-    finetune_language_layers   = True,  # False if not finetuning language layers
-    finetune_attention_modules = True,  # False if not finetuning attention layers
-    finetune_mlp_modules       = True,  # False if not finetuning MLP layers
-
-    r = 16,           # The larger, the higher the accuracy, but might overfit
-    lora_alpha = 16,  # Recommended alpha == r at least
-    lora_dropout = 0,
-    bias = "none",
-    random_state = 3407,
-    use_rslora = False,  # We support rank stabilized LoRA
-    loftq_config = None, # And LoftQ
+    r = lora_rank, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
+    target_modules = [
+        "q_proj", "k_proj", "v_proj", "o_proj",
+        "gate_proj", "up_proj", "down_proj",
+    ],
+    lora_alpha = lora_rank*2, # *2 speeds up training
     use_gradient_checkpointing = "unsloth", # Reduces memory usage
-    # target_modules = "all-linear", # Optional now! Can specify a list if needed
+    random_state = 3407,
 )
 
 
-# ### Data Prep
-# <a name="Data"></a>
+# # Optimized matrix multiplication
 # 
-# `AI4Math/MathVista` is a dataset that involves using images to solve logic and math problems.
+# Numpy has optimized matrix multiplication kernels for CPUs via BLAS optimized operations. For GPUs, one can use CUDA accelerated cuBLAS kernels which PyTorch calls under the hood.
 # 
-# For this notebook, we will only use math problems with numeric answers for simpilicity.
+# To generate some random matrices to do matrix multiplication, we can do the below:
 
-# In[ ]:
-
-
-from datasets import load_dataset
-from trl import GRPOConfig, GRPOTrainer
-
-dataset = load_dataset("AI4Math/MathVista", split = "testmini")
+# In[4]:
 
 
-# We filter the dataset to keep only float or numeric answers:
+import numpy as np
+def generate_random_matrices(seed = 3407, n = 256):
+    random_state = np.random.RandomState(seed)
+    n, k, m = random_state.randint(1, n+1, size = 3)
+    A = np.random.uniform(-10, 10, size = (n, k))
+    B = np.random.uniform(-10, 10, size = (k, m))
+    return A, A.tolist(), B, B.tolist()
 
-# In[ ]:
+
+# We shall generate a small matrix, and see the matrix multiplied output
+
+# In[5]:
 
 
-def is_numeric_answer(example):
+A, A_list, B, B_list = generate_random_matrices(seed = 42, n = 5)
+print(A)
+print(B)
+print(np.matmul(A, B))
+
+
+# We can call a LLM to generate a simple matrix multiply kernel in Python only, and we can calculate the differences between the actual result and the kernel's result
+
+# In[6]:
+
+
+def calculate_difference(pred, real):
+    if pred is None: return 5, 5
+    assert real is not None
+    import numpy as np
     try:
-        float(example["answer"])
-        return True
+        difference = pred - real
     except:
-        return False
-
-dataset = dataset.filter(is_numeric_answer)
-
-
-# We also resize the images to be 512 by 512 pixels to make the images managable in context length. We also convert them to RGB so they are compatible for training!
-
-# In[ ]:
+        return 5, 5
+    amax_error = float(np.amax(difference))
+    mse_error  = float(np.mean(np.square(difference)))
+    return amax_error, mse_error
 
 
-# Resize to (512, 512)
-def resize_images(example):
-    image = example["decoded_image"]
-    image = image.resize((512, 512))
-    example["decoded_image"] = image
-    return example
-dataset = dataset.map(resize_images)
-
-# Then convert to RGB
-def convert_to_rgb(example):
-    image = example["decoded_image"]
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-    example["decoded_image"] = image
-    return example
-dataset = dataset.map(convert_to_rgb)
+# In[7]:
 
 
-# We then create the conversational template that is needed to collate the dataset for RL:
-
-# In[ ]:
-
-
-# Define the delimiter variables for clarity and easy modification
-REASONING_START = "<REASONING>"
-REASONING_END = "</REASONING>"
-SOLUTION_START = "<SOLUTION>"
-SOLUTION_END = "</SOLUTION>"
-
-def make_conversation(example):
-    # Define placeholder constants if they are not defined globally
-    # The user's text prompt
-    text_content = (
-        f"{example['question']}. Also first provide your reasoning or working out"\
-        f" on how you would go about solving the question between {REASONING_START} and {REASONING_END}"
-        f" and then your final answer between {SOLUTION_START} and (put a single float here) {SOLUTION_END}"
-    )
-
-    # Construct the prompt in the desired multi-modal format
-    prompt = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image"},  # Placeholder for the image
-                {"type": "text", "text": text_content},  # The text part of the prompt
-            ],
-        },
-    ]
-    # The actual image data is kept separate for the processor
-    return {"prompt": prompt, "image": example["decoded_image"], "answer": example["answer"]}
-
-train_dataset = dataset.map(make_conversation)
-
-# We're reformatting dataset like this because decoded_images are the actual images
-# The "image": example["decoded_image"] does not properly format the dataset correctly
-
-# 1. Remove the original 'image' column
-train_dataset = train_dataset.remove_columns("image")
-
-# 2. Rename 'decoded_image' to 'image'
-train_dataset = train_dataset.rename_column("decoded_image", "image")
+# Kernel generated by GPT-5
+def matmul(A, B):
+    z, s = zip, sum
+    Bt = list(z(*B))
+    return [[s(a*b for a, b in z(row, col)) for col in Bt] for row in A]
 
 
-# Now let's apply the chat template across the entire dataset:
+# We see the error below is very small, so that's good!
 
-# In[ ]:
+# In[8]:
 
 
-train_dataset = train_dataset.map(
-    lambda example: {
-        "prompt": tokenizer.apply_chat_template(
-            example["prompt"],
-            tokenize = False,
-            add_generation_prompt = True, # Must add assistant
-        )
+prediction = matmul(A_list, B_list)
+calculate_difference(prediction, np.matmul(A, B))
+
+
+# # Countering Reward Hacking
+# 
+# The ultimate goal of RL is to maximize some reward (say speed, revenue, some metric).
+# 
+# But RL can **cheat** When the RL algorithm learns a trick or exploits something to increase the reward, without actually doing the task at end, this is called "Reward Hacking".
+# 
+# Some good examples are in https://en.wikipedia.org/wiki/Reward_hacking
+# 
+# For matrix multiplication kernels, we might see the following issues:
+# 
+# * Laziness: RL learns to use Numpy, Torch, other libraries, which calls optimized CUDA kernels.
+# * Caching: RL learns to cache the result of the output
+# * Cheating: RL learns to find the actual output by inspecting Python global variables
+# * RL learns to edit the timing function to make it output 0 time as passed.
+# 
+# And possibly more. We shall try to address each!
+
+# # Countering Reward Hacking 1: Stop laziness
+# We can stop the RL algorithm from calling optimized code by inspecting if the generated code imports other non standard Python libraries. We used GPT-5 to help generate this check `check_only_stdlib_imports`:
+
+# In[9]:
+
+
+#@title (Collapsible code)
+import ast
+import sys
+import sysconfig
+from pathlib import Path
+
+def _stdlib_names():
+    """
+    Build a set of canonical stdlib top-level module/package names.
+    Uses sys.stdlib_module_names when available (3.10+), with a
+    filesystem fallback for older versions/edge cases.
+    """
+    names = {m.lower() for m in getattr(sys, "stdlib_module_names", set())}
+    names |= {m.lower() for m in sys.builtin_module_names}
+    names.add("__future__")  # special-case
+
+    # Fallback/augmentation: scan the stdlib directory
+    try:
+        stdlib_dir = Path(sysconfig.get_path("stdlib"))
+        if stdlib_dir.exists():
+            for p in stdlib_dir.iterdir():
+                if p.name == "site-packages":
+                    continue
+                if p.suffix == ".py":
+                    names.add(p.stem.lower())
+                elif p.is_dir() and (p / "__init__.py").exists():
+                    names.add(p.name.lower())
+    except Exception:
+        # conservative fallback; the names set above will still work well
+        pass
+
+    return names
+
+_STDLIB_SET = _stdlib_names()
+
+def check_only_stdlib_imports(code: str):
+    """
+    Return (ok: bool, details: dict)
+
+    ok == True  -> all absolute imports are from the stdlib.
+    ok == False -> details['non_stdlib'] lists offending top-level modules.
+
+    details includes:
+      - stdlib: sorted list of stdlib imports found
+      - non_stdlib: sorted list of non-stdlib imports found
+      - relative_imports: count of relative imports (always allowed here)
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return False, {
+            "error": f"SyntaxError: {e}",
+            "stdlib": [],
+            "non_stdlib": [],
+            "relative_imports": 0,
+        }
+
+    abs_imports = set()
+    relative_count = 0
+
+    class Visitor(ast.NodeVisitor):
+        def visit_Import(self, node: ast.Import):
+            for alias in node.names:
+                abs_imports.add(alias.name.split(".")[0])
+        def visit_ImportFrom(self, node: ast.ImportFrom):
+            nonlocal relative_count
+            if (node.level or 0) > 0:
+                # relative import
+                relative_count += 1
+            else:
+                if node.module:
+                    abs_imports.add(node.module.split(".")[0])
+
+    Visitor().visit(tree)
+
+    stdlib_found = sorted(m for m in abs_imports if m.lower() in _STDLIB_SET)
+    non_stdlib = sorted(m for m in abs_imports if m.lower() not in _STDLIB_SET)
+
+    return len(non_stdlib) == 0, {
+        "stdlib": stdlib_found,
+        "non_stdlib": non_stdlib,
+        "relative_imports": relative_count,
     }
+
+
+# For example, let's call `check_only_stdlib_imports` on a random piece of matrix multiplication code generated by GPT-5:
+
+# In[10]:
+
+
+sample = """
+def matmul(A, B):
+    import numpy as np
+    from torch import matmul
+    z, s = zip, sum
+    Bt = list(z(*B))
+    return [[s(a*b for a, b in z(row, col)) for col in Bt] for row in A]
+"""
+ok, info = check_only_stdlib_imports(sample)
+print("Only stdlib imports?", ok)
+print(info)
+
+
+# # Countering Reward Hacking 2: Stop cheating
+# We can stop the RL algorithm from using global or cached variables by restricting it's `locals` and `globals`.
+# 
+# We are also going to use `exec` to create the function, so we have to save the output to an empty dict.
+# 
+# We also disallow global variable access.
+
+# In[11]:
+
+
+output_function = {}
+exec(sample, {}, output_function)
+output_function["matmul"]
+
+
+# We also disallow global variable access via `types.FunctionType(f.__code__, {})`
+
+# In[12]:
+
+
+import types
+output_function["matmul"] = types.FunctionType(output_function["matmul"].__code__, {})
+
+def import_numpy():
+    np.matmul
+    print("Success")
+
+import_numpy()
+import_numpy = types.FunctionType(import_numpy.__code__, {})
+try:
+    import_numpy()
+except Exception as e:
+    print(str(e))
+
+
+# In[13]:
+
+
+def create_locked_down_function(function):
+    output_function = {}
+    exec(function, {}, output_function)
+    new_matmul = output_function["matmul"]
+    new_matmul = types.FunctionType(new_matmul.__code__, {})
+    return new_matmul
+
+
+# # Countering Reward Hacking 3: Stop caching
+# We can stop the RL algorithm from using cached data by wiping the cache with a large fake matrix. We also have to benchmark carefully with multiple loops and turns.
+# 
+# We also add a **timer** to not make the algorithm go in an endless loop.
+
+# In[14]:
+
+
+import os, gc, time, statistics
+import signal
+from contextlib import contextmanager
+class TimeoutError(Exception): pass
+
+@contextmanager
+def time_limit(seconds):
+    def _handler(signum, frame):
+        raise TimeoutError(f"Timed out after {seconds}s")
+    old = signal.signal(signal.SIGALRM, _handler)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0.0)
+        signal.signal(signal.SIGALRM, old)
+
+class Benchmarker:
+    def __init__(self, trials = 3, loops = 1, timeout = 30):
+        self.buffer = np.zeros(2 * 1024 * 1024 * 1024, dtype = np.uint8)
+        self.trials = trials
+        self.loops = loops
+        assert timeout > 0 # Cannot be 0 since it won't work!
+        self.timeout = timeout
+    def thrash(self):
+        # Edit the buffer to wipe cache lines
+        self.buffer ^= 1
+        return int(self.buffer[::4096].sum())
+
+    def benchmark(self, function, arguments):
+        assert len(arguments) == self.loops
+        samples = []
+        exceptions = []
+        timed_out = 0
+        for _ in range(self.trials):
+            gc.collect(); gc.disable(); self.thrash()
+            t_start = time.perf_counter_ns()
+            for i in range(self.loops):
+                try:
+                    with time_limit(self.timeout):
+                        function(*arguments[i])
+                except TimeoutError as e:
+                    timed_out += 1
+                except Exception as e:
+                    exceptions.append(str(e))
+            t_end = time.perf_counter_ns()
+            gc.enable()
+            samples.append((t_end - t_start) // max(1, self.loops))
+        return {
+            "median_ns": int(statistics.median(samples)),
+            "mean_ns": int(statistics.fmean(samples)),
+            "stdev_ns": int(statistics.pstdev(samples) if len(samples) > 1 else 0),
+            "exceptions" : exceptions,
+            "timeouts" : timed_out,
+        }
+
+
+# For example we use our matmul kernel we had, and benchmark it with a 10 second delay:
+
+# In[15]:
+
+
+A, A_list, B, B_list = generate_random_matrices(seed = 0, n = 256)
+Benchmarker(trials = 1, timeout = 10).benchmark(output_function["matmul"], [(A_list, B_list)])
+
+
+# # Data & RL task setup
+# 
+# We now have to create a prompt to the model for which it will do some task. For our matrix multiply example, we use the below:
+
+# In[16]:
+
+
+prompt = """
+Create a new fast matrix multiplication function using only native Python code.
+You are given a list of list of numbers.
+Output your new function in backticks using the format below:
+```python
+def matmul(A, B):
+    return ...
+```
+""".strip()
+print(prompt)
+
+
+# First, let's prompt GPT-OSS without RL and see how it goes:
+
+# In[17]:
+
+
+text = tokenizer.apply_chat_template(
+    [{"role": "user", "content": prompt}],
+    tokenize = False,
+    add_generation_prompt = True,
+    reasoning_effort = "low",
+)
+
+from transformers import TextStreamer
+_ = model.generate(
+    **tokenizer(text, return_tensors = "pt").to("cuda"),
+    temperature = 1.0,
+    max_new_tokens = 512,
+    streamer = TextStreamer(tokenizer, skip_prompt = False),
 )
 
 
-# ## Reward functions
+# # Reward functions
 # 
-# We now define some basic formatting rewards functions to see if reasoning starts and ends, and also another to see if the answers were written correctly.
+# We now design the `extract_function` function which simply extracts the function wrapped in 3 backticks.
 # 
-# We also try to fix the `addCriterion` issue as described in our [blog post](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl#qwen-2.5-vl-vision-rl-issues-and-quirks)
+# And 4 reward functions:
+# 
+# 1. `function_works` which rewards the model if the strategy is a valid Python function.
+# 2. `no_cheating` which checks if the function imported other modules, and if it did, we penalize it.
+# 3. `correctness_check` which checks if the kernel was correct or wrong - it shouldn't generate gibberish!
+# 4. `speed_check` checks the performance relative to Numpy matmul directly.
 
-# In[ ]:
+# In[18]:
 
 
-# Reward functions
-import re
+def extract_function(text):
+    if text.count("```") >= 2:
+        first = text.find("```") + 3
+        second = text.find("```", first)
+        fx = text[first : second].strip()
+        fx = fx.removeprefix("python\n")
+        fx = fx[fx.find("def"):]
+        if fx.startswith("def matmul(A, B):"): return fx
+    return None
+print(extract_function(prompt))
 
-def formatting_reward_func(completions,**kwargs):
-    import re
-    thinking_pattern = f'{REASONING_START}(.*?){REASONING_END}'
-    answer_pattern = f'{SOLUTION_START}(.*?){SOLUTION_END}'
 
+# Below is our `function_works` reward function which uses Python's `exec` but guarded by not allowing leakage of local and global variables. We can also use `check_only_stdlib_imports` first to check if there are errors before even executing the function:
+
+# In[19]:
+
+
+ok, info = check_only_stdlib_imports("def a")
+ok, info
+
+
+# In[20]:
+
+
+def function_works(completions, **kwargs):
     scores = []
     for completion in completions:
         score = 0
-        thinking_matches = re.findall(thinking_pattern, completion, re.DOTALL)
-        answer_matches = re.findall(answer_pattern, completion, re.DOTALL)
-        if len(thinking_matches) == 1:
-            score += 1.0
-        if len(answer_matches) == 1:
-            score += 1.0
-
-        # Fix up addCriterion issues
-        # See https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl#qwen-2.5-vl-vision-rl-issues-and-quirks
-        # Penalize on excessive addCriterion and newlines
-        if len(completion) != 0:
-            removal = completion.replace("addCriterion", "").replace("\n", "")
-            if (len(completion)-len(removal))/len(completion) >= 0.5:
-                score -= 2.0
-
+        response = completion[0]["content"]
+        function = extract_function(response)
+        print(function)
+        if function is not None:
+            ok, info = check_only_stdlib_imports(function)
+        if function is None or "error" in info:
+            score = -2.0
+        else:
+            try:
+                new_matmul = create_locked_down_function(function)
+                score = 1.0
+            except:
+                score = -0.5
         scores.append(score)
     return scores
 
 
-def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[float]:
-    answer_pattern = f'{SOLUTION_START}(.*?){SOLUTION_END}'
+# `no_cheating` checks if the function cheated since it might have imported Numpy or Torch optimized code.
 
-    responses = [re.findall(answer_pattern, completion, re.DOTALL) for completion in completions]
-    q = prompts[0]
-    print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:{completions[0]}")
-    return [
-        2.0 if len(r)==1 and a == r[0].replace('\n','') else 0.0
-        for r, a in zip(responses, answer)
-    ]
+# In[21]:
 
 
-# Here is the first example prompt in the dataset
+def no_cheating(completions, **kwargs):
+    scores = []
+    for completion in completions:
+        score = 0
+        response = completion[0]["content"]
+        function = extract_function(response)
+        if function is not None:
+            ok, info = check_only_stdlib_imports(function)
+        else:
+            ok = False
+        scores.append(1.0 if ok else -20.0) # Penalize heavily!
+    return scores
 
-# In[ ]:
 
-
-train_dataset[0]["prompt"]
-
-
-# <a name="Inference"></a>
-# ### Inference
-# Now let's try the model on the hundredth sample of the train dataset without training.
+# Next `correctness_check` checks if the kernel was correct. We want to penalize if the absolute error is larger than 1, and if the mean squared error is somewhat bigger then machine epsilon.
 # 
+# We have to execute the code now!
 
-# In[ ]:
+# In[22]:
 
 
-from vllm import SamplingParams
-sampling_params = SamplingParams(
-    temperature = 1.0,
-    top_k = 50,
-    max_tokens = 1024,
-)
+np.finfo(np.float64).eps
 
-outputs = model.fast_generate(
-    {
-        "prompt": train_dataset[100]["prompt"],
-        "multi_modal_data": {"image": train_dataset[100]["image"]}
-    },
-    sampling_params,
-)
-print(outputs[0].outputs[0].text)
+
+# In[23]:
+
+
+def correctness_check(completions, **kwargs):
+    scores = []
+    for completion in completions:
+        score = 0
+        response = completion[0]["content"]
+        function = extract_function(response)
+        if function is not None:
+            ok, info = check_only_stdlib_imports(function)
+        if function is None or "error" in info:
+            scores.append(0)
+            continue
+        try:
+            new_matmul = create_locked_down_function(function)
+        except:
+            scores.append(0)
+            continue
+        # Generate some random matrices of size less than 128
+        A, A_list, B, B_list = generate_random_matrices(seed = np.random.randint(10000), n = 128)
+        try:
+            pred = new_matmul(A_list, B_list)
+        except:
+            # Failed!
+            scores.append(-2.0)
+            continue
+        true = np.matmul(A, B)
+        amax_error, mse_error = calculate_difference(pred, true)
+
+        # Check correctness and score!
+        machine_epsilon = 100*np.finfo(np.float64).eps
+        if   amax_error >= 3:   score = -3.0
+        elif amax_error >= 2:   score = -2.5
+        elif amax_error >= 1:   score = -2.0
+        elif amax_error >= 0.5: score = -1.0
+        elif amax_error >= 100*machine_epsilon: score = 0.0
+        elif amax_error >= machine_epsilon: score = 1.0
+        else: score = 3.0
+
+        if   mse_error >= 3:   score += -3.0
+        elif mse_error >= 2:   score += -2.5
+        elif mse_error >= 1:   score += -2.0
+        elif mse_error >= 0.5: score += -1.0
+        elif mse_error >= 100*machine_epsilon: score += 0.0
+        elif mse_error >= machine_epsilon: score += 1.0
+        else: score += 3.0
+        scores.append(score)
+    return scores
+
+
+# Finally our benchmarking function for `speed_check`! We shall limit the timer to 10 seconds and do 3 trials.
+
+# In[24]:
+
+
+A, A_list, B, B_list = generate_random_matrices(seed = 0, n = 256)
+benchmarker = Benchmarker(trials = 3, timeout = 10)
+numpy_results = benchmarker.benchmark(np.matmul, [(A, B)])
+numpy_results
+
+
+# In[25]:
+
+
+new_matmul = create_locked_down_function(extract_function(prompt))
+new_results = benchmarker.benchmark(new_matmul, [(A_list, B_list)])
+new_results
+
+
+# We can take the difference and do a negative sign for slower ones. If the ratio is less than 1 (ie faster, we shall invert it!)
+
+# In[26]:
+
+
+negative = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
+positive = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
+reward = negative if new_results["median_ns"] >= numpy_results["median_ns"] else positive
+reward
+
+
+# In[27]:
+
+
+new_results["median_ns"] = 3
+numpy_results["median_ns"] = 1000
+negative = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
+positive = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
+reward = negative if new_results["median_ns"] >= numpy_results["median_ns"] else positive
+reward
+
+
+# In[28]:
+
+
+def speed_check(completions, **kwargs):
+    scores = []
+    for completion in completions:
+        score = 0
+        response = completion[0]["content"]
+        function = extract_function(response)
+        if function is not None:
+            ok, info = check_only_stdlib_imports(function)
+        if function is None or "error" in info:
+            scores.append(0)
+            continue
+        try:
+            new_matmul = create_locked_down_function(function)
+        except:
+            scores.append(0)
+            continue
+        # Generate some random matrices of size less than 256
+        A, A_list, B, B_list = generate_random_matrices(seed = np.random.randint(10000), n = 256)
+        numpy_results = benchmarker.benchmark(np.matmul,  [(A, B)])
+        new_results   = benchmarker.benchmark(new_matmul, [(A_list, B_list)])
+
+        # Get score and clip to -10, 10
+        negative = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
+        positive = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
+        score = negative if new_results["median_ns"] >= numpy_results["median_ns"] else positive
+        if score >= 10:  score = 10
+        if score <= -10: score = -10
+        scores.append(score)
+    return scores
+
+
+# We create the dataset which includes a replica of our prompt:
+
+# In[29]:
+
+
+from datasets import Dataset
+dataset = Dataset.from_list([{"prompt" : [{"role": "user", "content": prompt.strip()}], "answer" : 0}]*1000)
+maximum_length = len(tokenizer(prompt.strip())["input_ids"])
+print(maximum_length)
+dataset[0]
 
 
 # <a name="Train"></a>
 # ### Train the model
 # 
-# Now set up the `GRPO` Trainer and all configurations! Note we actually enable `GSPO` as well!
+# Now set up GRPO Trainer and all configurations! We also support GSDP, GAPO, Dr GRPO and more! Go to our docs https://docs.unsloth.ai/ for more info!
 
-# In[ ]:
+# In[30]:
 
+
+max_prompt_length = maximum_length + 1 # + 1 just in case!
+max_completion_length = max_seq_length - max_prompt_length
 
 from trl import GRPOConfig, GRPOTrainer
 training_args = GRPOConfig(
-    learning_rate = 5e-6,
-    adam_beta1 = 0.9,
-    adam_beta2 = 0.99,
-    weight_decay = 0.1,
+    temperature = 1.0,
+    learning_rate = 5e-5,
+    weight_decay = 0.01,
     warmup_ratio = 0.1,
-    lr_scheduler_type = "cosine",
+    lr_scheduler_type = "linear",
     optim = "adamw_8bit",
     logging_steps = 1,
-    log_completions = False,
     per_device_train_batch_size = 1,
-    gradient_accumulation_steps = 2, # Increase to 4 for smoother training
-    num_generations = 4, # Decrease if out of memory
-    max_prompt_length = 1024,
-    max_completion_length = 1024,
-    num_train_epochs = 0.5, # Set to 1 for a full training run
-    # max_steps = 60,
-    save_steps = 60,
-    max_grad_norm = 0.1,
+    gradient_accumulation_steps = 1, # Increase to 4 for smoother training
+    num_generations = 2, # Decrease if out of memory
+    max_prompt_length = max_prompt_length,
+    max_completion_length = max_completion_length,
+    # num_train_epochs = 1, # Set to 1 for a full training run
+    max_steps = 100,
+    save_steps = 100,
     report_to = "none", # Can use Weights & Biases
     output_dir = "outputs",
 
-    # Below enables GSPO:
-    importance_sampling_level = "sequence",
-    mask_truncated_completions = False,
-    loss_type = "dr_grpo",
+    # For optional training + evaluation
+    # fp16_full_eval = True,
+    # per_device_eval_batch_size = 4,
+    # eval_accumulation_steps = 1,
+    # eval_strategy = "steps",
+    # eval_steps = 1,
 )
 
 
@@ -333,143 +712,84 @@ training_args = GRPOConfig(
 # | 2    | 0.000000      | 0.072375  | 0.248112   | 200.000000        | 0.000000 |
 # | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
 # 
-# During inference, you might encounter `addCriterion` or some weird gibberish outputs. Please read our [blog post](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl#qwen-2.5-vl-vision-rl-issues-and-quirks) on why this occurs. It seems to be an inherent thing inside of the model, and we can ignore this.
 
-# In[14]:
+# In[31]:
 
+
+# For optional training + evaluation
+# new_dataset = dataset.train_test_split(test_size = 0.01)
 
 trainer = GRPOTrainer(
     model = model,
-    args = training_args,
-    # Pass the processor to handle multimodal inputs
     processing_class = tokenizer,
     reward_funcs = [
-        formatting_reward_func,
-        correctness_reward_func,
+        function_works,
+        no_cheating,
+        correctness_check,
+        speed_check,
     ],
-    train_dataset = train_dataset,
+    args = training_args,
+    train_dataset = dataset,
+
+    # For optional training + evaluation
+    # train_dataset = new_dataset["train"],
+    # eval_dataset = new_dataset["test"],
 )
+
+
+# And let's train the model!
+# 
+# **NOTE** A T4 free GPU might take 5 minutes for one generation sadly since it's an old GPU - A100 or H100 will be much faster!
+
+# In[ ]:
+
 
 trainer.train()
 
 
 # <a name="Inference"></a>
-# ### Inference
-# 
-# 
-
-# And now with the LoRA we just trained with GRPO - we first save the LoRA first!
-
-# In[15]:
-
-
-model.save_lora("grpo_lora")
-
-
-# We try calling vLLM with our trained RL model:
-
-# In[16]:
-
-
-from vllm import SamplingParams
-sampling_params = SamplingParams(
-    temperature = 1.0,
-    top_k = 50,
-    max_tokens = 1024,
-)
-
-outputs = model.fast_generate(
-    {
-        "prompt": train_dataset[165]["prompt"],
-        "multi_modal_data": {"image": train_dataset[165]["image"]}
-    },
-    sampling_params,
-    lora_request = model.load_lora("grpo_lora"))
-print(outputs[0].outputs[0].text)
-
-
-# Verify LoRA is actually trained!
+# # Inference
+# Now let's try the model we just trained!
 
 # In[ ]:
 
 
-from safetensors import safe_open
+text = tokenizer.apply_chat_template(
+    [{"role": "user", "content": prompt}],
+    tokenize = False,
+    add_generation_prompt = True,
+    reasoning_effort = "low",
+)
 
-tensors = {}
-with safe_open("grpo_lora/adapter_model.safetensors", framework = "pt") as f:
-    # Verify both A and B are non zero
-    for key in f.keys():
-        tensor = f.get_tensor(key)
-        n_zeros = (tensor == 0).sum() / tensor.numel()
-        assert(n_zeros.item() != tensor.numel())
+from transformers import TextStreamer
+_ = model.generate(
+    **tokenizer(text, return_tensors = "pt").to("cuda"),
+    temperature = 1.0,
+    max_new_tokens = 1024,
+    streamer = TextStreamer(tokenizer, skip_prompt = False),
+)
 
 
 # <a name="Save"></a>
-# ### Saving to float16 for VLLM
+# ### Saving to float16 or MXFP4 for VLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `mxfp4` for MXFP4 (OpenAI's GPT-OSS native precision). We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
 # In[ ]:
 
 
-# Merge to 16bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")
-
-# Merge to 4bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_4bit", token = "")
-
-# Just LoRA adapters
+# Merge and push to hub in mxfp4 4bit format
 if False:
-    model.save_pretrained("model")
-    tokenizer.save_pretrained("model")
+    model.save_pretrained_merged("finetuned_model", tokenizer, save_method = "mxfp4")
+if False: model.push_to_hub_merged("repo_id/repo_name", tokenizer, token = "hf...", save_method = "mxfp4")
+
+# Merge and push to hub in 16bit
 if False:
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
+    model.save_pretrained_merged("finetuned_model", tokenizer, save_method = "merged_16bit")
+if False: # Pushing to HF Hub
+    model.push_to_hub_merged("hf/gpt-oss-finetune", tokenizer, save_method = "merged_16bit", token = "")
 
 
-# ### GGUF / llama.cpp Conversion
-# To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
-# 
-# Some supported quant methods (full list on our [Wiki page](https://github.com/unslothai/unsloth/wiki#gguf-quantization-options)):
-# * `q8_0` - Fast conversion. High resource use, but generally acceptable.
-# * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
-# * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
-# 
-# [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-
-# In[19]:
-
-
-# Save to 8bit Q8_0
-if False: model.save_pretrained_gguf("model", tokenizer,)
-# Remember to go to https://huggingface.co/settings/tokens for a token!
-# And change hf to your username!
-if False: model.push_to_hub_gguf("hf/model", tokenizer, token = "")
-
-# Save to 16bit GGUF
-if False: model.save_pretrained_gguf("model", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("hf/model", tokenizer, quantization_method = "f16", token = "")
-
-# Save to q4_k_m GGUF
-if False: model.save_pretrained_gguf("model", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("hf/model", tokenizer, quantization_method = "q4_k_m", token = "")
-
-# Save to multiple GGUF options - much faster if you want multiple!
-if False:
-    model.push_to_hub_gguf(
-        "hf/model", # Change hf to your username!
-        tokenizer,
-        quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
-    )
-
-
-# Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!
-
-# Now, use the `model-unsloth.gguf` file or `model-unsloth-Q4_K_M.gguf` file in llama.cpp.
-# 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other links:
@@ -485,3 +805,4 @@ if False:
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # </div>
+# 
