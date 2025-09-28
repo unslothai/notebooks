@@ -166,7 +166,7 @@ trainer = SFTTrainer(
         max_steps = 60, # Set num_train_epochs = 1 for full training runs
         learning_rate = 2e-4,
         logging_steps = 1,
-        optim = "adamw_8bit",
+        optim = "adamw_torch_8bit",
         weight_decay = 0.01,
         lr_scheduler_type = "linear",
         seed = 3407,

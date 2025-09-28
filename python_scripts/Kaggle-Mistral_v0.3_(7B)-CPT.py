@@ -205,7 +205,7 @@ trainer = UnslothTrainer(
         embedding_learning_rate = 1e-5,
 
         logging_steps = 1,
-        optim = "adamw_8bit",
+        optim = "adamw_torch_8bit",
         weight_decay = 0.01,
         lr_scheduler_type = "linear",
         seed = 3407,
@@ -319,7 +319,7 @@ trainer = UnslothTrainer(
         embedding_learning_rate = 1e-5,
 
         logging_steps = 1,
-        optim = "adamw_8bit",
+        optim = "adamw_torch_8bit",
         weight_decay = 0.00,
         lr_scheduler_type = "linear",
         seed = 3407,

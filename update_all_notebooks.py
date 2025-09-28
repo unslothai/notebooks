@@ -1031,6 +1031,18 @@ def update_notebook_sections(
 
             i += 1
 
+        # Update optimizer for Kaggle notebooks (change adamw_8bit to adamw_torch_8bit)
+        if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+            for cell in notebook_content["cells"]:
+                if cell["cell_type"] == "code":
+                    # Convert cell source to string for easier manipulation
+                    cell_source_list = cell["source"]
+                    for j, line in enumerate(cell_source_list):
+                        if "optim" in line and "adamw_8bit" in line:
+                            # Replace adamw_8bit with adamw_torch_8bit
+                            cell_source_list[j] = line.replace("adamw_8bit", "adamw_torch_8bit")
+                            updated = True
+
         # Add text to the last cell
         if notebook_content["cells"]:
             last_cell = notebook_content["cells"][-1]

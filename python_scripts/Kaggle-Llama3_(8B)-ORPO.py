@@ -198,7 +198,7 @@ orpo_trainer = ORPOTrainer(
         gradient_accumulation_steps = 4,
         beta = 0.1,
         logging_steps = 1,
-        optim = "adamw_8bit",
+        optim = "adamw_torch_8bit",
         lr_scheduler_type = "linear",
         max_steps = 30, # Change to num_train_epochs = 1 for full training runs
         output_dir = "outputs",
