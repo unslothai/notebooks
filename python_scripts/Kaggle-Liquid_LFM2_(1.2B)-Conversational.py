@@ -75,6 +75,7 @@ fourbit_models = [
 
 model, tokenizer = FastModel.from_pretrained(
     model_name = "unsloth/LFM2-1.2B",
+    use_exact_model_name = True,
     dtype = None, # None for auto detection
     max_seq_length = 2048, # Choose any for long context!
     load_in_4bit = False,  # 4 bit quantization to reduce memory
@@ -347,6 +348,7 @@ if False:
     from transformers import Lfm2ForCausalLM
     model, tokenizer = FastModel.from_pretrained(
         model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        use_exact_model_name = True,
         max_seq_length = max_seq_length,
         dtype = dtype,
         auto_model = Lfm2ForCausalLM,

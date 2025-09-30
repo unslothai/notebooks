@@ -1038,11 +1038,51 @@ def update_notebook_sections(
                 if cell["cell_type"] == "code":
                     # Convert cell source to string for easier manipulation
                     cell_source_list = cell["source"]
+
+                    # First, remove any existing use_exact_model_name lines to prevent duplicates
+                    new_cell_source = []
+                    removed_lines = 0
+                    for i, line in enumerate(cell_source_list):
+                        if "use_exact_model_name = True," in line.strip():
+                            removed_lines += 1
+                            continue  # Skip this line
+                        new_cell_source.append(line)
+
+                    if removed_lines > 0:
+                        cell_source_list = new_cell_source
+                        updated = True
+
+                    # Handle adamw_8bit replacement
                     for j, line in enumerate(cell_source_list):
                         if "optim" in line and "adamw_8bit" in line:
                             # Replace adamw_8bit with adamw_torch_8bit
                             cell_source_list[j] = line.replace("adamw_8bit", "adamw_torch_8bit")
                             updated = True
+
+                    # Add use_exact_model_name=True after model_name lines in FastModel calls
+                    for j, line in enumerate(cell_source_list):
+                        if "model_name = " in line:
+                            # Check if this is within a FastModel/ FastLanguageModel/ FastVisionModel call
+                            # Look backwards in the cell to find the context
+                            is_fast_model_call = False
+                            for k in range(max(0, j - 10), j):
+                                prev_line = cell_source_list[k].strip()
+                                if ("FastLanguageModel.from_pretrained" in prev_line or
+                                    "FastModel.from_pretrained" in prev_line or
+                                    "FastVisionModel.from_pretrained" in prev_line):
+                                    is_fast_model_call = True
+                                    break
+
+                            if is_fast_model_call:
+                                # Find the indentation of the model_name line
+                                indent_match = re.match(r'^(\s*)', line)
+                                base_indent = indent_match.group(1) if indent_match else ""
+
+                                # Add the parameter with the same indentation as model_name
+                                new_line = f"{base_indent}use_exact_model_name = True,\n"
+                                cell_source_list.insert(j + 1, new_line)
+                                updated = True
+                                break  # Exit the loop after adding once per cell
 
         # Add text to the last cell
         if notebook_content["cells"]:

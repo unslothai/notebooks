@@ -83,6 +83,7 @@ snapshot_download("unsloth/Spark-TTS-0.5B", local_dir = "Spark-TTS-0.5B")
 
 model, tokenizer = FastModel.from_pretrained(
     model_name = f"Spark-TTS-0.5B/LLM",
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     dtype = torch.float32, # Spark seems to only work on float32 for now
     full_finetuning = True, # We support full finetuning now!

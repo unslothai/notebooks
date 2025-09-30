@@ -76,6 +76,7 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Mistral-Nemo-Base-2407",
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     dtype = dtype,
     load_in_4bit = load_in_4bit,
@@ -283,6 +284,7 @@ if False:
     from unsloth import FastLanguageModel
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        use_exact_model_name = True,
         max_seq_length = max_seq_length,
         dtype = dtype,
         load_in_4bit = load_in_4bit,

@@ -70,6 +70,7 @@ max_seq_length = 800 # Can increase for longer RL output
 lora_rank = 4 # Larger rank = smarter, but slower
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/gpt-oss-20b",
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     load_in_4bit = True, # False for LoRA 16bit
     offload_embedding = True, # Reduces VRAM by 1GB

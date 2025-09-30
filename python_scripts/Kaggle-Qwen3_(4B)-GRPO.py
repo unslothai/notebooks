@@ -63,6 +63,7 @@ lora_rank = 32 # Larger rank = smarter, but slower
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Qwen3-4B-Base",
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     load_in_4bit = False, # False for LoRA 16bit
     fast_inference = True, # Enable vLLM fast inference

@@ -73,6 +73,7 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Phi-4",
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     load_in_4bit = load_in_4bit,
     # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
@@ -362,6 +363,7 @@ if False:
     from unsloth import FastLanguageModel
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        use_exact_model_name = True,
         max_seq_length = max_seq_length,
         dtype = dtype,
         load_in_4bit = load_in_4bit,

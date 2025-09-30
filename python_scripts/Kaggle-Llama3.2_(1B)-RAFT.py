@@ -188,6 +188,7 @@ import torch
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Llama-3.2-1B-Instruct",
+    use_exact_model_name = True,
     max_seq_length = 2048, # Choose any for long context!
     load_in_4bit = True,  # 4 bit quantization to reduce memory
     load_in_8bit = False, 

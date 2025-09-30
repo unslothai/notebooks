@@ -69,6 +69,7 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/gpt-oss-20b",
+    use_exact_model_name = True,
     dtype = None, # None for auto detection
     max_seq_length = 4096, # Choose any for long context!
     load_in_4bit = False,  # 4 bit quantization to reduce memory

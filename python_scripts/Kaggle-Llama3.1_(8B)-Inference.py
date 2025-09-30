@@ -64,6 +64,7 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Meta-Llama-3.1-8B-Instruct",
+    use_exact_model_name = True,
     max_seq_length = 8192,
     load_in_4bit = True,
     # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf

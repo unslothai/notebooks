@@ -80,6 +80,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     # "unsloth/Qwen2.5-14B",  "unsloth/Qwen2.5-32B",  "unsloth/Qwen2.5-72B",
     # And also all Instruct versions and Math. Coding verisons!
     model_name = "unsloth/Qwen2.5-7B",
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     dtype = dtype,
     load_in_4bit = load_in_4bit,
@@ -288,6 +289,7 @@ if False:
     from unsloth import FastLanguageModel
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        use_exact_model_name = True,
         max_seq_length = max_seq_length,
         dtype = dtype,
         load_in_4bit = load_in_4bit,

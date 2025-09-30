@@ -90,6 +90,7 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/mistral-7b-v0.3", # "unsloth/mistral-7b" for 16bit loading
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     dtype = dtype,
     load_in_4bit = load_in_4bit,

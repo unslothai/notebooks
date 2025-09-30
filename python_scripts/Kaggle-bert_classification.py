@@ -87,6 +87,7 @@ label2id = {"sadness": 0, "joy": 1, "love": 2, "anger": 3, "fear": 4, "surprise"
 
 model, tokenizer = FastModel.from_pretrained(
     model_name = "answerdotai/ModernBERT-large",
+    use_exact_model_name = True,
     auto_model = AutoModelForSequenceClassification,
     max_seq_length = max_seq_length,
     dtype = dtype,

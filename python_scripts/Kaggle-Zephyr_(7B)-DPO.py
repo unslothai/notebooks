@@ -69,6 +69,7 @@ load_in_4bit = True # Use 4bit quantization to reduce memory usage. Can be False
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/zephyr-sft-bnb-4bit", # Choose ANY! eg mistralai/Mistral-7B-Instruct-v0.2
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     dtype = dtype,
     load_in_4bit = load_in_4bit,

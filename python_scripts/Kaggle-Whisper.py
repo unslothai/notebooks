@@ -72,6 +72,7 @@ fourbit_models = [
 
 model, tokenizer = FastModel.from_pretrained(
     model_name = "unsloth/whisper-large-v3",
+    use_exact_model_name = True,
     dtype = None, # Leave as None for auto detection
     load_in_4bit = False, # Set to True to do 4bit quantization which reduces memory
     auto_model = WhisperForConditionalGeneration,

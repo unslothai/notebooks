@@ -77,6 +77,7 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Llasa-1B",
+    use_exact_model_name = True,
     max_seq_length = max_seq_length,
     dtype = None, # Select None for auto detection
     load_in_4bit = False, # Choose True for 4bit which reduces memory

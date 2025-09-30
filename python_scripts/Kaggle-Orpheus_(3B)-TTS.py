@@ -77,6 +77,7 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/orpheus-3b-0.1-ft",
+    use_exact_model_name = True,
     max_seq_length= 2048, # Choose any for long context!
     dtype = None, # Select None for auto detection
     load_in_4bit = False, # Select True for 4bit which reduces memory usage

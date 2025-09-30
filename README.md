@@ -119,9 +119,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **Liquid LFM2** **(1.2B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/fsdp2/nb/Liquid_LFM2_(1.2B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Liquid LFM2**  | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/fsdp2/nb/Liquid_LFM2-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Falcon H1** **(0.5B)** | Alpaca | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/fsdp2/nb/Falcon_H1_(0.5B)-Alpaca.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Falcon H1**  | Alpaca | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/feat/fsdp2/nb/Falcon_H1-Alpaca.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
 ### Llama Notebooks
 | Model | Type | Notebook Link |

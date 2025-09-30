@@ -74,6 +74,7 @@ fourbit_models = [
 
 model, tokenizer = FastModel.from_pretrained(
     model_name = "unsloth/gemma-3-27b-it",
+    use_exact_model_name = True,
     max_seq_length = 2048, # Choose any for long context!
     load_in_4bit = True,  # 4 bit quantization to reduce memory
     load_in_8bit = False, # [NEW!] A bit more accurate, uses 2x memory
@@ -347,6 +348,7 @@ if False:
     from unsloth import FastModel
     model, tokenizer = FastModel.from_pretrained(
         model_name = "gemma-3", # YOUR MODEL YOU USED FOR TRAINING
+        use_exact_model_name = True,
         max_seq_length = 2048,
         load_in_4bit = True,
     )

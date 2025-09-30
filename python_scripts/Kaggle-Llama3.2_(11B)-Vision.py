@@ -358,6 +358,7 @@ if False:
     from unsloth import FastVisionModel
     model, tokenizer = FastVisionModel.from_pretrained(
         model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        use_exact_model_name = True,
         load_in_4bit = True, # Set to False for 16bit LoRA
     )
     FastVisionModel.for_inference(model) # Enable for inference!

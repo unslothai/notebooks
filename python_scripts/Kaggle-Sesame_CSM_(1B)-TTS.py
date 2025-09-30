@@ -60,6 +60,7 @@ import torch
 
 model, processor = FastModel.from_pretrained(
     model_name = "unsloth/csm-1b",
+    use_exact_model_name = True,
     max_seq_length= 2048, # Choose any for long context!
     dtype = None, # Leave as None for auto-detection
     auto_model = CsmForConditionalGeneration,

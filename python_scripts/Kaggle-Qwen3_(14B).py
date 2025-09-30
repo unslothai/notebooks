@@ -72,6 +72,7 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Qwen3-14B",
+    use_exact_model_name = True,
     max_seq_length = 2048,   # Context length - can be longer, but uses more memory
     load_in_4bit = True,     # 4bit uses much less memory
     load_in_8bit = False,    # A bit more accurate, uses 2x memory
@@ -381,6 +382,7 @@ if False:
     from unsloth import FastLanguageModel
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        use_exact_model_name = True,
         max_seq_length = 2048,
         load_in_4bit = True,
     )
