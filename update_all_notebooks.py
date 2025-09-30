@@ -288,7 +288,6 @@ installation_gpt_oss_content = r"""%%capture
 !pip install --upgrade -qqq uv
 try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
-!uv pip install -qqq --upgrade --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
 !uv pip install -qqq \
     "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers>=4.55.3" \
     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
