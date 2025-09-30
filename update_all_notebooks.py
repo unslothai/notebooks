@@ -120,9 +120,10 @@ import os
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
 !pip install unsloth
 !pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
+!pip uninstall -y unsloth unsloth_zoo
 !pip install "git+https://github.com/Erland366/unsloth.git@feat/distributed_with_lock"
 !pip install "git+https://github.com/Erland366/unsloth-zoo.git@feat/distributed_with_lock"
-!pip install git+https://github.com/Erland366/nbdistributed.git 
+!pip install git+https://github.com/Erland366/nbdistributed.git
 """
 
 installation_kaggle_content = update_or_append_pip_install(

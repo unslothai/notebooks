@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.48\n!pip install "git+https://github.com/Erland366/unsloth.git@feat/distributed_with_lock"\n!pip install "git+https://github.com/Erland366/unsloth-zoo.git@feat/distributed_with_lock"\n!pip install git+https://github.com/Erland366/nbdistributed.git\n!pip install --no-deps trl==0.22.2\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps\n!pip install omegaconf\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.48\n!pip uninstall -y unsloth unsloth_zoo\n!pip install "git+https://github.com/Erland366/unsloth.git@feat/distributed_with_lock"\n!pip install "git+https://github.com/Erland366/unsloth-zoo.git@feat/distributed_with_lock"\n!pip install git+https://github.com/Erland366/nbdistributed.git\n!pip install --no-deps trl==0.22.2\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps\n!pip install omegaconf\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
 # 
 # 
 # # In[ ]:
