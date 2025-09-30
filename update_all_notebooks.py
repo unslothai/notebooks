@@ -121,8 +121,8 @@ import os
 !pip install unsloth
 !pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
 !pip uninstall -y unsloth unsloth_zoo
-!pip install "git+https://github.com/Erland366/unsloth.git@feat/distributed_with_lock"
-!pip install "git+https://github.com/Erland366/unsloth-zoo.git@feat/distributed_with_lock"
+!pip install "git+https://github.com/Erland366/unsloth.git@feat/distributed_with_lock" --no-deps
+!pip install "git+https://github.com/Erland366/unsloth-zoo.git@feat/distributed_with_lock" --no-deps
 !pip install git+https://github.com/Erland366/nbdistributed.git
 """
 
