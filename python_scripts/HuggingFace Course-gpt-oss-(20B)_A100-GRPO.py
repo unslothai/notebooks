@@ -113,7 +113,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     return_dict = True,
     reasoning_effort = "low", # **NEW!** Set reasoning effort to low, medium or high
-).to(model.device)
+).to("cuda")
 
 _ = model.generate(**inputs, max_new_tokens = 64, streamer = TextStreamer(tokenizer))
 
@@ -134,7 +134,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     return_dict = True,
     reasoning_effort = "medium", # **NEW!** Set reasoning effort to low, medium or high
-).to(model.device)
+).to("cuda")
 
 _ = model.generate(**inputs, max_new_tokens = 64, streamer = TextStreamer(tokenizer))
 
@@ -155,7 +155,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     return_dict = True,
     reasoning_effort = "high", # **NEW!** Set reasoning effort to low, medium or high
-).to(model.device)
+).to("cuda")
 
 _ = model.generate(**inputs, max_new_tokens = 64, streamer = TextStreamer(tokenizer))
 
@@ -281,7 +281,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     return_dict = True,
     reasoning_effort = "medium",
-).to(model.device)
+).to("cuda")
 from transformers import TextStreamer
 _ = model.generate(**inputs, max_new_tokens = 64, streamer = TextStreamer(tokenizer))
 
@@ -325,7 +325,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     return_dict = True,
     reasoning_effort = "high",
-).to(model.device)
+).to("cuda")
 from transformers import TextStreamer
 _ = model.generate(**inputs, max_new_tokens = 64, streamer = TextStreamer(tokenizer))
 
