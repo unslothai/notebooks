@@ -16,11 +16,11 @@
 # ### News
 
 # 
+# Unsloth now supports [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which automatically creates kernels!
+# 
 # [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) is now supported! Train Qwen2.5-VL, Gemma 3 etc. with GSPO or GRPO.
 # 
 # Introducing Unsloth [Standby for RL](https://docs.unsloth.ai/basics/memory-efficient-rl): GRPO is now faster, uses 30% less memory with 2x longer context.
-# 
-# Gpt-oss fine-tuning now supports 8× longer context with 0 accuracy loss. [Read more](https://docs.unsloth.ai/basics/long-context-gpt-oss-training)
 # 
 # Unsloth now supports Text-to-Speech (TTS) models. Read our [guide here](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning).
 # 
@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', '# We\'re installing the latest Torch, Triton, OpenAI\'s Triton kernels, Transformers and Unsloth!\n!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\n!uv pip install -qqq \\\n    "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers>=4.55.3" \\\n    "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n    "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n    git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels\n!uv pip install transformers==4.55.4\n!uv pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', '!pip install --upgrade -qqq uv\ntry: import numpy; get_numpy = f"numpy=={numpy.__version__}"\nexcept: get_numpy = "numpy"\n!uv pip install -qqq \\\n    "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers>=4.55.3" \\\n    "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n    "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n    git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels\n!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers\n!uv pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # In[ ]:
@@ -94,7 +94,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     return_dict = True,
     reasoning_effort = "low", # **NEW!** Set reasoning effort to low, medium or high
-).to(model.device)
+).to("cuda")
 
 _ = model.generate(**inputs, max_new_tokens = 512, streamer = TextStreamer(tokenizer))
 
@@ -115,7 +115,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     return_dict = True,
     reasoning_effort = "medium", # **NEW!** Set reasoning effort to low, medium or high
-).to(model.device)
+).to("cuda")
 
 _ = model.generate(**inputs, max_new_tokens = 1024, streamer = TextStreamer(tokenizer))
 
@@ -136,7 +136,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     return_dict = True,
     reasoning_effort = "high", # **NEW!** Set reasoning effort to low, medium or high
-).to(model.device)
+).to("cuda")
 
 _ = model.generate(**inputs, max_new_tokens = 2048, streamer = TextStreamer(tokenizer))
 

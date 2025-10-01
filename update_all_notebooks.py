@@ -285,7 +285,6 @@ installation_spark_kaggle_content = installation_kaggle_content + """\n!git clon
 # GPT OSS Notebook
 # =======================================================
 installation_gpt_oss_content = r"""%%capture
-# We're installing the latest Torch, Triton, OpenAI's Triton kernels, Transformers and Unsloth!
 !pip install --upgrade -qqq uv
 try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
@@ -293,12 +292,15 @@ except: get_numpy = "numpy"
     "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers>=4.55.3" \
     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
     "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
-    git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels"""
-installation_gpt_oss_content = update_or_append_pip_install(
-    installation_gpt_oss_content,
-    "transformers",
-    UV_PIN_TRANSFORMERS,
-)
+    git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels
+!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers
+!uv pip install --no-deps trl==0.22.2"""
+
+# installation_gpt_oss_content = update_or_append_pip_install(
+#     installation_gpt_oss_content,
+#     "transformers",
+#     "!uv pip install transformers==4.56.2",
+# )
 installation_gpt_oss_content = update_or_append_pip_install(
     installation_gpt_oss_content,
     "trl",
@@ -348,7 +350,7 @@ installation_llasa_content += """\
 installation_llasa_content = update_or_append_pip_install(
     installation_llasa_content,
     "transformers",
-    "!pip install transformers==4.48",
+    "!pip install transformers==4.56.1",
 )
 
 installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
@@ -459,11 +461,11 @@ installation_sglang_kaggle_content = installation_sglang_content
 # =======================================================
 
 new_announcement = """
+Unsloth now supports [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which automatically creates kernels!
+
 [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) is now supported! Train Qwen2.5-VL, Gemma 3 etc. with GSPO or GRPO.
 
 Introducing Unsloth [Standby for RL](https://docs.unsloth.ai/basics/memory-efficient-rl): GRPO is now faster, uses 30% less memory with 2x longer context.
-
-Gpt-oss fine-tuning now supports 8× longer context with 0 accuracy loss. [Read more](https://docs.unsloth.ai/basics/long-context-gpt-oss-training)
 
 Unsloth now supports Text-to-Speech (TTS) models. Read our [guide here](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning).
 
@@ -882,7 +884,7 @@ def update_notebook_sections(
                             installation = installation_steps
 
                         # GRPO INSTALLATION
-                        if is_path_contains_any(notebook_path.lower(), ["grpo"]):
+                        if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_grpo_kaggle_content
                                 # Kaggle will delete the second cell instead -> Need to check
