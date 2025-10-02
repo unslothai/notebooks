@@ -52,10 +52,14 @@ import torch
 fourbit_models = [
     "unsloth/granite-4.0-micro",
     "unsloth/granite-4.0-h-micro",
-    "unsloth/granite-4.0-tiny",
     "unsloth/granite-4.0-h-tiny",
-    "unsloth/granite-4.0-small",
     "unsloth/granite-4.0-h-small",
+
+    # Base pretrained Granite 4 models
+    "unsloth/granite-4.0-micro-base",
+    "unsloth/granite-4.0-h-micro-base",
+    "unsloth/granite-4.0-h-tiny-base",
+    "unsloth/granite-4.0-h-small-base",
 
     # 4bit dynamic quants for superior accuracy and low memory use
     "unsloth/gemma-3-12b-it-unsloth-bnb-4bit",
