@@ -87,7 +87,8 @@ model = FastLanguageModel.get_peft_model(
     model,
     r = 32, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
-                      "gate_proj", "up_proj", "down_proj",],
+                      "gate_proj", "up_proj", "down_proj",
+                      "shared_mlp.input_linear", "shared_mlp.output_linear"],
     lora_alpha = 32,
     lora_dropout = 0, # Supports any, but = 0 is optimized
     bias = "none",    # Supports any, but = "none" is optimized
