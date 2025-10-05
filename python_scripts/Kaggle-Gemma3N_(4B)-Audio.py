@@ -186,8 +186,6 @@ model = FastModel.get_peft_model(
         "embedding_projection",
     ],
     modules_to_save=[
-        "lm_head",
-        "embed_tokens",
         "embed_audio",
     ],
 )
