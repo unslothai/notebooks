@@ -185,9 +185,6 @@ model = FastModel.get_peft_model(
         "post", "linear_start", "linear_end",
         "embedding_projection",
     ],
-    modules_to_save=[
-        "embed_audio",
-    ],
 )
 
 
