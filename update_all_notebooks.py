@@ -286,6 +286,7 @@ installation_spark_kaggle_content = installation_kaggle_content + """\n!git clon
 # =======================================================
 installation_gpt_oss_content = r"""%%capture
 !pip install --upgrade -qqq uv
+import os; os.environ["UV_SYSTEM_PYTHON"]="1"
 try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
 !uv pip install -qqq \
