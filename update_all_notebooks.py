@@ -452,13 +452,12 @@ installation_gemma3n_content += gemma3n_extra_content
 installation_gemma3n_kaggle_content = installation_kaggle_content
 installation_gemma3n_kaggle_content += gemma3n_extra_content
 
-installation_gemma3n_modal_content = installation_modal_content + gemma3n_extra_content
 installation_gemma3n_modal_content = update_or_append_pip_install(
-    installation_gemma3n_modal_content,
+    installation_modal_content,
     "librosa",
     "!pip install librosa",
 )
-
+installation_gemma3n_modal_content += gemma3n_extra_content
 
 # =======================================================
 # SGLang Notebook
