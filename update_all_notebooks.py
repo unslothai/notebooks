@@ -15,6 +15,12 @@ DONT_UPDATE_EXCEPTIONS = [
     'Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb', # Daniel's?
 ]
 
+MODAL_NOTEBOOK_ALLOWLIST = {
+    "gpt-oss-(20B)-Fine-tuning.ipynb",
+    "Qwen3_(4B)-GRPO.ipynb",
+    "Gemma3N_(4B)-Conversational.ipynb",
+}
+
 def get_current_git_branch():
     try:
         # Run the git command to get the current branch name
@@ -92,6 +98,7 @@ SPACES = " " * 4
 
 installation_content = """%%capture
 import os, re
+os.environ["UV_SYSTEM_PYTHON"] = "1"
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth
 else:
@@ -115,6 +122,7 @@ installation_content = update_or_append_pip_install(
 
 installation_kaggle_content = """%%capture
 import os
+os.environ["UV_SYSTEM_PYTHON"] = "1"
 
 !pip install pip3-autoremove
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
@@ -133,6 +141,8 @@ installation_kaggle_content = update_or_append_pip_install(
     PIN_TRL,
 )
 
+installation_modal_content = installation_content
+
 # =======================================================
 # GRPO Notebook
 # =======================================================
@@ -140,6 +150,7 @@ installation_kaggle_content = update_or_append_pip_install(
 installation_grpo_content = """%%capture
 import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
+os.environ["UV_SYSTEM_PYTHON"] = "1"
 if "COLAB_" not in "".join(os.environ.keys()):
     # If you're not in Colab, just use pip install or uv pip install
     !pip install unsloth vllm
@@ -178,6 +189,7 @@ installation_extra_grpo_content = update_or_append_pip_install(
 installation_grpo_kaggle_content = """%%capture
 import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
+os.environ["UV_SYSTEM_PYTHON"] = "1"
 !pip install --upgrade -qqq uv
 try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
@@ -780,6 +792,7 @@ def update_notebook_sections(
     general_announcement,
     installation_steps,
     installation_steps_kaggle,
+    installation_steps_modal,
     new_announcement,
 ):
     try:
@@ -848,6 +861,7 @@ def update_notebook_sections(
 
         is_gguf = False
         is_ollama = False
+        is_modal = is_path_contains_any(notebook_path.lower(), ["modal"])
         is_gemma3 = is_path_contains_any(notebook_path.lower(), ["gemma3"])
         is_llama = is_path_contains_any(notebook_path.lower(), ["llama"])
         is_vision = is_path_contains_any(notebook_path.lower(), ["vision"])
@@ -881,6 +895,8 @@ def update_notebook_sections(
                     ):
                         if is_path_contains_any(notebook_path, ["kaggle"]):
                             installation = installation_steps_kaggle
+                        elif is_modal and installation_steps_modal is not None:
+                            installation = installation_steps_modal
                         else:
                             installation = installation_steps
 
@@ -1151,6 +1167,7 @@ def main():
             general_announcement_content,
             installation_content,
             installation_kaggle_content,
+            installation_modal_content,
             new_announcement,
         )
         # update_unsloth_config(notebook_file)
@@ -1195,9 +1212,11 @@ def update_readme(
     if args.to_main_repo:
         base_url_colab = "https://colab.research.google.com/github/unslothai/notebooks/blob/main/"
         base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/"
+        base_url_modal = "http://modal.com/notebooks/new/https://github.com/unslothai/notebooks/blob/main/"
     else:
         base_url_colab = f"https://colab.research.google.com/github/unslothai/notebooks/blob/{current_branch}/"
         base_url_kaggle = f"https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/{current_branch}/"
+        base_url_modal = f"http://modal.com/notebooks/new/https://github.com/unslothai/notebooks/blob/{current_branch}/"
 
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
     paths = [x.replace("\\", "/") for x in paths]
@@ -1214,10 +1233,12 @@ def update_readme(
         sections[section] = {
             "Colab": {"header": f"### {section} Notebooks\n", "rows": []},
             "Kaggle": {"header": f"### {section} Notebooks\n", "rows": []},
+            "Modal": {"header": f"### {section} Notebooks\n", "rows": []},
         }
 
     colab_table_header = "| Model | Type | Notebook Link |\n| --- | --- | --- |\n"
     kaggle_table_header = "| Model | Type | Notebook Link |\n| --- | --- | --- |\n"
+    modal_table_header = "| Model | Type | Notebook Link |\n| --- | --- | --- |\n"
 
     notebook_data = []
 
@@ -1230,6 +1251,7 @@ def update_readme(
         notebook_name = os.path.basename(path)
         std_notebook_name = notebook_name.replace("-", "_")
         is_kaggle = is_path_contains_any(path.lower(), ["kaggle"]) 
+        is_modal = is_path_contains_any(path.lower(), ["modal"])
 
         try:
             info = extract_model_info_refined(
@@ -1255,18 +1277,26 @@ def update_readme(
             section_name = 'GRPO'
         elif architecture and architecture in list_models:
              section_name = architecture
-        link_base = base_url_kaggle if is_kaggle else base_url_colab
-        link_url = f"{link_base}{path}"
+        platform = "Modal" if is_modal else ("Kaggle" if is_kaggle else "Colab")
 
-        if is_kaggle:
-            image_src = "https://kaggle.com/static/images/open-in-kaggle.svg"
-            image_alt = "Open in Kaggle"
-            if kaggle_accelerator:
-                link_url += f"&accelerator={kaggle_accelerator}"
+        if is_modal:
+            link_url = f"{base_url_modal}{path}"
+            link = f'<a href="{link_url}" target="_blank" rel="noopener noreferrer">Open in Modal</a>'
         else:
-            image_src = "https://colab.research.google.com/assets/colab-badge.svg"
-            image_alt = "Open In Colab"
-        link = f'<a href="{link_url}" target="_blank" rel="noopener noreferrer"><img src="{image_src}" alt="{image_alt}"></a>'
+            link_base = base_url_kaggle if is_kaggle else base_url_colab
+            link_url = f"{link_base}{path}"
+
+            if is_kaggle and kaggle_accelerator:
+                link_url += f"&accelerator={kaggle_accelerator}"
+
+            if is_kaggle:
+                image_src = "https://kaggle.com/static/images/open-in-kaggle.svg"
+                image_alt = "Open in Kaggle"
+            else:
+                image_src = "https://colab.research.google.com/assets/colab-badge.svg"
+                image_alt = "Open In Colab"
+
+            link = f'<a href="{link_url}" target="_blank" rel="noopener noreferrer"><img src="{image_src}" alt="{image_alt}"></a>'
 
         notebook_data.append(
             {
@@ -1278,6 +1308,7 @@ def update_readme(
                 "architecture" : architecture, 
                 "size" : size, 
                 "requires_a100": requires_a100,
+                "platform": platform,
             }
         )
 
@@ -1299,7 +1330,9 @@ def update_readme(
     for data in notebook_data:
         model_prefix = "(A100) " if data.get('requires_a100', False) else ""
         row = f"| **{model_prefix}{data['model']}** {data['size']} | {data['type']} | {data['link']} |\n"
-        platform = "Kaggle" if "kaggle" in data['link'].lower() else "Colab"
+        platform = data.get("platform", "Colab")
+        if platform not in sections[data["section"]]:
+            platform = "Colab"
         sections[data["section"]][platform]["rows"].append(row)
 
     for section in sections:
@@ -1311,6 +1344,10 @@ def update_readme(
             sections[section]["Kaggle"]["rows"].sort(key=lambda x: extract_version_from_row(x), reverse=True)
         except Exception as e:
             print(f"Warning: Could not sort Kaggle rows for section '{section}' by version: {e}")
+        try:
+            sections[section]["Modal"]["rows"].sort(key=lambda x: extract_version_from_row(x), reverse=True)
+        except Exception as e:
+            print(f"Warning: Could not sort Modal rows for section '{section}' by version: {e}")
 
     try:
         with open(readme_path, "r", encoding="utf-8") as f:
@@ -1348,6 +1385,13 @@ def update_readme(
             "</summary>\n\n"
         )
 
+        modal_updated_notebooks_links = (
+            "# 📒 Modal Notebooks\n"
+            "<details>\n  <summary>\n"
+            "    Click for all our Modal notebooks categorized by model:\n  "
+            "</summary>\n\n"
+        )
+
         for section in list_models:
             if sections[section]["Colab"]["rows"]:
                 colab_updated_notebooks_links += sections[section]["Colab"]["header"]
@@ -1359,7 +1403,13 @@ def update_readme(
                 kaggle_updated_notebooks_links += kaggle_table_header
                 kaggle_updated_notebooks_links += "".join(sections[section]["Kaggle"]["rows"]) + "\n"
 
+            if sections[section]["Modal"]["rows"]:
+                modal_updated_notebooks_links += sections[section]["Modal"]["header"]
+                modal_updated_notebooks_links += modal_table_header
+                modal_updated_notebooks_links += "".join(sections[section]["Modal"]["rows"]) + "\n"
+
         kaggle_updated_notebooks_links += "</details>\n\n"
+        modal_updated_notebooks_links += "</details>\n\n"
 
         now = datetime.now() 
         timestamp = f"\n"
@@ -1368,6 +1418,7 @@ def update_readme(
             content_before
             + colab_updated_notebooks_links
             + kaggle_updated_notebooks_links 
+            + modal_updated_notebooks_links
             + timestamp
             + content_after 
         )
@@ -1389,6 +1440,7 @@ def update_readme(
                 content_before
                 + colab_updated_notebooks_links
                 + kaggle_updated_notebooks_links 
+                + modal_updated_notebooks_links
                 + timestamp
                 + content_after
              )
@@ -1415,6 +1467,7 @@ def copy_and_update_notebooks(
     general_announcement,
     installation,
     installation_kaggle,
+    installation_modal,
     new_announcement,
 ):
     """Copies notebooks from template_dir to destination_dir, updates them, and renames them."""
@@ -1440,39 +1493,75 @@ def copy_and_update_notebooks(
         notebook_name = os.path.basename(template_notebook_path)
 
         colab_notebook_name = notebook_name
-        destination_notebook_path = os.path.join(destination_dir, colab_notebook_name)
+        colab_destination_path = os.path.join(destination_dir, colab_notebook_name)
 
-        shutil.copy2(template_notebook_path, destination_notebook_path)
+        shutil.copy2(template_notebook_path, colab_destination_path)
         print(f"Copied '{colab_notebook_name}' to '{destination_dir}'")
 
         kaggle_notebook_name = "Kaggle-" + notebook_name
-        destination_notebook_path = os.path.join(destination_dir, kaggle_notebook_name)
+        kaggle_destination_path = os.path.join(destination_dir, kaggle_notebook_name)
 
-        shutil.copy2(template_notebook_path, destination_notebook_path)
-
+        shutil.copy2(template_notebook_path, kaggle_destination_path)
         print(f"Copied '{kaggle_notebook_name}' to '{destination_dir}'")
+
+        modal_notebook_name = "Modal-" + notebook_name
+        modal_destination_path = os.path.join(destination_dir, modal_notebook_name)
+        should_create_modal = notebook_name in MODAL_NOTEBOOK_ALLOWLIST
+
+        if should_create_modal:
+            shutil.copy2(template_notebook_path, modal_destination_path)
+            print(f"Copied '{modal_notebook_name}' to '{destination_dir}'")
+        else:
+            if os.path.exists(modal_destination_path):
+                os.remove(modal_destination_path)
+                print(f"Removed '{modal_notebook_name}' (not in Modal allowlist)")
+            modal_destination_path = None
 
         if "GRPO" in template_notebook_path:
             hf_course_notebook_name = f"{hf_course_name}-" + notebook_name
-            destination_notebook_path = os.path.join(destination_dir, hf_course_notebook_name)
-            shutil.copy2(template_notebook_path, destination_notebook_path)
-            print(f"Copied f'{hf_course_name}-{notebook_name}' to '{destination_notebook_path}'")
+            hf_destination_path = os.path.join(destination_dir, hf_course_notebook_name)
+            shutil.copy2(template_notebook_path, hf_destination_path)
+            print(f"Copied f'{hf_course_name}-{notebook_name}' to '{hf_destination_path}'")
+        else:
+            hf_destination_path = None
 
         update_notebook_sections(
-            os.path.join(destination_dir, colab_notebook_name),
+            colab_destination_path,
             general_announcement,
             installation,
             installation_kaggle,
+            installation_modal,
             new_announcement,
         )
 
         update_notebook_sections(
-            destination_notebook_path,
+            kaggle_destination_path,
             general_announcement,
+            installation,
             installation_kaggle,
-            installation_kaggle,
+            installation_modal,
             new_announcement,
         )
+
+        if modal_destination_path:
+            update_notebook_sections(
+                modal_destination_path,
+                general_announcement,
+                installation,
+                installation_kaggle,
+                installation_modal,
+                new_announcement,
+            )
+
+        if hf_destination_path:
+            update_notebook_sections(
+                hf_destination_path,
+                general_announcement,
+                installation,
+                installation_kaggle,
+                installation_modal,
+                new_announcement,
+            )
 
     # Move Exceptions back to destination_dir from temp_location
     for entry in DONT_UPDATE_EXCEPTIONS:
@@ -1594,6 +1683,7 @@ if __name__ == "__main__":
         general_announcement_content,
         installation_content,
         installation_kaggle_content,
+        installation_modal_content,
         new_announcement,
     )
     main()
