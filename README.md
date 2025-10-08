@@ -342,6 +342,29 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 
 </details>
 
+# 📒 Modal Notebooks
+<details>
+  <summary>
+    Click for all our Modal notebooks categorized by model:
+  </summary>
+
+### GRPO Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Modal Qwen3** **(4B)** | GRPO | <a href="http://modal.com/notebooks/new/https://github.com/unslothai/notebooks/blob/main/nb/Modal-Qwen3_(4B)-GRPO.ipynb" target="_blank" rel="noopener noreferrer">Open in Modal</a> |
+
+### GPT-OSS Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Modal gpt oss** **(20B)** |  | <a href="http://modal.com/notebooks/new/https://github.com/unslothai/notebooks/blob/main/nb/Modal-gpt-oss-(20B)-Fine-tuning.ipynb" target="_blank" rel="noopener noreferrer">Open in Modal</a> |
+
+### Gemma Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Modal Gemma3N** **(4B)** | Multimodal | <a href="http://modal.com/notebooks/new/https://github.com/unslothai/notebooks/blob/main/nb/Modal-Gemma3N_(4B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer">Open in Modal</a> |
+
+</details>
+
 
 <!-- End of Notebook Links -->
 
