@@ -98,7 +98,6 @@ SPACES = " " * 4
 
 installation_content = """%%capture
 import os, re
-os.environ["UV_SYSTEM_PYTHON"] = "1"
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth
 else:
@@ -122,7 +121,6 @@ installation_content = update_or_append_pip_install(
 
 installation_kaggle_content = """%%capture
 import os
-os.environ["UV_SYSTEM_PYTHON"] = "1"
 
 !pip install pip3-autoremove
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
@@ -150,7 +148,6 @@ installation_modal_content = installation_content
 installation_grpo_content = """%%capture
 import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
-os.environ["UV_SYSTEM_PYTHON"] = "1"
 if "COLAB_" not in "".join(os.environ.keys()):
     # If you're not in Colab, just use pip install or uv pip install
     !pip install unsloth vllm
@@ -189,7 +186,6 @@ installation_extra_grpo_content = update_or_append_pip_install(
 installation_grpo_kaggle_content = """%%capture
 import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
-os.environ["UV_SYSTEM_PYTHON"] = "1"
 !pip install --upgrade -qqq uv
 try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
 except: get_numpy = "numpy"
