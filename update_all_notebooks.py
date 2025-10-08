@@ -908,9 +908,12 @@ def update_notebook_sections(
                                 del notebook_content["cells"][i + 2]
                             else:
                                 installation = installation_grpo_content
-                                # TODO: Remove after GRPO numpy bug fixed!
-                                # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                                notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
+                                if is_modal:
+                                    del notebook_content["cells"][i + 2]
+                                else:
+                                    # TODO: Remove after GRPO numpy bug fixed!
+                                    # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
+                                    notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
 
                         # META INSTALLATION
                         elif is_path_contains_any(notebook_path.lower(), ["Meta"]): 
