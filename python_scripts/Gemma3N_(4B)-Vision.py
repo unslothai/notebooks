@@ -96,6 +96,10 @@ model = FastVisionModel.get_peft_model(
     use_rslora = False,               # We support rank stabilized LoRA
     loftq_config = None,               # And LoftQ
     target_modules = "all-linear",    # Optional now! Can specify a list if needed
+    modules_to_save=[
+        "lm_head",
+        "embed_tokens",
+    ],
 )
 
 
