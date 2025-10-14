@@ -32,12 +32,12 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.55.4\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.57.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
 
-# In[2]:
+# In[ ]:
 
 
 from unsloth import FastVisionModel # FastLanguageModel for LLMs
@@ -62,7 +62,7 @@ fourbit_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastVisionModel.from_pretrained(
-    "unsloth/Qwen2.5-VL-7B-Instruct-bnb-4bit",
+    "unsloth/Qwen3-VL-8B-Instruct-unsloth-bnb-4bit",
     load_in_4bit = True, # Use 4bit to reduce memory use. False for 16bit LoRA.
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for long context
 )
@@ -72,7 +72,7 @@ model, tokenizer = FastVisionModel.from_pretrained(
 # 
 # **[NEW]** We also support finetuning ONLY the vision part of the model, or ONLY the language part. Or you can select both! You can also select to finetune the attention or the MLP layers!
 
-# In[3]:
+# In[4]:
 
 
 model = FastVisionModel.get_peft_model(
@@ -99,7 +99,7 @@ model = FastVisionModel.get_peft_model(
 # 
 # You can access the dataset [here](https://huggingface.co/datasets/unsloth/LaTeX_OCR). The full dataset is [here](https://huggingface.co/datasets/linxy/LaTeX_OCR).
 
-# In[4]:
+# In[5]:
 
 
 from datasets import load_dataset
@@ -108,19 +108,19 @@ dataset = load_dataset("unsloth/LaTeX_OCR", split = "train")
 
 # Let's take an overview look at the dataset. We shall see what the 3rd image is, and what caption it had.
 
-# In[5]:
+# In[6]:
 
 
 dataset
 
 
-# In[6]:
+# In[7]:
 
 
 dataset[2]["image"]
 
 
-# In[7]:
+# In[8]:
 
 
 dataset[2]["text"]
@@ -128,7 +128,7 @@ dataset[2]["text"]
 
 # We can also render the LaTeX in the browser directly!
 
-# In[8]:
+# In[9]:
 
 
 from IPython.display import display, Math, Latex
@@ -150,7 +150,7 @@ display(Math(latex))
 # ]
 # ```
 
-# In[9]:
+# In[10]:
 
 
 instruction = "Write the LaTeX representation for this image."
@@ -173,7 +173,7 @@ pass
 
 # Let's convert the dataset into the "correct" format for finetuning:
 
-# In[10]:
+# In[11]:
 
 
 converted_dataset = [convert_to_conversation(sample) for sample in dataset]
@@ -181,7 +181,7 @@ converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 
 # We look at how the conversations are structured for the first example:
 
-# In[11]:
+# In[12]:
 
 
 converted_dataset[0]
@@ -189,7 +189,7 @@ converted_dataset[0]
 
 # Let's first see before we do any finetuning what the model outputs for the first example!
 
-# In[12]:
+# In[13]:
 
 
 FastVisionModel.for_inference(model) # Enable for inference!
@@ -223,7 +223,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 # 
 # We use our new `UnslothVisionDataCollator` which will help in our vision finetuning setup.
 
-# In[ ]:
+# In[14]:
 
 
 from unsloth.trainer import UnslothVisionDataCollator
@@ -260,7 +260,7 @@ trainer = SFTTrainer(
 )
 
 
-# In[14]:
+# In[15]:
 
 
 # @title Show current memory stats
@@ -271,13 +271,13 @@ print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
 
-# In[15]:
+# In[16]:
 
 
 trainer_stats = trainer.train()
 
 
-# In[16]:
+# In[17]:
 
 
 # @title Show final memory and time stats
@@ -301,7 +301,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # 
 # We use `min_p = 0.1` and `temperature = 1.5`. Read this [Tweet](https://x.com/menhguin/status/1826132708508213629) for more information on why.
 
-# In[17]:
+# In[18]:
 
 
 FastVisionModel.for_inference(model) # Enable for inference!
@@ -335,7 +335,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
-# In[18]:
+# In[19]:
 
 
 model.save_pretrained("lora_model")  # Local saving
@@ -346,7 +346,7 @@ tokenizer.save_pretrained("lora_model")
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
-# In[19]:
+# In[20]:
 
 
 if False:
@@ -384,7 +384,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
-# In[20]:
+# In[21]:
 
 
 # Select ONLY 1 to save! (Both not needed!)

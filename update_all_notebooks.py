@@ -13,6 +13,8 @@ DONT_UPDATE_EXCEPTIONS = [
     'Falcon_H1-Alpaca.ipynb',
     'Liquid_LFM2-Conversational.ipynb',
     'Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb', # Daniel's?
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb',
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb'
 ]
 
 def get_current_git_branch():
@@ -443,6 +445,28 @@ installation_gemma3n_content += gemma3n_extra_content
 installation_gemma3n_kaggle_content = installation_kaggle_content
 installation_gemma3n_kaggle_content += gemma3n_extra_content
 
+# =======================================================
+# Qwen3VL Notebook
+# =======================================================
+gemma3n_extra_content = """\
+
+import torch; torch._dynamo.config.recompile_limit = 64;
+"""
+installation_qwen3_vl_content = installation_content 
+installation_qwen3_vl_content = update_or_append_pip_install(
+    installation_qwen3_vl_content,
+    "transformers",
+    "!pip install transformers==4.57.0",
+)
+
+installation_qwen3_vl_kaggle_content  = installation_kaggle_content
+installation_qwen3_vl_kaggle_content  = update_or_append_pip_install(
+    installation_qwen3_vl_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.57.0",
+)
+
+
 
 # =======================================================
 # SGLang Notebook
@@ -850,6 +874,7 @@ def update_notebook_sections(
         is_gemma3 = is_path_contains_any(notebook_path.lower(), ["gemma3"])
         is_llama = is_path_contains_any(notebook_path.lower(), ["llama"])
         is_vision = is_path_contains_any(notebook_path.lower(), ["vision"])
+        is_qwen3 = is_path_contains_any(notebook_path.lower(), ["qwen3"])
 
         while i < len(notebook_content["cells"]):
             cell = notebook_content["cells"][i]
@@ -984,6 +1009,11 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma3n_content
 
+                        if is_path_contains_any(notebook_path.lower(), ["qwen3"]) and is_vision:
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_qwen3_vl_kaggle_content
+                            else:
+                                installation = installation_qwen3_vl_content
 
                         notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
