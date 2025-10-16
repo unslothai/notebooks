@@ -461,25 +461,27 @@ if False: # Change to True to upload finetune
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now for all models! For now, you can convert easily to `Q8_0, F16 or BF16` precision. `Q4_K_M` for 4bit will come later!
 
-# In[26]:
+# In[ ]:
 
 
 if False: # Change to True to save to GGUF
     model.save_pretrained_gguf(
         "gemma-3-finetune",
-        quantization_type = "Q8_0", # For now only Q8_0, BF16, F16 supported
+        tokenizer,
+        quantization_method = "Q8_0", # For now only Q8_0, BF16, F16 supported
     )
 
 
 # Likewise, if you want to instead push to GGUF to your Hugging Face account, set `if False` to `if True` and add your Hugging Face token and upload location!
 
-# In[27]:
+# In[ ]:
 
 
 if False: # Change to True to upload GGUF
     model.push_to_hub_gguf(
         "gemma-3-finetune",
-        quantization_type = "Q8_0", # Only Q8_0, BF16, F16 supported
+        tokenizer,
+        quantization_method = "Q8_0", # Only Q8_0, BF16, F16 supported
         repo_id = "HF_ACCOUNT/gemma-finetune-gguf",
         token = "hf_...",
     )

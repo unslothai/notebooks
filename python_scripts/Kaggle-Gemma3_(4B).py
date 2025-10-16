@@ -390,7 +390,8 @@ if False: # Change to True to upload finetune
 if False: # Change to True to save to GGUF
     model.save_pretrained_gguf(
         "gemma-3-finetune",
-        quantization_type = "Q8_0", # For now only Q8_0, BF16, F16 supported
+        tokenizer,
+        quantization_method = "Q8_0", # For now only Q8_0, BF16, F16 supported
     )
 
 
@@ -402,7 +403,8 @@ if False: # Change to True to save to GGUF
 if False: # Change to True to upload GGUF
     model.push_to_hub_gguf(
         "gemma-3-finetune",
-        quantization_type = "Q8_0", # Only Q8_0, BF16, F16 supported
+        tokenizer,
+        quantization_method = "Q8_0", # Only Q8_0, BF16, F16 supported
         repo_id = "HF_ACCOUNT/gemma-finetune-gguf",
         token = "hf_...",
     )
