@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt_oss_(20B)_GRPO_BF16.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
 # To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
-# <div class="align-center"><a href="https://huggingface.co/learn/nlp-course/en/chapter12/6?fw=pt"><img src="https://github.com/unslothai/notebooks/raw/main/assets/hf%20course.png" width="165"></a>
+# <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
 # <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
-# 
-# In this [Hugging Face](https://huggingface.co/learn/nlp-course/en/chapter12/6?fw=pt) and Unsloth notebook, you will learn to transform gpt oss (20B) GRPO into a Reasoning model using GRPO.
 # 
 # To install Unsloth on your own computer, follow the installation instructions on our Github page [here](https://docs.unsloth.ai/get-started/installing-+-updating).
 # 
@@ -59,10 +59,10 @@ import torch
 max_seq_length = 768 # Can increase for longer RL output
 lora_rank = 4 # Larger rank = smarter, but slower
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/gpt-oss-20b",
+    model_name = "unsloth/gpt-oss-20b-BF16",
     max_seq_length = max_seq_length,
-    load_in_4bit = True, # False for LoRA 16bit
-    offload_embedding = True, # Reduces VRAM by 1GB
+    load_in_4bit = False, # False for LoRA 16bit
+    offload_embedding = False, # Reduces VRAM by 1GB
 )
 
 
@@ -746,7 +746,7 @@ trainer = GRPOTrainer(
 # 
 # **NOTE** A T4 free GPU might take 5 minutes for one generation sadly since it's an old GPU - A100 or H100 will be much faster!
 
-# In[32]:
+# In[ ]:
 
 
 trainer.train()

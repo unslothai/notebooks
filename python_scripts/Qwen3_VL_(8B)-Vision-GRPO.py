@@ -35,28 +35,6 @@
 # get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.57.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
-# # In[ ]:
-# 
-# 
-# #@title Colab Extra Install { display-mode: "form" }
-# get_ipython().run_line_magic('%capture', '')
-# import os
-# get_ipython().system('pip install --upgrade -qqq uv')
-# if "COLAB_" not in "".join(os.environ.keys()):
-#     # If you're not in Colab, just use pip install!
-#     get_ipython().system('pip install unsloth vllm')
-# else:
-#     try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
-#     except: get_numpy = "numpy"
-#     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-#     except: is_t4 = False
-#     get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
-#     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers')
-#     get_ipython().system('uv pip install -qqq {get_triton}')
-# get_ipython().system('uv pip install transformers==4.55.4')
-# get_ipython().system('uv pip install --no-deps trl==0.22.2')
-# 
-# 
 # # ### Unsloth
 
 # We're also introducing how you can do `GSPO` inside of Unsloth as well!

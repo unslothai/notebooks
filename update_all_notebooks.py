@@ -14,7 +14,9 @@ DONT_UPDATE_EXCEPTIONS = [
     'Liquid_LFM2-Conversational.ipynb',
     'Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb', # Daniel's?
     'gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb',
-    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb'
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb',
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb',
+    'Qwen3_VL_(8B)-Vision-GRPO.ipynb'
 ]
 
 def get_current_git_branch():
@@ -287,27 +289,30 @@ installation_spark_kaggle_content = installation_kaggle_content + """\n!git clon
 # GPT OSS Notebook
 # =======================================================
 installation_gpt_oss_content = r"""%%capture
+import os, importlib.util
 !pip install --upgrade -qqq uv
-try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
-except: get_numpy = "numpy"
-!uv pip install -qqq \
-    "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers>=4.55.3" \
-    "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
-    "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
-    git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels
-!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers
-!uv pip install --no-deps trl==0.22.2"""
+if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    
+    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
+    except: get_numpy = "numpy"
+    !uv pip install -qqq \
+        "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers==4.56.2" \
+        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
+        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
+        git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels
+elif importlib.util.find_spec("unsloth") is None:
+    !uv pip install -qqq unsloth
+!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2"""
 
 # installation_gpt_oss_content = update_or_append_pip_install(
 #     installation_gpt_oss_content,
 #     "transformers",
 #     "!uv pip install transformers==4.56.2",
 # )
-installation_gpt_oss_content = update_or_append_pip_install(
-    installation_gpt_oss_content,
-    "trl",
-    UV_PIN_TRL,
-)
+# installation_gpt_oss_content = update_or_append_pip_install(
+#     installation_gpt_oss_content,
+#     "trl",
+#     UV_PIN_TRL,
+# )
 
 installation_gpt_oss_kaggle_content = installation_gpt_oss_content
 
