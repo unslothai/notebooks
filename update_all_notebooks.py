@@ -14,7 +14,9 @@ DONT_UPDATE_EXCEPTIONS = [
     'Liquid_LFM2-Conversational.ipynb',
     'Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb', # Daniel's?
     'gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb',
-    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb'
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb',
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb',
+    'Qwen3_VL_(8B)-Vision-GRPO.ipynb'
 ]
 
 def get_current_git_branch():
