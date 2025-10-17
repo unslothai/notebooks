@@ -274,12 +274,15 @@ messages = [{
         "text" : "Continue the sequence: 1, 1, 2, 3, 5, 8,",
     }]
 }]
-text = tokenizer.apply_chat_template(
+inputs = tokenizer.apply_chat_template(
     messages,
     add_generation_prompt = True, # Must add for generation
+    tokenize = True,
+    return_tensors = "pt",
+    return_dict = True,
 )
 outputs = model.generate(
-    **tokenizer([text], return_tensors = "pt").to("cuda"),
+    **inputs.to("cuda"),
     max_new_tokens = 64, # Increase for longer outputs!
     # Recommended Gemma-3 settings!
     temperature = 1.0, top_p = 0.95, top_k = 64,
@@ -296,14 +299,17 @@ messages = [{
     "role": "user",
     "content": [{"type" : "text", "text" : "Why is the sky blue?",}]
 }]
-text = tokenizer.apply_chat_template(
+inputs = tokenizer.apply_chat_template(
     messages,
     add_generation_prompt = True, # Must add for generation
+    tokenize = True,
+    return_tensors = "pt",
+    return_dict = True,
 )
 
 from transformers import TextStreamer
 _ = model.generate(
-    **tokenizer([text], return_tensors = "pt").to("cuda"),
+    **inputs.to("cuda"),
     max_new_tokens = 64, # Increase for longer outputs!
     # Recommended Gemma-3 settings!
     temperature = 1.0, top_p = 0.95, top_k = 64,
@@ -343,14 +349,17 @@ messages = [{
     "role": "user",
     "content": [{"type" : "text", "text" : "What is Gemma-3?",}]
 }]
-text = tokenizer.apply_chat_template(
+inputs = tokenizer.apply_chat_template(
     messages,
     add_generation_prompt = True, # Must add for generation
+    tokenize = True,
+    return_tensors = "pt",
+    return_dict = True,
 )
 
 from transformers import TextStreamer
 _ = model.generate(
-    **tokenizer([text], return_tensors = "pt").to("cuda"),
+    **inputs.to("cuda"),
     max_new_tokens = 64, # Increase for longer outputs!
     # Recommended Gemma-3 settings!
     temperature = 1.0, top_p = 0.95, top_k = 64,

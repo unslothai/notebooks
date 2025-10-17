@@ -158,13 +158,13 @@ if "COLAB_" not in "".join(os.environ.keys()):
     # If you're not in Colab, just use pip install!
     !pip install unsloth vllm
 else:
-    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
-    except: get_numpy = "numpy"
+    try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
+    except: get_numpy = "numpy"; get_pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
     get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
     !uv pip install -qqq --upgrade \
-        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
+        unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
     !uv pip install -qqq {get_triton}"""
 
 installation_extra_grpo_content = update_or_append_pip_install(
@@ -183,13 +183,13 @@ installation_grpo_kaggle_content = """%%capture
 import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
 !pip install --upgrade -qqq uv
-try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
-except: get_numpy = "numpy"
+try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
+except: get_numpy = "numpy"; get_pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
 get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
 !uv pip install -qqq --upgrade \
-    unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
+    unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
 !uv pip install -qqq {get_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0."""
 
@@ -216,13 +216,13 @@ if "COLAB_" not in "".join(os.environ.keys()):
     # If you're not in Colab, just use pip install!
     !pip install unsloth vllm synthetic-data-kit==0.0.3
 else:
-    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
-    except: get_numpy = "numpy"
+    try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
+    except: get_numpy = "numpy"; get_pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
     get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
     !uv pip install -qqq --upgrade \
-        unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
+        unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
     !uv pip install -qqq {get_triton}
     !uv pip install synthetic-data-kit==0.0.3"""
 
@@ -240,13 +240,13 @@ installation_synthetic_data_content = update_or_append_pip_install(
 
 installation_grpo_synthetic_data_content = """%%capture
 !pip install --upgrade -qqq uv
-try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
-except: get_numpy = "numpy"
+try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
+except: get_numpy = "numpy"; get_pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
 get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
 !uv pip install -qqq --upgrade \
-    unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers
+    unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
 !uv pip install -qqq {get_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0
 !uv pip install synthetic-data-kit==0.0.3"""
@@ -292,10 +292,10 @@ installation_gpt_oss_content = r"""%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
 if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    
-    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
-    except: get_numpy = "numpy"
+    try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
+    except: get_numpy = "numpy"; get_pil = "pillow"
     !uv pip install -qqq \
-        "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers==4.56.2" \
+        "torch>=2.8.0" "triton>=3.4.0" {get_numpy} {get_pil} torchvision bitsandbytes "transformers==4.56.2" \
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
         "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
         git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels
