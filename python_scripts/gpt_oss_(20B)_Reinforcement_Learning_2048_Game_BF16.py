@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
-
 # # Goal: Make GPT-OSS play games with Reinforcement Learning
 # 
 # Our goal is to make GPT-OSS play the 2048 game with reinforcement learning, or a variant of it called [GRPO](https://arxiv.org/abs/2501.12948).
@@ -12,7 +10,7 @@
 # <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/2048_win.png/500px-2048_win.png" height=300 />
 
 # # Installation
-# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on GPT-OSS 20B. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster, which allows us to fit GPT-OSS RL in a free Google Colab instance.
+# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on GPT-OSS 20B. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
 
 # In[ ]:
 
@@ -21,9 +19,8 @@ get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip ins
 
 
 # We'll load GPT-OSS 20B and set some parameters:
-# * `max_seq_length = 768` The maximum context length of the model. Increasing it will use more memory, and 768 was the maximum we found to fit on a free 15GB Tesla T4 machine
-# * `lora_rank = 4` The larger this number, the smarter the RL process, but the slower and more memory usage
-# * `load_in_4bit = True` Uses quantization to reduce memory usage by 75% without reducing accuracy that much. `load_in_16bit` will be faster but will need a 80GB GPU (H100, B200)
+# * `max_seq_length = 768` The maximum context length of the model. Increasing it will use more memory.
+# * `lora_rank = 4` The larger this number, the smarter the RL process, but the slower and more memory usage`load_in_16bit` will be faster but will need a 64GB GPU or more (MI300)
 # * `offload_embedding = True` New Unsloth optimization which moves the embedding to CPU RAM, reducing VRAM by 1GB.
 
 # In[ ]:
@@ -34,10 +31,9 @@ import torch
 max_seq_length = 768 # Can increase for longer RL output
 lora_rank = 4        # Larger rank = smarter, but slower
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/gpt-oss-20b-BF16", # unsloth/gpt-oss-20b-BF16 for H100s
+    model_name = "unsloth/gpt-oss-20b-BF16",
+    load_in_4bit = False,
     max_seq_length = max_seq_length,
-    load_in_4bit = False,      # False for LoRA 16bit. Choose False on H100s
-    offload_embedding = False, # Reduces VRAM by 1GB
 )
 
 
@@ -652,7 +648,7 @@ def strategy_succeeds(completions, **kwargs):
     return scores
 
 
-# We'll now create the dataset which includes a replica of our prompt. Remember to add a reasoning effort of low! You can choose high reasoning mode, but this'll only work on more memory GPUs like H100s.
+# We'll now create the dataset which includes a replica of our prompt. Remember to add a reasoning effort of low! You can choose high reasoning mode, but this'll only work on more memory GPUs like MI300s.
 
 # In[ ]:
 
@@ -690,7 +686,7 @@ training_args = GRPOConfig(
     max_prompt_length = max_prompt_length,
     max_completion_length = max_completion_length,
     # num_train_epochs = 1, # Set to 1 for a full training run
-    max_steps = 1000,
+    max_steps = 600,
     save_steps = 100,
     report_to = "none", # Can use Weights & Biases, TrackIO
     output_dir = "outputs",
@@ -740,7 +736,7 @@ trainer = GRPOTrainer(
 
 # And let's train the model!
 # 
-# **NOTE** A T4 free GPU might take 5 minutes for one generation sadly since it's an old GPU - A100 or H100 will be much faster!
+# **NOTE** This might be quite slow! 600 steps takes ~5 hours or longer.
 
 # In[ ]:
 
