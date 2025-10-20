@@ -16,8 +16,7 @@ DONT_UPDATE_EXCEPTIONS = [
     'gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb',
     'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb',
     'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb',
-    'Qwen3_VL_(8B)-Vision-GRPO.ipynb',
-    'Synthetic_Data_Hackathon.ipynb',
+    'Qwen3_VL_(8B)-Vision-GRPO.ipynb'
 ]
 
 def get_current_git_branch():
@@ -1049,16 +1048,9 @@ def update_notebook_sections(
                 text_for_last_cell = text_for_last_cell_non_gguf
 
             if last_cell["cell_type"] == "markdown":
-                # Check if the last cell already contains footer content using key markers
+                # Check if the last cell already contains the text
                 existing_text = "".join(last_cell["source"])
-                # Key markers that indicate footer content already exists
-                footer_markers = [
-                    "And we're done! If you have any questions on Unsloth",
-                    "Train your own reasoning model - Llama GRPO notebook",
-                    "This notebook and all Unsloth notebooks are licensed"
-                ]
-                # Only add content if none of the footer markers are found
-                if not any(marker in existing_text for marker in footer_markers):
+                if text_for_last_cell not in existing_text:
                   last_cell["source"].extend(
                       [f"{line}\n" for line in text_for_last_cell.splitlines()]
                   )
