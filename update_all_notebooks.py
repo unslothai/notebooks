@@ -301,7 +301,7 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
         git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2"""
+!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo"""
 
 # installation_gpt_oss_content = update_or_append_pip_install(
 #     installation_gpt_oss_content,
