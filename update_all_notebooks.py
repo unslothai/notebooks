@@ -83,7 +83,7 @@ general_announcement_content_meta = general_announcement_content.split(announcem
 general_announcement_content_meta = general_announcement_content_meta[0] + "\n\n" + '<a href="https://github.com/meta-llama/synthetic-data-kit"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/meta%20round%20logo.png" width="137"></a>' + general_announcement_content_meta[1]
 
 # CONSTANT
-PIN_TRANSFORMERS = "!pip install transformers==4.55.4"
+PIN_TRANSFORMERS = "!pip install transformers==4.56.2"
 UV_PIN_TRANSFORMERS = PIN_TRANSFORMERS.replace("pip", "uv pip")
 
 PIN_TRL = "!pip install --no-deps trl==0.22.2"

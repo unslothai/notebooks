@@ -794,3 +794,5 @@ if False: # Pushing to HF Hub
 
 # # And we're done!
 # Congratulations you just learned how to do reinforcement learning with GPT-OSS! There were some advanced topics explained in this notebook - to learn more about GPT-OSS and RL, there are more docs in Unsloth's [Reinforcement Learning Guide with GPT-OSS](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
+# 
+# This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
