@@ -215,7 +215,7 @@ trainer = Seq2SeqTrainer(
         eval_strategy="steps",
         seed = 3407,
         output_dir = "outputs",
-        report_to = "none", # Use this for WandB etc
+        report_to = "none", # Use TrackIO/WandB etc
 
     ),
 )

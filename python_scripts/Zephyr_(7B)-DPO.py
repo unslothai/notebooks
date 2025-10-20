@@ -354,7 +354,7 @@ dpo_trainer = DPOTrainer(
         lr_scheduler_type = "linear",
         seed = 42,
         output_dir = "outputs",
-        report_to = "none", # Use this for WandB etc
+        report_to = "none", # Use TrackIO/WandB etc
     ),
     beta = 0.1,
     train_dataset = raw_datasets["train"],

@@ -206,7 +206,7 @@ trainer = SFTTrainer(
         lr_scheduler_type = "linear",
         seed = 3407,
         dataset_text_field = "text",
-        report_to = "none",  # Use this for WandB etc
+        report_to = "none",  # Use TrackIO/WandB etc
         max_grad_norm = 0.3,
     ),
 )

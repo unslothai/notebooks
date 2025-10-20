@@ -190,7 +190,7 @@ orpo_trainer = ORPOTrainer(
         lr_scheduler_type = "linear",
         max_steps = 30, # Change to num_train_epochs = 1 for full training runs
         output_dir = "outputs",
-        report_to = "none", # Use this for WandB etc
+        report_to = "none", # Use TrackIO/WandB etc
     ),
 )
 

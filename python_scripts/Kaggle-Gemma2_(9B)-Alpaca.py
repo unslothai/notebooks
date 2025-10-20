@@ -165,7 +165,7 @@ trainer = SFTTrainer(
         lr_scheduler_type = "linear",
         seed = 3407,
         output_dir = "outputs",
-        report_to = "none", # Use this for WandB etc
+        report_to = "none", # Use TrackIO/WandB etc
     ),
 )
 
