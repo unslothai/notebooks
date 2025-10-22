@@ -486,6 +486,25 @@ sys.path.append(f'{os.getcwd()}/sglang/python')"""
 installation_sglang_kaggle_content = installation_sglang_content
 
 # =======================================================
+# QAT Notebook
+# =======================================================
+installation_qat_content = """%%capture
+import os, re
+if "COLAB_" not in "".join(os.environ.keys()):
+    !pip install unsloth
+else:
+    # Do this only in Colab notebooks! Otherwise use pip install unsloth
+    import torch; v = re.match(r"[0-9\.]{3,}", str(torch.__version__)).group(0)
+    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")
+    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
+    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
+    !pip install --no-deps unsloth
+!pip install torchao==0.14.0 fbgemm-gpu-genai==1.3.0
+!pip install transformers==4.55.4
+!pip install --no-deps trl==0.22.2"""
+installation_qat_kaggle_content = installation_qat_content
+
+# =======================================================
 # NEWS (WILL KEEP CHANGING THIS)
 # =======================================================
 
@@ -996,6 +1015,13 @@ def update_notebook_sections(
                                 installation = installation_sglang_kaggle_content
                             else:
                                 installation = installation_sglang_content
+
+                        # QAT INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["qat"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_qat_kaggle_content
+                            else:
+                                installation = installation_qat_content
                                 
                         # GPT OSS INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
