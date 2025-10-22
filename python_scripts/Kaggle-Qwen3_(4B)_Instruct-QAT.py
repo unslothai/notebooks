@@ -32,13 +32,13 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install torchao==0.14.0 fbgemm-gpu-genai==1.3.0\n!pip install transformers==4.55.4\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
 # 
 
-# In[ ]:
+# In[2]:
 
 
 from unsloth import FastLanguageModel
@@ -61,9 +61,9 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Qwen3-4B-Instruct-2507",
-    max_seq_length = 2048, # Choose any for long context!
-    load_in_4bit = True,  # 4 bit quantization to reduce memory
-    load_in_8bit = False, # [NEW!] A bit more accurate, uses 2x memory
+    max_seq_length = 2048,   # Choose any for long context!
+    load_in_4bit = False,    # 4 bit quantization to reduce memory
+    load_in_8bit = False,    # [NEW!] A bit more accurate, uses 2x memory
     full_finetuning = False, # [NEW!] We have full finetuning now!
     # token = "hf_...", # use one if using gated models
 )
@@ -71,23 +71,35 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 
 # We now add LoRA adapters so we only need to update a small amount of parameters!
 
-# In[ ]:
+# In[3]:
 
 
 model = FastLanguageModel.get_peft_model(
     model,
-    r = 32, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
+    r = 16, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
                       "gate_proj", "up_proj", "down_proj",],
     lora_alpha = 32,
     lora_dropout = 0, # Supports any, but = 0 is optimized
     bias = "none",    # Supports any, but = "none" is optimized
     # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
+    qat_scheme = "int4",
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
     random_state = 3407,
     use_rslora = False,  # We support rank stabilized LoRA
     loftq_config = None, # And LoftQ
 )
+
+
+# Lets check if QAT is applied!
+
+# In[4]:
+
+
+for module in model.modules():
+    if "FakeQuantized" in module.__class__.__name__:
+        print("QAT is applied!")
+        break
 
 
 # <a name="Data"></a>
@@ -103,7 +115,7 @@ model = FastLanguageModel.get_peft_model(
 # ```
 # We use our `get_chat_template` function to get the correct chat template. We support `zephyr, chatml, mistral, llama, alpaca, vicuna, vicuna_old, phi3, llama3, phi4, qwen2.5, gemma3` and more.
 
-# In[ ]:
+# In[5]:
 
 
 from unsloth.chat_templates import get_chat_template
@@ -113,7 +125,7 @@ tokenizer = get_chat_template(
 )
 
 
-# In[ ]:
+# In[6]:
 
 
 from datasets import load_dataset
@@ -122,7 +134,7 @@ dataset = load_dataset("mlabonne/FineTome-100k", split = "train")
 
 # We now use `standardize_data_formats` to try converting datasets to the correct format for finetuning purposes!
 
-# In[ ]:
+# In[7]:
 
 
 from unsloth.chat_templates import standardize_data_formats
@@ -131,7 +143,7 @@ dataset = standardize_data_formats(dataset)
 
 # Let's see how row 100 looks like!
 
-# In[ ]:
+# In[8]:
 
 
 dataset[100]
@@ -139,7 +151,7 @@ dataset[100]
 
 # We now have to apply the chat template for `Qwen-3` onto the conversations, and save it to `text`.
 
-# In[ ]:
+# In[9]:
 
 
 def formatting_prompts_func(examples):
@@ -153,7 +165,7 @@ dataset = dataset.map(formatting_prompts_func, batched = True)
 # Let's see how the chat template did!
 # 
 
-# In[ ]:
+# In[10]:
 
 
 dataset[100]['text']
@@ -163,7 +175,7 @@ dataset[100]['text']
 # ### Train the model
 # Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 
-# In[ ]:
+# In[11]:
 
 
 from trl import SFTTrainer, SFTConfig
@@ -174,25 +186,25 @@ trainer = SFTTrainer(
     eval_dataset = None, # Can set up evaluation!
     args = SFTConfig(
         dataset_text_field = "text",
-        per_device_train_batch_size = 2,
+        per_device_train_batch_size = 1,
         gradient_accumulation_steps = 4, # Use GA to mimic batch size!
         warmup_steps = 5,
         # num_train_epochs = 1, # Set this for 1 full training run.
-        max_steps = 60,
+        max_steps = 30,
         learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
         logging_steps = 1,
         optim = "adamw_8bit",
         weight_decay = 0.01,
         lr_scheduler_type = "linear",
         seed = 3407,
-        report_to = "none", # Use TrackIO/WandB etc
+        report_to = "none", # Use this for WandB etc
     ),
 )
 
 
 # We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
 
-# In[ ]:
+# In[12]:
 
 
 from unsloth.chat_templates import train_on_responses_only
@@ -205,7 +217,7 @@ trainer = train_on_responses_only(
 
 # Let's verify masking the instruction part is done! Let's print the 100th row again.
 
-# In[ ]:
+# In[13]:
 
 
 tokenizer.decode(trainer.train_dataset[100]["input_ids"])
@@ -213,13 +225,13 @@ tokenizer.decode(trainer.train_dataset[100]["input_ids"])
 
 # Now let's print the masked out example - you should see only the answer is present:
 
-# In[ ]:
+# In[14]:
 
 
 tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
 
 
-# In[ ]:
+# In[15]:
 
 
 # @title Show current memory stats
@@ -232,13 +244,13 @@ print(f"{start_gpu_memory} GB of memory reserved.")
 
 # Let's train the model! To resume a training run, set `trainer.train(resume_from_checkpoint = True)`
 
-# In[ ]:
+# In[16]:
 
 
 trainer_stats = trainer.train()
 
 
-# In[ ]:
+# In[17]:
 
 
 # @title Show final memory and time stats
@@ -256,13 +268,24 @@ print(f"Peak reserved memory % of max memory = {used_percentage} %.")
 print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
 
 
+# Now that training is complete, let's convert the FakeQuantizedLinear layers back to standard nn.Linear layers. This removes the fake quantization overhead and prepares the model for its final conversion step or for merging LoRA adapters.
+
+# In[18]:
+
+
+from torchao.quantization import quantize_
+from torchao.quantization.qat import QATConfig
+
+quantize_(model, QATConfig(step = "convert"))
+
+
 # <a name="Inference"></a>
 # ### Inference
 # Let's run the model via Unsloth native inference! According to the `Qwen-3` team, the recommended settings for instruct inference are `temperature = 0.7, top_p = 0.8, top_k = 20`
 # 
 # For reasoning chat based inference, `temperature = 0.6, top_p = 0.95, top_k = 20`
 
-# In[ ]:
+# In[19]:
 
 
 messages = [
@@ -289,7 +312,7 @@ _ = model.generate(
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
-# In[ ]:
+# In[20]:
 
 
 model.save_pretrained("lora_model")  # Local saving
@@ -300,7 +323,7 @@ tokenizer.save_pretrained("lora_model")
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
-# In[ ]:
+# In[21]:
 
 
 if False:
@@ -312,81 +335,59 @@ if False:
     )
 
 
-# ### Saving to float16 for VLLM
+# We can now save and quantize the final model using TorchAO, applying the same configuration used during QAT training.
+
+# In[22]:
+
+
+model.save_pretrained_torchao(
+    "model",
+    tokenizer,
+    torchao_config = model._torchao_config.base_config,
+)
+
+
+# ### TorchAO Exporting and Conversion
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
-
-# In[ ]:
-
-
-# Merge to 16bit
-if False:
-    model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
-if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")
-
-# Merge to 4bit
-if False:
-    model.save_pretrained_merged("model", tokenizer, save_method = "merged_4bit",)
-if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_4bit", token = "")
-
-# Just LoRA adapters
-if False:
-    model.save_pretrained("model")
-    tokenizer.save_pretrained("model")
-if False: # Pushing to HF Hub
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
-
-
-# ### GGUF / llama.cpp Conversion
-# To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
+# We also support exporting to TorchAO-quantized checkpoints with custom configs to allow inference in vLLM or other inference engines.
 # 
-# Some supported quant methods (full list on our [Wiki page](https://github.com/unslothai/unsloth/wiki#gguf-quantization-options)):
-# * `q8_0` - Fast conversion. High resource use, but generally acceptable.
-# * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
-# * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
+# For a deeper dive into TorchAO configuration, you can refer to Hugging Face Transformers official documentation: https://huggingface.co/docs/transformers/main/quantization/torchao
 # 
-# [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 
-# Likewise, if you want to instead push to GGUF to your Hugging Face account, set `if False` to `if True` and add your Hugging Face token and upload location!
-
-# In[ ]:
+# In[23]:
 
 
-# Save to 8bit Q8_0
+# Save to TorchAO int4:
 if False:
-    model.save_pretrained_gguf("model", tokenizer,)
-# Remember to go to https://huggingface.co/settings/tokens for a token!
-# And change hf to your username!
-if False:
-    model.push_to_hub_gguf("hf/model", tokenizer, token = "")
+    from torchao.quantization import Int4WeightOnlyConfig
+    model.save_pretrained_torchao("model", tokenizer, torchao_config = Int4WeightOnlyConfig())
 
-# Save to 16bit GGUF
-if False:
-    model.save_pretrained_gguf("model", tokenizer, quantization_method = "f16")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("hf/model", tokenizer, quantization_method = "f16", token = "")
-
-# Save to q4_k_m GGUF
-if False:
-    model.save_pretrained_gguf("model", tokenizer, quantization_method = "q4_k_m")
-if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("hf/model", tokenizer, quantization_method = "q4_k_m", token = "")
-
-# Save to multiple GGUF options - much faster if you want multiple!
-if False:
-    model.push_to_hub_gguf(
+    from torchao.quantization import Int4WeightOnlyConfig
+    model.save_pretrained_torchao(
         "hf/model", # Change hf to your username!
         tokenizer,
-        quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
+        torchao_config = Int4WeightOnlyConfig(),
+        push_to_hub = True,
+        token = "", # Get a token at https://huggingface.co/settings/tokens
+    )
+
+# Save to TorchAO int8:
+if False:
+    from torchao.quantization import Int8DynamicActivationInt8WeightConfig
+    model.save_pretrained_torchao("model", tokenizer, torchao_config = Int8DynamicActivationInt8WeightConfig(),)
+
+if False: # Pushing to HF Hub
+    from torchao.quantization import Int8DynamicActivationInt8WeightConfig
+    model.save_pretrained_torchao(
+        "hf/model", # Change hf to your username!
+        tokenizer,
+        torchao_config = Int8DynamicActivationInt8WeightConfig(),
+        push_to_hub = True,
         token = "", # Get a token at https://huggingface.co/settings/tokens
     )
 
 
-# Now, use the `model-unsloth.gguf` file or `model-unsloth-Q4_K_M.gguf` file in llama.cpp.
-# 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other links:
@@ -401,7 +402,7 @@ if False:
 #   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
-# </div>
 # 
-#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
+# </div>
 # 

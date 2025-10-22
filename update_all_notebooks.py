@@ -486,6 +486,25 @@ sys.path.append(f'{os.getcwd()}/sglang/python')"""
 installation_sglang_kaggle_content = installation_sglang_content
 
 # =======================================================
+# QAT Notebook
+# =======================================================
+installation_qat_content = """%%capture
+import os, re
+if "COLAB_" not in "".join(os.environ.keys()):
+    !pip install unsloth
+else:
+    # Do this only in Colab notebooks! Otherwise use pip install unsloth
+    import torch; v = re.match(r"[0-9\.]{3,}", str(torch.__version__)).group(0)
+    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")
+    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
+    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
+    !pip install --no-deps unsloth
+!pip install torchao==0.14.0 fbgemm-gpu-genai==1.3.0
+!pip install transformers==4.55.4
+!pip install --no-deps trl==0.22.2"""
+installation_qat_kaggle_content = installation_qat_content
+
+# =======================================================
 # NEWS (WILL KEEP CHANGING THIS)
 # =======================================================
 
@@ -996,6 +1015,13 @@ def update_notebook_sections(
                                 installation = installation_sglang_kaggle_content
                             else:
                                 installation = installation_sglang_content
+
+                        # QAT INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["qat"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_qat_kaggle_content
+                            else:
+                                installation = installation_qat_content
                                 
                         # GPT OSS INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
@@ -1048,13 +1074,35 @@ def update_notebook_sections(
                 text_for_last_cell = text_for_last_cell_non_gguf
 
             if last_cell["cell_type"] == "markdown":
-                # Check if the last cell already contains the text
+                # Check if the last cell already contains footer content using key markers
                 existing_text = "".join(last_cell["source"])
-                if text_for_last_cell not in existing_text:
-                  last_cell["source"].extend(
-                      [f"{line}\n" for line in text_for_last_cell.splitlines()]
-                  )
-                  updated = True  # Mark as updated only if content was added
+                # Key markers that indicate footer content already exists
+                footer_markers = [
+                    "And we're done! If you have any questions on Unsloth",
+                    "Train your own reasoning model - Llama GRPO notebook",
+                    "This notebook and all Unsloth notebooks are licensed"
+                ]
+                # Specific check for LGPL license line
+                lgpl_marker = "This notebook and all Unsloth notebooks are licensed [LGPL-3.0]"
+
+                # Check if notebook has partial footer content but missing LGPL line
+                has_partial_footer = any(marker in existing_text for marker in footer_markers[:2])  # First two markers only
+                has_lgpl = lgpl_marker in existing_text
+
+                # Add content if:
+                # 1. No footer markers at all, OR
+                # 2. Has partial footer but missing LGPL license line
+                if not any(marker in existing_text for marker in footer_markers) or (has_partial_footer and not has_lgpl):
+                    # If there's partial footer but missing LGPL, only add the LGPL line
+                    if has_partial_footer and not has_lgpl:
+                        # Add just the LGPL license line
+                        last_cell["source"].append("\n  This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).\n")
+                    else:
+                        # Add complete footer
+                        last_cell["source"].extend(
+                            [f"{line}\n" for line in text_for_last_cell.splitlines()]
+                        )
+                    updated = True  # Mark as updated only if content was added
             else:
                 notebook_content["cells"].append(
                     {
