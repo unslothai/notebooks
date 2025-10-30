@@ -194,7 +194,7 @@ trainer = UnslothTrainer(
 
         logging_steps = 1,
         optim = "adamw_8bit",
-        weight_decay = 0.01,
+        weight_decay = 0.001,
         lr_scheduler_type = "linear",
         seed = 3407,
         output_dir = "outputs",

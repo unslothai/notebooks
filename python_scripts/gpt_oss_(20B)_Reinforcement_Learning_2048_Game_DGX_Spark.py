@@ -679,7 +679,7 @@ from trl import GRPOConfig, GRPOTrainer
 training_args = GRPOConfig(
     temperature = 1.0,
     learning_rate = 5e-5,
-    weight_decay = 0.01,
+    weight_decay = 0.001,
     warmup_ratio = 0.1,
     lr_scheduler_type = "linear",
     optim = "adamw_8bit",
