@@ -35,14 +35,16 @@
 # get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
 # 
 # 
-# # In[ ]:
-# 
-# 
-# from huggingface_hub import snapshot_download
-# snapshot_download("strangervisionhf/deepseek-ocr-latest-transformers", local_dir = "deepseek_ocr")
-# 
-# 
 # # ### Unsloth
+
+# Let's prepare the OCR model to our local first
+
+# In[ ]:
+
+
+from huggingface_hub import snapshot_download
+snapshot_download("strangervisionhf/deepseek-ocr-latest-transformers", local_dir = "deepseek_ocr")
+
 
 # In[ ]:
 
