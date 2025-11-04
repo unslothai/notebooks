@@ -486,6 +486,18 @@ sys.path.append(f'{os.getcwd()}/sglang/python')"""
 installation_sglang_kaggle_content = installation_sglang_content
 
 # =======================================================
+# Deepseek OCR Notebook
+# =======================================================
+installation_deepseek_ocr_content = installation_content
+installation_deepseek_ocr_content += """\n!pip install jiwer
+!pip install einops addict easydict"""
+
+installation_deepseek_ocr_kaggle_content = installation_kaggle_content
+installation_deepseek_ocr_kaggle_content += """\n!pip install jiwer
+!pip install einops addict easydict"""
+
+
+# =======================================================
 # QAT Notebook
 # =======================================================
 installation_qat_content = """%%capture
@@ -1044,6 +1056,14 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma3n_content
 
+                        # Deepseek OCR INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["deepseek_ocr"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_deepseek_ocr_kaggle_content
+                            else:
+                                installation = installation_deepseek_ocr_content
+
+                        # Qwen3VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qwen3"]) and is_vision:
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_qwen3_vl_kaggle_content
