@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
 # 
 # 
 # # ### Unsloth
@@ -72,54 +72,181 @@ model, tokenizer = FastVisionModel.from_pretrained(
 )
 
 
+# In[ ]:
+
+
+# @title Create evaluation functions
+
+import json
+import os
+from typing import Dict
+import numpy as np
+from jiwer import cer
+from tqdm import tqdm
+from datasets import load_dataset
+
+
+def calculate_cer(ref: str, hyp: str) -> float:
+    """Helper to calculate CER and convert to percentage."""
+    return cer(ref, hyp) * 100
+
+
+def evaluate_model(
+    model,
+    tokenizer,
+    dataset,
+    num_samples: int = 100,
+    base_size: int = 1024,
+    image_size: int = 640,
+    crop_mode: bool = True,
+    verbose: bool = True
+):
+    """
+    Runs the model over a subset of the dataset to see how it performs.
+    It'll calculate CER stats and save all the predictions.
+    """
+
+    results = {
+        'cer_scores': [],
+        'predictions': [],
+        'references': [],
+        'sample_indices': []
+    }
+
+    # make sure we don't try to sample more than we have
+    num_samples = min(num_samples, len(dataset))
+
+    # Grab evenly spaced samples from the dataset
+    indices = np.linspace(0, len(dataset) - 1, num_samples, dtype=int)
+
+    # Use tqdm for a progress bar if verbose
+    iterator = tqdm(indices, desc="Evaluating") if verbose else indices
+
+    for idx in iterator:
+        sample = dataset[int(idx)]
+
+        # The model.infer method needs a file path, so we save a temp image
+        temp_image_path = f"temp_eval_image_{idx}.jpg"
+        sample['image_path'].save(temp_image_path)
+
+        prediction = ""
+        reference = sample["text"].strip()
+
+        try:
+            # Run the actual inference
+            prediction = model.infer(
+                tokenizer,
+                prompt="<image>\nFree OCR. ",
+                image_file=temp_image_path,
+                output_path="temp_output",
+                base_size=base_size,
+                image_size=image_size,
+                crop_mode=crop_mode,
+                eval_mode=True,
+                save_results=False,
+                test_compress=False
+            )
+
+            prediction = prediction.strip()
+
+            # Calculate CER
+            cer_score = calculate_cer(reference, prediction)
+
+            results['cer_scores'].append(cer_score)
+            results['predictions'].append(prediction)
+            results['references'].append(reference)
+            results['sample_indices'].append(int(idx))
+
+        except Exception as e:
+            # Don't let one bad sample crash the whole evaluation
+            print(f"\nError processing sample {idx}: {e}")
+            print(f"Reference was: {reference}")
+            continue
+        finally:
+            # Clean up the temp file whether it succeeded or failed
+            if os.path.exists(temp_image_path):
+                os.remove(temp_image_path)
+
+    # Add summary stats
+    if results['cer_scores']:
+        results['mean_cer'] = np.mean(results['cer_scores'])
+        results['median_cer'] = np.median(results['cer_scores'])
+        results['std_cer'] = np.std(results['cer_scores'])
+        results['min_cer'] = np.min(results['cer_scores'])
+        results['max_cer'] = np.max(results['cer_scores'])
+    else:
+        print("Warning: No samples were successfully processed.")
+        results['mean_cer'] = -1.0
+
+    results['num_samples'] = len(results['cer_scores'])
+
+    return results
+
+def print_evaluation_summary(results: Dict, title: str = "Evaluation Results"):
+    """Prints a nice summary of the stats to the console."""
+
+    print("\n" + "="*60)
+    print(f"{title}")
+    print("="*60)
+    print(f"Number of samples: {results['num_samples']}")
+    print(f"Mean CER: {results['mean_cer']:.2f}%")
+    print(f"Median CER: {results['median_cer']:.2f}%")
+    print(f"Std Dev: {results['std_cer']:.2f}%")
+    print(f"Min CER: {results['min_cer']:.2f}%")
+    print(f"Max CER: {results['max_cer']:.2f}%")
+    print("="*60)
+
+    # Show best and worst examples
+    sorted_indices = np.argsort(results['cer_scores'])
+
+    print("\n Best Predictions (Lowest CER):")
+    for i in range(min(3, len(sorted_indices))):
+        idx = sorted_indices[i]
+        print(f"\nSample {results['sample_indices'][idx]} (CER: {results['cer_scores'][idx]:.2f}%)")
+        print(f"Reference:  {results['references'][idx][:100]}...")
+        print(f"Prediction: {results['predictions'][idx][:100]}...")
+
+    print("\n Worst Predictions (Highest CER):")
+    for i in range(min(3, len(sorted_indices))):
+        idx = sorted_indices[-(i+1)]
+        print(f"\nSample {results['sample_indices'][idx]} (CER: {results['cer_scores'][idx]:.2f}%)")
+        print(f"Reference:  {results['references'][idx][:100]}...")
+        print(f"Prediction: {results['predictions'][idx][:100]}...")
+
+def save_evaluation_results(results: Dict, filepath: str):
+    """Save full results dictionary to a JSON file."""
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    print(f"\n✅ Results saved to {filepath}")
+
+
 # ### Let's Evaluate Deepseek-OCR Baseline Performance on Persian Transcription
 
 # In[ ]:
 
 
+print("Loading evaluation dataset...")
 from datasets import load_dataset
-dataset = load_dataset("hezarai/parsynth-ocr-200k", split = "train[:2000]")
+
+eval_dataset = load_dataset("hezarai/parsynth-ocr-200k", split="test")
+
+print("\n Running Baseline Evaluation...")
+baseline_results = evaluate_model(
+    model=model,
+    tokenizer=tokenizer,
+    dataset=eval_dataset,
+    num_samples=200,
+    base_size=1024,
+    image_size=640,
+    crop_mode=True,
+    verbose=True
+)
+
+print_evaluation_summary(baseline_results, "Baseline Model Performance")
+save_evaluation_results(baseline_results, "baseline_evaluation.json")
 
 
-# In[ ]:
-
-
-# Save an image that will not be used during training for evaluation purposes
-dataset[1523]['image_path'].save("your_image.jpg")
-
-
-# In[ ]:
-
-
-dataset[1523]['image_path']
-
-
-# In[ ]:
-
-
-# prompt = "<image>\nFree OCR. "
-prompt = "<image>\nFree OCR. "
-image_file = 'your_image.jpg'
-output_path = 'your/output/dir'
-# infer(self, tokenizer, prompt='', image_file='', output_path = ' ', base_size = 1024, image_size = 640, crop_mode = True, test_compress = False, save_results = False):
-
-# Tiny: base_size = 512, image_size = 512, crop_mode = False
-# Small: base_size = 640, image_size = 640, crop_mode = False
-# Base: base_size = 1024, image_size = 1024, crop_mode = False
-# Large: base_size = 1280, image_size = 1280, crop_mode = False
-
-# Gundam: base_size = 1024, image_size = 640, crop_mode = True
-
-res = model.infer(tokenizer, prompt=prompt, image_file=image_file, output_path = output_path, base_size = 1024, image_size = 640, crop_mode=True, save_results = True, test_compress = False)
-
-
-# In[ ]:
-
-
-dataset[1523]["text"]
-
-
-# <h3>Baseline Model Performance: 23% Character Error Rate (CER) for this sample !</h3>
+# <h3>Mean Baseline Model Performance: 149.07% Character Error Rate (CER) for this eval set !</h3>
 
 # # Let's finetune Deepseek-OCR !
 
@@ -160,6 +287,8 @@ model = FastVisionModel.get_peft_model(
 # You can access the dataset [here](https://huggingface.co/datasets/hezarai/parsynth-ocr-200k).
 # 
 
+# Let's take an overview look at the dataset. We shall see what the 3rd image is, and what caption it had.
+
 # To format the dataset, all vision finetuning tasks should be formatted as follows:
 # 
 # ```python
@@ -177,6 +306,7 @@ model = FastVisionModel.get_peft_model(
 # In[ ]:
 
 
+from datasets import load_dataset
 instruction = "<image>\nFree OCR. "
 
 def convert_to_conversation(sample):
@@ -238,9 +368,11 @@ from deepseek_ocr.modeling_deepseekocr import (
 @dataclass
 class DeepSeekOCRDataCollator:
     """
+    Data collator that handles image preprocessing and tokenization at batch time.
+
     Args:
-        tokenizer: Tokenizer
-        model: Model
+        tokenizer: Tokenizer instance
+        model: Model instance (used to get dtype)
         image_size: Size for image patches (default: 640)
         base_size: Size for global view (default: 1024)
         crop_mode: Whether to use dynamic cropping for large images
@@ -388,6 +520,9 @@ class DeepSeekOCRDataCollator:
     def process_single_sample(self, messages: List[Dict]) -> Dict[str, Any]:
             """
             Process a single conversation into model inputs.
+
+            This version builds the token sequence in a single pass,
+            accurately calculating the prompt/response split point.
             """
 
             # --- 1. Setup ---
@@ -615,6 +750,49 @@ print(f"{start_gpu_memory} GB of memory reserved.")
 trainer_stats = trainer.train()
 
 
+# ### Now after fine-tuning lets evaluate the model!
+
+# In[ ]:
+
+
+FastVisionModel.for_inference(model) # Enable for inference!
+
+finetuned_results = evaluate_model(
+    model=model,
+    tokenizer=tokenizer,
+    dataset=eval_dataset,
+    num_samples=200,
+    base_size=1024,
+    image_size=640,
+    crop_mode=True,
+    verbose=True
+)
+
+print_evaluation_summary(finetuned_results, "Fine-tuned Model Performance")
+save_evaluation_results(finetuned_results, "finetuned_evaluation.json")
+
+
+# ### Now lets compare both.
+
+# In[ ]:
+
+
+print("\n" + "="*60)
+print("📈 PERFORMANCE COMPARISON")
+print("="*60)
+print(f"Baseline Mean CER:    {baseline_results['mean_cer']:.2f}%")
+print(f"Fine-tuned Mean CER:  {finetuned_results['mean_cer']:.2f}%")
+
+improvement = baseline_results['mean_cer'] - finetuned_results['mean_cer']
+relative_improvement = (improvement / baseline_results['mean_cer']) * 100
+
+print(f"\n✨ Absolute Improvement: {improvement:.2f}%")
+print(f"✨ Relative Improvement: {relative_improvement:.2f}%")
+print("="*60)
+
+
+# With only 60 steps, we reduced the Character Error Rate (CER) from 149.07% to 60.43%, representing a 88.6% absolute improvement in character errors!
+
 # In[ ]:
 
 
@@ -640,6 +818,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # In[ ]:
 
 
+eval_dataset[0]['image_path'].save('your_image.jpg')
 prompt = "<image>\nFree OCR. "
 image_file = 'your_image.jpg'
 output_path = 'your/output/dir'
@@ -659,14 +838,6 @@ res = model.infer(tokenizer, prompt=prompt, image_file=image_file,
     save_results = True,
     test_compress = False)
 
-
-# With only 60 steps, we dramatically improved the transcription quality. The Character Error Rate (CER) on this single sample dropped from 23% to 6%, a 74% relative reduction!
-# 
-# | Type | OCR |
-# | :--- | :--- |
-# | **Baseline (Pre-Finetune)** | `انضباطم نندم حقيقتن باورم نميتند` |
-# | **Finetuned (60 steps)** | `انضباطم نشدم حقیقتن باورم نمیشد` |
-# | **Ground Truth** | `انضباطمم شدم حقیقتن باورم نمیشد` |
 
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
