@@ -19,6 +19,41 @@ DONT_UPDATE_EXCEPTIONS = [
     'Qwen3_VL_(8B)-Vision-GRPO.ipynb'
 ]
 
+
+FIRST_MAPPING_NAME = {
+    "gpt-oss-(20B)-Fine-tuning.ipynb" : "gpt_oss_(20B)-Fine-tuning.ipynb",
+    "Qwen2_5_7B_VL_GRPO.ipynb" : "Qwen2.5_VL_(7B)-Vision-GRPO.ipynb",
+    "Qwen3_(4B)-Instruct.ipynb" : "Qwen3_(4B)-Conversational.ipynb",
+    "Qwen3_(4B)_Instruct-QAT.ipynb" : "Qwen3_(4B)-QAT.ipynb",
+
+    # GPT OSS 
+    "gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb" : "(DGX Spark)-gpt-oss-(20B)-GRPO-2048.ipynb",
+    "gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb" : "gpt-oss-(20B)-GRPO-2048.ipynb",
+    "Deepseek_OCR_(3B).ipynb" : "Deepseek_OCR_(3B)-Fine-Tuning.ipynb",
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb" : "(OpenEnv)-gpt-oss-BF16-(20B)-GRPO-2048.ipynb",
+    "gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb" : "gpt-oss-BF16-(20B)-GRPO-2048.ipynb",
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb" : "(OpenEnv)-gpt-oss-(20B)-GRPO-2048.ipynb",
+    "GPT_OSS_BNB_(20B)-Inference.ipynb" : "gpt-oss-BNB-(20B)-Inference.ipynb",
+    "GPT_OSS_MXFP4_(20B)-Inference.ipynb" : "gpt-oss-MXFP4-(20B)-Inference.ipynb",
+
+    # Gemma
+    "Gemma3_(4B).ipynb" : "Gemma3_(4B)-Conversational.ipynb",
+    "Gemma3_(270M).ipynb" : "Gemma3_(270M)-Conversational.ipynb",
+
+    # Granite
+    "Granite4.0_350M.ipynb" : "Granite4.0_(350M)-Conversational.ipynb",
+    "Granite4.0.ipynb" : "Granite4.0_(3B)-Conversational.ipynb",
+
+    # Bert
+    "bert_classification.ipynb" : "ModernBERT_(Large)-Classification.ipynb",
+
+    # Whisper
+    "Whisper.ipynb" : "Whisper_(Large)-Fine-Tuning.ipynb",
+
+    # Spark
+    "Spark_TTS_(0_5B).ipynb" : "Spark_TTS_(0.5B)-TTS.ipynb",
+}
+
 def get_current_git_branch():
     try:
         # Run the git command to get the current branch name
@@ -598,15 +633,17 @@ ARCHITECTURE_MAPPING = {
     'mistral': 'Mistral',
     'pixtral': 'Mistral',
     'zephyr': 'Mistral',
+    "Magistral" : "Mistral",
 
     # Whisper
     'whisper': 'Whisper',
 
     # Text-to-Speech Models (Group or keep separate?)
-    'oute': 'Oute', 
-    'llasa': 'Llama',
-    'spark': 'Spark',
-    'orpheus': 'Orpheus',
+    'oute': 'TTS', 
+    'llasa': 'TTS',
+    'spark': 'TTS',
+    'orpheus': 'TTS',
+    'sesame' : "TTS",
 
     # gpt oss
     'gpt oss': 'GPT-OSS',
@@ -614,6 +651,16 @@ ARCHITECTURE_MAPPING = {
     # Linear Attention
     'falcon' : 'Linear Attention',
     'liquid' : 'Linear Attention',
+
+    # Deepseek
+    'deepseek': 'Deepseek',
+
+    # Granite
+    'granite': 'Granite',
+    
+    # Bert
+    'bert': 'BERT',
+    'modernbert': 'BERT',
 
     # Other Models (Assign architecture or keep specific)
     # 'codeforces': 'CodeForces Model', # Example
@@ -637,7 +684,9 @@ KNOWN_TYPES_ORDERED = [
     'Synthetic Data',        
     'Reasoning Conversational',
     'Vision GRPO',
-    'GRPO LoRA',             
+    'GRPO LoRA',
+    'Fine Tuning',
+    'QAT',
     
     'Conversational',
     'Alpaca',
@@ -650,6 +699,10 @@ KNOWN_TYPES_ORDERED = [
     'Inference',            
     'Ollama',               
     'Audio',
+    'Thinking',
+
+    # GPT OSS
+    "GRPO 2048",
     
     'ORPO',
     'GRPO',
@@ -658,13 +711,15 @@ KNOWN_TYPES_ORDERED = [
     'TTS',                  
     'LoRA',
     'VL',                   
-    'RAFT'
-]
+    'RAFT',
 
-FIRST_MAPPING_NAME = {
-    "gpt-oss-(20B)-Fine-tuning" : "GPT_OSS_(20B)-Fine-tuning",
-    "Qwen2_5_7B_VL_GRPO" : "Qwen2.5_(7B)-VL-GRPO",
-}
+    # Deepseek OCR
+    "Evaluation",
+    "Eval",
+
+    # BERT, ModernBERT,
+    "Classification"
+]
 
 def extract_model_info_refined(filename, architecture_mapping, known_types_ordered):
     if not filename.endswith(".ipynb"):
@@ -1334,6 +1389,17 @@ def update_readme(
             continue
 
         notebook_name = os.path.basename(path)
+        old_notebook_name = notebook_name
+        check = False
+        if notebook_name in FIRST_MAPPING_NAME:
+            notebook_name = FIRST_MAPPING_NAME[notebook_name]
+            check = True
+        
+        # For Kaggle
+        if notebook_name.lstrip("Kaggle-") in FIRST_MAPPING_NAME:
+            notebook_name = FIRST_MAPPING_NAME[notebook_name.lstrip("Kaggle-")]
+            notebook_name = "Kaggle-" + notebook_name
+
         std_notebook_name = notebook_name.replace("-", "_")
         is_kaggle = is_path_contains_any(path.lower(), ["kaggle"]) 
 
