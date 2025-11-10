@@ -529,10 +529,9 @@ if False: # Change to True to save to GGUF
 
 if False: # Change to True to upload GGUF
     model.push_to_hub_gguf(
-        "gemma-3N-finetune",
+        "HF_ACCOUNT/gemma-3N-finetune-gguf",
         tokenizer,
         quantization_method = "Q8_0", # Only Q8_0, BF16, F16 supported
-        repo_id = "HF_ACCOUNT/gemma-3N-finetune-gguf",
         token = "hf_...",
     )
 
