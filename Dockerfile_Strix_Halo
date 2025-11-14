@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y sudo && \
 WORKDIR /opt/src
 
 # bitsandbytes (ROCm)
-RUN git clone --depth 1 -b rocm_enabled_multi_backend https://github.com/ROCm/bitsandbytes.git && \
+RUN git clone -b rocm_enabled_multi_backend https://github.com/ROCm/bitsandbytes.git && \
     cd bitsandbytes && \
     cmake -S . -DGPU_TARGETS="gfx1151" -DBNB_ROCM_ARCH="gfx1151" -DCOMPUTE_BACKEND=hip && \
     make -j && \
@@ -28,7 +28,7 @@ RUN python -m pip install --no-cache-dir \
 
 # xformers (pinned)
 WORKDIR /opt/src
-RUN git clone --depth 1 https://github.com/ROCm/xformers.git && \
+RUN git clone https://github.com/ROCm/xformers.git && \
     cd xformers && \
     git submodule update --init --recursive && \
     git checkout 13c93f3 && \
@@ -37,13 +37,13 @@ RUN git clone --depth 1 https://github.com/ROCm/xformers.git && \
 
 ENV FLASH_ATTENTION_TRITON_AMD_ENABLE="TRUE"
 WORKDIR /root
-RUN git clone --depth 1 https://github.com/ROCm/flash-attention.git && \
+RUN git clone https://github.com/ROCm/flash-attention.git && \
     cd flash-attention && git checkout v2.7.4-cktile && python setup.py install && \
     cd .. && rm -rf flash-attention
 
 # Unsloth (install first), then Zoo
 WORKDIR /opt/src
-RUN git clone --depth 1 https://github.com/unslothai/unsloth.git && \
+RUN git clone https://github.com/unslothai/unsloth.git && \
     cd unsloth && \
     python -m pip install --no-cache-dir . && \
     cd .. && rm -rf unsloth
