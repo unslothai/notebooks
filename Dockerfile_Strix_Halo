@@ -10,12 +10,11 @@ RUN apt-get update && apt-get install -y sudo && \
 WORKDIR /opt/src
 
 # bitsandbytes (ROCm)
-RUN git clone -b rocm_enabled_multi_backend https://github.com/ROCm/bitsandbytes.git && \
-    cd bitsandbytes && \
-    cmake -S . -DGPU_TARGETS="gfx1151" -DBNB_ROCM_ARCH="gfx1151" -DCOMPUTE_BACKEND=hip && \
+RUN git clone -b rocm_enabled_multi_backend https://github.com/ROCm/bitsandbytes.git
+WORKDIR /opt/src/bitsandbytes
+RUN cmake -S . -DGPU_TARGETS="gfx1151" -DBNB_ROCM_ARCH="gfx1151" -DCOMPUTE_BACKEND=hip && \
     make -j && \
-    python -m pip install --no-cache-dir . && \
-    cd .. && rm -rf bitsandbytes
+    python -m pip install --no-cache-dir .
 
 # Python deps
 RUN python -m pip install --no-cache-dir \
@@ -28,26 +27,25 @@ RUN python -m pip install --no-cache-dir \
 
 # xformers (pinned)
 WORKDIR /opt/src
-RUN git clone https://github.com/ROCm/xformers.git && \
-    cd xformers && \
-    git submodule update --init --recursive && \
+RUN git clone https://github.com/ROCm/xformers.git
+WORKDIR /opt/src/xformers
+RUN git submodule update --init --recursive && \
     git checkout 13c93f3 && \
-    PYTORCH_ROCM_ARCH=gfx1151 python setup.py install && \
-    cd .. && rm -rf xformers
+    PYTORCH_ROCM_ARCH=gfx1151 python setup.py install
 
 ENV FLASH_ATTENTION_TRITON_AMD_ENABLE="TRUE"
 WORKDIR /root
-RUN git clone https://github.com/ROCm/flash-attention.git && \
-    cd flash-attention && git checkout v2.7.4-cktile && python setup.py install && \
-    cd .. && rm -rf flash-attention
+RUN git clone https://github.com/ROCm/flash-attention.git
+RUN cd flash-attention && git checkout v2.7.4-cktile && python setup.py install
 
 # Unsloth (install first), then Zoo
 WORKDIR /opt/src
-RUN git clone https://github.com/unslothai/unsloth.git && \
-    cd unsloth && \
-    python -m pip install --no-cache-dir . && \
-    cd .. && rm -rf unsloth
-RUN python -m pip install --no-cache-dir jupyterlab ipywidgets ipykernel tqdm 'unsloth_zoo>=2025.5.7'
+RUN git clone https://github.com/unslothai/unsloth.git
+
+WORKDIR /opt/src/unsloth
+RUN python -m pip install --no-cache-dir .
+RUN python -m pip install --no-cache-dir jupyterlab ipywidgets ipykernel tqdm
+RUN python -m pip install --no-cache-dir 'unsloth_zoo>=2025.5.7'
 
 # Set default user and working directory
 USER user
