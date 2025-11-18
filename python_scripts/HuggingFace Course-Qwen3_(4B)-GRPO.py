@@ -572,7 +572,7 @@ del tokenized
 # 
 # Now set up GRPO Trainer and all configurations!
 
-# In[30]:
+# In[ ]:
 
 
 max_prompt_length = maximum_length + 1 # + 1 just in case!
@@ -598,7 +598,7 @@ training_args = GRPOConfig(
     lr_scheduler_type = "linear",
     optim = "adamw_8bit",
     logging_steps = 1,
-    per_device_train_batch_size = 1,
+    per_device_train_batch_size = 4,
     gradient_accumulation_steps = 1, # Increase to 4 for smoother training
     num_generations = 4, # Decrease if out of memory
     max_prompt_length = max_prompt_length,

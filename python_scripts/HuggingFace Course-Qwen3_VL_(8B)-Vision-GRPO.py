@@ -320,7 +320,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 1024,
 # 
 # Now set up the `GRPO` Trainer and all configurations! Note we actually enable `GSPO` as well!
 
-# In[18]:
+# In[ ]:
 
 
 from trl import GRPOConfig, GRPOTrainer
@@ -334,7 +334,7 @@ training_args = GRPOConfig(
     optim = "adamw_8bit",
     logging_steps = 1,
     log_completions = False,
-    per_device_train_batch_size = 1,
+    per_device_train_batch_size = 2,
     gradient_accumulation_steps = 1, # Increase to 4 for smoother training
     num_generations = 2, # Decrease if out of memory
     max_prompt_length = 1024,
