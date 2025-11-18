@@ -313,7 +313,7 @@ def check_numbers(prompts, completions, answer, **kwargs):
 # 
 # Now set up GRPO Trainer and all configurations!
 
-# In[18]:
+# In[ ]:
 
 
 max_prompt_length = 256
@@ -328,7 +328,7 @@ training_args = GRPOConfig(
     lr_scheduler_type = "cosine",
     optim = "adamw_torch_fused",
     logging_steps = 1,
-    per_device_train_batch_size = 1,
+    per_device_train_batch_size = 4,
     gradient_accumulation_steps = 1, # Increase to 4 for smoother training
     num_generations = 4, # Decrease if out of memory
     max_prompt_length = max_prompt_length,

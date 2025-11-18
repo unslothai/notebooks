@@ -199,7 +199,7 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
 # 
 # Now set up GRPO Trainer and all configurations!
 
-# In[4]:
+# In[ ]:
 
 
 max_prompt_length = 256
@@ -214,7 +214,7 @@ training_args = GRPOConfig(
     lr_scheduler_type = "cosine",
     optim = "paged_adamw_8bit",
     logging_steps = 1,
-    per_device_train_batch_size = 1,
+    per_device_train_batch_size = 6,
     gradient_accumulation_steps = 1, # Increase to 4 for smoother training
     num_generations = 6, # Decrease if out of memory
     max_prompt_length = max_prompt_length,

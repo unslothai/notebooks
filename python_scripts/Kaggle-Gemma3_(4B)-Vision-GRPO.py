@@ -275,7 +275,7 @@ train_dataset[0]["prompt"]
 # 
 # Now set up GRPO Trainer and all configurations!
 
-# In[14]:
+# In[ ]:
 
 
 from trl import GRPOConfig, GRPOTrainer
@@ -289,7 +289,7 @@ training_args = GRPOConfig(
     lr_scheduler_type = "cosine",
     optim = "adamw_8bit",
     logging_steps = 1,
-    per_device_train_batch_size = 1,
+    per_device_train_batch_size = 4,
     gradient_accumulation_steps = 2, # Increase to 4 for smoother training
     num_generations = 4, # Decrease if out of memory
     max_prompt_length = 1024,
