@@ -343,7 +343,7 @@ if False:
 model.save_pretrained_torchao(
     "model",
     tokenizer,
-    torchao_config = model._torchao_config.base_config,
+    torchao_config = model._torchao_config.base_config_and_filter_fns[0][0],
 )
 
 
