@@ -181,7 +181,17 @@ import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
 if "COLAB_" not in "".join(os.environ.keys()):
     # If you're not in Colab, just use pip install or uv pip install
-    !pip install unsloth vllm
+    import sys; is_windows = True if sys.platform == "win32" else False
+    try: import subprocess; is_xpu = "Intel XPU" in str(subprocess.check_output(["xpu-smi"]))
+    except: is_xpu = False
+    if is_xpu and is_windows:
+        !pip install unsloth[intel-gpu-torch290]
+        if os.path.exists(r"C:\Program Files (x86)\Intel\oneAPI\setvars.bat")
+            !call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
+            os.environ["USE_SYCL_KERNELS"] = "0"
+            os.environ["PYTHONUTF8"] = "1"
+    else:
+        !pip install unsloth vllm
 else:
     pass # For Colab / Kaggle, we need extra instructions hidden below \\/"""
 
