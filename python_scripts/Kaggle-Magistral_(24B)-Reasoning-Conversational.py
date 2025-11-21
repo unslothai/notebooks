@@ -114,25 +114,24 @@ reasoning_dataset
 # In[8]:
 
 
-def generate_conversation(examples):
-    problems  = examples["problem"]
-    solutions = examples["generated_solution"]
-    conversations = []
-    for problem, solution in zip(problems, solutions):
-        conversations.append([
+def generate_conversation(example):
+    problem  = example["problem"]
+    solution = example["generated_solution"]
+    conversation = [
             {"role" : "user",      "content" : problem},
             {"role" : "assistant", "content" : solution},
-        ])
-    return { "conversations": conversations, }
+        ]
+    return { "conversations": conversation, }
 
 
 # In[9]:
 
 
-reasoning_conversations = tokenizer.apply_chat_template(
-    reasoning_dataset.map(generate_conversation, batched = True)["conversations"],
-    tokenize = False,
-)
+reasoning_dataset = reasoning_dataset.map(generate_conversation)
+reasoning_conversations = [tokenizer.apply_chat_template(
+    conv["conversations"], tokenize = False)
+    for conv in reasoning_dataset
+]
 
 
 # Let's see the first transformed row:

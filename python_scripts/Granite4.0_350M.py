@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Granite4.0_350M.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
 # To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
@@ -29,26 +31,37 @@
 
 # # ### Installation
 # 
-# # In[ ]:
+# # In[1]:
 # 
 # 
 # get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
+# # In[2]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', '# These are mamba kernels and we must have these for faster training\n!pip install --no-build-isolation mamba_ssm==2.2.5\n!pip install --no-build-isolation causal_conv1d==1.5.2\n')
+# 
+# 
 # # ### Unsloth
 
-# In[ ]:
+# In[3]:
 
 
 from unsloth import FastLanguageModel
 import torch
 
 fourbit_models = [
-    "unsloth/Qwen3-1.7B-unsloth-bnb-4bit", # Qwen 14B 2x faster
-    "unsloth/Qwen3-4B-unsloth-bnb-4bit",
-    "unsloth/Qwen3-8B-unsloth-bnb-4bit",
-    "unsloth/Qwen3-14B-unsloth-bnb-4bit",
-    "unsloth/Qwen3-32B-unsloth-bnb-4bit",
+    "unsloth/granite-4.0-micro",
+    "unsloth/granite-4.0-h-micro",
+    "unsloth/granite-4.0-h-tiny",
+    "unsloth/granite-4.0-h-small",
+
+    # Base pretrained Granite 4 models
+    "unsloth/granite-4.0-micro-base",
+    "unsloth/granite-4.0-h-micro-base",
+    "unsloth/granite-4.0-h-tiny-base",
+    "unsloth/granite-4.0-h-small-base",
 
     # 4bit dynamic quants for superior accuracy and low memory use
     "unsloth/gemma-3-12b-it-unsloth-bnb-4bit",
@@ -59,131 +72,175 @@ fourbit_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/Magistral-Small-2509-unsloth-bnb-4bit",
-    max_seq_length = 2048,   # Context length - can be longer, but uses more memory
-    load_in_4bit = True,     # 4bit uses much less memory
-    load_in_8bit = False,    # A bit more accurate, uses 2x memory
-    full_finetuning = False, # We have full finetuning now!
-    device_map = "balanced", # Uses 2x Telsa T4s
-    # token = "hf_...",      # use one if using gated models
+    model_name = "unsloth/granite-4.0-350m-unsloth-bnb-4bit",
+    max_seq_length = 2048,   # Choose any for long context!
+    load_in_4bit = False,    # 4 bit quantization to reduce memory
+    load_in_8bit = False,    # [NEW!] A bit more accurate, uses 2x memory
+    full_finetuning = False, # [NEW!] We have full finetuning now!
 )
 
 
-# We now add LoRA adapters so we only need to update 1 to 10% of all parameters!
+# We now add LoRA adapters so we only need to update a small amount of parameters!
 
-# In[5]:
+# In[4]:
 
 
 model = FastLanguageModel.get_peft_model(
     model,
-    r = 32,           # Choose any number > 0! Suggested 8, 16, 32, 64, 128
+    r = 32, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
-                      "gate_proj", "up_proj", "down_proj",],
-    lora_alpha = 32,  # Best to choose alpha = rank or rank*2
+                      "gate_proj", "up_proj", "down_proj",
+                      "shared_mlp.input_linear", "shared_mlp.output_linear"],
+    lora_alpha = 32,
     lora_dropout = 0, # Supports any, but = 0 is optimized
     bias = "none",    # Supports any, but = "none" is optimized
     # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
     random_state = 3407,
-    use_rslora = False,   # We support rank stabilized LoRA
-    loftq_config = None,  # And LoftQ
+    use_rslora = False,  # We support rank stabilized LoRA
+    loftq_config = None, # And LoftQ
 )
 
 
 # <a name="Data"></a>
 # ### Data Prep
-# We use the [Open Math Reasoning](https://huggingface.co/datasets/nvidia/OpenMathReasoning) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and whicht got > 95% accuracy.
+# #### 📄 Using Google Sheets as Training Data
+# Our goal is to create a customer support bot that proactively helps and solves issues.
+# 
+# We’re storing examples in a Google Sheet with two columns:
+# 
+# - **Snippet**: A short customer support interaction
+# - **Recommendation**: A suggestion for how the agent should respond
+# 
+# This keeps things simple and collaborative. Anyone can edit the sheet, no database setup required.  
+# <br>
+# 
+# ---
+# <br>
+# 
+# #### 🔍 Why This Format?
+# 
+# This setup works well for tasks like:
+# 
+# - `Input snippet → Suggested reply`
+# - `Prompt → Rewrite`
+# - `Bug report → Diagnosis`
+# - `Text → Label or Category`
+# 
+# Just collect examples in a spreadsheet, and you’ve got usable training data.  
+# <br>
+# 
+# ---
+# <br>
+# 
+# #### ✅ What You'll Learn
+# 
+# We’ll show how to:
+# 
+# 1. Load the Google Sheet into your notebook
+# 2. Format it into a dataset
+# 3. Use it to train or prompt an LLM
+# 
+# 
+# The chat template for granite-4 look like this:
+# ```
+# <|start_of_role|>system<|end_of_role|>Knowledge Cutoff Date: April 2024.
+# Today's Date: June 24, 2025.
+# You are Granite, developed by IBM. You are a helpful AI assistant.<|end_of_text|>
+# 
+# <|start_of_role|>user<|end_of_role|>How do astronomers determine the original wavelength of light emitted by a celestial body at rest, which is necessary for measuring its speed using the Doppler effect?<|end_of_text|>
+# 
+# <|start_of_role|>assistant<|end_of_role|>Astronomers make use of the unique spectral fingerprints of elements found in stars...<|end_of_text|>
+# ```
+
+# In[5]:
+
+
+from datasets import load_dataset, Dataset
+
+# Use the below shared sheet
+# sheet_url = 'https://docs.google.com/spreadsheets/d/1NrjI5AGNIwRtKTAse5TW_hWq2CwAS03qCHif6vaaRh0/export?format=csv&gid=0'
+
+# Or unsloth/Support-Bot-Recommendation
+sheet_url = "https://huggingface.co/datasets/unsloth/Support-Bot-Recommendation/raw/main/support_recs.csv"
+
+dataset = load_dataset(
+    "csv",
+    data_files={"train": sheet_url},
+    column_names=["snippet", "recommendation"], # Replace with the actual column names of your sheet
+    skiprows=1  # skip header rows
+)["train"]
+
+
+# We've just loaded the Google Sheet as a csv style Dataset, but we still need to format it into conversational style like below and then apply the chat template.
+# 
+# ```
+# {"role": "system", "content": "You are an assistant"}
+# {"role": "user", "content": "What is 2+2?"}
+# {"role": "assistant", "content": "It's 4."}
+# ```
+# 
+# We'll use a helper function `formatting_prompts_func` to do both!
 
 # In[6]:
 
 
-from datasets import load_dataset
-reasoning_dataset = load_dataset("unsloth/OpenMathReasoning-mini", split = "cot")
+def formatting_prompts_func(examples):
+    user_texts = examples['snippet']
+    response_texts = examples['recommendation']
+    messages = [
+        [{"role": "user", "content": user_text},
+        {"role": "assistant", "content": response_text}] for user_text, response_text in zip(user_texts, response_texts)
+    ]
+    texts = [tokenizer.apply_chat_template(message, tokenize = False, add_generation_prompt = False) for message in messages]
+
+    return { "text" : texts, }
+
+dataset = dataset.map(formatting_prompts_func, batched = True,)
 
 
-# Let's see the structure of our dataset:
+# We now look at the raw input data before formatting.
 
 # In[7]:
 
 
-reasoning_dataset
+dataset[5]["snippet"]
 
-
-# We now convert the reasoning dataset into conversational format:
 
 # In[8]:
 
 
-def generate_conversation(example):
-    problem  = example["problem"]
-    solution = example["generated_solution"]
-    conversation = [
-            {"role" : "user",      "content" : problem},
-            {"role" : "assistant", "content" : solution},
-        ]
-    return { "conversations": conversation, }
+dataset[5]['recommendation']
 
+
+# And we see how the chat template transformed these conversations.
 
 # In[9]:
 
 
-reasoning_dataset = reasoning_dataset.map(generate_conversation)
-reasoning_conversations = [tokenizer.apply_chat_template(
-    conv["conversations"], tokenize = False)
-    for conv in reasoning_dataset
-]
-
-
-# Let's see the first transformed row:
-
-# In[10]:
-
-
-reasoning_conversations[0]
-
-
-# Now let's see how long the dataset is:
-
-# In[11]:
-
-
-print(len(reasoning_conversations))
-
-
-# In[13]:
-
-
-import pandas as pd
-data = pd.concat([
-    pd.Series(reasoning_conversations),
-])
-data.name = "text"
-
-from datasets import Dataset
-combined_dataset = Dataset.from_pandas(pd.DataFrame(data))
-combined_dataset = combined_dataset.shuffle(seed = 3407)
+dataset[5]["text"]
 
 
 # <a name="Train"></a>
 # ### Train the model
 # Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 
-# In[17]:
+# In[10]:
 
 
 from trl import SFTTrainer, SFTConfig
 trainer = SFTTrainer(
     model = model,
     tokenizer = tokenizer,
-    train_dataset = combined_dataset,
+    train_dataset = dataset,
     eval_dataset = None, # Can set up evaluation!
     args = SFTConfig(
         dataset_text_field = "text",
         per_device_train_batch_size = 2,
-        gradient_accumulation_steps = 2, # Use GA to mimic batch size!
+        gradient_accumulation_steps = 4, # Use GA to mimic batch size!
         warmup_steps = 5,
         # num_train_epochs = 1, # Set this for 1 full training run.
-        max_steps = 15,
+        max_steps = 60,
         learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
         logging_steps = 1,
         optim = "adamw_8bit",
@@ -195,7 +252,36 @@ trainer = SFTTrainer(
 )
 
 
-# In[15]:
+# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
+
+# In[11]:
+
+
+from unsloth.chat_templates import train_on_responses_only
+trainer = train_on_responses_only(
+    trainer,
+    instruction_part = "<|start_of_role|>user|end_of_role|>",
+    response_part = "<|start_of_role|>assistant<|end_of_role|>",
+)
+
+
+# Let's verify masking the instruction part is done! Let's print the 100th row again.
+
+# In[12]:
+
+
+tokenizer.decode(trainer.train_dataset[100]["input_ids"])
+
+
+# Now let's print the masked out example - you should see only the answer is present:
+
+# In[13]:
+
+
+tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
+
+
+# In[14]:
 
 
 # @title Show current memory stats
@@ -207,14 +293,18 @@ print(f"{start_gpu_memory} GB of memory reserved.")
 
 
 # Let's train the model! To resume a training run, set `trainer.train(resume_from_checkpoint = True)`
+# 
+# ```
+# Notice you might have to wait ~10 minutes for the Mamba kernels to compile! Please be patient!
+# ```
 
-# In[18]:
+# In[15]:
 
 
 trainer_stats = trainer.train()
 
 
-# In[19]:
+# In[16]:
 
 
 # @title Show final memory and time stats
@@ -234,26 +324,133 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 
 # <a name="Inference"></a>
 # ### Inference
-# Let's run the model via Unsloth native inference! According to the `Mistral` team, the recommended settings for reasoning inference are `temperature = 0.7, top_p = 0.95`
+# Let's run the model via Unsloth native inference! We'll use some example snippets not contained in our training data to get a sense of what was learned.
 
-# In[20]:
+# In[17]:
 
+
+# @title Test Scenarios
+# --- Scenario 1: Video-Conferencing Screen-Share Bug (11 turns) ---
+scenario_1 = """
+User: Everyone in my meeting just sees a black screen when I share.
+Agent: Sorry about that—are you sharing a window or your entire screen?
+User: Entire screen on macOS Sonoma.
+Agent: Thanks. Do you have “Enable hardware acceleration” toggled on in Settings → Video?
+User: Yeah, that switch is on.
+Agent: Could you try toggling it off and start a quick test share?
+User: Did that—still black for attendees.
+Agent: Understood. Are you on the desktop app v5.4.2 or the browser client?
+User: Desktop v5.4.2—just updated this morning.
+"""
+
+# --- Scenario 2: Smart-Lock Low-Battery Loop (9 turns) ---
+scenario_2 = """
+User: I changed the batteries, but the lock app still says 5 % and won’t auto-lock.
+Agent: Let’s check firmware. In the app, go to Settings → Device Info—what version shows?
+User: 3.18.0-alpha.
+Agent: Latest stable is 3.17.5. Did you enroll in the beta program?
+User: I might have months ago.
+Agent: Beta builds sometimes misreport battery. Remove one battery, wait ten seconds, reinsert, and watch the LED pattern.
+User: LED blinks blue twice, then red once.
+Agent: That blink code means “config mismatch.” Do you still have the old batteries handy?
+User: Tossed them already.
+"""
+
+# --- Scenario 3: Accounting SaaS — Corrupted Invoice Export (10 turns) ---
+scenario_3 = """
+User: Every invoice I download today opens as a blank PDF.
+Agent: Is this happening to historic invoices, new ones, or both?
+User: Both. Anything I export is 0 bytes.
+Agent: Are you exporting through “Bulk Actions” or individual invoice pages?
+User: Individual pages.
+Agent: Which browser/OS combo?
+User: Chrome on Windows 11, latest update.
+Agent: We released a new PDF renderer at 10 a.m. UTC. Could you try Edge quickly, just to rule out a caching quirk?
+User: Tried Edge—same zero-byte file.
+"""
+
+# --- Scenario 4: Fitness-Tracker App — Stuck Step Count (8 turns) ---
+scenario_4 = """
+User: My step count has been frozen at 4,237 since last night.
+Agent: Which phone are you syncing with?
+User: iPhone 15, iOS 17.5.
+Agent: In the Health Permissions screen, does “Motion & Fitness” show as ON?
+User: Yes, it’s toggled on.
+Agent: When you pull down to refresh the dashboard, does the sync spinner appear?
+User: Spinner flashes for a second, then nothing changes.
+"""
+
+# --- Scenario 5: Online-Course Platform — Quiz Submission Error (12 turns) ---
+scenario_5 = """
+User: My quiz submits but then shows “Unknown grading error” and resets the answers.
+Agent: Which course and quiz name?
+User: History 301, Unit 2 Quiz.
+Agent: Do you notice a red banner or any code like GR-### in the corner?
+User: Banner says “GR-412”.
+Agent: That code points to answer-payload size. Were you pasting images or long text into any answers?
+User: Maybe a long essay—about 800 words in Question 5.
+Agent: Are you on a laptop or mobile?
+User: Laptop, Safari on macOS.
+"""
+
+
+# In[18]:
+
+
+FastLanguageModel.for_inference(model) # Enable native 2x faster inference
 
 messages = [
-    {"role" : "user", "content" : "Solve (x + 2)^2 = 0."}
+    {"role": "user", "content": scenario_1},
 ]
-text = tokenizer.apply_chat_template(
+inputs = tokenizer.apply_chat_template(
     messages,
-    tokenize = False,
+    tokenize = True,
     add_generation_prompt = True, # Must add for generation
-)
+    padding = True,
+    return_tensors = "pt",
+    return_dict=True,
+).to("cuda")
 
 from transformers import TextStreamer
-_ = model.generate(
-    **tokenizer(text, return_tensors = "pt").to("cuda"),
-    max_new_tokens = 1024, # Increase for longer outputs!
-    temperature = 0.7, top_p = 0.95,
-    streamer = TextStreamer(tokenizer, skip_prompt = True),
+text_streamer = TextStreamer(tokenizer, skip_prompt = False)
+
+_ = model.generate(**inputs,
+                   streamer = text_streamer,
+                   max_new_tokens = 512, # Increase if tokens are getting cut off
+                   use_cache = True,
+                   # Adjust the sampling params to your preference
+                   do_sample=True,
+                   temperature = 0.7, top_p = 0.8, top_k = 20,
+)
+
+
+# In[19]:
+
+
+FastLanguageModel.for_inference(model) # Enable native 2x faster inference
+
+messages = [
+    {"role": "user", "content": scenario_2},
+]
+inputs = tokenizer.apply_chat_template(
+    messages,
+    tokenize = True,
+    add_generation_prompt = True, # Must add for generation
+    padding = True,
+    return_tensors = "pt",
+    return_dict=True,
+).to("cuda")
+
+from transformers import TextStreamer
+text_streamer = TextStreamer(tokenizer, skip_prompt = False)
+
+_ = model.generate(**inputs,
+                   streamer = text_streamer,
+                   max_new_tokens = 512, # Increase if tokens are getting cut off
+                   use_cache = True,
+                   # Adjust the sampling params to your preference
+                   do_sample=False,
+                   temperature = 0.7, top_p = 0.8, top_k = 20,
 )
 
 
@@ -263,7 +460,7 @@ _ = model.generate(
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
-# In[21]:
+# In[20]:
 
 
 model.save_pretrained("lora_model")  # Local saving
@@ -274,7 +471,7 @@ tokenizer.save_pretrained("lora_model")
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
-# In[22]:
+# In[21]:
 
 
 if False:
@@ -290,7 +487,7 @@ if False:
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
-# In[ ]:
+# In[22]:
 
 
 # Merge to 16bit
@@ -324,7 +521,9 @@ if False: # Pushing to HF Hub
 # 
 # [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 
-# In[24]:
+# Likewise, if you want to instead push to GGUF to your Hugging Face account, set `if False` to `if True` and add your Hugging Face token and upload location!
+
+# In[23]:
 
 
 # Save to 8bit Q8_0
