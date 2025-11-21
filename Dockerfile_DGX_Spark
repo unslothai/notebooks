@@ -1,7 +1,7 @@
 FROM nvcr.io/nvidia/pytorch:25.09-py3
 
 # Set CUDA environment variables
-ENV CUDA_HOME=/usr/local/cuda-13.0/
+ENV CUDA_HOME=/usr/local/cuda-13.0
 ENV CUDA_PATH=$CUDA_HOME
 ENV PATH=$CUDA_HOME/bin:$PATH
 ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
@@ -24,7 +24,8 @@ RUN git clone --depth=1 https://github.com/facebookresearch/xformers --recursive
     cd ..
 
 # Install unsloth and other dependencies
-RUN pip install unsloth unsloth_zoo bitsandbytes==0.48.0 transformers==4.56.2 trl==0.22.2
+RUN pip install --no-deps bitsandbytes==0.48.0 transformers==4.56.2 trl==0.22.2
+RUN pip install unsloth unsloth_zoo
 
 # Launch the shell
 CMD ["/bin/bash"]
