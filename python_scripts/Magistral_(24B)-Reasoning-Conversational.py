@@ -127,8 +127,10 @@ def generate_conversation(example):
 # In[9]:
 
 
-reasoning_conversations = [
-    tokenizer.apply_chat_template(conv["conversations"],tokenize = False,) for conv in reasoning_dataset.map(generate_conversation)
+reasoning_dataset = reasoning_dataset.map(generate_conversation)
+reasoning_conversations = [tokenizer.apply_chat_template(
+    conv["conversations"], tokenize = False)
+    for conv in reasoning_dataset
 ]
 
 
