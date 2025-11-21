@@ -135,10 +135,10 @@ if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth
 else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
-    import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)
-    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")
+    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)
+    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")
     !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
-    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
+    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
     !pip install --no-deps unsloth
 """
 installation_content = update_or_append_pip_install(
@@ -158,7 +158,7 @@ import os
 !pip install pip3-autoremove
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
 !pip install unsloth
-!pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0"
+!pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets==4.3.0"
 """
 
 installation_kaggle_content = update_or_append_pip_install(
@@ -226,7 +226,7 @@ get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.
 !uv pip install -qqq --upgrade \
     unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
 !uv pip install -qqq {get_triton}
-!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0."""
+!uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"""
 
 installation_grpo_kaggle_content = update_or_append_pip_install(
     installation_grpo_kaggle_content,
@@ -283,7 +283,7 @@ get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.
 !uv pip install -qqq --upgrade \
     unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
 !uv pip install -qqq {get_triton}
-!uv pip install "huggingface_hub>=0.34.0" "datasets>=3.4.1,<4.0.0
+!uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"
 !uv pip install synthetic-data-kit==0.0.3"""
 installation_grpo_synthetic_data_content = update_or_append_pip_install(
     installation_grpo_synthetic_data_content,
@@ -541,10 +541,10 @@ if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth
 else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
-    import torch; v = re.match(r"[0-9\.]{3,}", str(torch.__version__)).group(0)
-    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")
+    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)
+    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")
     !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
-    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer
+    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
     !pip install --no-deps unsloth
 !pip install torchao==0.14.0 fbgemm-gpu-genai==1.3.0
 !pip install transformers==4.55.4
