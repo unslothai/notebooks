@@ -662,7 +662,7 @@ def speed_check(completions, **kwargs):
 
 from datasets import Dataset
 dataset = Dataset.from_list([{"prompt" : [{"role": "user", "content": prompt.strip()}], "answer" : 0, "reasoning_effort": "low"}]*1000)
-maximum_length = len(tokenizer(prompt.strip())["input_ids"])
+maximum_length = len(tokenizer.apply_chat_template([{"role":"user", "content":prompt.strip()}], add_generation_prompt = True, tokenize = True))
 print(maximum_length)
 dataset[0]
 
