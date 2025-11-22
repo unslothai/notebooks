@@ -140,7 +140,7 @@ def generate_conversation(examples):
 
 
 reasoning_conversations = tokenizer.apply_chat_template(
-    reasoning_dataset.map(generate_conversation, batched = True)["conversations"],
+    list(reasoning_dataset.map(generate_conversation, batched = True)["conversations"]),
     tokenize = False,
 )
 
@@ -164,7 +164,7 @@ from unsloth.chat_templates import standardize_sharegpt
 dataset = standardize_sharegpt(non_reasoning_dataset)
 
 non_reasoning_conversations = tokenizer.apply_chat_template(
-    dataset["conversations"],
+    list(dataset["conversations"]),
     tokenize = False,
 )
 
