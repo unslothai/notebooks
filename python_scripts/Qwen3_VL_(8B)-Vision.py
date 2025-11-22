@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9\\.]{3,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.32.post2" if v == "2.8.0" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.57.0\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.57.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -72,7 +72,7 @@ model, tokenizer = FastVisionModel.from_pretrained(
 # 
 # **[NEW]** We also support finetuning ONLY the vision part of the model, or ONLY the language part. Or you can select both! You can also select to finetune the attention or the MLP layers!
 
-# In[4]:
+# In[ ]:
 
 
 model = FastVisionModel.get_peft_model(
@@ -99,7 +99,7 @@ model = FastVisionModel.get_peft_model(
 # 
 # You can access the dataset [here](https://huggingface.co/datasets/unsloth/LaTeX_OCR). The full dataset is [here](https://huggingface.co/datasets/linxy/LaTeX_OCR).
 
-# In[5]:
+# In[ ]:
 
 
 from datasets import load_dataset
@@ -108,19 +108,19 @@ dataset = load_dataset("unsloth/LaTeX_OCR", split = "train")
 
 # Let's take an overview look at the dataset. We shall see what the 3rd image is, and what caption it had.
 
-# In[6]:
+# In[ ]:
 
 
 dataset
 
 
-# In[7]:
+# In[ ]:
 
 
 dataset[2]["image"]
 
 
-# In[8]:
+# In[ ]:
 
 
 dataset[2]["text"]
@@ -128,7 +128,7 @@ dataset[2]["text"]
 
 # We can also render the LaTeX in the browser directly!
 
-# In[9]:
+# In[ ]:
 
 
 from IPython.display import display, Math, Latex
@@ -150,7 +150,7 @@ display(Math(latex))
 # ]
 # ```
 
-# In[10]:
+# In[ ]:
 
 
 instruction = "Write the LaTeX representation for this image."
@@ -173,7 +173,7 @@ pass
 
 # Let's convert the dataset into the "correct" format for finetuning:
 
-# In[11]:
+# In[ ]:
 
 
 converted_dataset = [convert_to_conversation(sample) for sample in dataset]
@@ -181,7 +181,7 @@ converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 
 # We look at how the conversations are structured for the first example:
 
-# In[12]:
+# In[ ]:
 
 
 converted_dataset[0]
@@ -189,7 +189,7 @@ converted_dataset[0]
 
 # Let's first see before we do any finetuning what the model outputs for the first example!
 
-# In[13]:
+# In[ ]:
 
 
 FastVisionModel.for_inference(model) # Enable for inference!
@@ -223,7 +223,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 # 
 # We use our new `UnslothVisionDataCollator` which will help in our vision finetuning setup.
 
-# In[14]:
+# In[ ]:
 
 
 from unsloth.trainer import UnslothVisionDataCollator
@@ -260,7 +260,7 @@ trainer = SFTTrainer(
 )
 
 
-# In[15]:
+# In[ ]:
 
 
 # @title Show current memory stats
@@ -271,13 +271,13 @@ print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
 
-# In[16]:
+# In[ ]:
 
 
 trainer_stats = trainer.train()
 
 
-# In[17]:
+# In[ ]:
 
 
 # @title Show final memory and time stats
@@ -301,7 +301,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # 
 # We use `min_p = 0.1` and `temperature = 1.5`. Read this [Tweet](https://x.com/menhguin/status/1826132708508213629) for more information on why.
 
-# In[18]:
+# In[ ]:
 
 
 FastVisionModel.for_inference(model) # Enable for inference!
@@ -335,7 +335,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
-# In[19]:
+# In[ ]:
 
 
 model.save_pretrained("lora_model")  # Local saving
@@ -346,7 +346,7 @@ tokenizer.save_pretrained("lora_model")
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
-# In[20]:
+# In[ ]:
 
 
 if False:
@@ -384,7 +384,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
-# In[21]:
+# In[ ]:
 
 
 # Select ONLY 1 to save! (Both not needed!)
@@ -396,6 +396,45 @@ if False: model.save_pretrained_merged("unsloth_finetune", tokenizer,)
 if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "PUT_HERE")
 
 
+# ### GGUF / llama.cpp Conversion
+# To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
+# 
+# Some supported quant methods (full list on our [Wiki page](https://github.com/unslothai/unsloth/wiki#gguf-quantization-options)):
+# * `q8_0` - Fast conversion. High resource use, but generally acceptable.
+# * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
+# * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
+# 
+# [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
+
+# In[ ]:
+
+
+# Save to 8bit Q8_0
+if False: model.save_pretrained_gguf("unsloth_finetune", tokenizer,)
+# Remember to go to https://huggingface.co/settings/tokens for a token!
+# And change hf to your username!
+if False: model.push_to_hub_gguf("hf/unsloth_finetune", tokenizer, token = "")
+
+# Save to 16bit GGUF
+if False: model.save_pretrained_gguf("unsloth_finetune", tokenizer, quantization_method = "f16")
+if False: model.push_to_hub_gguf("hf/unsloth_finetune", tokenizer, quantization_method = "f16", token = "")
+
+# Save to q4_k_m GGUF
+if False: model.save_pretrained_gguf("unsloth_finetune", tokenizer, quantization_method = "q4_k_m")
+if False: model.push_to_hub_gguf("hf/unsloth_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+
+# Save to multiple GGUF options - much faster if you want multiple!
+if False:
+    model.push_to_hub_gguf(
+        "hf/unsloth_finetune", # Change hf to your username!
+        tokenizer,
+        quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
+        token = "",
+    )
+
+
+# Now, use the `model-unsloth.gguf` file or `model-unsloth-Q4_K_M.gguf` file in llama.cpp.
+# 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other links:
@@ -411,6 +450,6 @@ if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, 
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 
-#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
+#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # </div>
 # 

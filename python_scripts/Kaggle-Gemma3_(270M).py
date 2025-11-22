@@ -174,7 +174,7 @@ dataset[100]['text']
 # ### Train the model
 # Now let's train our model. We do 100 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 
-# In[10]:
+# In[ ]:
 
 
 from trl import SFTTrainer, SFTConfig
@@ -185,7 +185,7 @@ trainer = SFTTrainer(
     eval_dataset = None, # Can set up evaluation!
     args = SFTConfig(
         dataset_text_field = "text",
-        per_device_train_batch_size = 8,
+        per_device_train_batch_size = 4,
         gradient_accumulation_steps = 1, # Use GA to mimic batch size!
         warmup_steps = 5,
         # num_train_epochs = 1, # Set this for 1 full training run.
@@ -367,7 +367,7 @@ if False: # Change to True to save to GGUF
 
 # Likewise, if you want to instead push to GGUF to your Hugging Face account, set `if False` to `if True` and add your Hugging Face token and upload location!
 
-# In[22]:
+# In[ ]:
 
 
 if False: # Change to True to upload GGUF
