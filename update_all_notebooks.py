@@ -301,24 +301,24 @@ installation_grpo_synthetic_data_content = update_or_append_pip_install(
 # =======================================================
 
 # Add install snac under install unsloth
-installation_orpheus_content = installation_content + """\n!pip install snac"""
-installation_orpheus_kaggle_content = installation_kaggle_content + """\n!pip install snac"""
+installation_orpheus_content = installation_content + """\n!pip install snac torchcodec \"datasets>=3.4.1,<4.0.0\""""
+installation_orpheus_kaggle_content = installation_kaggle_content + """\n!pip install snac torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 # =======================================================
 # Whisper Notebook
 # =======================================================
 
-installation_whisper_content = installation_content + """\n!pip install librosa soundfile evaluate jiwer"""
-installation_whisper_kaggle_content = installation_kaggle_content + """\n!pip install librosa soundfile evaluate jiwer"""
+installation_whisper_content = installation_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
+installation_whisper_kaggle_content = installation_kaggle_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 # =======================================================
 # Spark Notebook
 # =======================================================
 
 installation_spark_content = installation_content + """\n!git clone https://github.com/SparkAudio/Spark-TTS
-!pip install omegaconf einx"""
+!pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 installation_spark_kaggle_content = installation_kaggle_content + """\n!git clone https://github.com/SparkAudio/Spark-TTS
-!pip install omegaconf einx"""
+!pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 # =======================================================
 # GPT OSS Notebook
@@ -361,7 +361,7 @@ import os
 os.remove("/content/OuteTTS/outetts/models/gguf_model.py")
 os.remove("/content/OuteTTS/outetts/interface.py")
 os.remove("/content/OuteTTS/outetts/__init__.py")
-!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy
+!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
@@ -371,7 +371,7 @@ import os
 os.remove("/content/OuteTTS/outetts/models/gguf_model.py")
 os.remove("/content/OuteTTS/outetts/interface.py")
 os.remove("/content/OuteTTS/outetts/__init__.py")
-!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy
+!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
@@ -387,7 +387,7 @@ installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', insta
 installation_llasa_content += """\
 
 !pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
-!pip install omegaconf
+!pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_content = update_or_append_pip_install(
     installation_llasa_content,
@@ -396,7 +396,8 @@ installation_llasa_content = update_or_append_pip_install(
 )
 
 installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
-!pip install omegaconf\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
+!pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
+%env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
     "transformers",
@@ -420,7 +421,7 @@ installation_tool_calling_kaggle_content = installation_kaggle_content + """\n!p
 # =======================================================
 # Sesame CSM Notebook
 # =======================================================
-installation_sesame_csm_content = installation_content
+installation_sesame_csm_content = installation_content + """\n!pip install torchcodec \"datasets>=3.4.1,<4.0.0\""""
 installation_sesame_csm_content = update_or_append_pip_install(
     installation_sesame_csm_content,
     "transformers",
@@ -432,11 +433,11 @@ installation_sesame_csm_content = update_or_append_pip_install(
     PIN_TRL
 )
 
-installation_sesame_csm_kaggle_content = installation_kaggle_content
+installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip install torchcodec \"datasets>=3.4.1,<4.0.0\""""
 installation_sesame_csm_kaggle_content = update_or_append_pip_install(
     installation_sesame_csm_kaggle_content,
     "transformers",
-    "!pip install transformers==4.52.3",
+    "!pip install transformers==4.52.3 torchcodec",
 )
 installation_sesame_csm_kaggle_content = update_or_append_pip_install(
     installation_sesame_csm_kaggle_content,
@@ -477,8 +478,8 @@ installation_llama_vision_kaggle_content = update_or_append_pip_install(
 # =======================================================
 gemma3n_extra_content = """\
 
-import torch; torch._dynamo.config.recompile_limit = 64;
-"""
+!pip install torchcodec
+import torch; torch._dynamo.config.recompile_limit = 64;"""
 installation_gemma3n_content = installation_content 
 installation_gemma3n_content += gemma3n_extra_content
 
@@ -490,8 +491,8 @@ installation_gemma3n_kaggle_content += gemma3n_extra_content
 # =======================================================
 gemma3n_extra_content = """\
 
-import torch; torch._dynamo.config.recompile_limit = 64;
-"""
+!pip install torchcodec
+import torch; torch._dynamo.config.recompile_limit = 64;"""
 installation_qwen3_vl_content = installation_content 
 installation_qwen3_vl_content = update_or_append_pip_install(
     installation_qwen3_vl_content,
