@@ -497,14 +497,14 @@ installation_qwen3_vl_content = installation_content
 installation_qwen3_vl_content = update_or_append_pip_install(
     installation_qwen3_vl_content,
     "transformers",
-    "!pip install transformers==4.57.0",
+    "!pip install transformers==4.57.1",
 )
 
 installation_qwen3_vl_kaggle_content  = installation_kaggle_content
 installation_qwen3_vl_kaggle_content  = update_or_append_pip_install(
     installation_qwen3_vl_kaggle_content,
     "transformers",
-    "!pip install transformers==4.57.0",
+    "!pip install transformers==4.57.1",
 )
 
 
