@@ -532,6 +532,14 @@ installation_deepseek_ocr_kaggle_content = installation_kaggle_content
 installation_deepseek_ocr_kaggle_content += """\n!pip install jiwer
 !pip install einops addict easydict"""
 
+# =======================================================
+# ERNIE_4_5_VL Notebook
+# =======================================================
+installation_ernie_4_5_vl_content = installation_content
+installation_ernie_4_5_vl_content += """\n!pip install decord"""
+
+installation_ernie_4_5_vl_kaggle_content = installation_kaggle_content
+installation_ernie_4_5_vl_kaggle_content += """\n!pip install decord"""
 
 # =======================================================
 # QAT Notebook
@@ -1112,13 +1120,20 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma3n_content
 
+                        # ERNIE VL INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["ernie_4_5_vl"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_ernie_4_5_vl_kaggle_content
+                            else:
+                                installation = installation_ernie_4_5_vl_content
+                                
                         # Deepseek OCR INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["deepseek_ocr"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_deepseek_ocr_kaggle_content
                             else:
                                 installation = installation_deepseek_ocr_content
-
+                                
                         # Qwen3VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qwen3"]) and is_vision:
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
