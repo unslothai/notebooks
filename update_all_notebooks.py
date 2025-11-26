@@ -55,6 +55,10 @@ FIRST_MAPPING_NAME = {
 
     # Spark
     "Spark_TTS_(0_5B).ipynb" : "Spark_TTS_(0.5B)-TTS.ipynb",
+
+    # FP8
+    "Qwen3_8B_FP8_GRPO.ipynb" : "Qwen3_(8B)-FP8-GRPO.ipynb",
+    "Llama_FP8_GRPO.ipynb" : "Llama3.2_(1B)-FP8-GRPO.ipynb",
 }
 
 def get_current_git_branch():
@@ -713,6 +717,9 @@ KNOWN_TYPES_ORDERED = [
     'Audio',
     'Thinking',
 
+    # FP8 GRPO
+    "FP8 GRPO",
+
     # GPT OSS
     "GRPO 2048",
     
@@ -730,7 +737,7 @@ KNOWN_TYPES_ORDERED = [
     "Eval",
 
     # BERT, ModernBERT,
-    "Classification"
+    "Classification",
 ]
 
 def extract_model_info_refined(filename, architecture_mapping, known_types_ordered):
