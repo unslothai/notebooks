@@ -32,7 +32,7 @@ get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip ins
 
 # We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) from source:
 
-# In[2]:
+# In[3]:
 
 
 get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().parent.absolute() / "OpenEnv")\n')
@@ -43,9 +43,10 @@ get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn r
 # * `lora_rank = 4` The larger this number, the smarter the RL process, but the slower and more memory usage`load_in_16bit` will be faster but will need a 64GB GPU or more (MI300)
 # * `offload_embedding = True` New Unsloth optimization which moves the embedding to CPU RAM, reducing VRAM by 1GB.
 
-# In[3]:
+# In[4]:
 
 
+import os
 from unsloth import FastLanguageModel
 import torch
 max_seq_length = 768 # Can increase for longer RL output
@@ -54,12 +55,13 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/gpt-oss-20b",
     load_in_4bit = True,
     max_seq_length = max_seq_length,
+    offload_embedding = True, # Offload embeddings to save more VRAM
 )
 
 
 # To do efficient RL, we will use [LoRA](https://arxiv.org/abs/2106.09685), which allows us to only add 1 to 5% of extra weights to the model for finetuning purposes. This allows us to save memory usage by over 60%, and yet it retains good accuracy. Read Unsloth's [GPT-OSS RL Guide](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) for more details.
 
-# In[4]:
+# In[5]:
 
 
 model = FastLanguageModel.get_peft_model(
@@ -79,7 +81,7 @@ model = FastLanguageModel.get_peft_model(
 # 
 # We first launch an OpenEnv process and import it! This will allows us to see how the 2048 implementation looks like!
 
-# In[5]:
+# In[6]:
 
 
 from envs.openspiel_env import OpenSpielEnv
@@ -88,7 +90,7 @@ from envs.openspiel_env.models import OpenSpielAction, OpenSpielObservation
 
 # We'll be using Unsloth's OpenEnv implementation and wrapping the `launch_openenv` with some setup arguments:
 
-# In[6]:
+# In[7]:
 
 
 global port
@@ -118,7 +120,7 @@ launch_openenv = functools.partial(
 
 # Let's see how the current 2048 game state looks like:
 
-# In[7]:
+# In[8]:
 
 
 port, openenv_process = launch_openenv(port, openenv_process)
@@ -129,7 +131,7 @@ current_state
 
 # First let's convert the state into a list of list of numbers!
 
-# In[8]:
+# In[9]:
 
 
 import numpy as np
@@ -144,7 +146,7 @@ convert_to_board(current_state)
 
 # We also want to pretty print the game board!
 
-# In[9]:
+# In[10]:
 
 
 #@title (Collapsible) 2048 Game Renderer
@@ -201,7 +203,7 @@ def render_board(obs, colors: bool = True, border: bool = True, dot_for_zero: bo
     return "\n".join(rows)
 
 
-# In[10]:
+# In[11]:
 
 
 print(render_board(current_state))
@@ -209,7 +211,7 @@ print(render_board(current_state))
 
 # We can see the `legal_actions` ie what you can take as `[0, 1, 2, 3]` Let's try doing the action `0`.
 
-# In[11]:
+# In[12]:
 
 
 action = OpenSpielAction(action_id = 0, game_name = "2048")
@@ -220,7 +222,7 @@ print(render_board(current_state))
 
 # So it looks like `0` is a move up action! Let's try `1`.
 
-# In[12]:
+# In[13]:
 
 
 action = OpenSpielAction(action_id = 1, game_name = "2048")
@@ -231,7 +233,7 @@ print(render_board(current_state))
 
 # `1` is a move right action. And `2`:
 
-# In[13]:
+# In[14]:
 
 
 action = OpenSpielAction(action_id = 2, game_name = "2048")
@@ -242,7 +244,7 @@ print(render_board(current_state))
 
 # `2` is a move down. And I guess `3` is just move left!
 
-# In[14]:
+# In[15]:
 
 
 action = OpenSpielAction(action_id = 3, game_name = "2048")
@@ -253,7 +255,7 @@ print(render_board(current_state))
 
 # We can also print the game status which indicates if no more moves are possible, and also the possible actions you can take!
 
-# In[15]:
+# In[16]:
 
 
 print(current_state.done)
@@ -266,7 +268,7 @@ print(current_state.legal_actions)
 # 
 # We'll also add a timer to only execute the stratgegy for 2 seconds maximum, otherwise it might never terminate!
 
-# In[16]:
+# In[17]:
 
 
 from typing import Callable
@@ -305,7 +307,7 @@ def execute_strategy(strategy : Callable, current_state : OpenSpielObservation):
 
 # Let's make a generic strategy to just hit `3`. We should expect this generic strategy to fail:
 
-# In[17]:
+# In[18]:
 
 
 def always_move_left(board):
@@ -325,7 +327,7 @@ steps, if_done
 
 # To allow longer strategies for GPT-OSS Reinforcement Learning, we shall allow a 5 second timer.
 
-# In[18]:
+# In[19]:
 
 
 @execute_with_time_limit(5)
@@ -339,7 +341,7 @@ def execute_strategy(strategy : Callable, current_state : OpenSpielObservation):
 # 
 # For example the below piece of code is fine, since it only imports Python level functions. We use `check_python_modules`:
 
-# In[19]:
+# In[20]:
 
 
 from unsloth import check_python_modules
@@ -357,7 +359,7 @@ print(info)
 
 # For the below piece of code, since we import `numpy`, we should not allow the execution:
 
-# In[20]:
+# In[21]:
 
 
 sample = """
@@ -373,7 +375,7 @@ print(info)
 # We also disallow global variable access. We'll use Unsloth's `create_locked_down_function` function
 # 
 
-# In[21]:
+# In[22]:
 
 
 from unsloth import create_locked_down_function
@@ -389,7 +391,7 @@ except Exception as e:
     print(str(e))
 
 
-# In[22]:
+# In[23]:
 
 
 from unsloth import create_locked_down_function
@@ -410,7 +412,7 @@ except Exception as e:
 # 
 # We now have to create a prompt to tell the model to create a strategy for the 2048 game. You can customize this to some other task for another RL task.
 
-# In[23]:
+# In[24]:
 
 
 prompt = """
@@ -429,7 +431,7 @@ print(prompt)
 
 # First, let's prompt GPT-OSS without RL and see how it goes:
 
-# In[24]:
+# In[25]:
 
 
 text = tokenizer.apply_chat_template(
@@ -458,7 +460,7 @@ _ = model.generate(
 # 2. `no_cheating` which checks if the function imported other modules, and if it did, we penalize it.
 # 3. `strategy_succeeds` which checks if the game strategy actually succeeds in attaining 2048 after running the auto-generated strategy.
 
-# In[25]:
+# In[26]:
 
 
 def extract_function(text):
@@ -475,14 +477,14 @@ print(extract_function(prompt))
 
 # Below is our `function_works` reward function which uses Python's `exec` but guarded by not allowing leakage of local and global variables. We can also use `check_python_modules` first to check if there are errors before even executing the function:
 
-# In[26]:
+# In[27]:
 
 
 ok, info = check_python_modules("def a")
 ok, info
 
 
-# In[27]:
+# In[28]:
 
 
 def function_works(completions, **kwargs):
@@ -507,7 +509,7 @@ def function_works(completions, **kwargs):
 
 # `no_cheating` checks if the function cheated since it might have imported Numpy or other functions:
 
-# In[28]:
+# In[29]:
 
 
 def no_cheating(completions, **kwargs):
@@ -528,7 +530,7 @@ def no_cheating(completions, **kwargs):
 # 
 # We also add a global `PRINTER` to print out the strategy and board state.
 
-# In[29]:
+# In[30]:
 
 
 import numpy as np
@@ -582,7 +584,7 @@ def strategy_succeeds(completions, **kwargs):
 
 # We'll now create the dataset which includes a replica of our prompt. Remember to add a reasoning effort of low! You can choose high reasoning mode, but this'll only work on more memory GPUs like MI300s.
 
-# In[30]:
+# In[31]:
 
 
 from datasets import Dataset
@@ -599,7 +601,7 @@ dataset[0]
 # 
 # We're also using [TrackIO](https://github.com/gradio-app/trackio) which allows you to visualize all training metrics straight inside the notebook fully locally!
 
-# In[31]:
+# In[32]:
 
 
 max_prompt_length = maximum_length + 1 # + 1 just in case!
@@ -608,7 +610,7 @@ max_completion_length = max_seq_length - max_prompt_length
 from trl import GRPOConfig, GRPOTrainer
 training_args = GRPOConfig(
     temperature = 1.0,
-    learning_rate = 5e-5,
+    learning_rate = 2e-4,
     weight_decay = 0.001,
     warmup_ratio = 0.1,
     lr_scheduler_type = "linear",
@@ -645,7 +647,7 @@ training_args = GRPOConfig(
 # | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
 # 
 
-# In[32]:
+# In[33]:
 
 
 # For optional training + evaluation
@@ -672,7 +674,7 @@ trainer = GRPOTrainer(
 # 
 # [TrackIO](https://github.com/gradio-app/trackio) might be a bit slow to load - wait 2 minutes until the graphs pop up!
 
-# In[ ]:
+# In[34]:
 
 
 trainer.train()
@@ -682,7 +684,7 @@ trainer.train()
 # # Inference
 # Now let's try the model we just trained!
 
-# In[ ]:
+# In[35]:
 
 
 text = tokenizer.apply_chat_template(
@@ -706,7 +708,7 @@ _ = model.generate(
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `mxfp4` for MXFP4 (OpenAI's GPT-OSS native precision). We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
-# In[ ]:
+# In[36]:
 
 
 # Merge and push to hub in mxfp4 4bit format

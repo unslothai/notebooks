@@ -16,7 +16,10 @@ DONT_UPDATE_EXCEPTIONS = [
     'gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb',
     'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb',
     'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb',
-    'Qwen3_VL_(8B)-Vision-GRPO.ipynb'
+    'Qwen3_VL_(8B)-Vision-GRPO.ipynb',
+    'OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb',
+    'OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb',
+    'Synthetic_Data_Hackathon.ipynb'
 ]
 
 
@@ -1774,7 +1777,8 @@ if __name__ == "__main__":
         else:
             print(f"Missing files in {nb} compared to {original_template}:")
             for file in missing_files_list:
-                print(file)
+                if file not in DONT_UPDATE_EXCEPTIONS:
+                    print(file)
         exit(0)
     copy_and_update_notebooks(
         "original_template",
