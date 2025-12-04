@@ -974,6 +974,8 @@ def update_notebook_sections(
             general_announcement = general_announcement_content_meta
         elif "A100" in notebook_path:
             general_announcement = general_announcement_content_a100
+        elif "FP8" in notebook_path:
+            general_announcement = general_announcement_content_fp8
 
         # Update the general announcement section
         if first_markdown_index != -1:
