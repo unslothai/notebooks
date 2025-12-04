@@ -10,16 +10,17 @@ from nbconvert import PythonExporter
 import nbformat
 
 DONT_UPDATE_EXCEPTIONS = [
-    'Falcon_H1-Alpaca.ipynb',
-    'Liquid_LFM2-Conversational.ipynb',
-    'Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb', # Daniel's?
-    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb',
-    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb',
-    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb',
-    'Qwen3_VL_(8B)-Vision-GRPO.ipynb',
-    'OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb',
-    'OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb',
-    'Synthetic_Data_Hackathon.ipynb'
+    "Falcon_H1-Alpaca.ipynb",
+    "Liquid_LFM2-Conversational.ipynb",
+    "Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb", # Daniel's?
+    "gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb",
+    "gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb",
+    "gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb",
+    "Qwen3_VL_(8B)-Vision-GRPO.ipynb",
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb",
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb",
+    "Synthetic_Data_Hackathon.ipynb",
+    "Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb"
 ]
 
 
@@ -38,6 +39,7 @@ FIRST_MAPPING_NAME = {
     "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb" : "(OpenEnv)-gpt-oss-(20B)-GRPO-2048.ipynb",
     "GPT_OSS_BNB_(20B)-Inference.ipynb" : "gpt-oss-BNB-(20B)-Inference.ipynb",
     "GPT_OSS_MXFP4_(20B)-Inference.ipynb" : "gpt-oss-MXFP4-(20B)-Inference.ipynb",
+    "gpt_oss_(20B)_500K_Context_Fine_tuning" : "gpt_oss_(20B)-500K-Context.ipynb",
 
     # Gemma
     "Gemma3_(4B).ipynb" : "Gemma3_(4B)-Conversational.ipynb",
@@ -59,6 +61,10 @@ FIRST_MAPPING_NAME = {
     # FP8
     "Qwen3_8B_FP8_GRPO.ipynb" : "Qwen3_(8B)-FP8-GRPO.ipynb",
     "Llama_FP8_GRPO.ipynb" : "Llama3.2_(1B)-FP8-GRPO.ipynb",
+
+    # Ministral
+    "Ministral_3_VL_(3B)_Vision.ipynb" : "Ministral3_VL_(3B)-Vision.ipynb",
+    "Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb" : "Ministral3_(3B)-GRPO-Sudoku.ipynb"
 }
 
 def get_current_git_branch():
@@ -107,6 +113,7 @@ To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai
 You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)"""
 
 general_announcement_content_a100 = general_announcement_content.replace("on a **free** Tesla T4 Google Colab instance!", "on your A100 Google Colab Pro instance!")
+general_announcement_content_fp8 = general_announcement_content.replace("on a **free** Tesla T4 Google Colab instance!", "on your L4 Google Colab Pro instance!")
 
 announcement_separation = '<div class="align-center">'
 
@@ -568,6 +575,23 @@ else:
 installation_qat_kaggle_content = installation_qat_content
 
 # =======================================================
+# Ministral Notebook
+# =======================================================
+installation_ministral_content = installation_content
+installation_ministral_content = update_or_append_pip_install(
+    installation_ministral_content,
+    "transformers",
+    "!pip install git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce"
+)
+
+installation_ministral_kaggle_content = installation_kaggle_content
+installation_ministral_kaggle_content = update_or_append_pip_install(
+    installation_ministral_kaggle_content,
+    "transformers",
+    "!pip install git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce"
+)
+
+# =======================================================
 # NEWS (WILL KEEP CHANGING THIS)
 # =======================================================
 
@@ -632,56 +656,57 @@ hf_course_name = "HuggingFace Course"
 
 ARCHITECTURE_MAPPING = {
     # Gemma Family
-    'gemma': 'Gemma',
-    'codegemma': 'Gemma', # Explicitly map specific models if needed
+    "gemma": "Gemma",
+    "codegemma": "Gemma", # Explicitly map specific models if needed
 
     # Llama Family
-    'llama': 'Llama',
-    'tinylama': 'Llama',
+    "llama": "Llama",
+    "tinylama": "Llama",
 
     # Qwen Family
-    'qwen': 'Qwen',
+    "qwen": "Qwen",
 
     # Phi Family
-    'phi': 'Phi',
+    "phi": "Phi",
 
     # Mistral Family
-    'mistral': 'Mistral',
-    'pixtral': 'Mistral',
-    'zephyr': 'Mistral',
+    "mistral": "Mistral",
+    "pixtral": "Mistral",
+    "zephyr": "Mistral",
     "Magistral" : "Mistral",
+    "Ministral" : "Mistral",
 
     # Whisper
-    'whisper': 'Whisper',
+    "whisper": "Whisper",
 
     # Text-to-Speech Models (Group or keep separate?)
-    'oute': 'TTS', 
-    'llasa': 'TTS',
-    'spark': 'TTS',
-    'orpheus': 'TTS',
-    'sesame' : "TTS",
+    "oute": "TTS", 
+    "llasa": "TTS",
+    "spark": "TTS",
+    "orpheus": "TTS",
+    "sesame": "TTS",
 
     # gpt oss
-    'gpt oss': 'GPT-OSS',
+    "gpt oss": "GPT-OSS",
 
     # Linear Attention
-    'falcon' : 'Linear Attention',
-    'liquid' : 'Linear Attention',
+    "falcon": "Linear Attention",
+    "liquid": "Linear Attention",
 
     # Deepseek
-    'deepseek': 'Deepseek',
+    "deepseek": "Deepseek",
 
     # Granite
-    'granite': 'Granite',
+    "granite": "Granite",
     
     # Bert
-    'bert': 'BERT',
-    'modernbert': 'BERT',
+    "bert": "BERT",
+    "modernbert": "BERT",
 
     # Other Models (Assign architecture or keep specific)
     # 'codeforces': 'CodeForces Model', # Example
     # 'unsloth': 'Unsloth Model',     # Example
-    'meta synthetic data': 'Llama',
+    "meta synthetic data": "Llama",
 }
 
 TYPE_MAPPING = {
@@ -695,42 +720,43 @@ TYPE_MAPPING = {
 }
 
 KNOWN_TYPES_ORDERED = [
-    'Tool Calling',          
-    'Text Completion',       
-    'Synthetic Data',        
-    'Reasoning Conversational',
-    'Vision GRPO',
-    'GRPO LoRA',
-    'Fine Tuning',
-    'QAT',
+    "Tool Calling",          
+    "Text Completion",       
+    "Synthetic Data",        
+    "Reasoning Conversational",
+    "Vision GRPO",
+    "Fine Tuning",
+    "500K Context",
+    "QAT",
     
-    'Conversational',
-    'Alpaca',
-    'Vision',
-    'Reasoning',
-    'Completion',
-    'Finetune',             
-    'Studio',               
-    'Coder',                
-    'Inference',            
-    'Ollama',               
-    'Audio',
-    'Thinking',
+    "Conversational",
+    "Alpaca",
+    "Vision",
+    "Reasoning",
+    "Completion",
+    "Finetune",             
+    "Studio",               
+    "Coder",                
+    "Inference",            
+    "Ollama",               
+    "Audio",                
+    "Thinking",
 
     # FP8 GRPO
     "FP8 GRPO",
 
     # GPT OSS
     "GRPO 2048",
+    "GRPO Sudoku",
     
-    'ORPO',
-    'GRPO',
-    'DPO',
-    'CPT',
-    'TTS',                  
-    'LoRA',
-    'VL',                   
-    'RAFT',
+    "ORPO",
+    "GRPO",
+    "DPO",
+    "CPT",
+    "TTS",                  
+    "LoRA",
+    "VL",                   
+    "RAFT",
 
     # Deepseek OCR
     "Evaluation",
