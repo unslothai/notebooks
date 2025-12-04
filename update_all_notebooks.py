@@ -1134,6 +1134,12 @@ def update_notebook_sections(
                                 installation = installation_qat_kaggle_content
                             else:
                                 installation = installation_qat_content
+
+                        if is_path_contains_any(notebook_path.lower(), ["ministral"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_ministral_kaggle_content
+                            else:
+                                installation = installation_ministral_content
                                 
                         # GPT OSS INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
