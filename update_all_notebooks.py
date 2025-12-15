@@ -556,6 +556,32 @@ installation_ernie_4_5_vl_kaggle_content = installation_kaggle_content
 installation_ernie_4_5_vl_kaggle_content += """\n!pip install decord"""
 
 # =======================================================
+# Nemotron 3 Nano  Notebook
+# =======================================================
+installation_nemotron_nano_content = """%%capture
+import os, importlib.util
+!pip install --upgrade -qqq uv
+if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    
+    try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
+    except: get_numpy = "numpy"; get_pil = "pillow"
+    !uv pip install -qqq \\
+        "torch==2.7.1" "triton>=3.3.0" {get_numpy} {get_pil} torchvision bitsandbytes "transformers==4.56.2" \\
+        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
+        "unsloth[base] @ git+https://github.com/unslothai/unsloth"
+elif importlib.util.find_spec("unsloth") is None:
+    !uv pip install -qqq unsloth
+!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo
+
+# These are mamba kernels and we must have these for faster training
+# Mamba kernels are for now supported on torch==2.7.1. If you have newer torch versions, please wait 30 minutes for it to compile
+!uv pip install --no-build-isolation mamba_ssm==2.2.5
+!uv pip install --no-build-isolation causal_conv1d==1.5.2
+"""
+
+installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
+
+
+# =======================================================
 # QAT Notebook
 # =======================================================
 installation_qat_content = """%%capture
@@ -1176,7 +1202,14 @@ def update_notebook_sections(
                                 installation = installation_qwen3_vl_kaggle_content
                             else:
                                 installation = installation_qwen3_vl_content
-
+                                
+                        # Nemotron Nano 3 INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["nemotron-3-nano","nemotron-nano-3"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_nemotron_nano_kaggle_content
+                            else:
+                                installation = installation_nemotron_nano_content
+                                
                         notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
                         # TODO: Remove after GRPO numpy bug fixed! 
