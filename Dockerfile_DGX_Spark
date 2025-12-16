@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/pytorch:25.09-py3
+FROM nvcr.io/nvidia/pytorch:25.11-py3
 
 # Set CUDA environment variables
 ENV CUDA_HOME=/usr/local/cuda-13.0
