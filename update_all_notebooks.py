@@ -595,7 +595,7 @@ else:
     !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
     !pip install --no-deps unsloth
-!pip install torchao==0.14.0 fbgemm-gpu-genai==1.3.0
+!pip install torchao==0.14.0 fbgemm-gpu-genai==1.4.2
 !pip install transformers==4.55.4
 !pip install --no-deps trl==0.22.2"""
 installation_qat_kaggle_content = installation_qat_content
