@@ -573,10 +573,9 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo
 
 # These are mamba kernels and we must have these for faster training
-# Mamba kernels are for now supported on torch==2.7.1. If you have newer torch versions, please wait 30 minutes for it to compile
+# Mamba kernels are for now supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes for it to compile
 !uv pip install --no-build-isolation mamba_ssm==2.2.5
-!uv pip install --no-build-isolation causal_conv1d==1.5.2
-"""
+!uv pip install --no-build-isolation causal_conv1d==1.5.2"""
 
 installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
 
@@ -1203,8 +1202,8 @@ def update_notebook_sections(
                             else:
                                 installation = installation_qwen3_vl_content
                                 
-                        # Nemotron Nano 3 INSTALLATION
-                        if is_path_contains_any(notebook_path.lower(), ["nemotron-3-nano","nemotron-nano-3"]):
+                        # Nemotron Nano 3 INSTALLATION also Granite has mamba
+                        if is_path_contains_any(notebook_path.lower(), ["nemotron-3-nano","nemotron-nano-3", "granite4"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_nemotron_nano_kaggle_content
                             else:
