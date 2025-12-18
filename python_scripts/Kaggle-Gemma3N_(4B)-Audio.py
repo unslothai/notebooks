@@ -176,7 +176,7 @@ model = FastModel.get_peft_model(
     bias = "none",
     random_state = 3407,
     use_rslora = False,  # rsLoRA: For correct scaling, set alpha ~ sqrt(r) if True.
-    loftq_config = None,               # And LoftQ
+    loftq_config = None,  # We support LoftQ
     target_modules = [
         "q_proj", "k_proj", "v_proj", "o_proj",
         "gate_proj", "up_proj", "down_proj",

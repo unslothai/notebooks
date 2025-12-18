@@ -94,7 +94,7 @@ model = FastVisionModel.get_peft_model(
     bias = "none",
     random_state = 3407,
     use_rslora = False,  # rsLoRA: For correct scaling, set alpha ~ sqrt(r) if True.
-    loftq_config = None,               # And LoftQ
+    loftq_config = None,  # We support LoftQ
     target_modules = "all-linear",    # Optional now! Can specify a list if needed
 )
 

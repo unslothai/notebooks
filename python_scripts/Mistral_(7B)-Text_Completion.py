@@ -106,7 +106,7 @@ model = FastLanguageModel.get_peft_model(
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
     random_state = 3407,
     use_rslora = True,  # rsLoRA: For correct scaling, set alpha ~ sqrt(r) if True.
-    loftq_config = None, # And LoftQ
+    loftq_config = None,  # We support LoftQ
 )
 
 
