@@ -156,7 +156,7 @@ model = FastLanguageModel.get_peft_model(
     bias="none",
     use_gradient_checkpointing="unsloth",
     random_state=3407,
-    use_rslora=False,
+    use_rslora = False,  # rsLoRA: For correct scaling, set alpha ~ sqrt(r) if True.
     loftq_config=None,
 )
 
