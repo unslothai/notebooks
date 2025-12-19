@@ -781,15 +781,15 @@ _ = model.generate(
 
 # Merge and push to hub in mxfp4 4bit format
 if False:
-    model.save_pretrained_merged("finetuned_model", tokenizer, save_method = "mxfp4")
+    model.save_pretrained_merged("finetuned_model-mxfp4", tokenizer, save_method = "mxfp4")
 if False:
-    model.push_to_hub_merged("repo_id/repo_name", tokenizer, token = "hf...", save_method = "mxfp4")
+    model.push_to_hub_merged("repo_id/repo_name-mxfp4", tokenizer, token = "hf...", save_method = "mxfp4")
 
 # Merge and push to hub in 16bit
 if False:
-    model.save_pretrained_merged("finetuned_model", tokenizer, save_method = "merged_16bit")
+    model.save_pretrained_merged("finetuned_model-merged", tokenizer, save_method = "merged_16bit")
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/gpt-oss-finetune", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("hf/gpt-oss-finetune-merged", tokenizer, save_method = "merged_16bit", token = "")
 
 
 # # And we're done!

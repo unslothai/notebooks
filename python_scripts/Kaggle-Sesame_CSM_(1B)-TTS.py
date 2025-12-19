@@ -367,19 +367,19 @@ processor.save_pretrained("lora_model")
 
 
 # Merge to 16bit
-if False: model.save_pretrained_merged("model", processor, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("hf/model", processor, save_method = "merged_16bit", token = "")
+if False: model.save_pretrained_merged("model-merged", processor, save_method = "merged_16bit",)
+if False: model.push_to_hub_merged("hf/model-merged", processor, save_method = "merged_16bit", token = "")
 
 # Merge to 4bit
-if False: model.save_pretrained_merged("model", processor, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("hf/model", processor, save_method = "merged_4bit", token = "")
+if False: model.save_pretrained_merged("model-merged-4bit", processor, save_method = "merged_4bit",)
+if False: model.push_to_hub_merged("hf/model-merged-4bit", processor, save_method = "merged_4bit", token = "")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("model")
+    model.save_pretrained("lora_model")
     processor.save_pretrained("model")
 if False:
-    model.push_to_hub("hf/model", token = "")
+    model.push_to_hub("hf/lora_model", token = "")
     processor.push_to_hub("hf/model", token = "")
 
 

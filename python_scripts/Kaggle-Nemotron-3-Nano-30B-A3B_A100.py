@@ -314,23 +314,23 @@ if False:
 
 # Merge to 16bit
 if False:
-    model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
+    model.save_pretrained_merged("model-merged", tokenizer, save_method = "merged_16bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("hf/model-merged", tokenizer, save_method = "merged_16bit", token = "")
 
 # Merge to 4bit
 if False:
-    model.save_pretrained_merged("model", tokenizer, save_method = "merged_4bit",)
+    model.save_pretrained_merged("model-merged-4bit", tokenizer, save_method = "merged_4bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_4bit", token = "")
+    model.push_to_hub_merged("hf/model-merged-4bit", tokenizer, save_method = "merged_4bit", token = "")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("model")
-    tokenizer.save_pretrained("model")
+    model.save_pretrained("lora_model")
+    tokenizer.save_pretrained("lora_model")
 if False: # Pushing to HF Hub
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
+    model.push_to_hub("hf/lora_model", token = "")
+    tokenizer.push_to_hub("hf/lora_model", token = "")
 
 
 # ### GGUF / llama.cpp Conversion
