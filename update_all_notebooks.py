@@ -347,7 +347,7 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
         "torch>=2.8.0" "triton>=3.4.0" {get_numpy} {get_pil} torchvision bitsandbytes "transformers==4.56.2" \
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
         "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
-        git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels
+        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo"""
