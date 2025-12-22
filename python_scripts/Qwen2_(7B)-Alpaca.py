@@ -86,7 +86,7 @@ model = FastLanguageModel.get_peft_model(
     # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
     random_state = 3407,
-    use_rslora = False,  # rsLoRA: For correct scaling, set alpha ~ sqrt(r) if True.
+    use_rslora = False,  # If True, set alpha to ~16–32
     loftq_config = None,  # We support LoftQ
 )
 
