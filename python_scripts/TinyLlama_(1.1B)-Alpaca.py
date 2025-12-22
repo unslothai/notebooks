@@ -88,7 +88,7 @@ model = FastLanguageModel.get_peft_model(
     bias = "none",    # Currently only supports bias = "none"
     use_gradient_checkpointing = False, # @@@ IF YOU GET OUT OF MEMORY - set to True @@@
     random_state = 3407,
-    use_rslora = False,  # If True, set alpha to ~16–32
+    use_rslora = False,  # If True, use α≈16–32 for high ranks; α≈4–16 for low ranks.
     loftq_config = None,  # We support LoftQ
 )
 
