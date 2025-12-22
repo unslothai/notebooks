@@ -92,9 +92,17 @@ def update_or_append_pip_install(base_content, package_name, new_install_line):
     updated_content, substitutions_count = pattern.subn(new_install_line, base_content)
 
     if substitutions_count == 0:
-        return base_content.strip() + "\n" + new_install_line
+        output = base_content.strip() + "\n" + new_install_line
     else:
-        return updated_content
+        output = updated_content
+    # Convert pip install transformers==4.56.2\npip install --no-deps trl==0.22.2 to &&
+    finder = r"!pip install transformers==([\d\.]{3,})\n!pip install --no-deps trl==([\d\.]{3,})"
+    found = re.findall(finder, output)
+    if len(found) != 0:
+        transformers, trl = found[0]
+        new = f"!pip install transformers=={transformers} && pip install --no-deps trl=={trl}"
+        output = re.sub(finder, new, output)
+    return output
 
 current_branch = get_current_git_branch()
 # =======================================================
@@ -143,18 +151,18 @@ SPACES = " " * 4
 # INSTALLATION (MANY OF THIS IS SPECIFIC TO ONE OF THE NOTEBOOKS)
 # =======================================================
 
+XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.33.post1")"""
+
 installation_content = """%%capture
 import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
-    !pip install unsloth
+    !pip install unsloth  # Do this in local & cloud setups
 else:
-    # Do this only in Colab notebooks! Otherwise use pip install unsloth
-    import torch; v = re.match(r"[0-9]{1,}\.[0-9]{1,}", str(torch.__version__)).group(0)
-    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")
-    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
+    import torch; v = re.match(r'[\d]{1,}\.[\d]{1,}', str(torch.__version__)).group(0)
+    __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth
-"""
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 installation_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -207,14 +215,13 @@ if "COLAB_" not in "".join(os.environ.keys()):
     # If you're not in Colab, just use pip install!
     !pip install unsloth vllm
 else:
-    try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-    except: get_numpy = "numpy"; get_pil = "pillow"
+    try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
+    except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
-    !uv pip install -qqq --upgrade \
-        unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
-    !uv pip install -qqq {get_triton}"""
+    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+    !uv pip install -qqq {_triton}"""
 
 installation_extra_grpo_content = update_or_append_pip_install(
     installation_extra_grpo_content,
@@ -232,15 +239,13 @@ installation_grpo_kaggle_content = """%%capture
 import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
 !pip install --upgrade -qqq uv
-try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-except: get_numpy = "numpy"; get_pil = "pillow"
+try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
+except: _numpy = "numpy"; _pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
-!uv pip install -qqq --upgrade \
-    unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
-!uv pip install -qqq {get_triton}
-!uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"""
+_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+!uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"""
 
 installation_grpo_kaggle_content = update_or_append_pip_install(
     installation_grpo_kaggle_content,
@@ -265,14 +270,13 @@ if "COLAB_" not in "".join(os.environ.keys()):
     # If you're not in Colab, just use pip install!
     !pip install unsloth vllm synthetic-data-kit==0.0.3
 else:
-    try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-    except: get_numpy = "numpy"; get_pil = "pillow"
+    try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
+    except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
-    !uv pip install -qqq --upgrade \
-        unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
-    !uv pip install -qqq {get_triton}
+    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+    !uv pip install -qqq {_triton}
     !uv pip install synthetic-data-kit==0.0.3"""
 
 installation_synthetic_data_content = update_or_append_pip_install(
@@ -289,14 +293,13 @@ installation_synthetic_data_content = update_or_append_pip_install(
 
 installation_grpo_synthetic_data_content = """%%capture
 !pip install --upgrade -qqq uv
-try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-except: get_numpy = "numpy"; get_pil = "pillow"
+try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
+except: _numpy = "numpy"; _pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
-!uv pip install -qqq --upgrade \
-    unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers
-!uv pip install -qqq {get_triton}
+_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+!uv pip install -qqq --upgrade unsloth {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers
+!uv pip install -qqq {_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"
 !uv pip install synthetic-data-kit==0.0.3"""
 installation_grpo_synthetic_data_content = update_or_append_pip_install(
@@ -341,10 +344,10 @@ installation_gpt_oss_content = r"""%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
 if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    
-    try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-    except: get_numpy = "numpy"; get_pil = "pillow"
+    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
+    except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \
-        "torch>=2.8.0" "triton>=3.4.0" {get_numpy} {get_pil} torchvision bitsandbytes "transformers==4.56.2" \
+        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
         "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
         git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels
@@ -562,20 +565,18 @@ installation_nemotron_nano_content = """%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
 if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    
-    try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-    except: get_numpy = "numpy"; get_pil = "pillow"
+    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
+    except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
-        "torch==2.7.1" "triton>=3.3.0" {get_numpy} {get_pil} torchvision bitsandbytes "transformers==4.56.2" \\
+        "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo
 
-# These are mamba kernels and we must have these for faster training
-# Mamba kernels are for now supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes for it to compile
-!uv pip install --no-build-isolation mamba_ssm==2.2.5
-!uv pip install --no-build-isolation causal_conv1d==1.5.2"""
+# Mamba is supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes!
+!uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2"""
 
 installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
 
@@ -590,13 +591,11 @@ if "COLAB_" not in "".join(os.environ.keys()):
 else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
     import torch; v = re.match(r"[0-9]{1,}\.[0-9]{1,}", str(torch.__version__)).group(0)
-    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")
-    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo
+    __XFORMERS_INSTALL__
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth
 !pip install torchao==0.14.0 fbgemm-gpu-genai==1.4.2
-!pip install transformers==4.55.4
-!pip install --no-deps trl==0.22.2"""
+!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 installation_qat_kaggle_content = installation_qat_content
 
 # =======================================================
@@ -635,15 +634,17 @@ Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/a
 # LAST BLOCK CLOSE STATEMENT
 # =======================================================
 
-text_for_last_cell_gguf = """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
-
-Some other resources:
+OTHER_RESOURCES = """Some other resources:
 1. Looking to use Unsloth locally? Read our [Installation Guide](https://docs.unsloth.ai/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://docs.unsloth.ai/get-started/reinforcement-learning-rl-guide).
 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning) and [vision](https://docs.unsloth.ai/basics/vision-fine-tuning) model support.
 4. Explore our [LLM Tutorials Directory](https://docs.unsloth.ai/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
 5. Need help with Inference? Read our [Inference & Deployment page](https://docs.unsloth.ai/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
+"""
 
+text_for_last_cell_gguf = """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
+
+__OTHER_RESOURCES__
 <div class="align-center">
   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
@@ -652,7 +653,7 @@ Some other resources:
   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 
   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
-</div>"""
+</div>""".replace("__OTHER_RESOURCES__", OTHER_RESOURCES)
 
 text_for_last_cell_ollama = text_for_last_cell_gguf.replace("Now, ", "You can also ", 1)
 
@@ -660,12 +661,7 @@ text_for_last_cell_gemma3 = text_for_last_cell_gguf.replace("model-unsloth", "ge
 
 text_for_last_cell_non_gguf = """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 
-Some other links:
-1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
-
+__OTHER_RESOURCES__
 <div class="align-center">
   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
@@ -674,7 +670,7 @@ Some other links:
   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 
   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
-</div>"""
+</div>""".replace("__OTHER_RESOURCES__", OTHER_RESOURCES)
 
 hf_course_name = "HuggingFace Course"
 
