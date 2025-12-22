@@ -9,6 +9,129 @@ from glob import glob
 from nbconvert import PythonExporter
 import nbformat
 
+
+def update_old_unsloth(filename):
+    with open(filename, "r", encoding = "utf-8") as f: f = f.read()
+
+    # Convert versions like 2025.12.8 to 2025.12.8
+    f = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2025.12.8\1", f)
+
+    # Fix all A=A to A = A
+    # "    id2label=id2label,\n",
+    f = re.sub(
+        r'(\"[ ]{4,}[^\= ]{2,})\=([^\= ]{2,}\,\\n\"\,)',
+        r"\1 = \2",
+        f,
+    )
+
+    # Change gguf-quantization-options link
+    f = f.replace(
+        "https://github.com/unslothai/unsloth/wiki#gguf-quantization-options",
+        "https://docs.unsloth.ai/basics/inference-and-deployment/saving-to-gguf#locally"
+    )
+
+    # Fix dangling newlines like
+    """
+    if False:
+    model.push_to_hub("hf/model", token = "")
+    tokenizer.push_to_hub("hf/model", token = "")
+
+    """
+    f = re.sub(r"\)\\n([\"\']\n[ ]{2,}\])", r")\1", f)
+
+    # Redirect Alpaca dataset
+    f = f.replace(
+        "https://huggingface.co/datasets/yahma/alpaca-cleaned",
+        "https://huggingface.co/datasets/unsloth/alpaca-cleaned",
+    )
+    f = f.replace(
+        "Alpaca dataset from [yahma]",
+        "[Alpaca dataset]",
+    )
+
+    # Train on completions
+    f = f.replace(
+        "TRL's docs [here](https://huggingface.co/docs/trl/sft_trainer#train-on-completions-only).",
+        "our docs [here](https://docs.unsloth.ai/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide#training-on-completions-only-masking-out-inputs)",
+    )
+
+    # Conversational notebook
+    f = f.replace(
+        "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Alpaca.ipynb)",
+        "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb)",
+    )
+
+    # Fix Meta-Llama
+    f = f.replace(
+        "unsloth/Meta-Llama",
+        "unsloth/Llama",
+    )
+
+    # Move dtype into calling
+    if '"dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+\n",\n    ' in f and \
+        '"    dtype = dtype,\n",' in f:
+        f = f.replace(
+            '"dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+\n",\n    ',
+            '',
+        )
+        f = f.replace(
+            '"    dtype = dtype,\n",',
+            '"    dtype = dtype, # None for auto detection. Float16 for T4, Bfloat16 for Ampere, H100+\n",',
+        )
+
+    # TRL's `DPOTrainer`
+    f = f.replace("TRL's `DPOTrainer`", "`DPOTrainer` and `GRPOTrainer` for reinforcement learning!")
+
+    # Move packing = ...
+    packing = '''"    packing = False, # Can make training 5x faster for short sequences.\n",
+    "    args = SFTConfig(\n",'''
+    if packing in f:
+        f = f.replace(packing, "")
+        f = f.replace(
+            '''"        max_steps = 60,\n",
+    ''',
+            '''""        max_steps = 60,\n",
+    "        packing = False, # Makes training 2-5x faster for short sequences,\n",
+    ''')
+
+    # VLLM to vLLM
+    f = f.replace("VLLM", "vLLM")
+    f = f.replace(
+        "You can go to https://huggingface.co/settings/tokens for your personal tokens.",
+        "You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options."
+    )
+
+    # Fix saving for LoRA adapters only
+    f = f.replace('model.save_pretrained(\"model\")', 'model.save_pretrained(\"lora_model\")')
+    f = f.replace('tokenizer.save_pretrained(\"model\")', 'tokenizer.save_pretrained(\"lora_model\")')
+    f = f.replace('model.push_to_hub(\"hf/model\", token = \"\")', 'model.push_to_hub(\"hf/lora_model\", token = \"\")')
+    f = f.replace('tokenizer.push_to_hub(\"hf/model\", token = \"\")', 'tokenizer.push_to_hub(\"hf/lora_model\", token = \"\")')
+
+    # Fix 16bit
+    f = f.replace('model.save_pretrained_merged(\"model\", tokenizer, save_method = \"merged_16bit\",)', 'model.save_pretrained_merged(\"model_16bit\", tokenizer, save_method = \"merged_16bit\",)')
+    f = f.replace('model.push_to_hub_merged(\"hf/model\", tokenizer, save_method = \"merged_16bit\", token = \"\")', 'model.push_to_hub_merged(\"hf/model_16bit\", tokenizer, save_method = \"merged_16bit\", token = \"\")')
+
+    # Fix 4bit
+    f = f.replace('model.save_pretrained_merged(\"model\", tokenizer, save_method = \"merged_4bit\",)', 'model.save_pretrained_merged(\"model_4bit\", tokenizer, save_method = \"merged_4bit\",)')
+    f = f.replace('model.push_to_hub_merged(\"hf/model\", tokenizer, save_method = \"merged_4bit\", token = \"\")', 'model.push_to_hub_merged(\"hf/model_4bit\", tokenizer, save_method = \"merged_4bit\", token = \"\")')
+
+    # Fix GGUF
+    f = f.replace('model.save_pretrained_gguf(\"model\", tokenizer,)', 'model.save_pretrained_gguf(\"model-GGUF\", tokenizer,)')
+    f = f.replace('model.push_to_hub_gguf(\"hf/model\", tokenizer, token = \"\")', 'model.push_to_hub_gguf(\"hf/model-GGUF\", tokenizer, token = \"\")')
+    f = f.replace('model.save_pretrained_gguf(\"model\", tokenizer, quantization_method = \"f16\")', 'model.save_pretrained_gguf(\"model-GGUF\", tokenizer, quantization_method = \"f16\")')
+    f = f.replace('model.push_to_hub_gguf(\"hf/model\", tokenizer, quantization_method = \"f16\", token = \"\")', 'model.push_to_hub_gguf(\"hf/model-GGUF\", tokenizer, quantization_method = \"f16\", token = \"\")')
+    f = f.replace('model.save_pretrained_gguf(\"model\", tokenizer, quantization_method = \"q4_k_m\")', 'model.save_pretrained_gguf(\"model-GGUF\", tokenizer, quantization_method = \"q4_k_m\")')
+    f = f.replace('model.push_to_hub_gguf(\"hf/model\", tokenizer, quantization_method = \"q4_k_m\", token = \"\")', 'model.push_to_hub_gguf(\"hf/model-GGUF\", tokenizer, quantization_method = \"q4_k_m\", token = \"\")')
+    f = f.replace('''"    model.push_to_hub_gguf(\n",
+    "        \"hf/model\"''',
+        '''"    model.push_to_hub_gguf(\n",
+    "        \"hf/model-GGUF\"'''
+    )
+
+    with open(filename, "w", encoding = "utf-8") as w: w.write(f)
+pass
+
+
 DONT_UPDATE_EXCEPTIONS = [
     "Falcon_H1-Alpaca.ipynb",
     "Liquid_LFM2-Conversational.ipynb",
@@ -652,7 +775,7 @@ __OTHER_RESOURCES__
 
   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 
-  This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+  <b>This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)</b>
 </div>""".replace("__OTHER_RESOURCES__", OTHER_RESOURCES)
 
 text_for_last_cell_ollama = text_for_last_cell_gguf.replace("Now, ", "You can also ", 1)
@@ -1394,6 +1517,7 @@ def main():
             new_announcement,
         )
         # update_unsloth_config(notebook_file)
+        update_old_unsloth(notebook_file)
 
 def add_colab_badge(notebooks_dir):
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
