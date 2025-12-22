@@ -621,6 +621,8 @@ installation_ministral_kaggle_content = update_or_append_pip_install(
 # =======================================================
 
 new_announcement = """
+New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
+
 Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
 
 Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
