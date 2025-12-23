@@ -387,10 +387,10 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 # Select ONLY 1 to save! (Both not needed!)
 
 # Save locally to 16bit
-if False: model.save_pretrained_merged("unsloth_finetune", tokenizer,)
+if False: model.save_pretrained_merged("unsloth_finetune-merged", tokenizer,)
 
 # To export and save to your Hugging Face account
-if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "PUT_HERE")
+if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune-merged", tokenizer, token = "PUT_HERE")
 
 
 # ### GGUF / llama.cpp Conversion

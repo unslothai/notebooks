@@ -455,7 +455,7 @@ _ = model.generate(
 
 
 if True: # Change to True to save finetune!
-    model.save_pretrained_merged("gemma-3n", processor)
+    model.save_pretrained_merged("gemma-3n-merged", processor)
 
 
 # If you want to upload / push to your Hugging Face account, set `if False` to `if True` and add your Hugging Face token and upload location!

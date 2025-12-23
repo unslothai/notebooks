@@ -339,21 +339,21 @@ _ = model.generate(**inputs, max_new_tokens = 64, streamer = TextStreamer(tokeni
 
 # Merge to mxfp 4bit
 if False:
-    model.save_pretrained_merged("gpt-oss-finetune", tokenizer, save_method = "mxfp4",)
+    model.save_pretrained_merged("gpt-oss-finetune-mxfp4", tokenizer, save_method = "mxfp4",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/gpt-oss-finetune", tokenizer, save_method = "mxfp4", token = "")
+    model.push_to_hub_merged("hf/gpt-oss-finetune-mxfp4", tokenizer, save_method = "mxfp4", token = "")
 
 # Merge and push to hub in 16bit
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/gpt-oss-finetune", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("hf/gpt-oss-finetune-merged", tokenizer, save_method = "merged_16bit", token = "")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("gpt-oss-finetune")
-    tokenizer.save_pretrained("gpt-oss-finetune")
+    model.save_pretrained("lora_model")
+    tokenizer.save_pretrained("lora_model")
 if False: # Pushing to HF Hub
-    model.push_to_hub("hf/gpt-oss-finetune", token = "")
-    tokenizer.push_to_hub("hf/gpt-oss-finetune", token = "")
+    model.push_to_hub("hf/lora_model", token = "")
+    tokenizer.push_to_hub("hf/lora_model", token = "")
 
 
 # ### GGUF / llama.cpp Conversion
