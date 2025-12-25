@@ -71,8 +71,8 @@ model = FastModel.get_peft_model(
     # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
     random_state = 3407,
-    use_rslora = False,  # We support rank stabilized LoRA
-    loftq_config = None, # And LoftQ
+    use_rslora = False,  # If True, use α≈16–32 for high ranks; α≈4–16 for low ranks.
+    loftq_config = None,  # We support LoftQ
 )
 
 
