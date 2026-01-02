@@ -13,7 +13,7 @@ import nbformat
 def update_old_unsloth(filename):
     with open(filename, "r", encoding = "utf-8") as f: f = f.read()
 
-    # Convert versions like 2025.12.8 to 2025.12.8
+    # Convert versions like X.X.X to 2025.12.8
     f = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2025.12.8\1", f)
 
     # Fix all A=A to A = A
