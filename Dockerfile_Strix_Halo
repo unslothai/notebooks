@@ -1,0 +1,53 @@
+FROM rocm/pytorch:rocm6.4.4_ubuntu24.04_py3.12_pytorch_release_2.7.1
+
+# Create a new user with sudo privileges (passwordless)
+RUN apt-get update && apt-get install -y sudo && \
+    useradd -m -s /bin/bash user && \
+    usermod -aG sudo user && \
+    echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/src
+
+# bitsandbytes (ROCm)
+RUN git clone -b rocm_enabled_multi_backend https://github.com/ROCm/bitsandbytes.git
+WORKDIR /opt/src/bitsandbytes
+RUN cmake -S . -DGPU_TARGETS="gfx1151" -DBNB_ROCM_ARCH="gfx1151" -DCOMPUTE_BACKEND=hip && \
+    make -j && \
+    python -m pip install --no-cache-dir .
+
+# Python deps
+RUN python -m pip install --no-cache-dir \
+      'datasets>=3.4.1' \
+      'sentencepiece>=0.2.0' \
+      tqdm psutil 'wheel>=0.42.0' \
+      'accelerate>=0.34.1' \
+      'peft>=0.7.1,!=0.11.0' \
+      einops packaging 	
+
+# xformers (pinned)
+WORKDIR /opt/src
+RUN git clone https://github.com/ROCm/xformers.git
+WORKDIR /opt/src/xformers
+RUN git submodule update --init --recursive && \
+    git checkout 13c93f3 && \
+    PYTORCH_ROCM_ARCH=gfx1151 python setup.py install
+
+ENV FLASH_ATTENTION_TRITON_AMD_ENABLE="TRUE"
+WORKDIR /root
+RUN git clone https://github.com/ROCm/flash-attention.git
+RUN cd flash-attention && git checkout v2.7.4-cktile && python setup.py install
+
+# Unsloth (install first), then Zoo
+WORKDIR /opt/src
+RUN git clone https://github.com/unslothai/unsloth.git
+
+WORKDIR /opt/src/unsloth
+RUN python -m pip install --no-cache-dir .
+RUN python -m pip install --no-cache-dir jupyterlab ipywidgets ipykernel tqdm
+RUN python -m pip install --no-cache-dir 'unsloth_zoo>=2025.5.7'
+
+# Set default user and working directory
+USER user
+WORKDIR /home/user
+CMD ["/bin/bash"]
