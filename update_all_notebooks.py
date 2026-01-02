@@ -115,19 +115,6 @@ def update_old_unsloth(filename):
     f = f.replace('model.save_pretrained_merged(\"model\", tokenizer, save_method = \"merged_4bit\",)', 'model.save_pretrained_merged(\"model_4bit\", tokenizer, save_method = \"merged_4bit\",)')
     f = f.replace('model.push_to_hub_merged(\"hf/model\", tokenizer, save_method = \"merged_4bit\", token = \"\")', 'model.push_to_hub_merged(\"hf/model_4bit\", tokenizer, save_method = \"merged_4bit\", token = \"\")')
 
-    # Fix GGUF
-    f = f.replace('model.save_pretrained_gguf(\"model\", tokenizer,)', 'model.save_pretrained_gguf(\"model-GGUF\", tokenizer,)')
-    f = f.replace('model.push_to_hub_gguf(\"hf/model\", tokenizer, token = \"\")', 'model.push_to_hub_gguf(\"hf/model-GGUF\", tokenizer, token = \"\")')
-    f = f.replace('model.save_pretrained_gguf(\"model\", tokenizer, quantization_method = \"f16\")', 'model.save_pretrained_gguf(\"model-GGUF\", tokenizer, quantization_method = \"f16\")')
-    f = f.replace('model.push_to_hub_gguf(\"hf/model\", tokenizer, quantization_method = \"f16\", token = \"\")', 'model.push_to_hub_gguf(\"hf/model-GGUF\", tokenizer, quantization_method = \"f16\", token = \"\")')
-    f = f.replace('model.save_pretrained_gguf(\"model\", tokenizer, quantization_method = \"q4_k_m\")', 'model.save_pretrained_gguf(\"model-GGUF\", tokenizer, quantization_method = \"q4_k_m\")')
-    f = f.replace('model.push_to_hub_gguf(\"hf/model\", tokenizer, quantization_method = \"q4_k_m\", token = \"\")', 'model.push_to_hub_gguf(\"hf/model-GGUF\", tokenizer, quantization_method = \"q4_k_m\", token = \"\")')
-    f = f.replace('''"    model.push_to_hub_gguf(\n",
-    "        \"hf/model\"''',
-        '''"    model.push_to_hub_gguf(\n",
-    "        \"hf/model-GGUF\"'''
-    )
-
     with open(filename, "w", encoding = "utf-8") as w: w.write(f)
 pass
 
