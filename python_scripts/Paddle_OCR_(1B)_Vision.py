@@ -86,7 +86,7 @@ model = FastVisionModel.get_peft_model(
     lora_dropout = 0,
     bias = "none",
     random_state = 3407,
-    use_rslora = False,
+    use_rslora = False,  # If True, use α≈16–32 for high ranks; α≈4–16 for low ranks.
     target_modules = [
       "q_proj", "k_proj", "v_proj", "o_proj",
       "gate_proj", "up_proj", "down_proj",
