@@ -313,6 +313,21 @@ def update_old_unsloth(filename):
             text,
         )
 
+        # Inline dtype None and drop helper line when the auto-detection comment is present
+        dtype_comment = r"None for auto detection\.\s*Float16 for Tesla T4,\s*V100,\s*Bfloat16 for Ampere\+"
+        text = re.sub(
+            rf"^[ \t]*dtype[ \t]*=[ \t]*None[ \t]*#[ \t]*{dtype_comment}[ \t]*\n",
+            "",
+            text,
+            flags=re.M,
+        )
+        text = re.sub(
+            rf"(^[ \t]*dtype[ \t]*=[ \t]*)dtype([ \t]*,[ \t]*#[ \t]*{dtype_comment}[ \t]*$)",
+            r"\1None\2",
+            text,
+            flags=re.M,
+        )
+
         # Normalize vLLM naming in code where it is used as a package/path
         text = text.replace("vLLM", "vllm").replace("VLLM", "vllm")
 
