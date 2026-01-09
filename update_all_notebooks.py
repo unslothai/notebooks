@@ -313,20 +313,44 @@ def update_old_unsloth(filename):
             text,
         )
 
-        # Inline dtype None and drop helper line when the auto-detection comment is present
-        dtype_comment = r"None for auto detection\.\s*Float16 for Tesla T4,\s*V100,\s*Bfloat16 for Ampere\+"
-        text = re.sub(
-            rf"^[ \t]*dtype[ \t]*=[ \t]*None[ \t]*#[ \t]*{dtype_comment}[ \t]*\n",
-            "",
-            text,
-            flags=re.M,
-        )
-        text = re.sub(
-            rf"(^[ \t]*dtype[ \t]*=[ \t]*)dtype([ \t]*,[ \t]*#[ \t]*{dtype_comment}[ \t]*$)",
-            r"\1None\2",
-            text,
-            flags=re.M,
-        )
+        # If dtype=None helper line is directly before from_pretrained and dtype=dtype is used,
+        # drop the helper line and inline dtype=None with the standard comment.
+        dtype_comment = "None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+"
+        dtype_line_re = re.compile(r"^[ \t]*dtype\s*=\s*None\s*#.*$")
+        dtype_param_re = re.compile(r"(\bdtype\s*=\s*)dtype\b\s*,?")
+
+        lines = text.splitlines(True)
+        updated_lines = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if dtype_line_re.match(line) and i + 1 < len(lines) and ".from_pretrained" in lines[i + 1]:
+                # Try to update dtype within the from_pretrained call
+                replaced = False
+                depth = 0
+                j = i + 1
+                while j < len(lines):
+                    current = lines[j]
+                    if j == i + 1 and ".from_pretrained" not in current:
+                        break
+                    new_current, count = dtype_param_re.subn(
+                        r"\1None, # " + dtype_comment,
+                        current,
+                    )
+                    if count:
+                        replaced = True
+                    lines[j] = new_current
+                    depth += current.count("(") - current.count(")")
+                    if depth <= 0 and ".from_pretrained" in lines[i + 1]:
+                        break
+                    j += 1
+                if replaced:
+                    # Drop the dtype helper line and continue from the call
+                    i += 1
+                    continue
+            updated_lines.append(line)
+            i += 1
+        text = "".join(updated_lines)
 
         # Normalize vLLM naming in code where it is used as a package/path
         text = text.replace("vLLM", "vllm").replace("VLLM", "vllm")
