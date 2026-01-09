@@ -165,10 +165,10 @@ def update_old_unsloth(filename):
             "our docs [here](https://unsloth.ai/docs/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide#training-on-completions-only-masking-out-inputs)",
         )
 
-        # Conversational notebook
+        # Fix incorrect conversational link pointing to Alpaca notebook
         text = text.replace(
             "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Alpaca.ipynb)",
-            "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb)",
+            "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Conversational.ipynb)",
         )
 
         # Fix Meta-Llama
@@ -184,8 +184,15 @@ def update_old_unsloth(filename):
             text,
         )
 
-        # VLLM to vLLM
-        text = text.replace("VLLM", "vLLM")
+        # Ensure GGUF usage line matches base name used in code
+        text = re.sub(
+            r"Now, use the `[^`]+\.Q8_0\.gguf` file or `[^`]+\.Q4_K_M\.gguf` file in llama\.cpp\.",
+            f"Now, use the `{base_gguf}.Q8_0.gguf` file or `{base_gguf}.Q4_K_M.gguf` file in llama.cpp.",
+            text,
+        )
+
+        # Fix concatenated markdown line if it slipped in
+        text = text.replace("Unsloth!Now, use the", "Unsloth!\nNow, use the")
 
         # Update docs domain
         text = text.replace("docs.unsloth.ai", "unsloth.ai/docs")
@@ -205,25 +212,7 @@ def update_old_unsloth(filename):
         return text
 
     def replace_code(text):
-        # Move dtype into calling
-        lines = text.splitlines(True)
-        if any("dtype = None # None for auto detection." in line for line in lines) and \
-            any("dtype = dtype" in line for line in lines):
-            new_lines = []
-            for line in lines:
-                if "dtype = None # None for auto detection." in line:
-                    continue
-                if "dtype = dtype" in line and "auto detection" not in line:
-                    newline = "\n" if line.endswith("\n") else ""
-                    line = line.rstrip("\n")
-                    line = line.replace(
-                        "dtype = dtype,",
-                        "dtype = dtype, # None for auto detection. Float16 for T4, Bfloat16 for Ampere, H100+",
-                    )
-                    line = line + newline
-                new_lines.append(line)
-            lines = new_lines
-        text = "".join(lines)
+        # Keep explicit dtype definition lines intact to avoid undefined dtype later.
 
         # Update gguf save/push names
         text = re.sub(
@@ -311,6 +300,21 @@ def update_old_unsloth(filename):
             'token = "YOUR_HF_TOKEN"',
             text,
         )
+
+        # Preserve special tokens that should not be replaced by HF token
+        text = re.sub(
+            r"unsloth_eos_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']",
+            'unsloth_eos_token = "eos_token"',
+            text,
+        )
+        text = re.sub(
+            r"patch_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']",
+            'patch_token = "<|IMAGE_PLACEHOLDER|>"',
+            text,
+        )
+
+        # Normalize vLLM naming in code where it is used as a package/path
+        text = text.replace("vLLM", "vllm").replace("VLLM", "vllm")
 
         # Fix A=A to A = A in code
         text = _space_equals_in_code(text)
