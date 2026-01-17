@@ -11,18 +11,17 @@
 # To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
-# 
 
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
+# 
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
 # 
 # Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
-# 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
 # 
@@ -32,7 +31,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
 # 
 # 
 # # In[ ]:
@@ -96,7 +95,7 @@ def do_gemma_3n_inference(messages, max_new_tokens = 128):
             return_tensors = "pt",
         ).to("cuda"),
         max_new_tokens = max_new_tokens,
-        do_sample=False,
+        do_sample = False,
         streamer = TextStreamer(processor, skip_prompt = True),
     )
 
@@ -295,10 +294,10 @@ from trl import SFTTrainer, SFTConfig
 
 
 trainer = SFTTrainer(
-    model=model,
-    train_dataset=dataset,
-    processing_class=processor.tokenizer,
-    data_collator=collate_fn,
+    model = model,
+    train_dataset = dataset,
+    processing_class = processor.tokenizer,
+    data_collator = collate_fn,
     args = SFTConfig(
         per_device_train_batch_size = 2,
         gradient_accumulation_steps = 1,
@@ -309,7 +308,7 @@ trainer = SFTTrainer(
         num_train_epochs = 1,          # Set this instead of max_steps for full training runs
         learning_rate = 5e-5,
         logging_steps = 10,
-        save_strategy="steps",
+        save_strategy = "steps",
         optim = "adamw_8bit",
         weight_decay = 0.001,
         lr_scheduler_type = "cosine",
@@ -447,7 +446,7 @@ _ = model.generate(
 )
 
 
-# ### Saving to float16 for VLLM
+# ### Saving to float16 for vLLM
 # 
 # We also support saving to `float16` directly for deployment! We save it in the folder `gemma-3N-finetune`. Set `if False` to `if True` to let it run!
 

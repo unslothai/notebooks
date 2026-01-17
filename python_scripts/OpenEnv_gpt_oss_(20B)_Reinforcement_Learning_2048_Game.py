@@ -35,7 +35,7 @@ get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip ins
 # In[3]:
 
 
-get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().parent.absolute() / "OpenEnv")\n')
+get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel\n!pip install fastapi uvicorn requests\n!pip install open_spiel --prefer-binary\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\n!git checkout 83dda10\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().parent.absolute() / "OpenEnv")\n')
 
 
 # We'll load GPT-OSS 20B and set some parameters:

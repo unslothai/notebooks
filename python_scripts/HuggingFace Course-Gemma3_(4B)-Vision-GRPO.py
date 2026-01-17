@@ -13,18 +13,17 @@
 # To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
-# 
 
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
+# 
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
 # 
 # Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
-# 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
 # 
@@ -34,7 +33,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_vLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
 # 
 # 
 # # In[ ]:
@@ -48,13 +47,13 @@
 #     # If you're not in Colab, just use pip install!
 #     get_ipython().system('pip install unsloth vllm')
 # else:
-#     try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-#     except: get_numpy = "numpy"; get_pil = "pillow"
+#     try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
+#     except: _numpy = "numpy"; _pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
-#     get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
-#     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers')
-#     get_ipython().system('uv pip install -qqq {get_triton}')
+#     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+#     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
+#     get_ipython().system('uv pip install -qqq {_triton}')
 # get_ipython().system('uv pip install transformers==4.56.2')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
 # 
@@ -243,7 +242,7 @@ train_dataset = train_dataset.map(
     lambda example: {
         "prompt": tokenizer.apply_chat_template(
             example["prompt"],
-            tokenize=False,
+            tokenize = False,
             add_generation_prompt=False
         )
     }
@@ -320,8 +319,8 @@ training_args = GRPOConfig(
     max_completion_length = 1024,
     #num_train_epochs = 2, # Set to 1 for a full training run
     importance_sampling_level = "sequence",
-    mask_truncated_completions=False,
-    loss_type='dr_grpo',
+    mask_truncated_completions = False,
+    loss_type = 'dr_grpo',
     max_steps = 60,
     save_steps = 60,
     max_grad_norm = 0.1,
@@ -345,12 +344,12 @@ training_args = GRPOConfig(
 
 
 trainer = GRPOTrainer(
-    model=model,
-    args=training_args,
+    model = model,
+    args = training_args,
     # Pass the processor to handle multimodal inputs
-    processing_class=tokenizer,
+    processing_class = tokenizer,
     reward_funcs=[formatting_reward_func, correctness_reward_func],
-    train_dataset=train_dataset,
+    train_dataset = train_dataset,
 )
 
 trainer.train()
@@ -384,8 +383,8 @@ input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
 inputs = tokenizer(
     image,
     input_text,
-    add_special_tokens=False,
-    return_tensors="pt",
+    add_special_tokens = False,
+    return_tensors = "pt",
 ).to("cuda")
 
 from transformers import TextStreamer
@@ -449,8 +448,8 @@ input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
 inputs = tokenizer(
     image,
     input_text,
-    add_special_tokens=False,
-    return_tensors="pt",
+    add_special_tokens = False,
+    return_tensors = "pt",
 ).to("cuda")
 
 from transformers import TextStreamer
@@ -460,9 +459,9 @@ result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128
                         use_cache=True, temperature = 1.0, top_p = 0.95, top_k = 64)
 
 
-# ### Saving to float16 for VLLM
+# ### Saving to float16 for vLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options.
 
 # In[28]:
 
@@ -478,11 +477,12 @@ if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://docs.unsloth.ai/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://docs.unsloth.ai/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning) and [vision](https://docs.unsloth.ai/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://docs.unsloth.ai/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://docs.unsloth.ai/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
