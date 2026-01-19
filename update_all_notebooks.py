@@ -94,8 +94,8 @@ def update_old_unsloth(filename):
     "        packing = False, # Makes training 2-5x faster for short sequences,\n",
     ''')
 
-    # VLLM to vLLM
-    f = f.replace("VLLM", "vLLM")
+    # VLLM to vLLM, but avoid underscores/dashes or word-part matches
+    f = re.sub(r'(?<![A-Za-z0-9_-])VLLM(?![A-Za-z0-9_-])', "vLLM", f)
     f = f.replace(
         "You can go to https://huggingface.co/settings/tokens for your personal tokens.",
         "You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options."
