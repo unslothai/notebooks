@@ -11,18 +11,17 @@
 # To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
-# 
 
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
+# 
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
 # 
 # Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
-# 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
 # 
@@ -32,7 +31,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
 # 
 # 
 # # ### Unsloth
@@ -66,8 +65,8 @@ model, tokenizer = FastVisionModel.from_pretrained(
     "./deepseek_ocr",
     load_in_4bit = False, # Use 4bit to reduce memory use. False for 16bit LoRA.
     auto_model = AutoModel,
-    trust_remote_code=True,
-    unsloth_force_compile=True,
+    trust_remote_code = True,
+    unsloth_force_compile = True,
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for long context
 )
 
@@ -552,7 +551,7 @@ class DeepSeekOCRDataCollator:
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support TRL's `DPOTrainer`!
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
 # 
 # We use our new `DeepSeekOCRDataCollator` which will help in our vision finetuning setup.
 
@@ -563,12 +562,12 @@ from transformers import Trainer, TrainingArguments
 from unsloth import is_bf16_supported
 FastVisionModel.for_training(model) # Enable for training!
 data_collator = DeepSeekOCRDataCollator(
-    tokenizer=tokenizer,
+    tokenizer = tokenizer,
     model = model,
-    image_size=640,
-    base_size=1024,
-    crop_mode=True,
-    train_on_responses_only=True,
+    image_size = 640,
+    base_size = 1024,
+    crop_mode = True,
+    train_on_responses_only = True,
 )
 trainer = Trainer(
     model = model,
@@ -653,9 +652,9 @@ output_path = 'your/output/dir'
 
 res = model.infer(tokenizer, prompt=prompt, image_file=image_file,
     output_path = output_path,
-    image_size=640,
-    base_size=1024,
-    crop_mode=True,
+    image_size = 640,
+    base_size = 1024,
+    crop_mode = True,
     save_results = True,
     test_compress = False)
 
@@ -694,8 +693,8 @@ if False:
         model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
         load_in_4bit = False, # Use 4bit to reduce memory use. False for 16bit LoRA.
         auto_model = AutoModel,
-        trust_remote_code=True,
-        unsloth_force_compile=True,
+        trust_remote_code = True,
+        unsloth_force_compile = True,
         use_gradient_checkpointing = "unsloth", # True or "unsloth" for long context
     )
     FastVisionModel.for_inference(model) # Enable for inference!
@@ -713,16 +712,16 @@ output_path = 'your/output/dir'
 
 res = model.infer(tokenizer, prompt=prompt, image_file=image_file,
     output_path = output_path,
-    image_size=640,
-    base_size=1024,
-    crop_mode=True,
+    image_size = 640,
+    base_size = 1024,
+    crop_mode = True,
     save_results = True,
     test_compress = False)
 
 
-# ### Saving to float16 for VLLM
+# ### Saving to float16 for vLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 

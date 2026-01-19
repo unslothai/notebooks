@@ -11,18 +11,17 @@
 # To install Unsloth on your own computer, follow the installation instructions on our Github page [here](https://docs.unsloth.ai/get-started/installing-+-updating).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
-# 
 
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
+# 
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
 # 
 # Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
-# 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
 # 
@@ -32,7 +31,7 @@
 # In[1]:
 
 
-get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install librosa soundfile evaluate jiwer torchcodec "datasets>=3.4.1,<4.0.0"\n')
+get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install librosa soundfile evaluate jiwer torchcodec "datasets>=3.4.1,<4.0.0"\n')
 
 
 # In[2]:
@@ -194,7 +193,7 @@ trainer = Seq2SeqTrainer(
     data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=tokenizer),
     eval_dataset = test_dataset,
     tokenizer = tokenizer.feature_extractor,
-    compute_metrics=compute_metrics,
+    compute_metrics = compute_metrics,
     args = Seq2SeqTrainingArguments(
         # predict_with_generate=True,
         per_device_train_batch_size = 1,
@@ -212,7 +211,7 @@ trainer = Seq2SeqTrainer(
         lr_scheduler_type = "linear",
         label_names = ['labels'],
         eval_steps = 5 ,
-        eval_strategy="steps",
+        eval_strategy = "steps",
         seed = 3407,
         output_dir = "outputs",
         report_to = "none", # Use TrackIO/WandB etc
@@ -281,11 +280,11 @@ model.eval()
 # Create pipeline without specifying the device
 whisper = pipeline(
     "automatic-speech-recognition",
-    model=model,
-    tokenizer=tokenizer.tokenizer,
-    feature_extractor=tokenizer.feature_extractor,
-    processor=tokenizer,
-    return_language=True,
+    model = model,
+    tokenizer = tokenizer.tokenizer,
+    feature_extractor = tokenizer.feature_extractor,
+    processor = tokenizer,
+    return_language = True,
     torch_dtype=torch.float16  # Remove the device parameter
 )
 # Example usage
@@ -311,7 +310,7 @@ tokenizer.save_pretrained("lora_model")
 
 # ### Saving to float16
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 

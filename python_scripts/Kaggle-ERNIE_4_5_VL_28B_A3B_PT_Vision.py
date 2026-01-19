@@ -11,18 +11,17 @@
 # To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
-# 
 
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
+# 
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
 # 
 # Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
-# 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
 # 
@@ -32,7 +31,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install decord\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install decord\n')
 # 
 # 
 # # ### Unsloth
@@ -54,7 +53,7 @@ fourbit_models = [
 model_path = "unsloth/ERNIE-4.5-VL-28B-A3B-PT"
 model, tokenizer = FastVisionModel.from_pretrained(
     model_path,
-    auto_model=AutoModelForCausalLM,
+    auto_model = AutoModelForCausalLM,
     load_in_4bit = False, # Unsupported for this specific model variant
     trust_remote_code = True,
     unsloth_force_compile = True,
@@ -211,16 +210,16 @@ messages = [
 ]
 text_prompt = processor.tokenizer.apply_chat_template(
     messages,
-    tokenize=False,
-    add_generation_prompt=True,
+    tokenize = False,
+    add_generation_prompt = True,
     enable_thinking=False
 )
 inputs = processor(
-    text=[text_prompt],
-    images=[image],
-    videos=[],
-    padding=True,
-    return_tensors="pt",
+    text = [text_prompt],
+    images = [image],
+    videos = [],
+    padding = True,
+    return_tensors = "pt",
 )
 
 # Move inputs to GPU
@@ -299,8 +298,8 @@ class ErnieVisionDataCollator:
         )
 
         prompt_inputs = self.processor(
-            text=[prompt_text],
-            images=image_inputs,
+            text = [prompt_text],
+            images = image_inputs,
             return_tensors="pt"
         )
 
@@ -335,9 +334,9 @@ class ErnieVisionDataCollator:
             )
 
             inputs = self.processor(
-                text=[text],
-                images=image_inputs,
-                videos=video_inputs,
+                text = [text],
+                images = image_inputs,
+                videos = video_inputs,
                 return_tensors="pt"
             )
 
@@ -428,7 +427,7 @@ class ErnieSFTTrainer(SFTTrainer):
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 30 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support TRL's `DPOTrainer`!
+# Now let's train our model. We do 30 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
 # 
 # We use our new `ErnieVisionDataCollator` which will help in our vision finetuning setup.
 
@@ -440,9 +439,9 @@ from trl import  SFTConfig
 FastVisionModel.for_training(model) # Enable for training!
 
 custom_collator = ErnieVisionDataCollator(
-    processor=processor,
-    tokenizer=tokenizer,
-    max_seq_length=2048,
+    processor = processor,
+    tokenizer = tokenizer,
+    max_seq_length = 2048,
     train_on_responses_only = True,
 )
 
@@ -535,16 +534,16 @@ messages = [
 ]
 text_prompt = processor.tokenizer.apply_chat_template(
     messages,
-    tokenize=False,
-    add_generation_prompt=True,
+    tokenize = False,
+    add_generation_prompt = True,
     enable_thinking=False
 )
 inputs = processor(
-    text=[text_prompt],
-    images=[image],
-    videos=[],
-    padding=True,
-    return_tensors="pt",
+    text = [text_prompt],
+    images = [image],
+    videos = [],
+    padding = True,
+    return_tensors = "pt",
 )
 
 # Move inputs to GPU
@@ -592,9 +591,9 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
                    use_cache=False, temperature=1.5, min_p=0.1)
 
 
-# ### Saving to float16 for VLLM
+# ### Saving to float16 for vLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
@@ -610,11 +609,12 @@ if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://docs.unsloth.ai/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://docs.unsloth.ai/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning) and [vision](https://docs.unsloth.ai/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://docs.unsloth.ai/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://docs.unsloth.ai/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
