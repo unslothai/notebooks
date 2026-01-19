@@ -11,17 +11,18 @@
 # To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
+# 
 
 # ### News
 
 # 
-# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
-# 
-# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
+# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
 # 
 # Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
+# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# 
+# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
 # 
 # Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
 # 
@@ -31,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install protobuf==3.20.3 # required\n!pip install --no-deps transformers-cfg\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install protobuf==3.20.3 # required\n!pip install --no-deps transformers-cfg\n')
 # 
 # 
 # # ### Unsloth
@@ -61,8 +62,8 @@ load_in_4bit = True  # Use 4bit quantization to reduce memory usage. Can be Fals
 
 # 4bit pre quantized models we support for 4x faster downloading + no OOMs.
 fourbit_models = [
-    "unsloth/Llama-3.1-8B-bnb-4bit",  # Llama-3.1 2x faster
-    "unsloth/Llama-3.1-70B-bnb-4bit",
+    "unsloth/Meta-Llama-3.1-8B-bnb-4bit",  # Llama-3.1 2x faster
+    "unsloth/Meta-Llama-3.1-70B-bnb-4bit",
     "unsloth/Mistral-Small-Instruct-2409",  # Mistral 22b 2x faster!
     "unsloth/mistral-7b-instruct-v0.3-bnb-4bit",
     "unsloth/Phi-3.5-mini-instruct",  # Phi-3.5 2x faster!
@@ -83,10 +84,10 @@ qwen_models = [
 ]  # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastQwen2Model.from_pretrained(
-    model_name = "unsloth/Qwen2.5-Coder-1.5B-Instruct",
-    max_seq_length = None,
-    dtype = None,
-    load_in_4bit = False,
+    model_name="unsloth/Qwen2.5-Coder-1.5B-Instruct",
+    max_seq_length=None,
+    dtype=None,
+    load_in_4bit=False,
     fix_tokenizer=False
     # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
@@ -205,12 +206,12 @@ messages.append(user_query)
 tokenizer = copy.deepcopy(tokenizer_orig)
 input_ids = tokenizer.apply_chat_template(
     messages,
-    tokenize = True,
-    add_generation_prompt = True,
-    add_special_tokens = False,
-    padding = True,
-    tools = [get_vector_sum],
-    return_tensors = "pt",
+    tokenize=True,
+    add_generation_prompt=True,
+    add_special_tokens=False,
+    padding=True,
+    tools=[get_vector_sum],
+    return_tensors="pt",
 ).to("cuda")
 
 print(tokenizer.decode(input_ids[0]))
@@ -277,19 +278,19 @@ def generate_with_grammar(model, input_ids, **kwargs):
 
     partial_generate = partial(
         model.generate,
-        do_sample = False,
-        repetition_penalty = 1.1,
+        do_sample=False,
+        repetition_penalty=1.1,
         num_return_sequences=1,
         logits_processor=[grammar_processor],  # Ensure grammar_processor is accessible
-        temperature = None,
-        top_p = None,
-        top_k = None,
-        sliding_window = None,
+        temperature=None,
+        top_p=None,
+        top_k=None,
+        sliding_window=None,
     )
 
     # Execute generation with merged parameters
     return partial_generate(
-        input_ids = input_ids,
+        input_ids=input_ids,
         **kwargs
     )
 
@@ -298,7 +299,7 @@ def generate_with_grammar(model, input_ids, **kwargs):
 
 
 output = generate_with_grammar(
-    model = model,
+    model=model,
     input_ids=input_ids
 )
 
@@ -398,11 +399,11 @@ messages.append({
 tokenizer = copy.deepcopy(tokenizer_orig)
 tool_prompt = tokenizer.apply_chat_template(
     messages,
-    continue_final_message = True,
-    add_special_tokens = True,
-    return_tensors = "pt",
-    return_dict = True,
-    tools = None,
+    continue_final_message=True,
+    add_special_tokens=True,
+    return_tensors="pt",
+    return_dict=True,
+    tools=None,
 )
 tool_prompt = tool_prompt.to(model.device)
 
@@ -426,12 +427,12 @@ print(tokenizer.decode(generated_text, skip_special_tokens=True))
 tokenizer = copy.deepcopy(tokenizer_orig)
 input_ids = tokenizer.apply_chat_template(
     [user_query],
-    tokenize = True,
-    add_generation_prompt = True,
-    add_special_tokens = False,
-    padding = True,
-    tools = None,
-    return_tensors = "pt",
+    tokenize=True,
+    add_generation_prompt=True,
+    add_special_tokens=False,
+    padding=True,
+    tools=None,
+    return_tensors="pt",
 ).to("cuda")
 
 print(tokenizer.decode(input_ids[0]))
@@ -441,7 +442,7 @@ print(tokenizer.decode(input_ids[0]))
 
 
 output = model.generate(
-    input_ids = input_ids,
+    input_ids=input_ids,
     max_new_tokens=1024
 )
 
@@ -486,19 +487,19 @@ import requests
 
 class Item(BaseModel):
     id: int | None = Field(
-        default = None,
+        default=None,
         description="Unique identifier for the item (auto-generated by database)"
     )
     item_code: str = Field(
         ...,
         min_length=3,
-        max_length = 20,
+        max_length=20,
         description="Unique SKU or product code for the item"
     )
     name: str = Field(
         ...,
         min_length=2,
-        max_length = 50,
+        max_length=50,
         description="Human-readable name of the item"
     )
     cost: float = Field(
@@ -547,21 +548,21 @@ def get_all_items() -> List[Item]:
     """Fetches all the inventory items"""
     return [
         Item(
-            item_code = "ITEM-001",
-            name = "Apple",
-            cost = 1.13,
+            item_code="ITEM-001",
+            name="Apple",
+            cost=1.13,
             quantity=4
         ),
         Item(
-            item_code = "ITEM-002",
+            item_code="ITEM-002",
             name="Bottled Water",
-            cost = 1.04,
+            cost=1.04,
             quantity=20
         ),
         Item(
-            item_code = "ITEM-003",
+            item_code="ITEM-003",
             name="Instant Ramen",
-            cost = 10.13,
+            cost=10.13,
             quantity=4
         )
     ]
@@ -602,12 +603,12 @@ messages.append(user_query)
 tokenizer = copy.deepcopy(tokenizer_orig)
 input_ids = tokenizer.apply_chat_template(
     messages,
-    tokenize = True,
-    add_generation_prompt = True,
-    add_special_tokens = False,
-    padding = True,
+    tokenize=True,
+    add_generation_prompt=True,
+    add_special_tokens=False,
+    padding=True,
     tools=tools,  # pass the tools
-    return_tensors = "pt",
+    return_tensors="pt",
 ).to("cuda")
 
 print(tokenizer.decode(input_ids[0]))
@@ -617,7 +618,7 @@ print(tokenizer.decode(input_ids[0]))
 
 
 output = generate_with_grammar(
-    model = model,
+    model=model,
     input_ids=input_ids
 )
 
@@ -695,11 +696,11 @@ messages.append({
 tokenizer = copy.deepcopy(tokenizer_orig)
 tool_prompt = tokenizer.apply_chat_template(
     messages,
-    continue_final_message = True,
-    add_special_tokens = True,
-    return_tensors = "pt",
-    return_dict = True,
-    tools = None,
+    continue_final_message=True,
+    add_special_tokens=True,
+    return_tensors="pt",
+    return_dict=True,
+    tools=None,
 )
 tool_prompt = tool_prompt.to(model.device)
 
@@ -772,12 +773,12 @@ messages.append(user_query)
 tokenizer = copy.deepcopy(tokenizer_orig)
 input_ids = tokenizer.apply_chat_template(
     messages,
-    tokenize = True,
-    add_generation_prompt = True,
-    add_special_tokens = False,
-    padding = True,
-    tools = tools,
-    return_tensors = "pt",
+    tokenize=True,
+    add_generation_prompt=True,
+    add_special_tokens=False,
+    padding=True,
+    tools=tools,
+    return_tensors="pt",
 ).to("cuda")
 
 print(tokenizer.decode(input_ids[0]))
@@ -787,7 +788,7 @@ print(tokenizer.decode(input_ids[0]))
 
 
 output = generate_with_grammar(
-    model = model,
+    model=model,
     input_ids=input_ids
 )
 
@@ -872,11 +873,11 @@ messages.append({
 tokenizer = copy.deepcopy(tokenizer_orig)
 tool_prompt = tokenizer.apply_chat_template(
     messages,
-    continue_final_message = True,
-    add_special_tokens = True,
-    return_tensors = "pt",
-    return_dict = True,
-    tools = None,
+    continue_final_message=True,
+    add_special_tokens=True,
+    return_tensors="pt",
+    return_dict=True,
+    tools=None,
 )
 tool_prompt = tool_prompt.to(model.device)
 
@@ -894,12 +895,11 @@ print(tokenizer.decode(generated_text, skip_special_tokens=True))
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other resources:
-# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://docs.unsloth.ai/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
-# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://docs.unsloth.ai/get-started/reinforcement-learning-rl-guide).
-# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning) and [vision](https://docs.unsloth.ai/basics/vision-fine-tuning) model support.
-# 4. Explore our [LLM Tutorials Directory](https://docs.unsloth.ai/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
-# 5. Need help with Inference? Read our [Inference & Deployment page](https://docs.unsloth.ai/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
+# Some other links:
+# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
+# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
+# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
+# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
