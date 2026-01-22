@@ -53,7 +53,7 @@ fourbit_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model = FastSentenceTransformer.from_pretrained(
-    model_name = "sentence-transformers/all-MiniLM-L6-v2",
+    model_name = "unsloth/all-MiniLM-L6-v2",
     max_seq_length = 512,   # Choose any for long context!
     full_finetuning = False, # [NEW!] We have full finetuning now!
 )
