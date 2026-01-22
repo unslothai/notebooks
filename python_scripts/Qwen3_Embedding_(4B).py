@@ -53,7 +53,7 @@ fourbit_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model = FastSentenceTransformer.from_pretrained(
-    model_name = "Qwen/Qwen3-Embedding-4B",
+    model_name = "unsloth/Qwen3-Embedding-4B",
     max_seq_length = 512,   # Choose any for long context!
     load_in_4bit = False,  # 4 bit quantization to reduce memory
     load_in_8bit = False, # A bit more accurate, uses 2x memory
