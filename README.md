@@ -388,6 +388,14 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 
 <!-- End of Notebook Links -->
 
+## Known Issues / Environment Notes
+
+- **NumPy 2.x ↔ soxr**: NumPy 2.x breaks soxr, causing Unsloth import failures. Pin `numpy<2` to resolve. Use `pip install --force-reinstall "numpy<2"` if needed. _Impact: Prevents Unsloth from running._
+- **soxr reinstall**: `pip install --force-reinstall soxr` can pull NumPy 2.x back unless using `--no-deps`. Use `pip install --force-reinstall --no-deps soxr` to avoid this. _Impact: May reintroduce NumPy 2.x and break Unsloth imports._
+- **typing_extensions**: Older typing_extensions can break torch import (TypeIs missing) until upgraded. Upgrade with `pip install --upgrade typing_extensions`. _Impact: Prevents PyTorch from importing correctly._
+- **Resolver warnings**: Pinning `numpy<2` can cause pip resolver warnings with SciPy/Numba; typically non-fatal. _Impact: Cosmetic warnings only, does not affect functionality._
+- **ROCm / triton_key**: LoRA backward can crash under `torch.compile` if Triton lacks `triton_key`; workaround is to disable Inductor/compile on ROCm (handled in code now, but worth noting). _Impact: May cause training crashes on AMD GPUs when using torch.compile._
+
 # ✨ Contributing to Notebooks
 
 If you'd like to contribute to our notebooks, here's a guide to get you started:
