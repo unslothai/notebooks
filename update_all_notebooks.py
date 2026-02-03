@@ -400,7 +400,7 @@ def update_old_unsloth(filename):
 
     if updated:
         with open(filename, "w", encoding="utf-8") as w:
-            json.dump(notebook_content, w, indent=1, ensure_ascii=False)
+            json.dump(notebook_content, w, indent=1)
 pass
 
 
