@@ -5,10 +5,10 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 # 
@@ -16,15 +16,15 @@
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!git clone https://github.com/SparkAudio/Spark-TTS\n!pip install omegaconf einx torchcodec "datasets>=3.4.1,<4.0.0"\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.33.post1")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!git clone https://github.com/SparkAudio/Spark-TTS\n!pip install omegaconf einx torchcodec "datasets>=3.4.1,<4.0.0"\n')
 # 
 # 
 # # ### Unsloth
@@ -75,7 +75,7 @@ model, tokenizer = FastModel.from_pretrained(
     dtype = torch.float32, # Spark seems to only work on float32 for now
     full_finetuning = True, # We support full finetuning now!
     load_in_4bit = False,
-    #token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
+    #token = "YOUR_HF_TOKEN", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
 
 
@@ -84,7 +84,7 @@ model, tokenizer = FastModel.from_pretrained(
 # In[ ]:
 
 
-#LoRA does not work with float32 only works with bfloat16 !!!
+#LoRA does not work with float32 only works with bfloat16 !
 model = FastModel.get_peft_model(
     model,
     r = 128, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
@@ -139,9 +139,9 @@ def extract_wav2vec2_features( wavs: torch.Tensor) -> torch.Tensor:
 
         processed = audio_tokenizer.processor(
             wav_np,
-            sampling_rate=16000,
-            return_tensors="pt",
-            padding=True,
+            sampling_rate = 16000,
+            return_tensors = "pt",
+            padding = True,
         )
         input_values = processed.input_values
 
@@ -173,7 +173,7 @@ def formatting_audio_func(example):
     target_sr = audio_tokenizer.config['sample_rate']
 
     if sampling_rate != target_sr:
-        resampler = T.Resample(orig_freq=sampling_rate, new_freq=target_sr)
+        resampler = T.Resample(orig_freq = sampling_rate, new_freq = target_sr)
         audio_tensor_temp = torch.from_numpy(audio_array).float()
         audio_array = resampler(audio_tensor_temp).numpy()
 
@@ -222,7 +222,7 @@ def formatting_audio_func(example):
     return {"text": inputs}
 
 
-dataset = dataset.map(formatting_audio_func, remove_columns=["audio"])
+dataset = dataset.map(formatting_audio_func, remove_columns = ["audio"])
 print("Moving Bicodec model and Wav2Vec2Model to cpu.")
 audio_tokenizer.model.cpu()
 audio_tokenizer.feature_extractor.cpu()
@@ -231,7 +231,7 @@ torch.cuda.empty_cache()
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support TRL's `DPOTrainer`!
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
 
 # In[ ]:
 
@@ -359,18 +359,18 @@ def generate_speech_from_text(
         "<|start_global_token|>"
     ])
 
-    model_inputs = tokenizer([prompt], return_tensors="pt").to(device)
+    model_inputs = tokenizer([prompt], return_tensors = "pt").to(device)
 
     print("Generating token sequence...")
     generated_ids = model.generate(
         **model_inputs,
-        max_new_tokens=max_new_audio_tokens, # Limit generation length
-        do_sample=True,
-        temperature=temperature,
-        top_k=top_k,
-        top_p=top_p,
-        eos_token_id=tokenizer.eos_token_id, # Stop token
-        pad_token_id=tokenizer.pad_token_id # Use models pad token id
+        max_new_tokens = max_new_audio_tokens, # Limit generation length
+        do_sample = True,
+        temperature = temperature,
+        top_k = top_k,
+        top_p = top_p,
+        eos_token_id = tokenizer.eos_token_id, # Stop token
+        pad_token_id = tokenizer.pad_token_id # Use models pad token id
     )
     print("Token sequence generated.")
 
@@ -378,7 +378,7 @@ def generate_speech_from_text(
     generated_ids_trimmed = generated_ids[:, model_inputs.input_ids.shape[1]:]
 
 
-    predicts_text = tokenizer.batch_decode(generated_ids_trimmed, skip_special_tokens=False)[0]
+    predicts_text = tokenizer.batch_decode(generated_ids_trimmed, skip_special_tokens = False)[0]
     # print(f"\nGenerated Text (for parsing):\n{predicts_text}\n") # Debugging
 
     # Extract semantic token IDs using regex
@@ -386,7 +386,7 @@ def generate_speech_from_text(
     if not semantic_matches:
         print("Warning: No semantic tokens found in the generated output.")
         # Handle appropriately - perhaps return silence or raise error
-        return np.array([], dtype=np.float32)
+        return np.array([], dtype = np.float32)
 
     pred_semantic_ids = torch.tensor([int(token) for token in semantic_matches]).long().unsqueeze(0) # Add batch dim
 
@@ -394,7 +394,7 @@ def generate_speech_from_text(
     global_matches = re.findall(r"<\|bicodec_global_(\d+)\|>", predicts_text)
     if not global_matches:
          print("Warning: No global tokens found in the generated output (controllable mode). Might use defaults or fail.")
-         pred_global_ids = torch.zeros((1, 1), dtype=torch.long)
+         pred_global_ids = torch.zeros((1, 1), dtype = torch.long)
     else:
          pred_global_ids = torch.tensor([int(token) for token in global_matches]).long().unsqueeze(0) # Add batch dim
 
@@ -432,7 +432,7 @@ if __name__ == "__main__":
 
         # Optional: Play in notebook
         from IPython.display import Audio, display
-        display(Audio(generated_waveform, rate=sample_rate))
+        display(Audio(generated_waveform, rate = sample_rate))
     else:
         print("Audio generation failed (no tokens found?).")
 
@@ -446,48 +446,49 @@ if __name__ == "__main__":
 # In[ ]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-tokenizer.save_pretrained("lora_model")
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
-# tokenizer.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("spark_tts_lora")  # Local saving
+tokenizer.save_pretrained("spark_tts_lora")
+# model.push_to_hub("your_name/spark_tts_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/spark_tts_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # ### Saving to float16
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
 
 # Merge to 16bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.save_pretrained_merged("spark_tts_finetune_16bit", tokenizer, save_method = "merged_16bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/spark_tts_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
 
 # Merge to 4bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.save_pretrained_merged("spark_tts_finetune_4bit", tokenizer, save_method = "merged_4bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/spark_tts_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("model")
-    tokenizer.save_pretrained("model")
+    model.save_pretrained("spark_tts_lora")
+    tokenizer.save_pretrained("spark_tts_lora")
 if False:
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
+    model.push_to_hub("HF_USERNAME/spark_tts_lora", token = "")
+    tokenizer.push_to_hub("HF_USERNAME/spark_tts_lora", token = "")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 

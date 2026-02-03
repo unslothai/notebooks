@@ -5,10 +5,10 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 # 
@@ -16,15 +16,15 @@
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install decord\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.33.post1")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install decord\n')
 # 
 # 
 # # ### Unsloth
@@ -54,12 +54,12 @@ fourbit_models = [
 model_path = "unsloth/ERNIE-4.5-VL-28B-A3B-PT"
 model, tokenizer = FastVisionModel.from_pretrained(
     model_path,
-    auto_model=AutoModelForCausalLM,
+    auto_model = AutoModelForCausalLM,
     load_in_4bit = False, # Unsupported for this specific model variant
     trust_remote_code = True,
     unsloth_force_compile = True,
     use_gradient_checkpointing = False,
-    attn_implementation="eager"
+    attn_implementation = "eager"
 )
 
 
@@ -68,7 +68,7 @@ model, tokenizer = FastVisionModel.from_pretrained(
 # In[ ]:
 
 
-processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+processor = AutoProcessor.from_pretrained(model_path, trust_remote_code = True)
 processor.eval()
 model.add_image_preprocess(processor)
 
@@ -211,16 +211,16 @@ messages = [
 ]
 text_prompt = processor.tokenizer.apply_chat_template(
     messages,
-    tokenize=False,
-    add_generation_prompt=True,
-    enable_thinking=False
+    tokenize = False,
+    add_generation_prompt = True,
+    enable_thinking = False
 )
 inputs = processor(
-    text=[text_prompt],
-    images=[image],
-    videos=[],
-    padding=True,
-    return_tensors="pt",
+    text = [text_prompt],
+    images = [image],
+    videos = [],
+    padding = True,
+    return_tensors = "pt",
 )
 
 # Move inputs to GPU
@@ -229,8 +229,8 @@ inputs = inputs.to(device)
 
 from transformers import TextStreamer
 text_streamer = TextStreamer(tokenizer, skip_prompt = True)
-_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
-                   use_cache=False, temperature=1.5, min_p=0.1)
+_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
+                   use_cache = False, temperature = 1.5, min_p = 0.1)
 
 
 # In[ ]:
@@ -252,7 +252,7 @@ class ErnieVisionDataCollator:
     max_seq_length: int = 2048
     train_on_responses_only: bool = False
 
-    _img_patch_id: int = field(init=False, default=-1)
+    _img_patch_id: int = field(init = False, default = -1)
 
     def __post_init__(self):
         if self.tokenizer.pad_token_id is None:
@@ -295,13 +295,13 @@ class ErnieVisionDataCollator:
 
         prompt_msgs = msgs[:last_asst_idx]
         prompt_text = self.tokenizer.apply_chat_template(
-            prompt_msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False
+            prompt_msgs, tokenize = False, add_generation_prompt = True, enable_thinking = False
         )
 
         prompt_inputs = self.processor(
-            text=[prompt_text],
-            images=image_inputs,
-            return_tensors="pt"
+            text = [prompt_text],
+            images = image_inputs,
+            return_tensors = "pt"
         )
 
         prompt_ids = prompt_inputs['input_ids'][0]
@@ -312,7 +312,7 @@ class ErnieVisionDataCollator:
 
         matches = (full_input_ids[:limit] == prompt_ids[:limit])
 
-        mismatches = (~matches).nonzero(as_tuple=False)
+        mismatches = (~matches).nonzero(as_tuple = False)
 
         if len(mismatches) > 0:
             mask_len = mismatches[0].item()
@@ -331,14 +331,14 @@ class ErnieVisionDataCollator:
             image_inputs, video_inputs = self._extract_visuals(msgs)
 
             text = self.tokenizer.apply_chat_template(
-                msgs, tokenize=False, add_generation_prompt=False
+                msgs, tokenize = False, add_generation_prompt = False
             )
 
             inputs = self.processor(
-                text=[text],
-                images=image_inputs,
-                videos=video_inputs,
-                return_tensors="pt"
+                text = [text],
+                images = image_inputs,
+                videos = video_inputs,
+                return_tensors = "pt"
             )
 
             input_ids = inputs['input_ids'][0]
@@ -347,7 +347,7 @@ class ErnieVisionDataCollator:
 
             if input_ids[-1] != self.tokenizer.eos_token_id:
                 input_ids = torch.cat([input_ids, torch.tensor([self.tokenizer.eos_token_id])])
-                tt = torch.cat([tt, torch.tensor([0], dtype=tt.dtype)])
+                tt = torch.cat([tt, torch.tensor([0], dtype = tt.dtype)])
                 pos = torch.cat([pos, (pos[-1] + 1).unsqueeze(0)])
 
             labels = input_ids.clone()
@@ -368,12 +368,12 @@ class ErnieVisionDataCollator:
             if inputs.get('grid_thw') is not None: batch["grid_thw"].append(inputs['grid_thw'])
             if inputs.get('image_type_ids') is not None: batch["image_type_ids"].append(inputs['image_type_ids'])
 
-        padded_input = torch.nn.utils.rnn.pad_sequence(batch["input_ids"], batch_first=True, padding_value=self.tokenizer.pad_token_id)
-        padded_label = torch.nn.utils.rnn.pad_sequence(batch["labels"], batch_first=True, padding_value=self.ignore_index)
-        padded_tt = torch.nn.utils.rnn.pad_sequence(batch["token_type_ids"], batch_first=True, padding_value=0)
+        padded_input = torch.nn.utils.rnn.pad_sequence(batch["input_ids"], batch_first = True, padding_value = self.tokenizer.pad_token_id)
+        padded_label = torch.nn.utils.rnn.pad_sequence(batch["labels"], batch_first = True, padding_value = self.ignore_index)
+        padded_tt = torch.nn.utils.rnn.pad_sequence(batch["token_type_ids"], batch_first = True, padding_value = 0)
 
         max_len = padded_input.shape[1]
-        padded_pos = torch.zeros((len(batch["position_ids"]), max_len, 3), dtype=torch.long)
+        padded_pos = torch.zeros((len(batch["position_ids"]), max_len, 3), dtype = torch.long)
         for i, p in enumerate(batch["position_ids"]):
             l = min(p.shape[0], max_len)
             padded_pos[i, :l, :] = p[:l]
@@ -392,14 +392,14 @@ class ErnieVisionDataCollator:
             "position_ids": padded_pos,
         }
 
-        if batch["images"]: final_batch["images"] = torch.cat(batch["images"], dim=0)
-        if batch["grid_thw"]: final_batch["grid_thw"] = torch.cat(batch["grid_thw"], dim=0)
-        if batch["image_type_ids"]: final_batch["image_type_ids"] = torch.cat(batch["image_type_ids"], dim=0)
+        if batch["images"]: final_batch["images"] = torch.cat(batch["images"], dim = 0)
+        if batch["grid_thw"]: final_batch["grid_thw"] = torch.cat(batch["grid_thw"], dim = 0)
+        if batch["image_type_ids"]: final_batch["image_type_ids"] = torch.cat(batch["image_type_ids"], dim = 0)
 
         return final_batch
 
 class ErnieSFTTrainer(SFTTrainer):
-    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+    def compute_loss(self, model, inputs, return_outputs = False, num_items_in_batch = None):
         outputs = model(**inputs)
 
         logits = outputs.logits
@@ -428,7 +428,7 @@ class ErnieSFTTrainer(SFTTrainer):
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 30 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support TRL's `DPOTrainer`!
+# Now let's train our model. We do 30 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
 # 
 # We use our new `ErnieVisionDataCollator` which will help in our vision finetuning setup.
 
@@ -440,9 +440,9 @@ from trl import  SFTConfig
 FastVisionModel.for_training(model) # Enable for training!
 
 custom_collator = ErnieVisionDataCollator(
-    processor=processor,
-    tokenizer=tokenizer,
-    max_seq_length=2048,
+    processor = processor,
+    tokenizer = tokenizer,
+    max_seq_length = 2048,
     train_on_responses_only = True,
 )
 
@@ -535,16 +535,16 @@ messages = [
 ]
 text_prompt = processor.tokenizer.apply_chat_template(
     messages,
-    tokenize=False,
-    add_generation_prompt=True,
-    enable_thinking=False
+    tokenize = False,
+    add_generation_prompt = True,
+    enable_thinking = False
 )
 inputs = processor(
-    text=[text_prompt],
-    images=[image],
-    videos=[],
-    padding=True,
-    return_tensors="pt",
+    text = [text_prompt],
+    images = [image],
+    videos = [],
+    padding = True,
+    return_tensors = "pt",
 )
 
 # Move inputs to GPU
@@ -553,8 +553,8 @@ inputs = inputs.to(device)
 
 from transformers import TextStreamer
 text_streamer = TextStreamer(tokenizer, skip_prompt = True)
-_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
-                   use_cache=False, temperature=1.5, min_p=0.1)
+_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
+                   use_cache = False, temperature = 1.5, min_p = 0.1)
 
 
 # <a name="Save"></a>
@@ -566,10 +566,10 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
 # In[ ]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-tokenizer.save_pretrained("lora_model")
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
-# tokenizer.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("ernie_lora")  # Local saving
+tokenizer.save_pretrained("ernie_lora")
+# model.push_to_hub("your_name/ernie_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/ernie_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -580,7 +580,7 @@ tokenizer.save_pretrained("lora_model")
 if False:
     from unsloth import FastVisionModel
     model, tokenizer = FastVisionModel.from_pretrained(
-        model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        model_name = "ernie_lora", # YOUR MODEL YOU USED FOR TRAINING
         load_in_4bit = False, # Set to False for 16bit LoRA
     )
     FastVisionModel.for_inference(model) # Enable for inference!
@@ -588,13 +588,13 @@ if False:
 
 from transformers import TextStreamer
 text_streamer = TextStreamer(tokenizer, skip_prompt = True)
-_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens=128,
-                   use_cache=False, temperature=1.5, min_p=0.1)
+_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
+                   use_cache = False, temperature = 1.5, min_p = 0.1)
 
 
 # ### Saving to float16 for VLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
@@ -610,16 +610,17 @@ if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 

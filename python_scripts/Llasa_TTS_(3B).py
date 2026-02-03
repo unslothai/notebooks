@@ -5,10 +5,10 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 # 
@@ -16,15 +16,15 @@
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl==0.15.2 triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.1\n!pip install --no-deps trl==0.15.2\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps\n!pip install omegaconf torchcodec "datasets>=3.4.1,<4.0.0"\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.33.post1")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl==0.15.2 triton unsloth\n!pip install transformers==4.56.1\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps\n!pip install omegaconf torchcodec "datasets>=3.4.1,<4.0.0"\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
 # 
 # 
 # # ### Unsloth
@@ -68,7 +68,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     max_seq_length = max_seq_length,
     dtype = None, # Select None for auto detection
     load_in_4bit = False, # Choose True for 4bit which reduces memory
-    # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
+    # token = "YOUR_HF_TOKEN", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
 
 
@@ -135,24 +135,24 @@ def preprocess_and_save(
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
 ):
     codec_model = codec_model.to(device).eval()
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok = True)
     memmap_path = os.path.join(output_dir, f"input_ids.memmap")
     shape_path = os.path.join(output_dir, f"input_ids_shape.npy")
     num_samples = len(dataset)
     shape = (num_samples, max_length)
     try:
-        arr = np.memmap(memmap_path, dtype=np.int32, mode='w+', shape=shape)
+        arr = np.memmap(memmap_path, dtype = np.int32, mode = 'w+', shape = shape)
     except Exception as e:
         raise e
     valid_sequences_count = 0
     skipped_count = 0
-    for idx, example in tqdm(enumerate(dataset), total=num_samples, desc=f"Processing"):
+    for idx, example in tqdm(enumerate(dataset), total = num_samples, desc = f"Processing"):
         try:
             if 'text' not in example or example['text'] is None:
                 skipped_count += 1
                 continue
             text = f"<|TEXT_UNDERSTANDING_START|>{example['text']}<|TEXT_UNDERSTANDING_END|>"
-            text_ids = tokenizer.encode(text, add_special_tokens=False)
+            text_ids = tokenizer.encode(text, add_special_tokens = False)
             if "audio" not in example or "array" not in example["audio"] or "sampling_rate" not in example["audio"] or example["audio"]["array"] is None:
                 skipped_count += 1
                 continue
@@ -194,7 +194,7 @@ def preprocess_and_save(
             padding_length = max_length - len(combined_sequence)
             final_sequence = combined_sequence + [tokenizer.pad_token_id] * padding_length
             final_sequence = final_sequence[:max_length]
-            arr[valid_sequences_count] = np.array(final_sequence, dtype=np.int32)
+            arr[valid_sequences_count] = np.array(final_sequence, dtype = np.int32)
             valid_sequences_count += 1
         except Exception as e:
             skipped_count += 1
@@ -234,7 +234,7 @@ class MemmapTTSDataset(Dataset):
              self.length = 0
              self.memmap_data = None
         else:
-             self.memmap_data = np.memmap(memmap_file, dtype='int32', mode='r', shape=self.shape)
+             self.memmap_data = np.memmap(memmap_file, dtype = 'int32', mode = 'r', shape = self.shape)
              self.length = self.shape[0]
 
         try:
@@ -258,31 +258,31 @@ class MemmapTTSDataset(Dataset):
         except ValueError:
             return token_list
 
-    def pad_sequence_torch(self, sequence, max_length, value=0):
+    def pad_sequence_torch(self, sequence, max_length, value = 0):
         current_len = len(sequence)
         if current_len >= max_length:
             return sequence[:max_length]
         else:
             padding_size = max_length - current_len
-            padding = torch.full((padding_size,), value, dtype=sequence.dtype, device=sequence.device)
-            return torch.cat([sequence, padding], dim=0)
+            padding = torch.full((padding_size,), value, dtype = sequence.dtype, device = sequence.device)
+            return torch.cat([sequence, padding], dim = 0)
 
     def __getitem__(self, idx):
         if self.memmap_data is None or idx >= self.length:
             raise IndexError(f"Index out of bounds (length={self.length}).")
 
         raw_input_ids_np = self.memmap_data[idx]
-        input_ids_tensor_raw = torch.tensor(raw_input_ids_np, dtype=torch.long)
+        input_ids_tensor_raw = torch.tensor(raw_input_ids_np, dtype = torch.long)
         input_ids = None
         speech_gen_idx_in_final = -1
 
         try:
-            text_start_idx = (input_ids_tensor_raw == self.text_understanding_start_id).nonzero(as_tuple=True)[0][0].item()
-            text_end_idx = (input_ids_tensor_raw == self.text_understanding_end_id).nonzero(as_tuple=True)[0][0].item()
-            speech_start_idx = (input_ids_tensor_raw == self.speech_generation_start_id).nonzero(as_tuple=True)[0][0].item()
+            text_start_idx = (input_ids_tensor_raw == self.text_understanding_start_id).nonzero(as_tuple = True)[0][0].item()
+            text_end_idx = (input_ids_tensor_raw == self.text_understanding_end_id).nonzero(as_tuple = True)[0][0].item()
+            speech_start_idx = (input_ids_tensor_raw == self.speech_generation_start_id).nonzero(as_tuple = True)[0][0].item()
 
-            speech_end_marker_indices = (input_ids_tensor_raw == self.speech_generation_end_id).nonzero(as_tuple=True)[0]
-            pad_start_indices = (input_ids_tensor_raw == self.pad_token_id).nonzero(as_tuple=True)[0]
+            speech_end_marker_indices = (input_ids_tensor_raw == self.speech_generation_end_id).nonzero(as_tuple = True)[0]
+            pad_start_indices = (input_ids_tensor_raw == self.pad_token_id).nonzero(as_tuple = True)[0]
 
             if len(speech_end_marker_indices) > 0:
                  speech_end_idx = speech_end_marker_indices[0].item()
@@ -305,36 +305,36 @@ class MemmapTTSDataset(Dataset):
                  import inspect
                  sig = inspect.signature(self.tokenizer.apply_chat_template)
                  if 'add_generation_prompt' in sig.parameters:
-                     templated_ids_list = self.tokenizer.apply_chat_template(chat, tokenize=True, add_generation_prompt=False)
+                     templated_ids_list = self.tokenizer.apply_chat_template(chat, tokenize = True, add_generation_prompt = False)
                  else:
-                     templated_ids_list = self.tokenizer.apply_chat_template(chat, tokenize=True)
+                     templated_ids_list = self.tokenizer.apply_chat_template(chat, tokenize = True)
 
                  final_ids_list = self.replace_tagged_token(templated_ids_list, self.text_understanding_start_id, original_text_sequence.tolist())
                  final_ids_list = self.replace_tagged_token(final_ids_list, self.speech_generation_start_id, original_speech_sequence_with_markers.tolist())
-                 input_ids = torch.tensor(final_ids_list, dtype=torch.long)
+                 input_ids = torch.tensor(final_ids_list, dtype = torch.long)
 
                  try:
-                     speech_gen_idx_in_final = (input_ids == self.speech_generation_start_id).nonzero(as_tuple=True)[0][0].item()
+                     speech_gen_idx_in_final = (input_ids == self.speech_generation_start_id).nonzero(as_tuple = True)[0][0].item()
                  except IndexError:
                       speech_gen_idx_in_final = -1
             except Exception:
                  input_ids = input_ids_tensor_raw
                  try:
-                     speech_gen_idx_in_final = (input_ids == self.speech_generation_start_id).nonzero(as_tuple=True)[0][0].item()
+                     speech_gen_idx_in_final = (input_ids == self.speech_generation_start_id).nonzero(as_tuple = True)[0][0].item()
                  except IndexError:
                      speech_gen_idx_in_final = -1
 
         except Exception:
             input_ids = input_ids_tensor_raw
             try:
-                speech_gen_idx_in_final = (input_ids == self.speech_generation_start_id).nonzero(as_tuple=True)[0][0].item()
+                speech_gen_idx_in_final = (input_ids == self.speech_generation_start_id).nonzero(as_tuple = True)[0][0].item()
             except IndexError:
                 speech_gen_idx_in_final = -1
 
         if input_ids is None:
             input_ids = input_ids_tensor_raw
             try:
-                speech_gen_idx_in_final = (input_ids == self.speech_generation_start_id).nonzero(as_tuple=True)[0][0].item()
+                speech_gen_idx_in_final = (input_ids == self.speech_generation_start_id).nonzero(as_tuple = True)[0][0].item()
             except IndexError:
                 speech_gen_idx_in_final = -1
 
@@ -345,9 +345,9 @@ class MemmapTTSDataset(Dataset):
         attention_mask = (input_ids != self.pad_token_id).long()
         labels[input_ids == self.pad_token_id] = self.ignore_index
 
-        input_ids = self.pad_sequence_torch(input_ids, self.max_length, value=self.pad_token_id)
-        attention_mask = self.pad_sequence_torch(attention_mask, self.max_length, value=0)
-        labels = self.pad_sequence_torch(labels, self.max_length, value=self.ignore_index)
+        input_ids = self.pad_sequence_torch(input_ids, self.max_length, value = self.pad_token_id)
+        attention_mask = self.pad_sequence_torch(attention_mask, self.max_length, value = 0)
+        labels = self.pad_sequence_torch(labels, self.max_length, value = self.ignore_index)
 
         return {
             'input_ids': input_ids,
@@ -364,19 +364,19 @@ except Exception as e:
     raise f"ERROR loading XCodec2 model: {e}."
 
 preprocess_and_save(
-        dataset=dataset,
-        output_dir=OUTPUT_DIR,
-        tokenizer=tokenizer,
-        codec_model=codec_model,
-        sample_rate=SAMPLE_RATE,
-        max_length=max_seq_length,
-        device=DEVICE
+        dataset = dataset,
+        output_dir = OUTPUT_DIR,
+        tokenizer = tokenizer,
+        codec_model = codec_model,
+        sample_rate = SAMPLE_RATE,
+        max_length = max_seq_length,
+        device = DEVICE
     )
 try:
     train_dataset = MemmapTTSDataset(
-        data_path=OUTPUT_DIR,
-        tokenizer=tokenizer,
-        max_length=max_seq_length
+        data_path = OUTPUT_DIR,
+        tokenizer = tokenizer,
+        max_length = max_seq_length
      )
     print(f"Dataset loaded for split 'train'. Number of samples: {len(train_dataset)}")
 except Exception as e:
@@ -492,7 +492,7 @@ def extract_speech_ids(speech_tokens_str):
 
 #TTS start!
 with torch.inference_mode():
-    with torch.amp.autocast('cuda',dtype=model.dtype):
+    with torch.amp.autocast('cuda',dtype = model.dtype):
         formatted_text = f"<|TEXT_UNDERSTANDING_START|>{input_text}<|TEXT_UNDERSTANDING_END|>"
 
         # Tokenize the text
@@ -503,9 +503,9 @@ with torch.inference_mode():
 
         input_ids = tokenizer.apply_chat_template(
             chat,
-            tokenize=True,
-            return_tensors='pt',
-            continue_final_message=True
+            tokenize = True,
+            return_tensors = 'pt',
+            continue_final_message = True
         )
         input_ids = input_ids.to('cuda')
 
@@ -514,16 +514,16 @@ with torch.inference_mode():
         # Generate the speech autoregressively
         outputs = model.generate(
             input_ids,
-            max_length=2048,  # We trained our model with a max length of 2048
-            eos_token_id= speech_end_id ,
-            do_sample=True,
-            top_p=1.2,           #  Adjusts the diversity of generated content
-            temperature=1.2,   #  Controls randomness in output
+            max_length = 2048,  # We trained our model with a max length of 2048
+            eos_token_id = speech_end_id ,
+            do_sample = True,
+            top_p = 1.2,           #  Adjusts the diversity of generated content
+            temperature = 1.2,   #  Controls randomness in output
         )
     # Extract the speech tokens
     generated_ids = outputs[0][input_ids.shape[1]:-1]
 
-    speech_tokens = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+    speech_tokens = tokenizer.batch_decode(generated_ids, skip_special_tokens = True)
 
     # Convert  token <|s_23456|> to int 23456
     speech_tokens = extract_speech_ids(speech_tokens)
@@ -535,7 +535,7 @@ with torch.inference_mode():
 
 sf.write("output.wav", gen_wav[0, 0, :].cpu().numpy(), 16000)
 
-display(Audio(gen_wav[0, 0, :].cpu().numpy(), rate=16000))
+display(Audio(gen_wav[0, 0, :].cpu().numpy(), rate = 16000))
 
 
 # <a name="Save"></a>
@@ -547,48 +547,49 @@ display(Audio(gen_wav[0, 0, :].cpu().numpy(), rate=16000))
 # In[ ]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-tokenizer.save_pretrained("lora_model")
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
-# tokenizer.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("llasa_tts_lora")  # Local saving
+tokenizer.save_pretrained("llasa_tts_lora")
+# model.push_to_hub("your_name/llasa_tts_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/llasa_tts_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # ### Saving to float16
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
 
 # Merge to 16bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.save_pretrained_merged("llasa_tts_finetune_16bit", tokenizer, save_method = "merged_16bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/llasa_tts_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
 
 # Merge to 4bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.save_pretrained_merged("llasa_tts_finetune_4bit", tokenizer, save_method = "merged_4bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/llasa_tts_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("model")
-    tokenizer.save_pretrained("model")
+    model.save_pretrained("llasa_tts_lora")
+    tokenizer.save_pretrained("llasa_tts_lora")
 if False:
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
+    model.push_to_hub("HF_USERNAME/llasa_tts_lora", token = "")
+    tokenizer.push_to_hub("HF_USERNAME/llasa_tts_lora", token = "")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 

@@ -7,10 +7,10 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth on your own computer, follow the installation instructions on our Github page [here](https://docs.unsloth.ai/get-started/installing-+-updating).
+# To install Unsloth on your own computer, follow the installation instructions on our Github page [here](https://unsloth.ai/docs/get-started/installing-+-updating).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 # 
@@ -18,15 +18,15 @@
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -34,7 +34,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install omegaconf einx\n!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS\nimport os\nos.remove("/content/OuteTTS/outetts/models/gguf_model.py")\nos.remove("/content/OuteTTS/outetts/interface.py")\nos.remove("/content/OuteTTS/outetts/__init__.py")\n!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec "datasets>=3.4.1,<4.0.0"\n!pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.33.post1")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install omegaconf einx\n!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS\nimport os\nos.remove("/content/OuteTTS/outetts/models/gguf_model.py")\nos.remove("/content/OuteTTS/outetts/interface.py")\nos.remove("/content/OuteTTS/outetts/__init__.py")\n!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec "datasets>=3.4.1,<4.0.0"\n!pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
 # 
 # 
 # # ### Unsloth
@@ -70,7 +70,7 @@ model, tokenizer = FastModel.from_pretrained(
     max_seq_length = max_seq_length,
     dtype = None, # Set to None for auto detection
     load_in_4bit = False, # Set to True for 4bit which reduces memory
-    # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
+    # token = "YOUR_HF_TOKEN", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
 
 
@@ -104,7 +104,7 @@ model = FastModel.get_peft_model(
 
 from datasets import load_dataset,Audio,Dataset
 dataset = load_dataset("MrDragonFox/Elise", split = "train")
-dataset = dataset.cast_column("audio", Audio(sampling_rate=24000))
+dataset = dataset.cast_column("audio", Audio(sampling_rate = 24000))
 
 
 # In[5]:
@@ -144,15 +144,15 @@ class DataCreationV3:
 
         # Create a dummy ModelConfig mainly for device and paths needed by AudioProcessor/DacInterface
         dummy_config = ModelConfig(
-            tokenizer_path=model_tokenizer_path,
-            device=self.device,
-            audio_codec_path=None # Let AudioProcessor use default DAC path
+            tokenizer_path = model_tokenizer_path,
+            device = self.device,
+            audio_codec_path = None # Let AudioProcessor use default DAC path
         )
-        self.audio_processor = AudioProcessor(config=dummy_config)
+        self.audio_processor = AudioProcessor(config = dummy_config)
         self.prompt_processor = PromptProcessor(model_tokenizer_path)
 
         print(f"Loading Whisper model: {whisper_model_name} on {self.device}")
-        self.whisper_model = whisper.load_model(whisper_model_name, device=self.device)
+        self.whisper_model = whisper.load_model(whisper_model_name, device = self.device)
         print("Whisper model loaded.")
 
     # Renamed and adapted from the previous version
@@ -166,12 +166,12 @@ class DataCreationV3:
 
         # Whisper needs a file path, so save bytes to a temporary file
         try:
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp_audio_file:
+            with tempfile.NamedTemporaryFile(suffix = ".wav", delete = True) as tmp_audio_file:
                 tmp_audio_file.write(audio_bytes)
                 tmp_audio_file.flush() # Ensure data is written
 
                 # 1. Get word timings using Whisper
-                whisper_result = self.whisper_model.transcribe(tmp_audio_file.name, word_timestamps=True)
+                whisper_result = self.whisper_model.transcribe(tmp_audio_file.name, word_timestamps = True)
                 # Use the provided transcript for consistency, but Whisper timings
                 normalized_transcript = text_normalizations(transcript)
 
@@ -229,7 +229,7 @@ class DataCreationV3:
         skipped_count = 0
 
         # Iterate directly over the dataset
-        for i, item in enumerate(tqdm(dataset, desc="Processing Dataset")):
+        for i, item in enumerate(tqdm(dataset, desc = "Processing Dataset")):
             try:
                 # --- Adapt to your dataset's column names ---
                 transcript = item.get('text')
@@ -244,7 +244,7 @@ class DataCreationV3:
                 audio_array = audio_info['array']
                 buffer = io.BytesIO()
                 # Ensure array is float32 for common compatibility, adjust subtype if needed
-                sf.write(buffer, audio_array.astype(np.float32), audio_info['sampling_rate'], format='WAV', subtype='FLOAT')
+                sf.write(buffer, audio_array.astype(np.float32), audio_info['sampling_rate'], format = 'WAV', subtype = 'FLOAT')
                 buffer.seek(0)
                 audio_bytes = buffer.getvalue()
 
@@ -266,7 +266,7 @@ class DataCreationV3:
                  print("Processing interrupted by user.")
                  break
             except Exception as e:
-                print(f"Row {i}: Unhandled error processing item: {e}", exc_info=True)
+                print(f"Row {i}: Unhandled error processing item: {e}", exc_info = True)
                 skipped_count += 1
                 # Decide if you want to stop on errors or just skip
                 continue
@@ -280,8 +280,8 @@ if __name__ == "__main__":
 
 
     data_processor = DataCreationV3(
-        model_tokenizer_path=_MODEL_TOKENIZER_PATH,
-        whisper_model_name=_WHISPER_MODEL
+        model_tokenizer_path = _MODEL_TOKENIZER_PATH,
+        whisper_model_name = _WHISPER_MODEL
     )
 
     # Process the dataset and collect prompts (or process iteratively)
@@ -299,7 +299,7 @@ if __name__ == "__main__":
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support TRL's `DPOTrainer`!
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
 
 # In[6]:
 
@@ -393,7 +393,7 @@ import re
 FastModel.for_inference(model)
 
 def get_audio(tokens):
-        decoded_output = tokenizer.batch_decode(tokens, skip_special_tokens=False)[0]
+        decoded_output = tokenizer.batch_decode(tokens, skip_special_tokens = False)[0]
         c1 = list(map(int,re.findall(r"<\|c1_(\d+)\|>", decoded_output)))
         c2 = list(map(int,re.findall(r"<\|c2_(\d+)\|>", decoded_output)))
 
@@ -406,7 +406,7 @@ def get_audio(tokens):
             return None
 
         return data_processor.audio_processor.audio_codec.decode(
-            torch.tensor([output], dtype=torch.int64).to(data_processor.audio_processor.audio_codec.device)
+            torch.tensor([output], dtype = torch.int64).to(data_processor.audio_processor.audio_codec.device)
         )
 
 class RepetitionPenaltyLogitsProcessorPatch(LogitsProcessor):
@@ -481,18 +481,18 @@ if __name__ == "__main__":
         "<|audio_start|><|global_features_start|>",
     ])
     with torch.inference_mode():
-        with torch.amp.autocast('cuda',dtype=model.dtype):
-          model_inputs = tokenizer([prompt], return_tensors="pt").to("cuda")
+        with torch.amp.autocast('cuda',dtype = model.dtype):
+          model_inputs = tokenizer([prompt], return_tensors = "pt").to("cuda")
 
           print("Generating token sequence...")
           generated_ids = model.generate(
               **model_inputs,
-              temperature=0.4,
-              top_k=40,
-              top_p=0.9,
-              repetition_penalty=1.1,
-              min_p=0.05,
-              max_new_tokens=2048, # Limit generation length
+              temperature = 0.4,
+              top_k = 40,
+              top_p = 0.9,
+              repetition_penalty = 1.1,
+              min_p = 0.05,
+              max_new_tokens = 2048, # Limit generation length
           )
           print("Token sequence generated.")
 
@@ -501,7 +501,7 @@ if __name__ == "__main__":
     audio = get_audio(generated_ids)
     audio = audio.cpu()
     from IPython.display import Audio, display
-    display(Audio(audio.squeeze(0), rate=24000))
+    display(Audio(audio.squeeze(0), rate = 24000))
 
 
 # <a name="Save"></a>
@@ -513,34 +513,34 @@ if __name__ == "__main__":
 # In[12]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-tokenizer.save_pretrained("lora_model")
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
-# tokenizer.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("oute_tts_lora")  # Local saving
+tokenizer.save_pretrained("oute_tts_lora")
+# model.push_to_hub("your_name/oute_tts_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/oute_tts_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # ### Saving to float16
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[13]:
 
 
 # Merge to 16bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.save_pretrained_merged("oute_tts_finetune_16bit", tokenizer, save_method = "merged_16bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/oute_tts_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
 
 # Merge to 4bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.save_pretrained_merged("oute_tts_finetune_4bit", tokenizer, save_method = "merged_4bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/oute_tts_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("model")
-    tokenizer.save_pretrained("model")
+    model.save_pretrained("oute_tts_lora")
+    tokenizer.save_pretrained("oute_tts_lora")
 if False:
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
+    model.push_to_hub("HF_USERNAME/oute_tts_lora", token = "")
+    tokenizer.push_to_hub("HF_USERNAME/oute_tts_lora", token = "")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
@@ -549,12 +549,12 @@ if False:
 # 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
 # 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 # 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # </div>

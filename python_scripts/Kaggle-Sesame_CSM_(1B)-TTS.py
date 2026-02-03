@@ -5,10 +5,10 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 # 
@@ -16,15 +16,15 @@
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.52.3 torchcodec\n!pip install --no-deps trl==0.22.2\n!pip install torchcodec "datasets>=3.4.1,<4.0.0"\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.52.3 torchcodec\n!pip install torchcodec "datasets>=3.4.1,<4.0.0"\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -48,7 +48,7 @@ import torch
 
 model, processor = FastModel.from_pretrained(
     model_name = "unsloth/csm-1b",
-    max_seq_length= 2048, # Choose any for long context!
+    max_seq_length = 2048, # Choose any for long context!
     dtype = None, # Leave as None for auto-detection
     auto_model = CsmForConditionalGeneration,
     load_in_4bit = False, # Select True for 4bit - reduces memory usage
@@ -90,7 +90,7 @@ import os
 from transformers import AutoProcessor
 processor = AutoProcessor.from_pretrained("unsloth/csm-1b")
 
-raw_ds = load_dataset("MrDragonFox/Elise", split="train")
+raw_ds = load_dataset("MrDragonFox/Elise", split = "train")
 
 # Getting the speaker id is important for multi-speaker models and speaker consistency
 speaker_key = "source"
@@ -102,7 +102,7 @@ elif "source" not in raw_ds.column_names and "speaker_id" in raw_ds.column_names
     speaker_key = "speaker_id"
 
 target_sampling_rate = 24000
-raw_ds = raw_ds.cast_column("audio", Audio(sampling_rate=target_sampling_rate))
+raw_ds = raw_ds.cast_column("audio", Audio(sampling_rate = target_sampling_rate))
 
 def preprocess_example(example):
     conversation = [
@@ -118,9 +118,9 @@ def preprocess_example(example):
     try:
         model_inputs = processor.apply_chat_template(
             conversation,
-            tokenize=True,
-            return_dict=True,
-            output_labels=True,
+            tokenize = True,
+            return_dict = True,
+            output_labels = True,
             text_kwargs = {
                 "padding": "max_length", # pad to the max_length
                 "max_length": 256, # this should be the max length of audio
@@ -159,8 +159,8 @@ def preprocess_example(example):
 
 processed_ds = raw_ds.map(
     preprocess_example,
-    remove_columns=raw_ds.column_names,
-    desc="Preprocessing dataset",
+    remove_columns = raw_ds.column_names,
+    desc = "Preprocessing dataset",
 )
 
 
@@ -243,25 +243,25 @@ import soundfile as sf
 
 text = "We just finished fine tuning a text to speech model... and it's pretty good!"
 speaker_id = 0
-inputs = processor(f"[{speaker_id}]{text}", add_special_tokens=True).to("cuda")
+inputs = processor(f"[{speaker_id}]{text}", add_special_tokens = True).to("cuda")
 audio_values = model.generate(
     **inputs,
-    max_new_tokens=125, # 125 tokens is 10 seconds of audio, for longer speech increase this
+    max_new_tokens = 125, # 125 tokens is 10 seconds of audio, for longer speech increase this
     # play with these parameters to tweak results
-    # depth_decoder_top_k=0,
-    # depth_decoder_top_p=0.9,
-    # depth_decoder_do_sample=True,
-    # depth_decoder_temperature=0.9,
-    # top_k=0,
-    # top_p=1.0,
-    # temperature=0.9,
-    # do_sample=True,
+    # depth_decoder_top_k = 0,
+    # depth_decoder_top_p = 0.9,
+    # depth_decoder_do_sample = True,
+    # depth_decoder_temperature = 0.9,
+    # top_k = 0,
+    # top_p = 1.0,
+    # temperature = 0.9,
+    # do_sample = True,
     #########################################################
-    output_audio=True
+    output_audio = True
 )
 audio = audio_values[0].to(torch.float32).cpu().numpy()
 sf.write("example_without_context.wav", audio, 24000)
-display(Audio(audio, rate=24000))
+display(Audio(audio, rate = 24000))
 
 
 # In[ ]:
@@ -277,25 +277,25 @@ conversation = [
 audio_values = model.generate(
     **processor.apply_chat_template(
         conversation,
-        tokenize=True,
-        return_dict=True,
+        tokenize = True,
+        return_dict = True,
     ).to("cuda"),
-    max_new_tokens=125, # 125 tokens is 10 seconds of audio, for longer speech increase this
+    max_new_tokens = 125, # 125 tokens is 10 seconds of audio, for longer speech increase this
     # play with these parameters to tweak results
-    # depth_decoder_top_k=0,
-    # depth_decoder_top_p=0.9,
-    # depth_decoder_do_sample=True,
-    # depth_decoder_temperature=0.9,
-    # top_k=0,
-    # top_p=1.0,
-    # temperature=0.9,
-    # do_sample=True,
+    # depth_decoder_top_k = 0,
+    # depth_decoder_top_p = 0.9,
+    # depth_decoder_do_sample = True,
+    # depth_decoder_temperature = 0.9,
+    # top_k = 0,
+    # top_p = 1.0,
+    # temperature = 0.9,
+    # do_sample = True,
     #########################################################
-    output_audio=True
+    output_audio = True
 )
 audio = audio_values[0].to(torch.float32).cpu().numpy()
 sf.write("example_without_context.wav", audio, 24000)
-display(Audio(audio, rate=24000))
+display(Audio(audio, rate = 24000))
 
 
 # #### Voice and style consistency
@@ -321,27 +321,27 @@ conversation = [
 
 inputs = processor.apply_chat_template(
         conversation,
-        tokenize=True,
-        return_dict=True,
+        tokenize = True,
+        return_dict = True,
     )
 audio_values = model.generate(
     **inputs.to("cuda"),
-    max_new_tokens=125, # 125 tokens is 10 seconds of audio, for longer text increase this
+    max_new_tokens = 125, # 125 tokens is 10 seconds of audio, for longer text increase this
     # play with these parameters to tweak results
-    # depth_decoder_top_k=0,
-    # depth_decoder_top_p=0.9,
-    # depth_decoder_do_sample=True,
-    # depth_decoder_temperature=0.9,
-    # top_k=0,
-    # top_p=1.0,
-    # temperature=0.9,
-    # do_sample=True,
+    # depth_decoder_top_k = 0,
+    # depth_decoder_top_p = 0.9,
+    # depth_decoder_do_sample = True,
+    # depth_decoder_temperature = 0.9,
+    # top_k = 0,
+    # top_p = 1.0,
+    # temperature = 0.9,
+    # do_sample = True,
     #########################################################
-    output_audio=True
+    output_audio = True
 )
 audio = audio_values[0].to(torch.float32).cpu().numpy()
 sf.write("example_with_context.wav", audio, 24000)
-display(Audio(audio, rate=24000))
+display(Audio(audio, rate = 24000))
 
 
 # <a name="Save"></a>
@@ -353,48 +353,49 @@ display(Audio(audio, rate=24000))
 # In[18]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-processor.save_pretrained("lora_model")
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
-# processor.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("sesame_csm_lora")  # Local saving
+processor.save_pretrained("sesame_csm_lora")
+# model.push_to_hub("your_name/sesame_csm_lora", token = "YOUR_HF_TOKEN") # Online saving
+# processor.push_to_hub("your_name/sesame_csm_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # ### Saving to float16
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
 
 # Merge to 16bit
-if False: model.save_pretrained_merged("model", processor, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("hf/model", processor, save_method = "merged_16bit", token = "")
+if False: model.save_pretrained_merged("sesame_csm_finetune_16bit", processor, save_method = "merged_16bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/sesame_csm_finetune_16bit", processor, save_method = "merged_16bit", token = "")
 
 # Merge to 4bit
-if False: model.save_pretrained_merged("model", processor, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("hf/model", processor, save_method = "merged_4bit", token = "")
+if False: model.save_pretrained_merged("sesame_csm_finetune_4bit", processor, save_method = "merged_4bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/sesame_csm_finetune_4bit", processor, save_method = "merged_4bit", token = "")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("model")
-    processor.save_pretrained("model")
+    model.save_pretrained("sesame_csm_lora")
+    processor.save_pretrained("sesame_csm_lora")
 if False:
-    model.push_to_hub("hf/model", token = "")
-    processor.push_to_hub("hf/model", token = "")
+    model.push_to_hub("HF_USERNAME/sesame_csm_lora", token = "")
+    processor.push_to_hub("HF_USERNAME/sesame_csm_lora", token = "")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 
