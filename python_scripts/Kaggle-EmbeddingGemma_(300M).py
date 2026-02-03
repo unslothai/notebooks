@@ -5,25 +5,28 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
+# 
 
 # ### News
 
 # 
-# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
 # 
-# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -90,8 +93,8 @@ model = FastSentenceTransformer.get_peft_model(
 
 from datasets import load_dataset,Dataset
 
-stream_train = list(load_dataset("tomaarsen/miriad-4.4M-split", split="train",streaming=True).take(10000))
-stream_eval = list(load_dataset("tomaarsen/miriad-4.4M-split", split="eval",streaming=True).take(2000))
+stream_train = list(load_dataset("tomaarsen/miriad-4.4M-split", split = "train",streaming = True).take(10000))
+stream_eval = list(load_dataset("tomaarsen/miriad-4.4M-split", split = "eval",streaming = True).take(2000))
 
 train_dataset = Dataset.from_generator(lambda: (yield from stream_train))
 eval_dataset = Dataset.from_generator(lambda: (yield from stream_eval))
@@ -153,22 +156,22 @@ trainer = SentenceTransformerTrainer(
     train_dataset = train_dataset,
     eval_dataset = eval_dataset,
     loss = loss,
-    args=SentenceTransformerTrainingArguments(
-        # num_train_epochs=1,
+    args = SentenceTransformerTrainingArguments(
+        # num_train_epochs = 1,
         max_steps = 30,
         per_device_train_batch_size = 64,
         per_device_eval_batch_size = 64,
         gradient_accumulation_steps = 2, # Use GA to mimic batch size!
         learning_rate = 2e-5,
-        logging_steps=5,
+        logging_steps = 5,
         warmup_ratio = 0.03,
-        prompts={  # Map training column names to model prompts
+        prompts = {  # Map training column names to model prompts
           "question": model.prompts["query"],
           "passage_text": model.prompts["document"],
         },
-        report_to="none", # Use TrackIO/WandB etc
+        report_to = "none", # Use TrackIO/WandB etc
         eval_strategy = "steps",
-        eval_steps=5,
+        eval_steps = 5,
         bf16 = is_bf16_supported(),
         output_dir = "output",
         lr_scheduler_type = "linear",
@@ -176,7 +179,7 @@ trainer = SentenceTransformerTrainer(
         # to accidentally use them for negative examples
         batch_sampler = BatchSamplers.NO_DUPLICATES,
     ),
-    evaluator=evaluator, # Optinal, will make trainig slower
+    evaluator = evaluator, # Optinal, will make trainig slower
 )
 
 
@@ -244,11 +247,11 @@ candidates = [
     "Gastroesophageal Reflux Disease (GERD) causes burning retrosternal pain usually after meals."
 ]
 
-query_emb = model.encode(query, convert_to_tensor=True)
-candidate_embs = model.encode(candidates, convert_to_tensor=True)
+query_emb = model.encode(query, convert_to_tensor = True)
+candidate_embs = model.encode(candidates, convert_to_tensor = True)
 similarities = model.similarity(query_emb, candidate_embs)
 
-ranking = similarities.argsort(descending=True)[0]
+ranking = similarities.argsort(descending = True)[0]
 
 for idx in ranking.tolist():
     score = similarities[0][idx].item()
@@ -265,8 +268,8 @@ for idx in ranking.tolist():
 # In[17]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("embeddinggemma_lora")  # Local saving
+# model.push_to_hub("your_name/embeddinggemma_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -281,30 +284,30 @@ if False:
     )
 
 
-# ### Saving to float16 for vLLM
+# ### Saving to float16 for VLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[19]:
 
 
 # Merge to 16bit
 if False:
-    model.save_pretrained_merged("model", tokenizer=model.tokenizer, save_method = "merged_16bit",)
+    model.save_pretrained_merged("embeddinggemma_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/model", tokenizer=model.tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/embeddinggemma_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("model")
+    model.save_pretrained("embeddinggemma_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("hf/model", token = "")
+    model.push_to_hub("HF_USERNAME/embeddinggemma_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
 # 
-# Some supported quant methods (full list on our [Wiki page](https://docs.unsloth.ai/basics/inference-and-deployment/saving-to-gguf#locally)):
+# Some supported quant methods (full list on our [docs page](https://unsloth.ai/docs/basics/inference-and-deployment/saving-to-gguf)):
 # * `q8_0` - Fast conversion. High resource use, but generally acceptable.
 # * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
 # * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
@@ -315,46 +318,46 @@ if False: # Pushing to HF Hub
 
 # Save to 8bit Q8_0
 if False:
-    model.save_pretrained_gguf("model",)
+    model.save_pretrained_gguf("embeddinggemma_finetune",)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
 if False:
-    model.push_to_hub_gguf("hf/model", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False:
-    model.save_pretrained_gguf("model", quantization_method = "f16")
+    model.save_pretrained_gguf("embeddinggemma_finetune", quantization_method = "f16")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("hf/model", quantization_method = "f16", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False:
-    model.save_pretrained_gguf("model", quantization_method = "q4_k_m")
+    model.save_pretrained_gguf("embeddinggemma_finetune", quantization_method = "q4_k_m")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("hf/model", quantization_method = "q4_k_m", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
     model.push_to_hub_gguf(
-        "hf/model", # Change hf to your username!
+        "HF_USERNAME/embeddinggemma_finetune", # Change hf to your username!
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "", # Get a token at https://huggingface.co/settings/tokens
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
-# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://docs.unsloth.ai/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
-# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://docs.unsloth.ai/get-started/reinforcement-learning-rl-guide).
-# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning) and [vision](https://docs.unsloth.ai/basics/vision-fine-tuning) model support.
-# 4. Explore our [LLM Tutorials Directory](https://docs.unsloth.ai/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
-# 5. Need help with Inference? Read our [Inference & Deployment page](https://docs.unsloth.ai/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 

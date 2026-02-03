@@ -5,12 +5,12 @@
 # <div class="align-center"><a href="https://huggingface.co/learn/nlp-course/en/chapter12/6?fw=pt"><img src="https://github.com/unslothai/notebooks/raw/main/assets/hf%20course.png" width="165"></a>
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
 # In this [Hugging Face](https://huggingface.co/learn/nlp-course/en/chapter12/6?fw=pt) and Unsloth notebook, you will learn to transform Gemma3 (4B) Vision GRPO into a Reasoning model using GRPO.
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 # 
@@ -18,15 +18,17 @@
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -34,7 +36,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_vllm_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
 # 
 # 
 # # In[ ]:
@@ -48,13 +50,13 @@
 #     # If you're not in Colab, just use pip install!
 #     get_ipython().system('pip install unsloth vllm')
 # else:
-#     try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-#     except: get_numpy = "numpy"; get_pil = "pillow"
+#     try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
+#     except: _numpy = "numpy"; _pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
-#     get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm==0.10.2", "triton")
-#     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers')
-#     get_ipython().system('uv pip install -qqq {get_triton}')
+#     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+#     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
+#     get_ipython().system('uv pip install -qqq {_triton}')
 # get_ipython().system('uv pip install transformers==4.56.2')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
 # 
@@ -129,7 +131,7 @@ from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 import torch
 
-dataset = load_dataset("AI4Math/MathVista",split="testmini")
+dataset = load_dataset("AI4Math/MathVista",split = "testmini")
 
 
 # Let us see what our data looks like
@@ -243,8 +245,8 @@ train_dataset = train_dataset.map(
     lambda example: {
         "prompt": tokenizer.apply_chat_template(
             example["prompt"],
-            tokenize=False,
-            add_generation_prompt=False
+            tokenize = False,
+            add_generation_prompt = False
         )
     }
 )
@@ -261,9 +263,9 @@ def formatting_reward_func(completions,**kwargs):
     thinking_pattern = f'{REASONING_START}(.*?){REASONING_END}'
     answer_pattern = f'{SOLUTION_START}(.*?){SOLUTION_END}'
 
-    scores=[]
+    scores = []
     for completion in completions :
-      score=0
+      score = 0
       thinking_matches = re.findall(thinking_pattern, completion, re.DOTALL)
       answer_matches = re.findall(answer_pattern, completion, re.DOTALL)
       if len(thinking_matches) == 1 :
@@ -320,8 +322,8 @@ training_args = GRPOConfig(
     max_completion_length = 1024,
     #num_train_epochs = 2, # Set to 1 for a full training run
     importance_sampling_level = "sequence",
-    mask_truncated_completions=False,
-    loss_type='dr_grpo',
+    mask_truncated_completions = False,
+    loss_type = 'dr_grpo',
     max_steps = 60,
     save_steps = 60,
     max_grad_norm = 0.1,
@@ -345,12 +347,12 @@ training_args = GRPOConfig(
 
 
 trainer = GRPOTrainer(
-    model=model,
-    args=training_args,
+    model = model,
+    args = training_args,
     # Pass the processor to handle multimodal inputs
-    processing_class=tokenizer,
-    reward_funcs=[formatting_reward_func, correctness_reward_func],
-    train_dataset=train_dataset,
+    processing_class = tokenizer,
+    reward_funcs = [formatting_reward_func, correctness_reward_func],
+    train_dataset = train_dataset,
 )
 
 trainer.train()
@@ -380,19 +382,19 @@ messages = [
     }
 ]
 
-input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+input_text = tokenizer.apply_chat_template(messages, add_generation_prompt = True)
 inputs = tokenizer(
     image,
     input_text,
-    add_special_tokens=False,
-    return_tensors="pt",
+    add_special_tokens = False,
+    return_tensors = "pt",
 ).to("cuda")
 
 from transformers import TextStreamer
 
-text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+text_streamer = TextStreamer(tokenizer, skip_prompt = True)
 result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
-                        use_cache=True, temperature = 1.0, top_p = 0.95, top_k = 64)
+                        use_cache = True, temperature = 1.0, top_p = 0.95, top_k = 64)
 
 
 # <a name="Save"></a>
@@ -404,10 +406,10 @@ result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128
 # In[18]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-tokenizer.save_pretrained("lora_model")
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
-# processor.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("gemma_3_lora")  # Local saving
+tokenizer.save_pretrained("gemma_3_lora")
+# model.push_to_hub("your_name/gemma_3_lora", token = "YOUR_HF_TOKEN") # Online saving
+# processor.push_to_hub("your_name/gemma_3_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -419,8 +421,8 @@ if False:
     from unsloth import FastVisionModel
 
     model, processor = FastVisionModel.from_pretrained(
-        model_name="lora_model",  # YOUR MODEL YOU USED FOR TRAINING
-        load_in_4bit=True,  # Set to False for 16bit LoRA
+        model_name = "gemma_3_lora",  # YOUR MODEL YOU USED FOR TRAINING
+        load_in_4bit = True,  # Set to False for 16bit LoRA
     )
     FastVisionModel.for_inference(model)  # Enable for inference!
 
@@ -445,24 +447,24 @@ messages = [
         ],
     },
 ]
-input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+input_text = tokenizer.apply_chat_template(messages, add_generation_prompt = True)
 inputs = tokenizer(
     image,
     input_text,
-    add_special_tokens=False,
-    return_tensors="pt",
+    add_special_tokens = False,
+    return_tensors = "pt",
 ).to("cuda")
 
 from transformers import TextStreamer
 
-text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+text_streamer = TextStreamer(tokenizer, skip_prompt = True)
 result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
-                        use_cache=True, temperature = 1.0, top_p = 0.95, top_k = 64)
+                        use_cache = True, temperature = 1.0, top_p = 0.95, top_k = 64)
 
 
 # ### Saving to float16 for VLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[28]:
 
@@ -473,21 +475,22 @@ result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128
 if False: model.save_pretrained_merged("unsloth_finetune", tokenizer,)
 
 # To export and save to your Hugging Face account
-if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "PUT_HERE")
+if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 

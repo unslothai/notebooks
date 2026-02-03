@@ -5,10 +5,10 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 # 
@@ -16,15 +16,17 @@
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -32,7 +34,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
 # 
 # 
 # # In[ ]:
@@ -73,7 +75,7 @@ model, processor = FastModel.from_pretrained(
     max_seq_length = 1024, # Choose any for long context!
     load_in_4bit = True,  # 4 bit quantization to reduce memory
     full_finetuning = False, # [NEW!] We have full finetuning now!
-    # token = "hf_...", # use one if using gated models
+    # token = "YOUR_HF_TOKEN", # use one if using gated models
 )
 
 
@@ -96,7 +98,7 @@ def do_gemma_3n_inference(messages, max_new_tokens = 128):
             return_tensors = "pt",
         ).to("cuda"),
         max_new_tokens = max_new_tokens,
-        do_sample=False,
+        do_sample = False,
         streamer = TextStreamer(processor, skip_prompt = True),
     )
 
@@ -108,7 +110,7 @@ def do_gemma_3n_inference(messages, max_new_tokens = 128):
 
 from datasets import load_dataset,Audio,concatenate_datasets
 
-dataset = load_dataset("kadirnar/Emilia-DE-B000000", split="train")
+dataset = load_dataset("kadirnar/Emilia-DE-B000000", split = "train")
 
 # Select a single audio sample to reserve for testing.
 # This index is chosen from the full dataset before we create the smaller training split.
@@ -116,7 +118,7 @@ test_audio = dataset[7546]
 
 dataset = dataset.select(range(3000))
 
-dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
+dataset = dataset.cast_column("audio", Audio(sampling_rate = 16000))
 
 
 # In[ ]:
@@ -124,7 +126,7 @@ dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
 
 from IPython.display import Audio, display
 print(test_audio['text'])
-Audio(test_audio['audio']['array'],rate=test_audio['audio']['sampling_rate'])
+Audio(test_audio['audio']['array'],rate = test_audio['audio']['sampling_rate'])
 
 
 # In[ ]:
@@ -240,7 +242,7 @@ def format_intersection_data(samples: dict) -> dict[str, list]:
 # In[6]:
 
 
-dataset = dataset.map(format_intersection_data, batched=True, batch_size=4, num_proc=4)
+dataset = dataset.map(format_intersection_data, batched = True, batch_size = 4, num_proc = 4)
 
 
 # In[7]:
@@ -253,7 +255,7 @@ def collate_fn(examples):
         for example in examples:
             # Apply chat template to get text
             text = processor.apply_chat_template(
-                example["messages"], tokenize=False, add_generation_prompt=False
+                example["messages"], tokenize = False, add_generation_prompt = False
             ).strip()
             texts.append(text)
 
@@ -262,7 +264,7 @@ def collate_fn(examples):
 
         # Tokenize the texts and process the images
         batch = processor(
-            text=texts, audio=audios, return_tensors="pt", padding=True
+            text = texts, audio = audios, return_tensors = "pt", padding = True
         )
 
         # The labels are the input_ids, and we mask the padding tokens in the loss computation
@@ -295,10 +297,10 @@ from trl import SFTTrainer, SFTConfig
 
 
 trainer = SFTTrainer(
-    model=model,
-    train_dataset=dataset,
-    processing_class=processor.tokenizer,
-    data_collator=collate_fn,
+    model = model,
+    train_dataset = dataset,
+    processing_class = processor.tokenizer,
+    data_collator = collate_fn,
     args = SFTConfig(
         per_device_train_batch_size = 2,
         gradient_accumulation_steps = 1,
@@ -309,7 +311,7 @@ trainer = SFTTrainer(
         num_train_epochs = 1,          # Set this instead of max_steps for full training runs
         learning_rate = 5e-5,
         logging_steps = 10,
-        save_strategy="steps",
+        save_strategy = "steps",
         optim = "adamw_8bit",
         weight_decay = 0.001,
         lr_scheduler_type = "cosine",
@@ -406,10 +408,10 @@ do_gemma_3n_inference(messages, max_new_tokens = 256)
 # In[ ]:
 
 
-model.save_pretrained("gemma-3n")  # Local saving
-processor.save_pretrained("gemma-3n")
-# model.push_to_hub("HF_ACCOUNT/gemma-3n", token = "...") # Online saving
-# processor.push_to_hub("HF_ACCOUNT/gemma-3n", token = "...") # Online saving
+model.save_pretrained("gemma_3n_lora")  # Local saving
+processor.save_pretrained("gemma_3n_lora")
+# model.push_to_hub("HF_ACCOUNT/gemma_3n_lora", token = "YOUR_HF_TOKEN") # Online saving
+# processor.push_to_hub("HF_ACCOUNT/gemma_3n_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -420,7 +422,7 @@ processor.save_pretrained("gemma-3n")
 if False:
     from unsloth import FastModel
     model, processor = FastModel.from_pretrained(
-        model_name = "gemma-3n", # YOUR MODEL YOU USED FOR TRAINING
+        model_name = "gemma_3n_lora", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 2048,
         load_in_4bit = True,
     )
@@ -466,7 +468,7 @@ if True: # Change to True to save finetune!
 if False: # Change to True to upload finetune
     model.push_to_hub_merged(
         "HF_ACCOUNT/gemma-3N-finetune", processor,
-        token = "hf_..."
+        token = "YOUR_HF_TOKEN"
     )
 
 
@@ -478,7 +480,7 @@ if False: # Change to True to upload finetune
 
 if False: # Change to True to save to GGUF
     model.save_pretrained_gguf(
-        "gemma-3N-finetune",
+        "gemma_3n_finetune",
         processor,
         quantization_method = "Q8_0", # For now only Q8_0, BF16, F16 supported
     )
@@ -491,10 +493,10 @@ if False: # Change to True to save to GGUF
 
 if False: # Change to True to upload GGUF
     model.push_to_hub_gguf(
-        "HF_ACCOUNT/gemma-3N-finetune-gguf",
+        "HF_ACCOUNT/gemma_3n_finetune",
         processor,
         quantization_method = "Q8_0", # Only Q8_0, BF16, F16 supported
-        token = "hf_...",
+        token = "YOUR_HF_TOKEN",
     )
 
 
@@ -506,12 +508,12 @@ if False: # Change to True to upload GGUF
 # 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
 # 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 # 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # </div>

@@ -10,112 +10,378 @@ from nbconvert import PythonExporter
 import nbformat
 
 
+def _get_base_name_from_filename(filename):
+    name = os.path.splitext(os.path.basename(filename))[0]
+    for prefix in ("Kaggle-", "HuggingFace Course-"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+
+    lower = name.lower()
+    if re.match(r"gemma[-_]?3n", lower):
+        return "gemma_3n"
+    if re.match(r"gemma[-_]?3", lower):
+        return "gemma_3"
+
+    stop_match = re.search(r"[\(\[\{]", name)
+    trimmed = name[:stop_match.start()] if stop_match else name
+    trimmed = trimmed.strip(" _-") or name
+
+    segments = re.split(r"[^A-Za-z0-9]+", trimmed)
+    segments = [s for s in segments if s]
+    if not segments:
+        base = trimmed.lower()
+        base = base.replace("-", "_")
+        base = re.sub(r"__+", "_", base)
+        return base.strip("_")
+
+    max_len = 24
+    parts = []
+    for seg in segments:
+        if re.fullmatch(r"[A-Za-z]+", seg):
+            token = seg.lower()
+        elif re.fullmatch(r"[A-Za-z][0-9]", seg):
+            token = seg.lower()
+        else:
+            if not parts:
+                lead = re.match(r"[A-Za-z]+", seg)
+                if lead:
+                    token = lead.group(0).lower()
+                    parts.append(token)
+            break
+        candidate = "_".join(parts + [token]) if parts else token
+        if len(candidate) <= max_len:
+            parts.append(token)
+        else:
+            break
+
+    base = "_".join(parts) if parts else segments[0].lower()
+    return base
+
+
+def _strip_extra_trailing_blank_lines(lines):
+    while len(lines) > 1 and lines[-1].strip() == "" and lines[-2].strip() == "":
+        lines.pop()
+    return lines
+
+
+def _space_equals_in_code(text):
+    # Characters that form compound assignment operators when followed by =
+    # e.g., +=, -=, *=, /=, //=, **=, %=, |=, &=, ^=, :=, @=
+    COMPOUND_OP_CHARS = ("+", "-", "*", "/", "%", "|", "&", "^", ":", "@")
+
+    new_lines = []
+    for line in text.splitlines(True):
+        in_quote = None
+        escaped = False
+        out = []
+        for i, ch in enumerate(line):
+            if escaped:
+                out.append(ch)
+                escaped = False
+                continue
+            if ch == "\\":
+                out.append(ch)
+                escaped = True
+                continue
+            if in_quote:
+                out.append(ch)
+                if ch == in_quote:
+                    in_quote = None
+                continue
+            if ch in ("\"", "'"):
+                out.append(ch)
+                in_quote = ch
+                continue
+
+            if ch == "=":
+                prev_char = line[i - 1] if i > 0 else ""
+                next_char = line[i + 1] if i + 1 < len(line) else ""
+                # Don't add space before = if it's part of ==, <=, >=, !=
+                # or a compound operator like +=, -=, *=, /=, etc.
+                if prev_char not in ("=", "<", ">", "!") and prev_char not in COMPOUND_OP_CHARS and next_char != "=":
+                    if out and out[-1] not in (" ", "\t"):
+                        out.append(" ")
+                    out.append("=")
+                    if next_char not in (" ", "\t", "\n", ""):
+                        out.append(" ")
+                    continue
+            out.append(ch)
+        new_lines.append("".join(out))
+    return "".join(new_lines)
+
+
 def update_old_unsloth(filename):
-    with open(filename, "r", encoding = "utf-8") as f: f = f.read()
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            notebook_content = json.load(f)
+    except Exception:
+        return
 
-    # Convert versions like X.X.X to 2025.12.8
-    f = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2025.12.8\1", f)
+    base = _get_base_name_from_filename(filename)
+    if base.endswith("_finetune"):
+        base_gguf = base
+        base_lora = f"{base}_lora"
+        base_16 = f"{base}_16bit"
+        base_4 = f"{base}_4bit"
+    else:
+        base_gguf = f"{base}_finetune"
+        base_lora = f"{base}_lora"
+        base_16 = f"{base}_finetune_16bit"
+        base_4 = f"{base}_finetune_4bit"
 
-    # Fix all A=A to A = A
-    # "    id2label=id2label,\n",
-    f = re.sub(
-        r'(\"[ ]{4,}[^\= ]{2,})\=([^\= ]{2,}\,\\n\"\,)',
-        r"\1 = \2",
-        f,
-    )
+    def replace_hf_prefix(name, new_name):
+        if "/" in name:
+            prefix = name.split("/", 1)[0]
+            if prefix == "hf":
+                prefix = "HF_USERNAME"
+            return f"{prefix}/{new_name}"
+        return new_name
 
-    # Change gguf-quantization-options link
-    f = f.replace(
-        "https://github.com/unslothai/unsloth/wiki#gguf-quantization-options",
-        "https://docs.unsloth.ai/basics/inference-and-deployment/saving-to-gguf#locally"
-    )
-
-    # Fix dangling newlines like
-    """
-    if False:
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
-
-    """
-    f = re.sub(r"\)\\n([\"\']\n[ ]{2,}\])", r")\1", f)
-
-    # Redirect Alpaca dataset
-    f = f.replace(
-        "https://huggingface.co/datasets/yahma/alpaca-cleaned",
-        "https://huggingface.co/datasets/unsloth/alpaca-cleaned",
-    )
-    f = f.replace(
-        "Alpaca dataset from [yahma]",
-        "[Alpaca dataset]",
-    )
-
-    # Train on completions
-    f = f.replace(
-        "TRL's docs [here](https://huggingface.co/docs/trl/sft_trainer#train-on-completions-only).",
-        "our docs [here](https://docs.unsloth.ai/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide#training-on-completions-only-masking-out-inputs)",
-    )
-
-    # Conversational notebook
-    f = f.replace(
-        "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Alpaca.ipynb)",
-        "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb)",
-    )
-
-    # Fix Meta-Llama
-    f = f.replace(
-        "unsloth/Meta-Llama",
-        "unsloth/Llama",
-    )
-
-    # Move dtype into calling
-    if '"dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+\n",\n    ' in f and \
-        '"    dtype = dtype,\n",' in f:
-        f = f.replace(
-            '"dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+\n",\n    ',
-            '',
+    def replace_common(text):
+        text = text.replace("</a></a>", "</a>")
+        text = text.replace(
+            "To install Unsloth your local device",
+            "To install Unsloth on your local device",
         )
-        f = f.replace(
-            '"    dtype = dtype,\n",',
-            '"    dtype = dtype, # None for auto detection. Float16 for T4, Bfloat16 for Ampere, H100+\n",',
+        text = re.sub(r"!{2,}", "!", text)
+        text = text.replace("ee notice", "we notice")
+
+        # Convert versions like X.X.X to 2025.12.8
+        text = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2025.12.8\1", text)
+
+        # Change gguf-quantization-options link
+        text = text.replace(
+            "https://github.com/unslothai/unsloth/wiki#gguf-quantization-options",
+            "https://unsloth.ai/docs/basics/inference-and-deployment/saving-to-gguf",
+        )
+        text = text.replace("https://docs.unsloth.ai/", "https://unsloth.ai/docs/")
+
+        # Redirect Alpaca dataset
+        text = text.replace(
+            "https://huggingface.co/datasets/yahma/alpaca-cleaned",
+            "https://huggingface.co/datasets/unsloth/alpaca-cleaned",
+        )
+        text = text.replace("yahma/alpaca-cleaned", "unsloth/alpaca-cleaned")
+        text = text.replace("Alpaca dataset from [yahma]", "[Alpaca dataset]")
+
+        # Train on completions
+        text = text.replace(
+            "TRL's docs [here](https://huggingface.co/docs/trl/sft_trainer#train-on-completions-only).",
+            "our docs [here](https://unsloth.ai/docs/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide#training-on-completions-only-masking-out-inputs)",
         )
 
-    # TRL's `DPOTrainer`
-    f = f.replace("TRL's `DPOTrainer`", "`DPOTrainer` and `GRPOTrainer` for reinforcement learning!")
+        # Fix incorrect conversational link pointing to Alpaca notebook
+        text = text.replace(
+            "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Alpaca.ipynb)",
+            "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Conversational.ipynb)",
+        )
 
-    # Move packing = ...
-    packing = '''"    packing = False, # Can make training 5x faster for short sequences.\n",
-    "    args = SFTConfig(\n",'''
-    if packing in f:
-        f = f.replace(packing, "")
-        f = f.replace(
-            '''"        max_steps = 60,\n",
-    ''',
-            '''""        max_steps = 60,\n",
-    "        packing = False, # Makes training 2-5x faster for short sequences,\n",
-    ''')
+        # Fix Meta-Llama
+        text = text.replace("unsloth/Meta-Llama", "unsloth/Llama")
 
-    # VLLM to vLLM, but avoid underscores/dashes or word-part matches
-    f = re.sub(r'(?<![A-Za-z0-9_-])VLLM(?![A-Za-z0-9_-])', "vLLM", f)
-    f = f.replace(
-        "You can go to https://huggingface.co/settings/tokens for your personal tokens.",
-        "You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options."
-    )
+        # TRL's `DPOTrainer`
+        text = text.replace("TRL's `DPOTrainer`", "`DPOTrainer` and `GRPOTrainer` for reinforcement learning!")
 
-    # Fix saving for LoRA adapters only
-    f = f.replace('model.save_pretrained(\"model\")', 'model.save_pretrained(\"lora_model\")')
-    f = f.replace('tokenizer.save_pretrained(\"model\")', 'tokenizer.save_pretrained(\"lora_model\")')
-    f = f.replace('model.push_to_hub(\"hf/model\", token = \"\")', 'model.push_to_hub(\"hf/lora_model\", token = \"\")')
-    f = f.replace('tokenizer.push_to_hub(\"hf/model\", token = \"\")', 'tokenizer.push_to_hub(\"hf/lora_model\", token = \"\")')
+        # Move packing = ...
+        text = re.sub(
+            r"(\n[ \t]*)packing\s*=\s*(True|False).*?\n(\1args\s*=\s*SFTConfig\(\n)",
+            r"\3\1    packing = \2, # Makes training 2-5x faster for short sequences,\n",
+            text,
+        )
 
-    # Fix 16bit
-    f = f.replace('model.save_pretrained_merged(\"model\", tokenizer, save_method = \"merged_16bit\",)', 'model.save_pretrained_merged(\"model_16bit\", tokenizer, save_method = \"merged_16bit\",)')
-    f = f.replace('model.push_to_hub_merged(\"hf/model\", tokenizer, save_method = \"merged_16bit\", token = \"\")', 'model.push_to_hub_merged(\"hf/model_16bit\", tokenizer, save_method = \"merged_16bit\", token = \"\")')
+        # Ensure GGUF usage line matches base name used in code
+        text = re.sub(
+            r"Now, use the `[^`]+\.Q8_0\.gguf` file or `[^`]+\.Q4_K_M\.gguf` file in llama\.cpp\.",
+            f"Now, use the `{base_gguf}.Q8_0.gguf` file or `{base_gguf}.Q4_K_M.gguf` file in llama.cpp.",
+            text,
+        )
 
-    # Fix 4bit
-    f = f.replace('model.save_pretrained_merged(\"model\", tokenizer, save_method = \"merged_4bit\",)', 'model.save_pretrained_merged(\"model_4bit\", tokenizer, save_method = \"merged_4bit\",)')
-    f = f.replace('model.push_to_hub_merged(\"hf/model\", tokenizer, save_method = \"merged_4bit\", token = \"\")', 'model.push_to_hub_merged(\"hf/model_4bit\", tokenizer, save_method = \"merged_4bit\", token = \"\")')
+        # Fix concatenated markdown line if it slipped in
+        text = text.replace("Unsloth!Now, use the", "Unsloth!\nNow, use the")
 
-    with open(filename, "w", encoding = "utf-8") as w: w.write(f)
+        # Update docs domain
+        text = text.replace("docs.unsloth.ai", "unsloth.ai/docs")
+        text = text.replace("[Wiki page]", "[docs page]")
+        text = text.replace("[wiki page]", "[docs page]")
+
+        text = text.replace(
+            "You can go to https://huggingface.co/settings/tokens for your personal tokens.",
+            "You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.",
+        )
+
+        # GGUF filename references
+        text = text.replace("model-unsloth-Q4_K_M.gguf", f"{base_gguf}.Q4_K_M.gguf")
+        text = text.replace("model-unsloth.Q4_K_M.gguf", f"{base_gguf}.Q4_K_M.gguf")
+        text = text.replace("model-unsloth.Q8_0.gguf", f"{base_gguf}.Q8_0.gguf")
+        text = text.replace("model-unsloth.gguf", f"{base_gguf}.Q8_0.gguf")
+        return text
+
+    def replace_code(text):
+        # Keep explicit dtype definition lines intact to avoid undefined dtype later.
+
+        # Update gguf save/push names
+        text = re.sub(
+            r"(save_pretrained_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+            rf"\1\2{base_gguf}\4",
+            text,
+            flags=re.DOTALL,
+        )
+
+        def _replace_push_gguf(match):
+            new_name = replace_hf_prefix(match.group(3), base_gguf)
+            return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}"
+
+        text = re.sub(
+            r"(push_to_hub_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+            _replace_push_gguf,
+            text,
+            flags=re.DOTALL,
+        )
+
+        # Update merged save/push names
+        def _replace_save_merged(match):
+            method = match.group(6)
+            new_name = base_16 if method == "merged_16bit" else base_4
+            return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}{match.group(5)}{method}{match.group(7)}"
+
+        text = re.sub(
+            r"(save_pretrained_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+            _replace_save_merged,
+            text,
+            flags=re.DOTALL,
+        )
+
+        def _replace_push_merged(match):
+            method = match.group(6)
+            new_name = base_16 if method == "merged_16bit" else base_4
+            replaced = replace_hf_prefix(match.group(3), new_name)
+            return f"{match.group(1)}{match.group(2)}{replaced}{match.group(4)}{match.group(5)}{method}{match.group(7)}"
+
+        text = re.sub(
+            r"(push_to_hub_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+            _replace_push_merged,
+            text,
+            flags=re.DOTALL,
+        )
+
+        # Update LoRA save/push names
+        text = re.sub(
+            r"(\b(?:model|tokenizer|processor)\.save_pretrained\(\s*)([\"\'])([^\"\']*)([\"\'])",
+            rf"\1\2{base_lora}\4",
+            text,
+        )
+
+        def _replace_push_lora(match):
+            new_name = replace_hf_prefix(match.group(3), base_lora)
+            return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}"
+
+        text = re.sub(
+            r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])",
+            _replace_push_lora,
+            text,
+        )
+
+        # LoRA load snippets
+        text = re.sub(
+            r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)",
+            rf"\1\2{base_lora}\4\5",
+            text,
+        )
+        text = re.sub(
+            r"([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)",
+            rf"\1{base_lora}\3\4",
+            text,
+        )
+        text = re.sub(r"([\"\'])lora_model([\"\'])", rf"\1{base_lora}\2", text)
+        text = re.sub(r"([\"\'])finetuned_model([\"\'])", rf"\1{base_lora}\2", text)
+
+        # Update hf/ to HF_USERNAME/ in quoted strings
+        text = text.replace('"hf/', '"HF_USERNAME/')
+        text = text.replace("'hf/", "'HF_USERNAME/")
+
+        # Update tokens
+        text = re.sub(
+            r"(?:(?<=^)|(?<=[\s,#\"']))token\s*=\s*([^\n,\)]*)",
+            'token = "YOUR_HF_TOKEN"',
+            text,
+        )
+
+        # Preserve special tokens that should not be replaced by HF token
+        text = re.sub(
+            r"unsloth_eos_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']",
+            'unsloth_eos_token = "eos_token"',
+            text,
+        )
+        text = re.sub(
+            r"patch_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']",
+            'patch_token = "<|IMAGE_PLACEHOLDER|>"',
+            text,
+        )
+
+        # If dtype=None helper line is directly before from_pretrained and dtype=dtype is used,
+        # drop the helper line and inline dtype=None with the standard comment.
+        dtype_comment = "None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+"
+        dtype_line_re = re.compile(r"^[ \t]*dtype\s*=\s*None\s*#.*$")
+        dtype_param_re = re.compile(r"(\bdtype\s*=\s*)dtype\b\s*,?")
+
+        lines = text.splitlines(True)
+        updated_lines = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if dtype_line_re.match(line) and i + 1 < len(lines) and ".from_pretrained" in lines[i + 1]:
+                # Try to update dtype within the from_pretrained call
+                replaced = False
+                depth = 0
+                j = i + 1
+                while j < len(lines):
+                    current = lines[j]
+                    if j == i + 1 and ".from_pretrained" not in current:
+                        break
+                    new_current, count = dtype_param_re.subn(
+                        r"\1None, # " + dtype_comment,
+                        current,
+                    )
+                    if count:
+                        replaced = True
+                    lines[j] = new_current
+                    depth += current.count("(") - current.count(")")
+                    if depth <= 0 and ".from_pretrained" in lines[i + 1]:
+                        break
+                    j += 1
+                if replaced:
+                    # Drop the dtype helper line and continue from the call
+                    i += 1
+                    continue
+            updated_lines.append(line)
+            i += 1
+        text = "".join(updated_lines)
+
+        # Normalize vLLM naming in code where it is used as a package/path
+        text = text.replace("vLLM", "vllm").replace("VLLM", "vllm")
+
+        # Fix A=A to A = A in code
+        text = _space_equals_in_code(text)
+
+        return text
+
+    updated = False
+    for cell in notebook_content.get("cells", []):
+        if not isinstance(cell.get("source"), list):
+            continue
+        is_code = cell.get("cell_type") == "code"
+        text = "".join(cell["source"])
+        new_text = replace_common(text)
+        if is_code:
+            new_text = replace_code(new_text)
+        if new_text != text:
+            updated = True
+        cell["source"] = _strip_extra_trailing_blank_lines(new_text.splitlines(True))
+
+    if updated:
+        with open(filename, "w", encoding="utf-8") as w:
+            json.dump(notebook_content, w, indent=1, ensure_ascii=False)
 pass
 
 
@@ -730,6 +996,8 @@ installation_ministral_kaggle_content = update_or_append_pip_install(
 # =======================================================
 
 new_announcement = """
+Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
+
 New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
 
 You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
@@ -1188,10 +1456,10 @@ def update_notebook_sections(
                                 installation = installation_grpo_content
                                 # TODO: Remove after GRPO numpy bug fixed!
                                 # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                                notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
+                                notebook_content["cells"][i + 2]["source"] = [f"{line}\n" for line in installation_extra_grpo_content.splitlines()]
 
                         # META INSTALLATION
-                        elif is_path_contains_any(notebook_path.lower(), ["Meta"]): 
+                        elif is_path_contains_any(notebook_path.lower(), ["Meta"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_grpo_synthetic_data_content
                                 # Kaggle will delete the second cell instead -> Need to check
@@ -1200,8 +1468,8 @@ def update_notebook_sections(
                                 installation = installation_synthetic_data_content
                                 # TODO: Remove after GRPO numpy bug fixed!
                                 # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                                notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
-                        
+                                notebook_content["cells"][i + 2]["source"] = [f"{line}\n" for line in installation_extra_grpo_content.splitlines()]
+
                         # ORPHEUS INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["orpheus"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -1314,7 +1582,7 @@ def update_notebook_sections(
                             else:
                                 installation = installation_nemotron_nano_content
                                 
-                        notebook_content["cells"][i + 1]["source"] = installation
+                        notebook_content["cells"][i + 1]["source"] = [f"{line}\n" for line in installation.splitlines()]
                         updated = True
                         # TODO: Remove after GRPO numpy bug fixed! 
                         # Error: ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
