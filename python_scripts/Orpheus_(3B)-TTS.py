@@ -5,10 +5,10 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 # 
@@ -16,15 +16,15 @@
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install snac torchcodec "datasets>=3.4.1,<4.0.0"\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.33.post1")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install snac torchcodec "datasets>=3.4.1,<4.0.0"\n')
 # 
 # 
 # # ### Unsloth
@@ -65,10 +65,10 @@ fourbit_models = [
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/orpheus-3b-0.1-ft",
-    max_seq_length= 2048, # Choose any for long context!
+    max_seq_length = 2048, # Choose any for long context!
     dtype = None, # Select None for auto detection
     load_in_4bit = False, # Select True for 4bit which reduces memory usage
-    # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
+    # token = "YOUR_HF_TOKEN", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
 
 
@@ -122,8 +122,8 @@ snac_model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz")
 snac_model = snac_model.to("cuda")
 def tokenise_audio(waveform):
   waveform = torch.from_numpy(waveform).unsqueeze(0)
-  waveform = waveform.to(dtype=torch.float32)
-  resample_transform = T.Resample(orig_freq=ds_sample_rate, new_freq=24000)
+  waveform = waveform.to(dtype = torch.float32)
+  resample_transform = T.Resample(orig_freq = ds_sample_rate, new_freq = 24000)
   waveform = resample_transform(waveform)
 
   waveform = waveform.unsqueeze(0).to("cuda")
@@ -162,7 +162,7 @@ def add_codes(example):
 
     return example
 
-dataset = dataset.map(add_codes, remove_columns=["audio"])
+dataset = dataset.map(add_codes, remove_columns = ["audio"])
 
 tokeniser_length = 128256
 start_of_text = 128000
@@ -219,7 +219,7 @@ def create_input_ids(example):
     # Determine whether to include the source field
     text_prompt = f"{example['source']}: {example['text']}" if "source" in example else example["text"]
 
-    text_ids = tokenizer.encode(text_prompt, add_special_tokens=True)
+    text_ids = tokenizer.encode(text_prompt, add_special_tokens = True)
     text_ids.append(end_of_text)
 
     example["text_tokens"] = text_ids
@@ -240,7 +240,7 @@ def create_input_ids(example):
     return example
 
 
-dataset = dataset.map(create_input_ids, remove_columns=["text", "codes_list"])
+dataset = dataset.map(create_input_ids, remove_columns = ["text", "codes_list"])
 columns_to_keep = ["input_ids", "labels", "attention_mask"]
 columns_to_remove = [col for col in dataset.column_names if col not in columns_to_keep]
 
@@ -345,15 +345,15 @@ prompts_ = [(f"{chosen_voice}: " + p) if chosen_voice else p for p in prompts]
 all_input_ids = []
 
 for prompt in prompts_:
-  input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+  input_ids = tokenizer(prompt, return_tensors = "pt").input_ids
   all_input_ids.append(input_ids)
 
-start_token = torch.tensor([[ 128259]], dtype=torch.int64) # Start of human
-end_tokens = torch.tensor([[128009, 128260]], dtype=torch.int64) # End of text, End of human
+start_token = torch.tensor([[ 128259]], dtype = torch.int64) # Start of human
+end_tokens = torch.tensor([[128009, 128260]], dtype = torch.int64) # End of text, End of human
 
 all_modified_input_ids = []
 for input_ids in all_input_ids:
-  modified_input_ids = torch.cat([start_token, input_ids, end_tokens], dim=1) # SOH SOT Text EOT EOH
+  modified_input_ids = torch.cat([start_token, input_ids, end_tokens], dim = 1) # SOH SOT Text EOT EOH
   all_modified_input_ids.append(modified_input_ids)
 
 all_padded_tensors = []
@@ -361,32 +361,32 @@ all_attention_masks = []
 max_length = max([modified_input_ids.shape[1] for modified_input_ids in all_modified_input_ids])
 for modified_input_ids in all_modified_input_ids:
   padding = max_length - modified_input_ids.shape[1]
-  padded_tensor = torch.cat([torch.full((1, padding), 128263, dtype=torch.int64), modified_input_ids], dim=1)
-  attention_mask = torch.cat([torch.zeros((1, padding), dtype=torch.int64), torch.ones((1, modified_input_ids.shape[1]), dtype=torch.int64)], dim=1)
+  padded_tensor = torch.cat([torch.full((1, padding), 128263, dtype = torch.int64), modified_input_ids], dim = 1)
+  attention_mask = torch.cat([torch.zeros((1, padding), dtype = torch.int64), torch.ones((1, modified_input_ids.shape[1]), dtype = torch.int64)], dim = 1)
   all_padded_tensors.append(padded_tensor)
   all_attention_masks.append(attention_mask)
 
-all_padded_tensors = torch.cat(all_padded_tensors, dim=0)
-all_attention_masks = torch.cat(all_attention_masks, dim=0)
+all_padded_tensors = torch.cat(all_padded_tensors, dim = 0)
+all_attention_masks = torch.cat(all_attention_masks, dim = 0)
 
 input_ids = all_padded_tensors.to("cuda")
 attention_mask = all_attention_masks.to("cuda")
 generated_ids = model.generate(
-      input_ids=input_ids,
-      attention_mask=attention_mask,
-      max_new_tokens=1200,
-      do_sample=True,
-      temperature=0.6,
-      top_p=0.95,
-      repetition_penalty=1.1,
-      num_return_sequences=1,
-      eos_token_id=128258,
+      input_ids = input_ids,
+      attention_mask = attention_mask,
+      max_new_tokens = 1200,
+      do_sample = True,
+      temperature = 0.6,
+      top_p = 0.95,
+      repetition_penalty = 1.1,
+      num_return_sequences = 1,
+      eos_token_id = 128258,
      use_cache = True
   )
 token_to_find = 128257
 token_to_remove = 128258
 
-token_indices = (generated_ids == token_to_find).nonzero(as_tuple=True)
+token_indices = (generated_ids == token_to_find).nonzero(as_tuple = True)
 
 if len(token_indices[1]) > 0:
     last_occurrence_idx = token_indices[1][-1].item()
@@ -443,7 +443,7 @@ else:
   for i in range(len(my_samples)):
     print(prompts[i])
     samples = my_samples[i]
-    display(Audio(samples.detach().squeeze().to("cpu").numpy(), rate=24000))
+    display(Audio(samples.detach().squeeze().to("cpu").numpy(), rate = 24000))
 # Clean up to save RAM
 del my_samples,samples
 
@@ -457,48 +457,49 @@ del my_samples,samples
 # In[ ]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-tokenizer.save_pretrained("lora_model")
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
-# tokenizer.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("orpheus_lora")  # Local saving
+tokenizer.save_pretrained("orpheus_lora")
+# model.push_to_hub("your_name/orpheus_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/orpheus_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # ### Saving to float16
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
 
 # Merge to 16bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.save_pretrained_merged("orpheus_finetune_16bit", tokenizer, save_method = "merged_16bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/orpheus_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
-if False: model.save_pretrained_merged("model", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("hf/model", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.save_pretrained_merged("orpheus_finetune_4bit", tokenizer, save_method = "merged_4bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/orpheus_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("model")
-    tokenizer.save_pretrained("model")
+    model.save_pretrained("orpheus_lora")
+    tokenizer.save_pretrained("orpheus_lora")
 if False:
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
+    model.push_to_hub("HF_USERNAME/orpheus_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/orpheus_lora", token = "YOUR_HF_TOKEN")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 
