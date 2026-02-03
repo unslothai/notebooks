@@ -18,6 +18,8 @@
 # ### News
 
 # 
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
 # New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
 # You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
@@ -34,7 +36,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    \n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    \n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory = python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo\n')
 # 
 # 
 # # ### Unsloth
@@ -343,19 +345,19 @@ _ = model.generate(**inputs, max_new_tokens = 64, streamer = TextStreamer(tokeni
 if False:
     model.save_pretrained_merged("gpt_oss_finetune_4bit", tokenizer, save_method = "mxfp4",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/gpt_oss_finetune_4bit", tokenizer, save_method = "mxfp4", token = "")
+    model.push_to_hub_merged("HF_USERNAME/gpt_oss_finetune_4bit", tokenizer, save_method = "mxfp4", token = "YOUR_HF_TOKEN")
 
 # Merge and push to hub in 16bit
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/gpt_oss_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/gpt_oss_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("gpt_oss_lora")
     tokenizer.save_pretrained("gpt_oss_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("HF_USERNAME/gpt_oss_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/gpt_oss_lora", token = "")
+    model.push_to_hub("HF_USERNAME/gpt_oss_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/gpt_oss_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -377,19 +379,19 @@ if False:
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
 if False:
-    model.push_to_hub_gguf("HF_USERNAME/gpt_oss_finetune", tokenizer, token = "")
+    model.push_to_hub_gguf("HF_USERNAME/gpt_oss_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False:
     model.save_pretrained_gguf("gpt_oss_finetune", tokenizer, quantization_method = "f16")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/gpt_oss_finetune", tokenizer, quantization_method = "f16", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/gpt_oss_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False:
     model.save_pretrained_gguf("gpt_oss_finetune", tokenizer, quantization_method = "q4_k_m")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/gpt_oss_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/gpt_oss_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -397,7 +399,7 @@ if False:
         "HF_USERNAME/gpt_oss_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "", # Get a token at https://huggingface.co/settings/tokens
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 

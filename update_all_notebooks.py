@@ -66,6 +66,10 @@ def _strip_extra_trailing_blank_lines(lines):
 
 
 def _space_equals_in_code(text):
+    # Characters that form compound assignment operators when followed by =
+    # e.g., +=, -=, *=, /=, //=, **=, %=, |=, &=, ^=, :=, @=
+    COMPOUND_OP_CHARS = ("+", "-", "*", "/", "%", "|", "&", "^", ":", "@")
+
     new_lines = []
     for line in text.splitlines(True):
         in_quote = None
@@ -93,7 +97,9 @@ def _space_equals_in_code(text):
             if ch == "=":
                 prev_char = line[i - 1] if i > 0 else ""
                 next_char = line[i + 1] if i + 1 < len(line) else ""
-                if prev_char not in ("=", "<", ">", "!") and next_char != "=":
+                # Don't add space before = if it's part of ==, <=, >=, !=
+                # or a compound operator like +=, -=, *=, /=, etc.
+                if prev_char not in ("=", "<", ">", "!") and prev_char not in COMPOUND_OP_CHARS and next_char != "=":
                     if out and out[-1] not in (" ", "\t"):
                         out.append(" ")
                     out.append("=")
@@ -990,6 +996,8 @@ installation_ministral_kaggle_content = update_or_append_pip_install(
 # =======================================================
 
 new_announcement = """
+Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
+
 New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
 
 You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
@@ -1448,10 +1456,10 @@ def update_notebook_sections(
                                 installation = installation_grpo_content
                                 # TODO: Remove after GRPO numpy bug fixed!
                                 # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                                notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
+                                notebook_content["cells"][i + 2]["source"] = [f"{line}\n" for line in installation_extra_grpo_content.splitlines()]
 
                         # META INSTALLATION
-                        elif is_path_contains_any(notebook_path.lower(), ["Meta"]): 
+                        elif is_path_contains_any(notebook_path.lower(), ["Meta"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_grpo_synthetic_data_content
                                 # Kaggle will delete the second cell instead -> Need to check
@@ -1460,8 +1468,8 @@ def update_notebook_sections(
                                 installation = installation_synthetic_data_content
                                 # TODO: Remove after GRPO numpy bug fixed!
                                 # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                                notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
-                        
+                                notebook_content["cells"][i + 2]["source"] = [f"{line}\n" for line in installation_extra_grpo_content.splitlines()]
+
                         # ORPHEUS INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["orpheus"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -1574,7 +1582,7 @@ def update_notebook_sections(
                             else:
                                 installation = installation_nemotron_nano_content
                                 
-                        notebook_content["cells"][i + 1]["source"] = installation
+                        notebook_content["cells"][i + 1]["source"] = [f"{line}\n" for line in installation.splitlines()]
                         updated = True
                         # TODO: Remove after GRPO numpy bug fixed! 
                         # Error: ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject

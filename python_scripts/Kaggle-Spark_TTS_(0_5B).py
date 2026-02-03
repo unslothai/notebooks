@@ -16,6 +16,8 @@
 # ### News
 
 # 
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
 # New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
 # You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
@@ -461,19 +463,19 @@ tokenizer.save_pretrained("spark_tts_lora")
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("spark_tts_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/spark_tts_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/spark_tts_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False: model.save_pretrained_merged("spark_tts_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/spark_tts_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/spark_tts_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("spark_tts_lora")
     tokenizer.save_pretrained("spark_tts_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/spark_tts_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/spark_tts_lora", token = "")
+    model.push_to_hub("HF_USERNAME/spark_tts_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/spark_tts_lora", token = "YOUR_HF_TOKEN")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!

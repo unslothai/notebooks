@@ -16,6 +16,8 @@
 # ### News
 
 # 
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
 # New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
 # You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
@@ -32,7 +34,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\n_vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.10.2\', \'triton\')\n!uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_vllm_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\n_vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.10.2\', \'triton\')\n!uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -45,7 +47,7 @@
 
 
 import os
-os.environ['UNSLOTH_VLLM_STANDBY'] = "1" # Unsloth standby saves 30%+ memory for RL
+os.environ['UNSLOTH_vllm_STANDBY'] = "1" # Unsloth standby saves 30%+ memory for RL
 from unsloth import FastLanguageModel
 import torch
 max_seq_length = 2048 # Can increase for longer reasoning traces
@@ -794,19 +796,19 @@ output
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("qwen_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False: model.save_pretrained_merged("qwen_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("qwen_lora")
     tokenizer.save_pretrained("qwen_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/qwen_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "")
+    model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -826,15 +828,15 @@ if False:
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -842,7 +844,7 @@ if False:
         "HF_USERNAME/qwen_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
+        token = "YOUR_HF_TOKEN",
     )
 
 

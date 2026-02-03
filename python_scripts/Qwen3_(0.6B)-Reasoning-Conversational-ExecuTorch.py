@@ -295,7 +295,7 @@ model.save_pretrained_torchao(save_to, tokenizer = tokenizer)
 # Or push to hub under your username
 # from huggingface_hub import get_token, whoami
 # def _get_username():
-#     token = get_token()
+#     token = "YOUR_HF_TOKEN")
 #     username = whoami(token = token)["name"]
 #     return username
 # username = _get_username()

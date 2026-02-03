@@ -352,7 +352,7 @@ _ = model.generate(
 # <a name="Save"></a>
 # ### Saving to float16 or MXFP4 for vLLM
 # 
-# Unsloth supports saving to `float16` directly. Select `merged_16bit` for float16. Unsloth also supports saving in low or mixed precision such as `mxfp4`, and allows `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+# Unsloth supports saving to `float16` directly. Select `merged_16bit` for float16. Unsloth also supports saving in low or mixed precision such as `mxfp4`, and allows `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
@@ -362,7 +362,7 @@ if False:
     model.save_pretrained_merged("nemo_gym_sudoku_finetune_4bit", tokenizer, save_method = "mxfp4")
 if False:
     model.push_to_hub_merged(
-        "repo_id/nemo_gym_sudoku_finetune_4bit", tokenizer, token = "hf...", save_method = "mxfp4"
+        "repo_id/nemo_gym_sudoku_finetune_4bit", tokenizer, token = "YOUR_HF_TOKEN", save_method = "mxfp4"
     )
 
 # Merge and push to hub in 16bit
@@ -372,7 +372,7 @@ if False:
     )
 if False:  # Pushing to HF Hub
     model.push_to_hub_merged(
-        "HF_USERNAME/nemo_gym_sudoku_finetune_16bit", tokenizer, save_method = "merged_16bit", token = ""
+        "HF_USERNAME/nemo_gym_sudoku_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN"
     )
 
 

@@ -16,6 +16,8 @@
 # ### News
 
 # 
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
 # New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
 # You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
@@ -368,7 +370,7 @@ if False: # Pushing to HF Hub
         tokenizer,
         torchao_config = Int4WeightOnlyConfig(),
         push_to_hub = True,
-        token = "", # Get a token at https://huggingface.co/settings/tokens
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 # Save to TorchAO int8:
@@ -383,7 +385,7 @@ if False: # Pushing to HF Hub
         tokenizer,
         torchao_config = Int8DynamicActivationInt8WeightConfig(),
         push_to_hub = True,
-        token = "", # Get a token at https://huggingface.co/settings/tokens
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 

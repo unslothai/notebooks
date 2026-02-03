@@ -674,7 +674,7 @@ if False:
 # ### Merge LoRA adapters to base model and save to disk
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback.
-# Use push_to_hub_merged to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+# Use push_to_hub_merged to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 # 
 # ***Using these methods will require an extra GGUF conversion step to use the models in LM Studio.*** You may do one of the following:
 # 1. Use our natively supported GGUF/llama.cpp conversion - scroll down to the next section!
@@ -689,21 +689,21 @@ if False:
 if False:
     model.save_pretrained_merged("functiongemma_finetune_16bit", tokenizer, save_method = "merged_16bit")
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/functiongemma_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/functiongemma_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False:
     model.save_pretrained_merged("functiongemma_finetune_4bit", tokenizer, save_method = "merged_4bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/functiongemma_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/functiongemma_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("functiongemma_lora")
     tokenizer.save_pretrained("functiongemma_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("HF_USERNAME/functiongemma_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/functiongemma_lora", token = "")
+    model.push_to_hub("HF_USERNAME/functiongemma_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/functiongemma_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### Use native GGUF conversion and save to disk

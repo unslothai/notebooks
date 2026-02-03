@@ -16,6 +16,8 @@
 # ### News
 
 # 
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
 # New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
 # You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
@@ -492,21 +494,21 @@ if False:
 if False:
     model.save_pretrained_merged("granite_finetune_16bit", tokenizer, save_method = "merged_16bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/granite_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/granite_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False:
     model.save_pretrained_merged("granite_finetune_4bit", tokenizer, save_method = "merged_4bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/granite_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/granite_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("granite_lora")
     tokenizer.save_pretrained("granite_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("HF_USERNAME/granite_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/granite_lora", token = "")
+    model.push_to_hub("HF_USERNAME/granite_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/granite_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -530,19 +532,19 @@ if False:
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
 if False:
-    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, token = "")
+    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False:
     model.save_pretrained_gguf("granite_finetune", tokenizer, quantization_method = "f16")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, quantization_method = "f16", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False:
     model.save_pretrained_gguf("granite_finetune", tokenizer, quantization_method = "q4_k_m")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -550,7 +552,7 @@ if False:
         "HF_USERNAME/granite_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "", # Get a token at https://huggingface.co/settings/tokens
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 

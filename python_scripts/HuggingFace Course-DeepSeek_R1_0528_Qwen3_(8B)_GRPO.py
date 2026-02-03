@@ -18,6 +18,8 @@
 # ### News
 
 # 
+# Long-Context GRPO for reinforcement learning - train stably at massive sequence lengths. Fine-tune models with up to 7x more context length efficiently. [Read Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
 # New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
 # 
 # You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
@@ -34,7 +36,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_vllm_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
 # 
 # 
 # # In[ ]:
@@ -757,19 +759,19 @@ print(f"Improvement: +{with_lora_id_count - without_lora_id_count} Indonesian re
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("deepseek_r1_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/deepseek_r1_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/deepseek_r1_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False: model.save_pretrained_merged("deepseek_r1_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/deepseek_r1_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/deepseek_r1_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("deepseek_r1_lora")
     tokenizer.save_pretrained("deepseek_r1_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/deepseek_r1_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/deepseek_r1_lora", token = "")
+    model.push_to_hub("HF_USERNAME/deepseek_r1_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/deepseek_r1_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -789,15 +791,15 @@ if False:
 if False: model.save_pretrained_gguf("deepseek_r1_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/deepseek_r1_finetune", tokenizer, token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/deepseek_r1_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False: model.save_pretrained_gguf("deepseek_r1_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/deepseek_r1_finetune", tokenizer, quantization_method = "f16", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/deepseek_r1_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("deepseek_r1_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/deepseek_r1_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/deepseek_r1_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -805,7 +807,7 @@ if False:
         "HF_USERNAME/deepseek_r1_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
+        token = "YOUR_HF_TOKEN",
     )
 
 
