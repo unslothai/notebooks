@@ -35,12 +35,6 @@
 # get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    \n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    !uv pip install -qqq \\\n        "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo\n\n# Mamba is supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes!\n!uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2\n')
 # 
 # 
-# # In[ ]:
-# 
-# 
-# get_ipython().run_cell_magic('capture', '', '# These are mamba kernels and we must have these for faster training\n!pip install --no-build-isolation mamba_ssm==2.2.5\n!pip install --no-build-isolation causal_conv1d==1.5.2\n')
-# 
-# 
 # # ### Unsloth
 
 # In[3]:
@@ -492,21 +486,21 @@ if False:
 if False:
     model.save_pretrained_merged("granite_finetune_16bit", tokenizer, save_method = "merged_16bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/granite_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/granite_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False:
     model.save_pretrained_merged("granite_finetune_4bit", tokenizer, save_method = "merged_4bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/granite_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/granite_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("granite_lora")
     tokenizer.save_pretrained("granite_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("HF_USERNAME/granite_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/granite_lora", token = "")
+    model.push_to_hub("HF_USERNAME/granite_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/granite_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -530,19 +524,19 @@ if False:
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
 if False:
-    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, token = "")
+    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False:
     model.save_pretrained_gguf("granite_finetune", tokenizer, quantization_method = "f16")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, quantization_method = "f16", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False:
     model.save_pretrained_gguf("granite_finetune", tokenizer, quantization_method = "q4_k_m")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/granite_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -550,7 +544,7 @@ if False:
         "HF_USERNAME/granite_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "", # Get a token at https://huggingface.co/settings/tokens
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 

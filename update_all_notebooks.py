@@ -66,6 +66,10 @@ def _strip_extra_trailing_blank_lines(lines):
 
 
 def _space_equals_in_code(text):
+    # Characters that form compound assignment operators when followed by =
+    # e.g., +=, -=, *=, /=, //=, **=, %=, |=, &=, ^=, :=, @=
+    COMPOUND_OP_CHARS = ("+", "-", "*", "/", "%", "|", "&", "^", ":", "@")
+
     new_lines = []
     for line in text.splitlines(True):
         in_quote = None
@@ -93,7 +97,9 @@ def _space_equals_in_code(text):
             if ch == "=":
                 prev_char = line[i - 1] if i > 0 else ""
                 next_char = line[i + 1] if i + 1 < len(line) else ""
-                if prev_char not in ("=", "<", ">", "!") and next_char != "=":
+                # Don't add space before = if it's part of ==, <=, >=, !=
+                # or a compound operator like +=, -=, *=, /=, etc.
+                if prev_char not in ("=", "<", ">", "!") and prev_char not in COMPOUND_OP_CHARS and next_char != "=":
                     if out and out[-1] not in (" ", "\t"):
                         out.append(" ")
                     out.append("=")
@@ -2064,21 +2070,26 @@ def copy_and_update_notebooks(
         colab_notebook_name = notebook_name
         destination_notebook_path = os.path.join(destination_dir, colab_notebook_name)
 
-        shutil.copy2(template_notebook_path, destination_notebook_path)
-        print(f"Copied '{colab_notebook_name}' to '{destination_dir}'")
+        # Only copy if destination doesn't exist (preserve existing files and their metadata ordering)
+        if not os.path.exists(destination_notebook_path):
+            shutil.copy2(template_notebook_path, destination_notebook_path)
+            print(f"Copied '{colab_notebook_name}' to '{destination_dir}'")
 
         kaggle_notebook_name = "Kaggle-" + notebook_name
-        destination_notebook_path = os.path.join(destination_dir, kaggle_notebook_name)
+        kaggle_destination_path = os.path.join(destination_dir, kaggle_notebook_name)
 
-        shutil.copy2(template_notebook_path, destination_notebook_path)
-
-        print(f"Copied '{kaggle_notebook_name}' to '{destination_dir}'")
+        # Only copy if destination doesn't exist (preserve existing files and their metadata ordering)
+        if not os.path.exists(kaggle_destination_path):
+            shutil.copy2(template_notebook_path, kaggle_destination_path)
+            print(f"Copied '{kaggle_notebook_name}' to '{destination_dir}'")
 
         if "GRPO" in template_notebook_path:
             hf_course_notebook_name = f"{hf_course_name}-" + notebook_name
-            destination_notebook_path = os.path.join(destination_dir, hf_course_notebook_name)
-            shutil.copy2(template_notebook_path, destination_notebook_path)
-            print(f"Copied f'{hf_course_name}-{notebook_name}' to '{destination_notebook_path}'")
+            hf_course_destination_path = os.path.join(destination_dir, hf_course_notebook_name)
+            # Only copy if destination doesn't exist (preserve existing files and their metadata ordering)
+            if not os.path.exists(hf_course_destination_path):
+                shutil.copy2(template_notebook_path, hf_course_destination_path)
+                print(f"Copied f'{hf_course_name}-{notebook_name}' to '{hf_course_destination_path}'")
 
         update_notebook_sections(
             os.path.join(destination_dir, colab_notebook_name),
@@ -2089,12 +2100,21 @@ def copy_and_update_notebooks(
         )
 
         update_notebook_sections(
-            destination_notebook_path,
+            kaggle_destination_path,
             general_announcement,
             installation_kaggle,
             installation_kaggle,
             new_announcement,
         )
+
+        if "GRPO" in template_notebook_path:
+            update_notebook_sections(
+                hf_course_destination_path,
+                general_announcement,
+                installation,
+                installation_kaggle,
+                new_announcement,
+            )
 
     # Move Exceptions back to destination_dir from temp_location
     for entry in DONT_UPDATE_EXCEPTIONS:

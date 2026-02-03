@@ -11,7 +11,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
-# 
 
 # ### News
 
@@ -113,6 +112,7 @@ train_dataset[0]
 
 
 from sentence_transformers.evaluation import InformationRetrievalEvaluator
+import torch
 
 queries = dict(enumerate(eval_dataset["question"]))
 corpus = dict(enumerate(list(eval_dataset["passage_text"]) + train_dataset["passage_text"][:2000]))
@@ -124,7 +124,8 @@ evaluator = InformationRetrievalEvaluator(
     show_progress_bar = False,
     batch_size = 64,
 )
-evaluator(model)
+with torch.autocast(device_type = "cuda", dtype = model.dtype, enabled = model.dtype != torch.float16):
+    print(evaluator(model))
 
 
 # <a name="Train"></a>
@@ -177,7 +178,7 @@ trainer = SentenceTransformerTrainer(
         # to accidentally use them for negative examples
         batch_sampler = BatchSamplers.NO_DUPLICATES,
     ),
-    evaluator = evaluator, # Optinal, will make trainig slower
+    evaluator = evaluator, # Optional, will make training slower
 )
 
 
@@ -224,7 +225,8 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # In[15]:
 
 
-evaluator(model)
+with torch.autocast(device_type = "cuda", dtype = model.dtype, enabled = model.dtype != torch.float16):
+    print(evaluator(model))
 
 
 # In just 30 steps, the model's Accuracy@1 increased from 0.871 to 0.883, demonstrating how quickly the model adapts to the specific dataset.
@@ -282,9 +284,9 @@ if False:
     )
 
 
-# ### Saving to float16 for VLLM
+# ### Saving to float16 for vLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[19]:
 
@@ -293,19 +295,19 @@ if False:
 if False:
     model.save_pretrained_merged("embeddinggemma_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/embeddinggemma_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/embeddinggemma_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("embeddinggemma_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("HF_USERNAME/embeddinggemma_lora", token = "")
+    model.push_to_hub("HF_USERNAME/embeddinggemma_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
 # 
-# Some supported quant methods (full list on our [docs page](https://unsloth.ai/docs/basics/inference-and-deployment/saving-to-gguf)):
+# Some supported quant methods (full list on our [docs page](https://unsloth.ai/docs/basics/inference-and-deployment/saving-to-gguf#locally)):
 # * `q8_0` - Fast conversion. High resource use, but generally acceptable.
 # * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
 # * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
@@ -320,26 +322,26 @@ if False:
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
 if False:
-    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False:
     model.save_pretrained_gguf("embeddinggemma_finetune", quantization_method = "f16")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", quantization_method = "f16", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False:
     model.save_pretrained_gguf("embeddinggemma_finetune", quantization_method = "q4_k_m")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", quantization_method = "q4_k_m", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/embeddinggemma_finetune", quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
     model.push_to_hub_gguf(
         "HF_USERNAME/embeddinggemma_finetune", # Change hf to your username!
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "", # Get a token at https://huggingface.co/settings/tokens
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 

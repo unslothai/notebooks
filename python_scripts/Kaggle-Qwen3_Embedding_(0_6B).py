@@ -11,7 +11,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
-# 
 
 # ### News
 
@@ -262,7 +261,7 @@ if False:
 
 # ### Saving to float16 for vLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[14]:
 
@@ -271,13 +270,13 @@ if False:
 if False:
     model.save_pretrained_merged("qwen_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("qwen_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("HF_USERNAME/qwen_lora", token = "")
+    model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -298,26 +297,26 @@ if False:
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
 if False:
-    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False:
     model.save_pretrained_gguf("qwen_finetune", quantization_method = "f16")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", quantization_method = "f16", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False:
     model.save_pretrained_gguf("qwen_finetune", quantization_method = "q4_k_m")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", quantization_method = "q4_k_m", token = "")
+    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
     model.push_to_hub_gguf(
         "HF_USERNAME/qwen_finetune", # Change hf to your username!
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "", # Get a token at https://huggingface.co/settings/tokens
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 

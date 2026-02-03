@@ -245,13 +245,13 @@ model.save_pretrained("gpt_oss_lora")
 # Merge and push to hub in mxfp4 4bit format
 if False:
     model.save_pretrained_merged("gpt_oss_finetune_4bit", tokenizer, save_method = "mxfp4")
-if False: model.push_to_hub_merged("repo_id/gpt_oss_finetune_4bit", tokenizer, token = "hf...", save_method = "mxfp4")
+if False: model.push_to_hub_merged("repo_id/gpt_oss_finetune_4bit", tokenizer, token = "YOUR_HF_TOKEN", save_method = "mxfp4")
 
 # Merge and push to hub in 16bit
 if False:
     model.save_pretrained_merged("gpt_oss_finetune_16bit", tokenizer, save_method = "merged_16bit")
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/gpt_oss_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/gpt_oss_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!

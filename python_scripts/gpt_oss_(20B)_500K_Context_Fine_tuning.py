@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt_oss_(20B)_500K_Context_Fine_tuning.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
 # To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
@@ -29,7 +31,7 @@
 
 # # ### Installation
 # 
-# # In[ ]:
+# # In[1]:
 # 
 # 
 # get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    \n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo\n')
@@ -245,13 +247,13 @@ model.save_pretrained("gpt_oss_lora")
 # Merge and push to hub in mxfp4 4bit format
 if False:
     model.save_pretrained_merged("gpt_oss_finetune_4bit", tokenizer, save_method = "mxfp4")
-if False: model.push_to_hub_merged("repo_id/gpt_oss_finetune_4bit", tokenizer, token = "hf...", save_method = "mxfp4")
+if False: model.push_to_hub_merged("repo_id/gpt_oss_finetune_4bit", tokenizer, token = "YOUR_HF_TOKEN", save_method = "mxfp4")
 
 # Merge and push to hub in 16bit
 if False:
     model.save_pretrained_merged("gpt_oss_finetune_16bit", tokenizer, save_method = "merged_16bit")
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/gpt_oss_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/gpt_oss_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!

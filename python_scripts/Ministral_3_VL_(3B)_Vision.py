@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Ministral_3_VL_(3B)_Vision.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
 # To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
@@ -29,7 +31,7 @@
 
 # # ### Installation
 # 
-# # In[ ]:
+# # In[1]:
 # 
 # 
 # get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.33.post1")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n')
@@ -390,7 +392,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 if False: model.save_pretrained_merged("unsloth_finetune", tokenizer,)
 
 # To export and save to your Hugging Face account
-if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "PUT_HERE")
+if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -410,15 +412,15 @@ if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, 
 if False: model.save_pretrained_gguf("ministral_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False: model.save_pretrained_gguf("ministral_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, quantization_method = "f16", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("ministral_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -426,7 +428,7 @@ if False:
         "HF_USERNAME/ministral_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
+        token = "YOUR_HF_TOKEN",
     )
 
 

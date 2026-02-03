@@ -29,37 +29,31 @@
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
-# # ### Installation
-# 
-# # In[ ]:
-# 
-# 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
-# 
-# 
-# # In[ ]:
-# 
-# 
+# ### Installation
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
+
+
 # #@title Colab Extra Install { display-mode: "form" }
-# get_ipython().run_line_magic('%capture', '')
+# %%capture
 # import os
-# get_ipython().system('pip install --upgrade -qqq uv')
+# !pip install --upgrade -qqq uv
 # if "COLAB_" not in "".join(os.environ.keys()):
 #     # If you're not in Colab, just use pip install!
-#     get_ipython().system('pip install unsloth vllm')
+#     !pip install unsloth vllm
 # else:
 #     try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
 #     except: _numpy = "numpy"; _pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
 #     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
-#     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
-#     get_ipython().system('uv pip install -qqq {_triton}')
-# get_ipython().system('uv pip install transformers==4.56.2')
-# get_ipython().system('uv pip install --no-deps trl==0.22.2')
-# 
-# 
-# # ### Unsloth
+#     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+#     !uv pip install -qqq {_triton}
+# !uv pip install transformers==4.56.2
+# !uv pip install --no-deps trl==0.22.2
 
 # Load up `Llama 3.1 8B Instruct`, and set parameters
 
@@ -77,7 +71,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     load_in_4bit = True, # False for LoRA 16bit
     fast_inference = True, # Enable vllm fast inference
     max_lora_rank = lora_rank,
-    gpu_memory_utilization = 0.9, # Reduce if out of memory
+    gpu_memory_utilization = 0.7, # Reduce if out of memory
 )
 
 model = FastLanguageModel.get_peft_model(
@@ -199,7 +193,7 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
 # 
 # Now set up GRPO Trainer and all configurations!
 
-# In[4]:
+# In[ ]:
 
 
 max_prompt_length = 256
@@ -216,7 +210,7 @@ training_args = GRPOConfig(
     logging_steps = 1,
     per_device_train_batch_size = 1,
     gradient_accumulation_steps = 1, # Increase to 4 for smoother training
-    num_generations = 6, # Decrease if out of memory
+    num_generations = 4, # Decrease if out of memory
     max_prompt_length = max_prompt_length,
     max_completion_length = max_seq_length - max_prompt_length,
     # num_train_epochs = 1, # Set to 1 for a full training run
@@ -329,19 +323,19 @@ output
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("llama_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/llama_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/llama_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False: model.save_pretrained_merged("llama_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/llama_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/llama_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("llama_lora")
     tokenizer.save_pretrained("llama_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/llama_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/llama_lora", token = "")
+    model.push_to_hub("HF_USERNAME/llama_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/llama_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -361,15 +355,15 @@ if False:
 if False: model.save_pretrained_gguf("llama_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/llama_finetune", tokenizer, token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/llama_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False: model.save_pretrained_gguf("llama_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/llama_finetune", tokenizer, quantization_method = "f16", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/llama_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("llama_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/llama_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/llama_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -377,7 +371,7 @@ if False:
         "HF_USERNAME/llama_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
+        token = "YOUR_HF_TOKEN",
     )
 
 

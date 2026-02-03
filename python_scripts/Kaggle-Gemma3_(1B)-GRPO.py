@@ -27,17 +27,13 @@
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
-# # ### Installation
-# 
-# # In[ ]:
-# 
-# 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\n_vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.10.2\', \'triton\')\n!uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
-# 
-# 
-# # ### Unsloth
+# ### Installation
 
-# Load up `Gemma 3 1B Instruct`, and set parameters
+# In[ ]:
+
+
+get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\n_vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.10.2\', \'triton\')\n!uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
+
 
 # In[3]:
 

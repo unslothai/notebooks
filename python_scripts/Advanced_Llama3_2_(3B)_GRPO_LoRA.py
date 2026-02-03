@@ -490,19 +490,19 @@ output
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("advanced_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/advanced_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/advanced_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False: model.save_pretrained_merged("advanced_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/advanced_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/advanced_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("advanced_lora")
     tokenizer.save_pretrained("advanced_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/advanced_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/advanced_lora", token = "")
+    model.push_to_hub("HF_USERNAME/advanced_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/advanced_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -522,15 +522,15 @@ if False:
 if False: model.save_pretrained_gguf("advanced_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/advanced_finetune", tokenizer, token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/advanced_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False: model.save_pretrained_gguf("advanced_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/advanced_finetune", tokenizer, quantization_method = "f16", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/advanced_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("advanced_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/advanced_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/advanced_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -538,7 +538,7 @@ if False:
         "HF_USERNAME/advanced_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
+        token = "YOUR_HF_TOKEN",
     )
 
 

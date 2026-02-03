@@ -27,21 +27,13 @@
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
-# # ### Installation
-# 
-# # In[ ]:
-# 
-# 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\n_vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.10.2\', \'triton\')\n!uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
-# 
-# 
-# # ### Unsloth
+# ### Installation
 
-# We're also introducing how you can do `GSPO` inside of Unsloth as well!
-# 
-# The goal of this notebook is to make a vision language model solve maths problems via reinforcement learning given an image input like below:
-# 
-# <img src="https://raw.githubusercontent.com/lupantech/MathVista/main/assets/our_new_3_datasets.png" alt="Alt text" height="256">
+# In[ ]:
+
+
+get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\n_vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.10.2\', \'triton\')\n!uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
+
 
 # In[ ]:
 
@@ -185,20 +177,6 @@ train_dataset = train_dataset.rename_column("decoded_image", "image")
 
 # Now let's apply the chat template across the entire dataset:
 
-# In[ ]:
-
-
-train_dataset = train_dataset.map(
-    lambda example: {
-        "prompt": tokenizer.apply_chat_template(
-            example["prompt"],
-            tokenize = False,
-            add_generation_prompt = True, # Must add assistant
-        )
-    }
-)
-
-
 # ## Reward functions
 # 
 # We now define some basic formatting rewards functions to see if reasoning starts and ends, and also another to see if the answers were written correctly.
@@ -218,6 +196,8 @@ def formatting_reward_func(completions,**kwargs):
 
     scores = []
     for completion in completions:
+        if isinstance(completion, list):
+            completion = completion[0]["content"] if completion else ""
         score = 0
         thinking_matches = re.findall(thinking_pattern, completion, re.DOTALL)
         answer_matches = re.findall(answer_pattern, completion, re.DOTALL)
@@ -241,6 +221,7 @@ def formatting_reward_func(completions,**kwargs):
 def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[float]:
     answer_pattern = f'{SOLUTION_START}(.*?){SOLUTION_END}'
 
+    completions = [(c[0]["content"] if c else "") if isinstance(c, list) else c for c in completions]
     responses = [re.findall(answer_pattern, completion, re.DOTALL) for completion in completions]
     q = prompts[0]
     print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:{completions[0]}")
@@ -412,19 +393,19 @@ with safe_open("grpo_lora/adapter_model.safetensors", framework = "pt") as f:
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("qwen_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False: model.save_pretrained_merged("qwen_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("qwen_lora")
     tokenizer.save_pretrained("qwen_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/qwen_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "")
+    model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -444,15 +425,15 @@ if False:
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -460,7 +441,7 @@ if False:
         "HF_USERNAME/qwen_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
+        token = "YOUR_HF_TOKEN",
     )
 
 
@@ -483,5 +464,6 @@ if False:
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # </div>
+# 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 

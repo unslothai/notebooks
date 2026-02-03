@@ -528,19 +528,19 @@ tokenizer.save_pretrained("oute_tts_lora")
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("oute_tts_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/oute_tts_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/oute_tts_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False: model.save_pretrained_merged("oute_tts_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/oute_tts_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/oute_tts_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("oute_tts_lora")
     tokenizer.save_pretrained("oute_tts_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/oute_tts_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/oute_tts_lora", token = "")
+    model.push_to_hub("HF_USERNAME/oute_tts_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/oute_tts_lora", token = "YOUR_HF_TOKEN")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!

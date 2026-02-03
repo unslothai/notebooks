@@ -400,7 +400,7 @@ if False:
     model.save_pretrained_merged("nemo_gym_multi_finetune_4bit", tokenizer, save_method = "mxfp4")
 if False:
     model.push_to_hub_merged(
-        "repo_id/nemo_gym_multi_finetune_4bit", tokenizer, token = "hf...", save_method = "mxfp4"
+        "repo_id/nemo_gym_multi_finetune_4bit", tokenizer, token = "YOUR_HF_TOKEN", save_method = "mxfp4"
     )
 
 # Merge and push to hub in 16bit
@@ -410,7 +410,7 @@ if False:
     )
 if False:  # Pushing to HF Hub
     model.push_to_hub_merged(
-        "HF_USERNAME/nemo_gym_multi_finetune_16bit", tokenizer, save_method = "merged_16bit", token = ""
+        "HF_USERNAME/nemo_gym_multi_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN"
     )
 
 

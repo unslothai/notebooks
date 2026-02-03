@@ -329,21 +329,21 @@ if False:
 if False:
     model.save_pretrained_merged("functiongemma_finetune_16bit", tokenizer, save_method = "merged_16bit")
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/functiongemma_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/functiongemma_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False:
     model.save_pretrained_merged("functiongemma_finetune_4bit", tokenizer, save_method = "merged_4bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/functiongemma_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+    model.push_to_hub_merged("HF_USERNAME/functiongemma_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("functiongemma_lora")
     tokenizer.save_pretrained("functiongemma_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("HF_USERNAME/functiongemma_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/functiongemma_lora", token = "")
+    model.push_to_hub("HF_USERNAME/functiongemma_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/functiongemma_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion

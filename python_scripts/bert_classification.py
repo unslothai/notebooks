@@ -74,7 +74,7 @@ id2label = {0: "sadness", 1: "joy", 2: "love", 3: "anger",4: "fear",5: "surprise
 label2id = {"sadness": 0, "joy": 1, "love": 2, "anger": 3, "fear": 4, "surprise": 5}
 
 model, tokenizer = FastModel.from_pretrained(
-    model_name = "answerdotai/ModernBERT-large",
+    model_name = "unsloth/ModernBERT-large",
     auto_model = AutoModelForSequenceClassification,
     max_seq_length = max_seq_length,
     dtype = dtype,

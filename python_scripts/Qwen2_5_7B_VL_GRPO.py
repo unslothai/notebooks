@@ -27,37 +27,31 @@
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
-# # ### Installation
-# 
-# # In[ ]:
-# 
-# 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
-# 
-# 
-# # In[ ]:
-# 
-# 
+# ### Installation
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
+
+
 # #@title Colab Extra Install { display-mode: "form" }
-# get_ipython().run_line_magic('%capture', '')
+# %%capture
 # import os
-# get_ipython().system('pip install --upgrade -qqq uv')
+# !pip install --upgrade -qqq uv
 # if "COLAB_" not in "".join(os.environ.keys()):
 #     # If you're not in Colab, just use pip install!
-#     get_ipython().system('pip install unsloth vllm')
+#     !pip install unsloth vllm
 # else:
 #     try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
 #     except: _numpy = "numpy"; _pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
 #     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
-#     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
-#     get_ipython().system('uv pip install -qqq {_triton}')
-# get_ipython().system('uv pip install transformers==4.56.2')
-# get_ipython().system('uv pip install --no-deps trl==0.22.2')
-# 
-# 
-# # ### Unsloth
+#     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+#     !uv pip install -qqq {_triton}
+# !uv pip install transformers==4.56.2
+# !uv pip install --no-deps trl==0.22.2
 
 # We're also introducing how you can do `GSPO` inside of Unsloth as well!
 # 
@@ -207,20 +201,6 @@ train_dataset = train_dataset.rename_column("decoded_image", "image")
 
 # Now let's apply the chat template across the entire dataset:
 
-# In[ ]:
-
-
-train_dataset = train_dataset.map(
-    lambda example: {
-        "prompt": tokenizer.apply_chat_template(
-            example["prompt"],
-            tokenize = False,
-            add_generation_prompt = True, # Must add assistant
-        )
-    }
-)
-
-
 # ## Reward functions
 # 
 # We now define some basic formatting rewards functions to see if reasoning starts and ends, and also another to see if the answers were written correctly.
@@ -240,6 +220,8 @@ def formatting_reward_func(completions,**kwargs):
 
     scores = []
     for completion in completions:
+        if isinstance(completion, list):
+            completion = completion[0]["content"] if completion else ""
         score = 0
         thinking_matches = re.findall(thinking_pattern, completion, re.DOTALL)
         answer_matches = re.findall(answer_pattern, completion, re.DOTALL)
@@ -263,6 +245,7 @@ def formatting_reward_func(completions,**kwargs):
 def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[float]:
     answer_pattern = f'{SOLUTION_START}(.*?){SOLUTION_END}'
 
+    completions = [(c[0]["content"] if c else "") if isinstance(c, list) else c for c in completions]
     responses = [re.findall(answer_pattern, completion, re.DOTALL) for completion in completions]
     q = prompts[0]
     print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:{completions[0]}")
@@ -355,7 +338,7 @@ training_args = GRPOConfig(
 # 
 # During inference, you might encounter `addCriterion` or some weird gibberish outputs. Please read our [blog post](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl#qwen-2.5-vl-vision-rl-issues-and-quirks) on why this occurs. It seems to be an inherent thing inside of the model, and we can ignore this.
 
-# In[14]:
+# In[ ]:
 
 
 trainer = GRPOTrainer(
@@ -380,7 +363,7 @@ trainer.train()
 
 # And now with the LoRA we just trained with GRPO - we first save the LoRA first!
 
-# In[15]:
+# In[ ]:
 
 
 model.save_lora("grpo_lora")
@@ -388,7 +371,7 @@ model.save_lora("grpo_lora")
 
 # We try calling vLLM with our trained RL model:
 
-# In[16]:
+# In[ ]:
 
 
 from vllm import SamplingParams
@@ -434,19 +417,19 @@ with safe_open("grpo_lora/adapter_model.safetensors", framework = "pt") as f:
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("qwen_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False: model.save_pretrained_merged("qwen_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "")
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
     model.save_pretrained("qwen_lora")
     tokenizer.save_pretrained("qwen_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/qwen_lora", token = "")
-    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "")
+    model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -459,22 +442,22 @@ if False:
 # 
 # [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 
-# In[19]:
+# In[ ]:
 
 
 # Save to 8bit Q8_0
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
@@ -482,7 +465,7 @@ if False:
         "HF_USERNAME/qwen_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
-        token = "",
+        token = "YOUR_HF_TOKEN",
     )
 
 
