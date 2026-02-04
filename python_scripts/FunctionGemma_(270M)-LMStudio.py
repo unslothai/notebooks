@@ -64,7 +64,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     load_in_8bit = False, # [NEW!] A bit more accurate, uses 2x memory
     load_in_16bit = True, # [NEW!] Enables 16bit LoRA
     full_finetuning = False, # [NEW!] We have full finetuning now!
-    # token = "YOUR_HF_TOKEN", # use one if using gated models
+    # token = "YOUR_HF_TOKEN", # HF Token for gated models
 )
 
 
@@ -644,7 +644,7 @@ _ = model.generate(
 
 # <a name="Save"></a>
 # ### Saving and loading LoRA adapters for inference
-# To save the final model as LoRA adapters, either use Huggingface's `push_to_hub` for an online save or `save_pretrained` for a local save.
+# To save the final model as LoRA adapters, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
@@ -674,7 +674,7 @@ if False:
 # ### Merge LoRA adapters to base model and save to disk
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback.
-# Use push_to_hub_merged to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+# Use push_to_hub_merged to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 # 
 # ***Using these methods will require an extra GGUF conversion step to use the models in LM Studio.*** You may do one of the following:
 # 1. Use our natively supported GGUF/llama.cpp conversion - scroll down to the next section!

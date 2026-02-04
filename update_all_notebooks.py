@@ -48,7 +48,7 @@ SPELL_IGNORE_WORDS = {
     "tokenization", "tokenize", "prepending", "customizable", "chatbots",
     "modelfile", "subprocess", "app", "bot", "dict", "globals", "configs",
     "shouldn", "backticks", "analyse", "filepath", "pclass", "skp",
-    "pte", "nocommit", "uncomment", "entrypoint", "pid", "resize",
+    "pte", "uncomment", "entrypoint", "pid", "resize",
     "alibaba", "moby", "ebooks", "pdf", "ppt", "docx", "num",
     "doesn", "removeprefix", "multiturn", "rechne", "direkt", "ich",
 }
@@ -63,6 +63,14 @@ SPELL_KNOWN_FIXES = {
     "randomnly": "randomly",
     "enclused": "enclosed",
     "effecient": "efficient",
+    "fibonnaci": "fibonacci",
+    "Fibonnaci": "Fibonacci",
+    "SHould": "Should",
+    "GTP-OSS": "GPT-OSS",
+    "stratgegy": "strategy",
+    "verifer": "verifier",
+    "verisons": "versions",
+    "datases": "datasets",
 }
 
 
@@ -369,6 +377,30 @@ def update_old_unsloth(filename):
         text = text.replace("model-unsloth.Q4_K_M.gguf", f"{base_gguf}.Q4_K_M.gguf")
         text = text.replace("model-unsloth.Q8_0.gguf", f"{base_gguf}.Q8_0.gguf")
         text = text.replace("model-unsloth.gguf", f"{base_gguf}.Q8_0.gguf")
+
+        # Fix "Huggingface" -> "Hugging Face" (only capitalized, not in URLs/packages)
+        text = text.replace("Huggingface's", "Hugging Face's")
+        text = re.sub(r"Huggingface  (`[^`]+`)", r"Hugging Face \1", text)
+        text = text.replace("Huggingface TRL's", "Hugging Face TRL's")
+
+        # Fix instruction_part missing < before |end_of_role|>
+        text = text.replace(
+            '<|start_of_role|>user|end_of_role|>',
+            '<|start_of_role|>user<|end_of_role|>',
+        )
+
+        # Fix typos in specific phrases
+        text = text.replace("Prime and Prejudice", "Pride and Prejudice")
+        text = text.replace("2x Telsa T4s", "2x Tesla T4s")
+        text = text.replace("float32 s disable", "float32 so disable")
+        text = text.replace("and its amazing", "and it's amazing")
+        text = text.replace("look like this:", "looks like this:")
+        text = text.replace("Replace with out specific", "Replace without specific")
+        text = text.replace("AutoModelForPeftCausalLM", "AutoPeftModelForCausalLM")
+
+        # Remove @nocommit placeholders
+        text = re.sub(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?', '', text)
+
         return text
 
     def replace_code(text):
@@ -2483,29 +2515,52 @@ if __name__ == "__main__":
     )
 
     # Apply targeted fixes to ALL notebooks (including DONT_UPDATE_EXCEPTIONS)
+    # These are safe fixes that should apply everywhere.
+    _ALL_NB_FIXES = {
+        "fibonnaci": "fibonacci",
+        "Fibonnaci": "Fibonacci",
+        "SHould": "Should",
+        "GTP-OSS": "GPT-OSS",
+        "stratgegy": "strategy",
+        "verifer": "verifier",
+        "verisons": "versions",
+        "datases": "datasets",
+        "Huggingface's": "Hugging Face's",
+        "Huggingface TRL's": "Hugging Face TRL's",
+        "Prime and Prejudice": "Pride and Prejudice",
+        "2x Telsa T4s": "2x Tesla T4s",
+        "float32 s disable": "float32 so disable",
+        "and its amazing": "and it's amazing",
+        "look like this:": "looks like this:",
+        "Replace with out specific": "Replace without specific",
+        "AutoModelForPeftCausalLM": "AutoPeftModelForCausalLM",
+        "<|start_of_role|>user|end_of_role|>": "<|start_of_role|>user<|end_of_role|>",
+    }
     for nb_path in glob(os.path.join("nb", "*.ipynb")):
         try:
             with open(nb_path, "r", encoding="utf-8") as f:
-                nb_content = json.load(f)
-            changed = False
-            for cell in nb_content.get("cells", []):
-                src = cell.get("source", [])
-                if isinstance(src, list):
-                    new_src = []
-                    for line in src:
-                        new_line = re.sub(
-                            r"# use one if using gated models.*",
-                            "# HF Token for gated models",
-                            line,
-                        )
-                        if new_line != line:
-                            changed = True
-                        new_src.append(new_line)
-                    if changed:
-                        cell["source"] = new_src
-            if changed:
+                raw = f.read()
+            new_raw = raw
+            new_raw = re.sub(
+                r"# use one if using gated models[^\n]*",
+                "# HF Token for gated models",
+                new_raw,
+            )
+            new_raw = re.sub(
+                r"Huggingface  (`[^`]+`)",
+                r"Hugging Face \1",
+                new_raw,
+            )
+            new_raw = re.sub(
+                r'\[@nocommit[^\]]*\]\([^\)]*\)\.?',
+                '',
+                new_raw,
+            )
+            for wrong, right in _ALL_NB_FIXES.items():
+                new_raw = new_raw.replace(wrong, right)
+            if new_raw != raw:
                 with open(nb_path, "w", encoding="utf-8") as f:
-                    json.dump(nb_content, f, indent=1)
+                    f.write(new_raw)
         except Exception:
             pass
         os.chmod(nb_path, 0o644)

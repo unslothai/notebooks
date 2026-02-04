@@ -224,7 +224,7 @@ def reward_fn(completions, prompts = None, **kwargs):
         completion_text = completion[0]["content"]
         task_prompt = prompts[i][0]["content"]
 
-        # prepare data in Nemo Gym verifer request format
+        # prepare data in Nemo Gym verifier request format
         verify_request = {
             "responses_create_params": {
                 "input": [{"role": "user", "content": task_prompt, "type": "message"}]
@@ -352,7 +352,7 @@ _ = model.generate(
 # <a name="Save"></a>
 # ### Saving to float16 or MXFP4 for vLLM
 # 
-# Unsloth supports saving to `float16` directly. Select `merged_16bit` for float16. Unsloth also supports saving in low or mixed precision such as `mxfp4`, and allows `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+# Unsloth supports saving to `float16` directly. Select `merged_16bit` for float16. Unsloth also supports saving in low or mixed precision such as `mxfp4`, and allows `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 

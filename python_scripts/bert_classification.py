@@ -16,15 +16,17 @@
 # ### News
 
 # 
-# New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
+# Train MoEs - DeepSeek, GLM, Qwen and gpt-oss faster with 32% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
-# You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
+# You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
+# Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
 # 
-# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 3x faster LLM training with 30% less VRAM and 500K context. [3x faster](https://unsloth.ai/docs/new/3x-faster-training-packing) • [500K Context](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -83,7 +85,7 @@ model, tokenizer = FastModel.from_pretrained(
     id2label = id2label,
     label2id = label2id,
     load_in_4bit = load_in_4bit,
-    # token = "YOUR_HF_TOKEN", # use one if using gated models like meta-llama/Llama-2-7b-hf
+    # token = "YOUR_HF_TOKEN", # HF Token for gated models
 )
 
 
@@ -185,7 +187,7 @@ def compute_metrics(eval_pred):
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's use Huggingface  `Trainer`! More docs here: [Transformers docs](https://huggingface.co/docs/transformers/main_classes/trainer). We train for one full epoch (num_train_epochs=1) to get a meaningful result.
+# Now let's use Hugging Face `Trainer`! More docs here: [Transformers docs](https://huggingface.co/docs/transformers/main_classes/trainer). We train for one full epoch (num_train_epochs=1) to get a meaningful result.
 
 # In[8]:
 
@@ -238,7 +240,7 @@ trainer_stats = trainer.train()
 
 from transformers import pipeline
 
-sentence1 = "We just finished training ModernBERT with Unsloth and its amazing!"
+sentence1 = "We just finished training ModernBERT with Unsloth and it's amazing!"
 
 classifier = pipeline("sentiment-analysis", model = model,tokenizer = tokenizer)
 
@@ -247,7 +249,7 @@ classifier(sentence1)
 
 # <a name="Save"></a>
 # ### Saving finetuned models
-# To save the final model, either use Huggingface's `push_to_hub` for an online save or `save_pretrained` for a local save.
+# To save the final model, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
 # 
 
 # In[15]:

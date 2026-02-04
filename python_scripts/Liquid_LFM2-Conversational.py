@@ -68,7 +68,7 @@ model, tokenizer = FastModel.from_pretrained(
     max_seq_length = 2048, # Choose any for long context!
     load_in_4bit = False,  # 4 bit quantization to reduce memory
     full_finetuning = False, # [NEW!] We have full finetuning now!
-    # token = "hf_...", # use one if using gated models
+    # token = "hf_...", # HF Token for gated models
 )
 
 
@@ -82,7 +82,7 @@ model = FastModel.get_peft_model(
     finetune_vision_layers     = False, # LFM for now is just text only
     finetune_language_layers   = True,  # Should leave on!
     finetune_attention_modules = True,  # Attention good for GRPO
-    finetune_mlp_modules       = True,  # SHould leave on always!
+    finetune_mlp_modules       = True,  # Should leave on always!
 
     r = 16,           # Larger = higher accuracy, but might overfit
     lora_alpha = 16,  # Recommended alpha == r at least
@@ -313,7 +313,7 @@ _ = model.generate(
 
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
-# To save the final model as LoRA adapters, either use Huggingface's `push_to_hub` for an online save or `save_pretrained` for a local save.
+# To save the final model as LoRA adapters, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
@@ -365,7 +365,7 @@ _ = model.generate(
 )
 
 
-# You can also use Hugging Face's `AutoModelForPeftCausalLM`. Only use this if you do not have `unsloth` installed. It can be hopelessly slow, since `4bit` model downloading is not supported, and Unsloth's **inference is 2x faster**.
+# You can also use Hugging Face's `AutoPeftModelForCausalLM`. Only use this if you do not have `unsloth` installed. It can be hopelessly slow, since `4bit` model downloading is not supported, and Unsloth's **inference is 2x faster**.
 
 # In[22]:
 

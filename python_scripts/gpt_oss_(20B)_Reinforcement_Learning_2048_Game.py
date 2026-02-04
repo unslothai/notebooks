@@ -364,7 +364,7 @@ print(game.board().pretty(), game.state())
 # 
 # We'll set up a function to accept some strategy that'll emit an action within `WASD` and check the game state.
 # 
-# We'll also add a timer to only execute the stratgegy for 2 seconds maximum, otherwise it might never terminate!
+# We'll also add a timer to only execute the strategy for 2 seconds maximum, otherwise it might never terminate!
 
 # In[ ]:
 

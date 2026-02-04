@@ -302,7 +302,7 @@ model.save_pretrained_torchao(save_to, tokenizer = tokenizer)
 # model.save_pretrained_torchao(f"{username}/{save_to}", tokenizer = tokenizer, push_to_hub = True)
 
 
-# Once saved, we can export the model checkpoint to ExecuTorch.  Follow the directions [@nocommit TBD](TBD).And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
+# Once saved, we can export the model checkpoint to ExecuTorch.  Follow the directions And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
 # 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.

@@ -259,7 +259,7 @@ print(current_state.legal_actions)
 # 
 # We'll set up a function to accept some strategy that'll emit an action within `0123` and check the game state.
 # 
-# We'll also add a timer to only execute the stratgegy for 2 seconds maximum, otherwise it might never terminate!
+# We'll also add a timer to only execute the strategy for 2 seconds maximum, otherwise it might never terminate!
 
 # In[ ]:
 
