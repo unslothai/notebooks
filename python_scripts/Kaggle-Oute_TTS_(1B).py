@@ -34,7 +34,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n!pip install omegaconf einx\n!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS\nimport os\nos.remove("/content/OuteTTS/outetts/models/gguf_model.py")\nos.remove("/content/OuteTTS/outetts/interface.py")\nos.remove("/content/OuteTTS/outetts/__init__.py")\n!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec "datasets>=3.4.1,<4.0.0"\n!pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install omegaconf einx\n!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS\nimport os\nos.remove("/content/OuteTTS/outetts/models/gguf_model.py")\nos.remove("/content/OuteTTS/outetts/interface.py")\nos.remove("/content/OuteTTS/outetts/__init__.py")\n!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec "datasets>=3.4.1,<4.0.0"\n!pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
 # 
 # 
 # # ### Unsloth

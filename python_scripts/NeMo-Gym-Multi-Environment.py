@@ -33,7 +33,7 @@
 
 # # Load the model
 # 
-# In this example, we will do full finetuning, but Unsloth supports optimized low precision (e.g. 4 or 8 bit) or parameter-effecient training methods (e.g. LoRA). Check out Unsloth's documentation if you are interested in these methods!
+# In this example, we will do full finetuning, but Unsloth supports optimized low precision (e.g. 4 or 8 bit) or parameter-efficient training methods (e.g. LoRA). Check out Unsloth's documentation if you are interested in these methods!
 
 # In[ ]:
 

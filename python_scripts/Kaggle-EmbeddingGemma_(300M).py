@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -112,6 +112,7 @@ train_dataset[0]
 # In[5]:
 
 
+import torch
 from sentence_transformers.evaluation import InformationRetrievalEvaluator
 
 queries = dict(enumerate(eval_dataset["question"]))
@@ -124,7 +125,8 @@ evaluator = InformationRetrievalEvaluator(
     show_progress_bar = False,
     batch_size = 64,
 )
-evaluator(model)
+with torch.autocast("cuda"):
+    print(evaluator(model))
 
 
 # <a name="Train"></a>
@@ -177,7 +179,7 @@ trainer = SentenceTransformerTrainer(
         # to accidentally use them for negative examples
         batch_sampler = BatchSamplers.NO_DUPLICATES,
     ),
-    evaluator = evaluator, # Optinal, will make trainig slower
+    evaluator = evaluator, # Optional, will make training slower
 )
 
 
@@ -224,7 +226,8 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # In[15]:
 
 
-evaluator(model)
+with torch.autocast("cuda"):
+    print(evaluator(model))
 
 
 # In just 30 steps, the model's Accuracy@1 increased from 0.871 to 0.883, demonstrating how quickly the model adapts to the specific dataset.

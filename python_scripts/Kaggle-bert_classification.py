@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -74,7 +74,7 @@ id2label = {0: "sadness", 1: "joy", 2: "love", 3: "anger",4: "fear",5: "surprise
 label2id = {"sadness": 0, "joy": 1, "love": 2, "anger": 3, "fear": 4, "surprise": 5}
 
 model, tokenizer = FastModel.from_pretrained(
-    model_name = "answerdotai/ModernBERT-large",
+    model_name = "unsloth/ModernBERT-large",
     auto_model = AutoModelForSequenceClassification,
     max_seq_length = max_seq_length,
     dtype = dtype,

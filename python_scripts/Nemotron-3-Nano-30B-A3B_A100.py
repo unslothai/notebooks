@@ -96,7 +96,7 @@ model = FastLanguageModel.get_peft_model(
 
 # <a name="Data"></a>
 # ### Data Prep
-# We now use the `Nemotron` format for conversation style finetunes. We use the [Open Math Reasoning]() dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and whicht got > 95% accuracy. Nemotron renders multi turn conversations like below:
+# We now use the `Nemotron` format for conversation style finetunes. We use the [Open Math Reasoning]() dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy. Nemotron renders multi turn conversations like below:
 # 
 # ```
 # <|im_start|>user

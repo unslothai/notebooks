@@ -89,7 +89,7 @@ model = FastVisionModel.get_peft_model(
 # 
 # `AI4Math/MathVista` is a dataset that involves using images to solve logic and math problems.
 # 
-# For this notebook, we will only use math problems with numeric answers for simpilicity.
+# For this notebook, we will only use math problems with numeric answers for simplicity.
 
 # In[ ]:
 
@@ -115,7 +115,7 @@ def is_numeric_answer(example):
 dataset = dataset.filter(is_numeric_answer)
 
 
-# We also resize the images to be 512 by 512 pixels to make the images managable in context length. We also convert them to RGB so they are compatible for training!
+# We also resize the images to be 512 by 512 pixels to make the images manageable in context length. We also convert them to RGB so they are compatible for training!
 
 # In[ ]:
 

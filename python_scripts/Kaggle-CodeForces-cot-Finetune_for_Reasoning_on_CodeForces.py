@@ -32,7 +32,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2 && pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -94,7 +94,7 @@ model = FastLanguageModel.get_peft_model(
 # 
 # We are using the [`open-r1/codeforces-cots`](https://huggingface.co/datasets/open-r1/codeforces-cots/viewer/solutions_decontaminated?views%5B%5D=solutions_decontaminated) by the Hugging Face Open R1 project. This is a dataset of problems for a competitive coding challenge.
 # 
-# The Open R1 team have found that models trained to reason on competive coding tasks like this outperform other models on coding benchmarks.
+# The Open R1 team have found that models trained to reason on competitive coding tasks like this outperform other models on coding benchmarks.
 # 
 # 
 # ![image](https://huggingface.co/open-r1/OlympicCoder-7B/resolve/main/lcb-evals.png)

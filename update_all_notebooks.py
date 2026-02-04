@@ -1,4 +1,5 @@
 import argparse
+import ast
 import json
 import os
 import re
@@ -8,6 +9,141 @@ from datetime import datetime
 from glob import glob
 from nbconvert import PythonExporter
 import nbformat
+from spellchecker import SpellChecker
+
+
+SPELL_IGNORE_WORDS = {
+    "unsloth", "qwen", "llama", "gemma", "lora", "gguf", "vllm", "grpo",
+    "kaggle", "colab", "alpaca", "qlora", "peft", "sft", "dpo", "orpo",
+    "bnb", "bitsandbytes", "xformers", "triton", "cuda", "pytorch",
+    "tokenizer", "huggingface", "finetune", "finetuning", "bf16", "fp16",
+    "fp8", "int4", "int8", "eos", "vram", "gpu", "cpu", "trl", "sdpa",
+    "ipynb", "ggml", "ollama", "mistral", "deepseek", "pixtral", "qat",
+    "nemotron", "magistral", "ministral", "granite", "ernie", "bert",
+    "roberta", "xlm", "matmul", "autocast", "dtype", "warmup",
+    "pretrained", "instruct", "mergekit", "wandb", "tensorboard", "lmstudio",
+    "venv", "conda", "repo", "param",
+    "numpy", "scipy", "sklearn", "tokenizers", "datasets",
+    "checkpointing", "logits", "softmax", "quantized", "quantize",
+    "quantization", "backprop", "embeddings", "hyperparameters", "trainable",
+    "nemo", "nvidia", "multimodal", "env", "linux", "macos", "runpod",
+    "eval", "cot", "codeforces", "completions",
+    # HTML/markdown tags and attributes commonly found in notebooks
+    "img", "src", "href", "div", "png", "svg", "alt", "https", "http",
+    "html", "css", "url", "readme", "github", "runtime", "cpp", "natively",
+    "pretraining", "finetunes", "tts", "llms", "vlm", "vlms", "gpt", "oss",
+    "dataset", "nli", "finetuned", "tutoring", "tutored",
+    "unslothai", "nbsp", "executorch", "regex",
+    "prequantized", "prepend", "prepended", "hugging", "submodule",
+    "repo", "repos", "txt", "csv", "json", "yaml", "toml",
+    "subfolder", "subdirectory", "gradio", "chatbot", "natively",
+    # Common words in notebooks that are valid but not in dictionary
+    "etc", "pre", "multi", "chatml", "vicuna", "labonne", "maxime",
+    "maths", "tokenized", "workflow", "functiongemma", "templating",
+    "tomaarsen", "miriad", "langid", "bahasa",
+    "electroglyph", "runpod",
+    # GitHub usernames, package names, tech terms
+    "willccbb", "sglang", "thytu", "vicgalle", "kadirnar", "saibo",
+    "etherl", "mithex", "pydantic", "scikit", "jsonl", "docstrings",
+    "tokenization", "tokenize", "prepending", "customizable", "chatbots",
+    "modelfile", "subprocess", "app", "bot", "dict", "globals", "configs",
+    "shouldn", "backticks", "analyse", "filepath", "pclass", "skp",
+    "pte", "nocommit", "uncomment", "entrypoint", "pid", "resize",
+    "alibaba", "moby", "ebooks", "pdf", "ppt", "docx", "num",
+    "doesn", "removeprefix", "multiturn", "rechne", "direkt", "ich",
+}
+
+SPELL_KNOWN_FIXES = {
+    "Optinal": "Optional",
+    "trainig": "training",
+    "competive": "competitive",
+    "whicht": "which",
+    "simpilicity": "simplicity",
+    "managable": "manageable",
+    "randomnly": "randomly",
+    "enclused": "enclosed",
+    "effecient": "efficient",
+}
+
+
+def check_spelling(notebook_content, notebook_name):
+    """Check spelling in markdown cells and code comments. Auto-fix known misspellings."""
+    spell = SpellChecker()
+    spell.word_frequency.load_words(SPELL_IGNORE_WORDS)
+    issues = []
+    fixed = False
+    for i, cell in enumerate(notebook_content.get("cells", [])):
+        source = cell.get("source", [])
+        if isinstance(source, str):
+            source = [source]
+        text = "".join(source)
+
+        # Apply known fixes
+        new_text = text
+        for wrong, right in SPELL_KNOWN_FIXES.items():
+            if wrong in new_text:
+                new_text = new_text.replace(wrong, right)
+        if new_text != text:
+            cell["source"] = new_text.splitlines(True)
+            fixed = True
+
+        # Check for unknown misspellings in markdown cells (use new_text which has known fixes applied)
+        if cell.get("cell_type") == "markdown":
+            # Strip HTML tags and URLs before extracting words
+            clean_text = re.sub(r'<[^>]+>', ' ', new_text)
+            clean_text = re.sub(r'https?://\S+', ' ', clean_text)
+            clean_text = re.sub(r'\[([^\]]*)\]\([^\)]*\)', r'\1', clean_text)
+            words = re.findall(r'\b[a-zA-Z]{3,}\b', clean_text)
+            # Filter out code identifiers (camelCase, snake_case, ALL_CAPS)
+            english_words = [
+                w for w in words
+                if w == w.lower() or w == w.capitalize()
+            ]
+            lower_words = [w.lower() for w in english_words]
+            misspelled = spell.unknown(lower_words)
+            misspelled -= SPELL_IGNORE_WORDS
+            if misspelled:
+                issues.append((i, misspelled))
+    return fixed, issues
+
+
+def validate_notebook_syntax(notebook_path):
+    """Validate Python syntax of all code cells in a notebook."""
+    try:
+        with open(notebook_path, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+    except Exception:
+        return []
+
+    errors = []
+    for i, cell in enumerate(nb.get("cells", [])):
+        if cell.get("cell_type") != "code":
+            continue
+        source = "".join(cell.get("source", []))
+        if not source.strip():
+            continue
+
+        # Remove IPython magics and shell commands for AST parsing
+        # Replace with 'pass' to avoid empty blocks (e.g., if COLAB: !pip install)
+        clean_lines = []
+        for line in source.splitlines():
+            stripped = line.lstrip()
+            if stripped.startswith(("!", "%", "%%")):
+                indent = line[:len(line) - len(stripped)]
+                clean_lines.append(indent + "pass")
+            else:
+                clean_lines.append(line)
+        clean_source = "\n".join(clean_lines)
+
+        if not clean_source.strip():
+            continue
+
+        try:
+            ast.parse(clean_source)
+        except SyntaxError as e:
+            errors.append((i, e.lineno, str(e)))
+
+    return errors
 
 
 def _get_base_name_from_filename(filename):
@@ -165,8 +301,8 @@ def update_old_unsloth(filename):
         text = re.sub(r"!{2,}", "!", text)
         text = text.replace("ee notice", "we notice")
 
-        # Convert versions like X.X.X to 2025.12.8
-        text = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2025.12.8\1", text)
+        # Convert versions like X.X.X to 2026.2.1
+        text = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2026.2.1\1", text)
 
         # Change gguf-quantization-options link
         text = text.replace(
@@ -312,6 +448,14 @@ def update_old_unsloth(filename):
         )
         text = re.sub(r"([\"\'])lora_model([\"\'])", rf"\1{base_lora}\2", text)
         text = re.sub(r"([\"\'])finetuned_model([\"\'])", rf"\1{base_lora}\2", text)
+
+        # Also handle AutoPeftModelForCausalLM.from_pretrained("xxx_lora")
+        # and AutoTokenizer.from_pretrained("xxx_lora") for load-back consistency
+        text = re.sub(
+            r"(Auto(?:PeftModel\w*|Tokenizer|Model\w*)\.from_pretrained\(\s*)([\"\'])([^\"\']*_lora[^\"\']*)([\"\'])",
+            rf"\1\2{base_lora}\4",
+            text,
+        )
 
         # Update hf/ to HF_USERNAME/ in quoted strings
         text = text.replace('"hf/', '"HF_USERNAME/')
@@ -490,13 +634,6 @@ def update_or_append_pip_install(base_content, package_name, new_install_line):
         output = base_content.strip() + "\n" + new_install_line
     else:
         output = updated_content
-    # Convert pip install transformers==4.56.2\npip install --no-deps trl==0.22.2 to &&
-    finder = r"!pip install transformers==([\d\.]{3,})\n!pip install --no-deps trl==([\d\.]{3,})"
-    found = re.findall(finder, output)
-    if len(found) != 0:
-        transformers, trl = found[0]
-        new = f"!pip install transformers=={transformers} && pip install --no-deps trl=={trl}"
-        output = re.sub(finder, new, output)
     return output
 
 current_branch = get_current_git_branch()
@@ -546,7 +683,7 @@ SPACES = " " * 4
 # INSTALLATION (MANY OF THIS IS SPECIFIC TO ONE OF THE NOTEBOOKS)
 # =======================================================
 
-XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.33.post1")"""
+XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
 
 installation_content = """%%capture
 import os, re
@@ -1792,6 +1929,40 @@ def main():
         # update_unsloth_config(notebook_file)
         update_old_unsloth(notebook_file)
 
+    # Spelling check
+    print("\n=== Spelling Check ===")
+    spell_issues_found = False
+    for notebook_file in notebook_files:
+        try:
+            with open(notebook_file, "r", encoding="utf-8") as f:
+                nb_content = json.load(f)
+            fixed, issues = check_spelling(nb_content, os.path.basename(notebook_file))
+            if fixed:
+                with open(notebook_file, "w", encoding="utf-8") as f:
+                    json.dump(nb_content, f, indent=1)
+                print(f"  AUTO-FIXED spelling in {os.path.basename(notebook_file)}")
+            if issues:
+                spell_issues_found = True
+                for cell_idx, words in issues:
+                    print(f"  SPELLING: {os.path.basename(notebook_file)} cell {cell_idx}: {words}")
+        except Exception:
+            pass
+    if not spell_issues_found:
+        print("  No spelling issues found.")
+
+    # AST syntax check
+    print("\n=== AST Syntax Check ===")
+    syntax_issues_found = False
+    for notebook_file in notebook_files:
+        errors = validate_notebook_syntax(notebook_file)
+        if errors:
+            syntax_issues_found = True
+            for cell_idx, lineno, msg in errors:
+                print(f"  SYNTAX: {os.path.basename(notebook_file)} cell {cell_idx} line {lineno}: {msg}")
+    if not syntax_issues_found:
+        print("  No syntax issues found.")
+
+
 def add_colab_badge(notebooks_dir):
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
     paths = [x.replace("\\", "/") for x in paths]
@@ -1829,12 +2000,8 @@ def update_readme(
     type_order=None,      
     kaggle_accelerator="nvidiaTeslaT4",
 ):
-    if args.to_main_repo:
-        base_url_colab = "https://colab.research.google.com/github/unslothai/notebooks/blob/main/"
-        base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/"
-    else:
-        base_url_colab = f"https://colab.research.google.com/github/unslothai/notebooks/blob/{current_branch}/"
-        base_url_kaggle = f"https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/{current_branch}/"
+    base_url_colab = "https://colab.research.google.com/github/unslothai/notebooks/blob/main/"
+    base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/"
 
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
     paths = [x.replace("\\", "/") for x in paths]
@@ -2084,26 +2251,56 @@ def copy_and_update_notebooks(
     else:
         os.makedirs(destination_dir, exist_ok=True)
 
+    def _preserve_outputs(dest_path, template_path):
+        """Copy template to dest, preserving output cells from existing dest if cell count matches."""
+        existing_outputs = {}
+        existing_nb = None
+        if os.path.exists(dest_path):
+            try:
+                with open(dest_path, "r", encoding="utf-8") as f:
+                    existing_nb = json.load(f)
+                for idx, cell in enumerate(existing_nb.get("cells", [])):
+                    if cell.get("outputs"):
+                        existing_outputs[idx] = cell["outputs"]
+            except Exception:
+                existing_outputs = {}
+                existing_nb = None
+
+        shutil.copy2(template_path, dest_path)
+
+        if existing_outputs and existing_nb is not None:
+            try:
+                with open(dest_path, "r", encoding="utf-8") as f:
+                    new_nb = json.load(f)
+                if len(new_nb.get("cells", [])) == len(existing_nb.get("cells", [])):
+                    for idx, outputs in existing_outputs.items():
+                        if idx < len(new_nb["cells"]):
+                            new_nb["cells"][idx]["outputs"] = outputs
+                    with open(dest_path, "w", encoding="utf-8") as f:
+                        json.dump(new_nb, f, indent=1)
+            except Exception:
+                pass
+
     for template_notebook_path in template_notebooks:
         notebook_name = os.path.basename(template_notebook_path)
 
         colab_notebook_name = notebook_name
         destination_notebook_path = os.path.join(destination_dir, colab_notebook_name)
 
-        shutil.copy2(template_notebook_path, destination_notebook_path)
+        _preserve_outputs(destination_notebook_path, template_notebook_path)
         print(f"Copied '{colab_notebook_name}' to '{destination_dir}'")
 
         kaggle_notebook_name = "Kaggle-" + notebook_name
         destination_notebook_path = os.path.join(destination_dir, kaggle_notebook_name)
 
-        shutil.copy2(template_notebook_path, destination_notebook_path)
+        _preserve_outputs(destination_notebook_path, template_notebook_path)
 
         print(f"Copied '{kaggle_notebook_name}' to '{destination_dir}'")
 
         if "GRPO" in template_notebook_path:
             hf_course_notebook_name = f"{hf_course_name}-" + notebook_name
             destination_notebook_path = os.path.join(destination_dir, hf_course_notebook_name)
-            shutil.copy2(template_notebook_path, destination_notebook_path)
+            _preserve_outputs(destination_notebook_path, template_notebook_path)
             print(f"Copied f'{hf_course_name}-{notebook_name}' to '{destination_notebook_path}'")
 
         update_notebook_sections(
