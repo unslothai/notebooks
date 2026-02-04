@@ -524,6 +524,13 @@ def update_old_unsloth(filename):
         text = re.sub(r'\bvLLM\b', 'vllm', text)
         text = re.sub(r'\bVLLM\b(?!_)', 'vllm', text)
 
+        # Simplify gated models comment
+        text = re.sub(
+            r"# use one if using gated models.*",
+            "# HF Token for gated models",
+            text,
+        )
+
         # Fix A=A to A = A in code
         text = _space_equals_in_code(text)
 
@@ -545,6 +552,7 @@ def update_old_unsloth(filename):
     if updated:
         with open(filename, "w", encoding="utf-8") as w:
             json.dump(notebook_content, w, indent=1)
+        os.chmod(filename, 0o644)
 pass
 
 
@@ -1153,15 +1161,17 @@ installation_ministral_kaggle_content = update_or_append_pip_install(
 # =======================================================
 
 new_announcement = """
-New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://unsloth.ai/docs/new/3x-faster-training-packing)
+Train MoEs - DeepSeek, GLM, Qwen and gpt-oss faster with 32% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 
-You can now train with 500K context windows on a single 80GB GPU. [Blog](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
+You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
 
-Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://unsloth.ai/docs/new/how-to-train-llms-with-unsloth-and-docker).
+Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
 
-New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+3x faster LLM training with 30% less VRAM and 500K context. [3x faster](https://unsloth.ai/docs/new/3x-faster-training-packing) • [500K Context](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 
-Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/all-our-models) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks)."""
+New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
+
+Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks)."""
 
 # =======================================================
 # LAST BLOCK CLOSE STATEMENT
@@ -1832,6 +1842,7 @@ def update_notebook_sections(
         if updated:
             with open(notebook_path, "w", encoding="utf-8") as f:
                 json.dump(notebook_content, f, indent=1)
+            os.chmod(notebook_path, 0o644)
             print(f"Updated: {notebook_path}")
         else:
             print(f"No sections found to update in: {notebook_path}")
@@ -1940,6 +1951,7 @@ def main():
             if fixed:
                 with open(notebook_file, "w", encoding="utf-8") as f:
                     json.dump(nb_content, f, indent=1)
+                os.chmod(notebook_file, 0o644)
                 print(f"  AUTO-FIXED spelling in {os.path.basename(notebook_file)}")
             if issues:
                 spell_issues_found = True
@@ -1989,6 +2001,7 @@ def add_colab_badge(notebooks_dir):
 
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(notebook_content, f, indent=1)
+            os.chmod(path, 0o644)
 
 
 def update_readme(
@@ -2266,7 +2279,8 @@ def copy_and_update_notebooks(
                 existing_outputs = {}
                 existing_nb = None
 
-        shutil.copy2(template_path, dest_path)
+        shutil.copyfile(template_path, dest_path)
+        os.chmod(dest_path, 0o644)
 
         if existing_outputs and existing_nb is not None:
             try:
@@ -2278,6 +2292,7 @@ def copy_and_update_notebooks(
                             new_nb["cells"][idx]["outputs"] = outputs
                     with open(dest_path, "w", encoding="utf-8") as f:
                         json.dump(new_nb, f, indent=1)
+                    os.chmod(dest_path, 0o644)
             except Exception:
                 pass
 
@@ -2466,6 +2481,34 @@ if __name__ == "__main__":
         KNOWN_TYPES_ORDERED,
         type_order
     )
+
+    # Apply targeted fixes to ALL notebooks (including DONT_UPDATE_EXCEPTIONS)
+    for nb_path in glob(os.path.join("nb", "*.ipynb")):
+        try:
+            with open(nb_path, "r", encoding="utf-8") as f:
+                nb_content = json.load(f)
+            changed = False
+            for cell in nb_content.get("cells", []):
+                src = cell.get("source", [])
+                if isinstance(src, list):
+                    new_src = []
+                    for line in src:
+                        new_line = re.sub(
+                            r"# use one if using gated models.*",
+                            "# HF Token for gated models",
+                            line,
+                        )
+                        if new_line != line:
+                            changed = True
+                        new_src.append(new_line)
+                    if changed:
+                        cell["source"] = new_src
+            if changed:
+                with open(nb_path, "w", encoding="utf-8") as f:
+                    json.dump(nb_content, f, indent=1)
+        except Exception:
+            pass
+        os.chmod(nb_path, 0o644)
 
     if not args.disable_convert_to_script:
         convert_folder("nb", "python_scripts")
