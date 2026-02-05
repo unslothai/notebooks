@@ -93,7 +93,7 @@ model = FastVisionModel.get_peft_model(
 # 
 # `AI4Math/MathVista` is a dataset that involves using images to solve logic and math problems.
 # 
-# For this notebook, we will only use math problems with numeric answers for simpilicity.
+# For this notebook, we will only use math problems with numeric answers for simplicity.
 
 # In[5]:
 
