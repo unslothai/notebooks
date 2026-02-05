@@ -303,7 +303,7 @@ def update_old_unsloth(filename):
         """Apply common text replacements for both code and markdown cells."""
         text = text.replace("</a></a>", "</a>")
         text = text.replace(
-            "To install Unsloth your local device",
+            "To install Unsloth on your local device",
             "To install Unsloth on your local device",
         )
         text = re.sub(r"!{2,}", "!", text)

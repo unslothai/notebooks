@@ -182,7 +182,7 @@ chat_template = \
     "{% if add_generation_prompt %}{{ '{reasoning_start}' }}"\
     "{% endif %}"
 
-# Replace without specific template:
+# Replace with our specific template:
 chat_template = chat_template\
     .replace("'{system_prompt}'",   f"'{system_prompt}'")\
     .replace("'{reasoning_start}'", f"'{reasoning_start}'")
