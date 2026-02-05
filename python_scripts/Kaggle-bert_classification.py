@@ -5,26 +5,28 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
-# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
 # 
 
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# Train MoEs - DeepSeek, GLM, Qwen and gpt-oss faster with 32% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# 3x faster LLM training with 30% less VRAM and 500K context. [3x faster](https://unsloth.ai/docs/new/3x-faster-training-packing) • [500K Context](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -55,10 +57,10 @@ load_in_4bit = False # Use 4bit quantization to reduce memory usage. Can be Fals
 
 # 4bit pre quantized models we support for 4x faster downloading + no OOMs.
 fourbit_models = [
-    "unsloth/Meta-Llama-3.1-8B-bnb-4bit",      # Llama-3.1 15 trillion tokens model 2x faster!
-    "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
-    "unsloth/Meta-Llama-3.1-70B-bnb-4bit",
-    "unsloth/Meta-Llama-3.1-405B-bnb-4bit",    # We also uploaded 4bit for 405b!
+    "unsloth/Llama-3.1-8B-bnb-4bit",      # Llama-3.1 15 trillion tokens model 2x faster!
+    "unsloth/Llama-3.1-8B-Instruct-bnb-4bit",
+    "unsloth/Llama-3.1-70B-bnb-4bit",
+    "unsloth/Llama-3.1-405B-bnb-4bit",    # We also uploaded 4bit for 405b!
     "unsloth/Mistral-Nemo-Base-2407-bnb-4bit", # New Mistral 12b 2x faster!
     "unsloth/Mistral-Nemo-Instruct-2407-bnb-4bit",
     "unsloth/mistral-7b-v0.3-bnb-4bit",        # Mistral v3 2x faster!
@@ -74,16 +76,16 @@ id2label = {0: "sadness", 1: "joy", 2: "love", 3: "anger",4: "fear",5: "surprise
 label2id = {"sadness": 0, "joy": 1, "love": 2, "anger": 3, "fear": 4, "surprise": 5}
 
 model, tokenizer = FastModel.from_pretrained(
-    model_name = "answerdotai/ModernBERT-large",
+    model_name = "unsloth/ModernBERT-large",
     auto_model = AutoModelForSequenceClassification,
     max_seq_length = max_seq_length,
     dtype = dtype,
     num_labels  = 6,
     full_finetuning = True,
-    id2label=id2label,
-    label2id=label2id,
+    id2label = id2label,
+    label2id = label2id,
     load_in_4bit = load_in_4bit,
-    # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
+    # token = "YOUR_HF_TOKEN", # HF Token for gated models
 )
 
 
@@ -107,7 +109,7 @@ model = FastModel.get_peft_model(
     random_state = 3407,
     use_rslora = False,  # We support rank stabilized LoRA
     loftq_config = None, # And LoftQ
-    task_type="SEQ_CLS",
+    task_type = "SEQ_CLS",
 )
 
 
@@ -124,17 +126,17 @@ model = FastModel.get_peft_model(
 from datasets import load_dataset
 
 # Load the IMDB dataset
-dataset = load_dataset("dair-ai/emotion","unsplit",split='train[:30000]')
+dataset = load_dataset("dair-ai/emotion","unsplit",split = 'train[:30000]')
 
 # Split into training and validation sets
-dataset = dataset.train_test_split(test_size=0.2)
+dataset = dataset.train_test_split(test_size = 0.2)
 
 def tokenize_function(examples):
     return tokenizer(examples["text"])
 
 # Apply the tokenizer to the dataset
-train_dataset = dataset['train'].map(tokenize_function, batched=True)
-val_dataset = dataset["test"].map(tokenize_function, batched=True)
+train_dataset = dataset['train'].map(tokenize_function, batched = True)
+val_dataset = dataset["test"].map(tokenize_function, batched = True)
 
 
 # 
@@ -148,7 +150,7 @@ from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 
 labels = train_dataset["label"]
-class_weights = compute_class_weight("balanced", classes=np.unique(labels), y=labels)
+class_weights = compute_class_weight("balanced", classes = np.unique(labels), y = labels)
 
 
 # In[5]:
@@ -179,13 +181,13 @@ from sklearn.metrics import accuracy_score
 
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
-    preds = logits.argmax(axis=-1)
+    preds = logits.argmax(axis = -1)
     return {"accuracy": accuracy_score(labels, preds)}
 
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's use Huggingface  `Trainer`! More docs here: [Transformers docs](https://huggingface.co/docs/transformers/main_classes/trainer). We train for one full epoch (num_train_epochs=1) to get a meaningful result.
+# Now let's use Hugging Face `Trainer`! More docs here: [Transformers docs](https://huggingface.co/docs/transformers/main_classes/trainer). We train for one full epoch (num_train_epochs=1) to get a meaningful result.
 
 # In[8]:
 
@@ -210,8 +212,8 @@ trainer = Trainer(
         logging_steps = 1,
         optim = "adamw_8bit",
         weight_decay = 0.001,
-        eval_strategy="steps",
-        eval_steps=0.10,  # Evaluate every 10% of total training steps
+        eval_strategy = "steps",
+        eval_steps = 0.10,  # Evaluate every 10% of total training steps
         lr_scheduler_type = "linear",
         seed = 3407,
         output_dir = "outputs",
@@ -238,39 +240,39 @@ trainer_stats = trainer.train()
 
 from transformers import pipeline
 
-sentence1 = "We just finished training ModernBERT with Unsloth and its amazing!"
+sentence1 = "We just finished training ModernBERT with Unsloth and it's amazing!"
 
-classifier = pipeline("sentiment-analysis", model=model,tokenizer=tokenizer)
+classifier = pipeline("sentiment-analysis", model = model,tokenizer = tokenizer)
 
 classifier(sentence1)
 
 
 # <a name="Save"></a>
 # ### Saving finetuned models
-# To save the final model, either use Huggingface's `push_to_hub` for an online save or `save_pretrained` for a local save.
+# To save the final model, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
 # 
 
 # In[15]:
 
 
-model.save_pretrained("model")  # Local saving
-tokenizer.save_pretrained("model")
-# model.push_to_hub("your_name/model", token = "...") # Online saving
-# tokenizer.push_to_hub("your_name/model", token = "...") # Online saving
+model.save_pretrained("bert_classification_lora")  # Local saving
+tokenizer.save_pretrained("bert_classification_lora")
+# model.push_to_hub("your_name/bert_classification_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/bert_classification_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
+# Some other resources:
 # 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
 # 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 # 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # </div>

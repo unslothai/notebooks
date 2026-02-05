@@ -9,10 +9,10 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install).
 
 # # Goal: Make gpt-oss play games with Reinforcement Learning
 # 
@@ -26,15 +26,15 @@
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"\n    except: get_numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers==4.56.2" trackio \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth trackio\n!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo\n')
+get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try:\n        import numpy\n\n        get_numpy = f"numpy=={numpy.__version__}"\n    except:\n        get_numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers==4.56.2" trackio \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth trackio\n!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo\n')
 
 
-# We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) from source:
+# We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) and connect to the OpenSpiel environment on Hugging Face:
 
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().parent.absolute() / "OpenEnv")\n')
+get_ipython().run_cell_magic('capture', '', '!pip install -qqq git+https://github.com/meta-pytorch/OpenEnv.git#subdirectory=envs/openspiel_env\n')
 
 
 # We'll load GPT-OSS 20B and set some parameters:
@@ -47,72 +47,61 @@ get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn r
 
 from unsloth import FastLanguageModel
 import torch
-max_seq_length = 768 # Can increase for longer RL output
-lora_rank = 4        # Larger rank = smarter, but slower
+
+max_seq_length = 768  # Can increase for longer RL output
+lora_rank = 4  # Larger rank = smarter, but slower
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/gpt-oss-20b-BF16",
-    load_in_4bit = False,
-    max_seq_length = max_seq_length,
+    model_name="unsloth/gpt-oss-20b-BF16",
+    load_in_4bit=False,
+    max_seq_length=max_seq_length,
 )
 
 
-# To do efficient RL, we will use [LoRA](https://arxiv.org/abs/2106.09685), which allows us to only add 1 to 5% of extra weights to the model for finetuning purposes. This allows us to save memory usage by over 60%, and yet it retains good accuracy. Read Unsloth's [GPT-OSS RL Guide](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) for more details.
+# To do efficient RL, we will use [LoRA](https://arxiv.org/abs/2106.09685), which allows us to only add 1 to 5% of extra weights to the model for finetuning purposes. This allows us to save memory usage by over 60%, and yet it retains good accuracy. Read Unsloth's [GPT-OSS RL Guide](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning) for more details.
 
 # In[ ]:
 
 
 model = FastLanguageModel.get_peft_model(
     model,
-    r = lora_rank, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
-    target_modules = [
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
+    r=lora_rank,  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
+    target_modules=[
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
     ],
-    lora_alpha = lora_rank*2, # *2 speeds up training
-    use_gradient_checkpointing = "unsloth", # Reduces memory usage
-    random_state = 3407,
+    lora_alpha=lora_rank * 2,  # *2 speeds up training
+    use_gradient_checkpointing="unsloth",  # Reduces memory usage
+    random_state=3407,
 )
 
 
 # # 2048 game environment with OpenEnv
 # 
-# We first launch an OpenEnv process and import it! This will allows us to see how the 2048 implementation looks like!
+# We connect to the OpenSpiel 2048 environment via websocket! This will allow us to see how the 2048 implementation looks like!
 
 # In[ ]:
 
 
-from envs.openspiel_env import OpenSpielEnv
-from envs.openspiel_env.models import OpenSpielAction, OpenSpielObservation
+from openspiel_env import OpenSpielEnv
+from openspiel_env.models import OpenSpielAction, OpenSpielObservation
 
 
-# We'll be using Unsloth's OpenEnv implementation and wrapping the `launch_openenv` with some setup arguments:
+# You can use the hosted Space or run locally:
 
 # In[ ]:
 
 
-global port
-global openenv_process
-port = 9000
-openenv_process = None
-server = "envs.openspiel_env.server.app:app"
-environment = {
-    **os.environ,
-    "PYTHONPATH": f"{working_directory}/src",
-    "OPENSPIEL_GAME": "2048",
-    "OPENSPIEL_AGENT_PLAYER": "0",
-    "OPENSPIEL_OPPONENT_POLICY": "random",
-}
+# Connect to OpenSpiel 2048 environment on HuggingFace Spaces
+# The game is configured server-side via OPENSPIEL_GAME=2048
+OPENSPIEL_URL = "https://openenv-openspiel-env.hf.space"
+# For local: OPENSPIEL_URL = "http://localhost:8000"
 
-# Augment Unsloth's OpenEnv creation function
-import functools
-from unsloth import is_port_open, launch_openenv
-launch_openenv = functools.partial(
-    launch_openenv,
-    working_directory = working_directory,
-    server = server,
-    environment = environment,
-    openenv_class = OpenSpielEnv,
-)
+env = OpenSpielEnv(base_url=OPENSPIEL_URL)
 
 
 # Let's see how the current 2048 game state looks like:
@@ -120,8 +109,7 @@ launch_openenv = functools.partial(
 # In[ ]:
 
 
-port, openenv_process = launch_openenv(port, openenv_process)
-result = openenv_process.reset()
+result = env.reset()
 current_state = result.observation
 current_state
 
@@ -132,12 +120,16 @@ current_state
 
 
 import numpy as np
+
+
 def convert_to_board(current_state):
     n = len(current_state.info_state)
     size = int(np.sqrt(n))
-    board = np.array_split(np.array(current_state.info_state, dtype = int), size)
+    board = np.array_split(np.array(current_state.info_state, dtype=int), size)
     board = [x.tolist() for x in board]
     return board, size
+
+
 convert_to_board(current_state)
 
 
@@ -146,13 +138,14 @@ convert_to_board(current_state)
 # In[ ]:
 
 
-#@title (Collapsible) 2048 Game Renderer
+# @title (Collapsible) 2048 Game Renderer
 def render_board(obs, colors: bool = True, border: bool = True, dot_for_zero: bool = True) -> str:
     """
     Pretty-print the board with colors that scale from 0 up to self.target.
     Uses ANSI 256-color codes (works in most terminals). Set colors=False to disable.
     """
     import math
+
     b, size = convert_to_board(obs)
     mx = max((max(row) for row in b), default=0)
     cell_w = max(3, len(str(mx)))
@@ -194,9 +187,9 @@ def render_board(obs, colors: bool = True, border: bool = True, dot_for_zero: bo
         content = "│".join(fmt(v) for v in b[r])
         rows.append(("│" + content + "│") if border else content)
         if border:
-            rows.append(hline("└" if r == size - 1 else "├",
-                            "┴" if r == size - 1 else "┼",
-                            "┘" if r == size - 1 else "┤"))
+            rows.append(
+                hline("└" if r == size - 1 else "├", "┴" if r == size - 1 else "┼", "┘" if r == size - 1 else "┤")
+            )
     return "\n".join(rows)
 
 
@@ -211,8 +204,8 @@ print(render_board(current_state))
 # In[ ]:
 
 
-action = OpenSpielAction(action_id = 0, game_name = "2048")
-result = openenv_process.step(action)
+action = OpenSpielAction(action_id=0, game_name="2048")
+result = env.step(action)
 current_state = result.observation
 print(render_board(current_state))
 
@@ -222,8 +215,8 @@ print(render_board(current_state))
 # In[ ]:
 
 
-action = OpenSpielAction(action_id = 1, game_name = "2048")
-result = openenv_process.step(action)
+action = OpenSpielAction(action_id=1, game_name="2048")
+result = env.step(action)
 current_state = result.observation
 print(render_board(current_state))
 
@@ -233,8 +226,8 @@ print(render_board(current_state))
 # In[ ]:
 
 
-action = OpenSpielAction(action_id = 2, game_name = "2048")
-result = openenv_process.step(action)
+action = OpenSpielAction(action_id=2, game_name="2048")
+result = env.step(action)
 current_state = result.observation
 print(render_board(current_state))
 
@@ -244,8 +237,8 @@ print(render_board(current_state))
 # In[ ]:
 
 
-action = OpenSpielAction(action_id = 3, game_name = "2048")
-result = openenv_process.step(action)
+action = OpenSpielAction(action_id=3, game_name="2048")
+result = env.step(action)
 current_state = result.observation
 print(render_board(current_state))
 
@@ -263,7 +256,7 @@ print(current_state.legal_actions)
 # 
 # We'll set up a function to accept some strategy that'll emit an action within `0123` and check the game state.
 # 
-# We'll also add a timer to only execute the stratgegy for 2 seconds maximum, otherwise it might never terminate!
+# We'll also add a timer to only execute the strategy for 2 seconds maximum, otherwise it might never terminate!
 
 # In[ ]:
 
@@ -272,7 +265,8 @@ from typing import Callable
 from unsloth import execute_with_time_limit
 import itertools
 
-def _execute_strategy(strategy, current_state : OpenSpielObservation):
+
+def _execute_strategy(strategy, current_state: OpenSpielObservation):
     assert callable(strategy)
 
     steps = 0
@@ -288,17 +282,16 @@ def _execute_strategy(strategy, current_state : OpenSpielObservation):
         if type(action) is not int or action not in current_state.legal_actions:
             return steps, max(itertools.chain.from_iterable(board)) == 2048
 
-        global port, openenv_process
-        port, openenv_process = launch_openenv(port, openenv_process)
-        action = OpenSpielAction(action_id = action, game_name = "2048")
-        result = openenv_process.step(action)
+        action = OpenSpielAction(action_id=action, game_name="2048")
+        result = env.step(action)
         current_state = result.observation
         if result.reward is not None:
             total_reward += result.reward
     return steps, max(itertools.chain.from_iterable(board)) == 2048
 
+
 @execute_with_time_limit(2)
-def execute_strategy(strategy : Callable, current_state : OpenSpielObservation):
+def execute_strategy(strategy: Callable, current_state: OpenSpielObservation):
     return _execute_strategy(strategy, current_state)
 
 
@@ -310,9 +303,9 @@ def execute_strategy(strategy : Callable, current_state : OpenSpielObservation):
 def always_move_left(board):
     return 3
 
+
 # Reset OpenEnv to an initial state!
-port, openenv_process = launch_openenv(port, openenv_process)
-result = openenv_process.reset()
+result = env.reset()
 current_state = result.observation
 try:
     steps, if_done = execute_strategy(always_move_left, current_state)
@@ -328,7 +321,7 @@ steps, if_done
 
 
 @execute_with_time_limit(5)
-def execute_strategy(strategy : Callable, current_state : OpenSpielObservation):
+def execute_strategy(strategy: Callable, current_state: OpenSpielObservation):
     return _execute_strategy(strategy, current_state)
 
 
@@ -376,6 +369,7 @@ print(info)
 
 
 from unsloth import create_locked_down_function
+
 function = """
 def import_numpy():
     np.matmul
@@ -392,6 +386,7 @@ except Exception as e:
 
 
 from unsloth import create_locked_down_function
+
 function = """
 def add(a, b):
     def adder(a):
@@ -433,17 +428,18 @@ print(prompt)
 
 text = tokenizer.apply_chat_template(
     [{"role": "user", "content": prompt}],
-    tokenize = False,
-    add_generation_prompt = True,
-    reasoning_effort = "low",
+    tokenize=False,
+    add_generation_prompt=True,
+    reasoning_effort="low",
 )
 
 from transformers import TextStreamer
+
 _ = model.generate(
-    **tokenizer(text, return_tensors = "pt").to("cuda"),
-    temperature = 1.0,
-    max_new_tokens = 512,
-    streamer = TextStreamer(tokenizer, skip_prompt = False),
+    **tokenizer(text, return_tensors="pt").to("cuda"),
+    temperature=1.0,
+    max_new_tokens=512,
+    streamer=TextStreamer(tokenizer, skip_prompt=False),
 )
 
 
@@ -464,11 +460,14 @@ def extract_function(text):
     if text.count("```") >= 2:
         first = text.find("```") + 3
         second = text.find("```", first)
-        fx = text[first : second].strip()
+        fx = text[first:second].strip()
         fx = fx.removeprefix("python\n")
-        fx = fx[fx.find("def"):]
-        if fx.startswith("def strategy(board):"): return fx
+        fx = fx[fx.find("def") :]
+        if fx.startswith("def strategy(board):"):
+            return fx
     return None
+
+
 print(extract_function(prompt))
 
 
@@ -517,9 +516,9 @@ def no_cheating(completions, **kwargs):
         function = extract_function(response)
         if function is not None:
             ok, info = check_python_modules(function)
-            scores.append(1.0 if ok else -20.0) # Penalize heavily!
+            scores.append(1.0 if ok else -20.0)  # Penalize heavily!
         else:
-            scores.append(-1.0) # Failed creating function
+            scores.append(-1.0)  # Failed creating function
     return scores
 
 
@@ -531,8 +530,11 @@ def no_cheating(completions, **kwargs):
 
 
 import numpy as np
+
 global PRINTER
 PRINTER = 0
+
+
 def strategy_succeeds(completions, **kwargs):
     global PRINTER
     scores = []
@@ -557,9 +559,7 @@ def strategy_succeeds(completions, **kwargs):
             continue
         try:
             # Reset OpenEnv to an initial state!
-            global port, openenv_process
-            port, openenv_process = launch_openenv(port, openenv_process)
-            result = openenv_process.reset()
+            result = env.reset()
             current_state = result.observation
             steps, if_done = execute_strategy(new_strategy, current_state)
             print(f"Steps = {steps} If Done = {if_done}")
@@ -567,15 +567,15 @@ def strategy_succeeds(completions, **kwargs):
                 print(function)
             print(render_board(current_state))
             if if_done:
-                scores.append(20.0) # Success - massively reward!
+                scores.append(20.0)  # Success - massively reward!
             else:
-                scores.append(2.0) # Failed but function works!
+                scores.append(2.0)  # Failed but function works!
         except TimeoutError as e:
             print("Timeout")
-            scores.append(-1.0) # Failed with timeout
+            scores.append(-1.0)  # Failed with timeout
         except Exception as e:
             print(f"Exception = {str(e)}")
-            scores.append(-3.0) # Failed
+            scores.append(-3.0)  # Failed
     return scores
 
 
@@ -585,8 +585,13 @@ def strategy_succeeds(completions, **kwargs):
 
 
 from datasets import Dataset
-dataset = Dataset.from_list([{"prompt" : [{"role": "user", "content": prompt.strip()}], "answer" : 0, "reasoning_effort": "low"}]*1000)
-maximum_length = len(tokenizer.apply_chat_template([{"role": "user", "content": prompt.strip()}], add_generation_prompt = True))
+
+dataset = Dataset.from_list(
+    [{"prompt": [{"role": "user", "content": prompt.strip()}], "answer": 0, "reasoning_effort": "low"}] * 1000
+)
+maximum_length = len(
+    tokenizer.apply_chat_template([{"role": "user", "content": prompt.strip()}], add_generation_prompt=True)
+)
 print(maximum_length)
 dataset[0]
 
@@ -594,36 +599,36 @@ dataset[0]
 # <a name="Train"></a>
 # ### Train the model
 # 
-# Now set up GRPO Trainer and all configurations! We also support GSPO, GAPO, Dr GRPO and more! Go the Unsloth [Reinforcement Learning Docs](https://docs.unsloth.ai/get-started/reinforcement-learning-rl-guide) for more options.
+# Now set up GRPO Trainer and all configurations! We also support GSPO, GAPO, Dr GRPO and more! Go the Unsloth [Reinforcement Learning Docs](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide) for more options.
 # 
 # We're also using [TrackIO](https://github.com/gradio-app/trackio) which allows you to visualize all training metrics straight inside the notebook fully locally!
 
 # In[ ]:
 
 
-max_prompt_length = maximum_length + 1 # + 1 just in case!
+max_prompt_length = maximum_length + 1  # + 1 just in case!
 max_completion_length = max_seq_length - max_prompt_length
 
 from trl import GRPOConfig, GRPOTrainer
-training_args = GRPOConfig(
-    temperature = 1.0,
-    learning_rate = 5e-5,
-    weight_decay = 0.001,
-    warmup_ratio = 0.1,
-    lr_scheduler_type = "linear",
-    optim = "adamw_8bit",
-    logging_steps = 1,
-    per_device_train_batch_size = 1,
-    gradient_accumulation_steps = 1, # Increase to 4 for smoother training
-    num_generations = 2, # Decrease if out of memory
-    max_prompt_length = max_prompt_length,
-    max_completion_length = max_completion_length,
-    # num_train_epochs = 1, # Set to 1 for a full training run
-    max_steps = 600,
-    save_steps = 100,
-    report_to = "none", # Can use Weights & Biases, TrackIO
-    output_dir = "outputs",
 
+training_args = GRPOConfig(
+    temperature=1.0,
+    learning_rate=5e-5,
+    weight_decay=0.001,
+    warmup_ratio=0.1,
+    lr_scheduler_type="linear",
+    optim="adamw_8bit",
+    logging_steps=1,
+    per_device_train_batch_size=1,
+    gradient_accumulation_steps=1,  # Increase to 4 for smoother training
+    num_generations=2,  # Decrease if out of memory
+    max_prompt_length=max_prompt_length,
+    max_completion_length=max_completion_length,
+    # num_train_epochs = 1, # Set to 1 for a full training run
+    max_steps=600,
+    save_steps=100,
+    report_to="none",  # Can use Weights & Biases, TrackIO
+    output_dir="outputs",
     # For optional training + evaluation
     # fp16_full_eval = True,
     # per_device_eval_batch_size = 4,
@@ -651,16 +656,15 @@ training_args = GRPOConfig(
 # new_dataset = dataset.train_test_split(test_size = 0.01)
 
 trainer = GRPOTrainer(
-    model = model,
-    processing_class = tokenizer,
-    reward_funcs = [
+    model=model,
+    processing_class=tokenizer,
+    reward_funcs=[
         function_works,
         no_cheating,
         strategy_succeeds,
     ],
-    args = training_args,
-    train_dataset = dataset,
-
+    args=training_args,
+    train_dataset=dataset,
     # For optional training + evaluation
     # train_dataset = new_dataset["train"],
     # eval_dataset = new_dataset["test"],
@@ -686,17 +690,18 @@ trainer.train()
 
 text = tokenizer.apply_chat_template(
     [{"role": "user", "content": prompt}],
-    tokenize = False,
-    add_generation_prompt = True,
-    reasoning_effort = "low",
+    tokenize=False,
+    add_generation_prompt=True,
+    reasoning_effort="low",
 )
 
 from transformers import TextStreamer
+
 _ = model.generate(
-    **tokenizer(text, return_tensors = "pt").to("cuda"),
-    temperature = 1.0,
-    max_new_tokens = 1024,
-    streamer = TextStreamer(tokenizer, skip_prompt = False),
+    **tokenizer(text, return_tensors="pt").to("cuda"),
+    temperature=1.0,
+    max_new_tokens=1024,
+    streamer=TextStreamer(tokenizer, skip_prompt=False),
 )
 
 
@@ -710,18 +715,18 @@ _ = model.generate(
 
 # Merge and push to hub in mxfp4 4bit format
 if False:
-    model.save_pretrained_merged("finetuned_model", tokenizer, save_method = "mxfp4")
+    model.save_pretrained_merged("finetuned_model", tokenizer, save_method="mxfp4")
 if False:
-    model.push_to_hub_merged("repo_id/repo_name", tokenizer, token = "hf...", save_method = "mxfp4")
+    model.push_to_hub_merged("repo_id/repo_name", tokenizer, token="hf...", save_method="mxfp4")
 
 # Merge and push to hub in 16bit
 if False:
-    model.save_pretrained_merged("finetuned_model", tokenizer, save_method = "merged_16bit")
-if False: # Pushing to HF Hub
-    model.push_to_hub_merged("hf/gpt-oss-finetune", tokenizer, save_method = "merged_16bit", token = "")
+    model.save_pretrained_merged("finetuned_model", tokenizer, save_method="merged_16bit")
+if False:  # Pushing to HF Hub
+    model.push_to_hub_merged("hf/gpt-oss-finetune", tokenizer, save_method="merged_16bit", token="")
 
 
 # # And we're done!
-# Congratulations you just learned how to do reinforcement learning with GPT-OSS! There were some advanced topics explained in this notebook - to learn more about GPT-OSS and RL, there are more docs in Unsloth's [Reinforcement Learning Guide with GPT-OSS](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
+# Congratulations you just learned how to do reinforcement learning with GPT-OSS! There were some advanced topics explained in this notebook - to learn more about GPT-OSS and RL, there are more docs in Unsloth's [Reinforcement Learning Guide with GPT-OSS](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).

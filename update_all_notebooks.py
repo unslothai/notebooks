@@ -1,4 +1,5 @@
 import argparse
+import ast
 import json
 import os
 import re
@@ -8,114 +9,614 @@ from datetime import datetime
 from glob import glob
 from nbconvert import PythonExporter
 import nbformat
+from spellchecker import SpellChecker
+
+
+SPELL_IGNORE_WORDS = {
+    "unsloth", "qwen", "llama", "gemma", "lora", "gguf", "vllm", "grpo",
+    "kaggle", "colab", "alpaca", "qlora", "peft", "sft", "dpo", "orpo",
+    "bnb", "bitsandbytes", "xformers", "triton", "cuda", "pytorch",
+    "tokenizer", "huggingface", "finetune", "finetuning", "bf16", "fp16",
+    "fp8", "int4", "int8", "eos", "vram", "gpu", "cpu", "trl", "sdpa",
+    "ipynb", "ggml", "ollama", "mistral", "deepseek", "pixtral", "qat",
+    "nemotron", "magistral", "ministral", "granite", "ernie", "bert",
+    "roberta", "xlm", "matmul", "autocast", "dtype", "warmup",
+    "pretrained", "instruct", "mergekit", "wandb", "tensorboard", "lmstudio",
+    "venv", "conda", "repo", "param",
+    "numpy", "scipy", "sklearn", "tokenizers", "datasets",
+    "checkpointing", "logits", "softmax", "quantized", "quantize",
+    "quantization", "backprop", "embeddings", "hyperparameters", "trainable",
+    "nemo", "nvidia", "multimodal", "env", "linux", "macos", "runpod",
+    "eval", "cot", "codeforces", "completions",
+    # HTML/markdown tags and attributes commonly found in notebooks
+    "img", "src", "href", "div", "png", "svg", "alt", "https", "http",
+    "html", "css", "url", "readme", "github", "runtime", "cpp", "natively",
+    "pretraining", "finetunes", "tts", "llms", "vlm", "vlms", "gpt", "oss",
+    "dataset", "nli", "finetuned", "tutoring", "tutored",
+    "unslothai", "nbsp", "executorch", "regex",
+    "prequantized", "prepend", "prepended", "hugging", "submodule",
+    "repo", "repos", "txt", "csv", "json", "yaml", "toml",
+    "subfolder", "subdirectory", "gradio", "chatbot", "natively",
+    # Common words in notebooks that are valid but not in dictionary
+    "etc", "pre", "multi", "chatml", "vicuna", "labonne", "maxime",
+    "maths", "tokenized", "workflow", "functiongemma", "templating",
+    "tomaarsen", "miriad", "langid", "bahasa",
+    "electroglyph", "runpod",
+    # GitHub usernames, package names, tech terms
+    "willccbb", "sglang", "thytu", "vicgalle", "kadirnar", "saibo",
+    "etherl", "mithex", "pydantic", "scikit", "jsonl", "docstrings",
+    "tokenization", "tokenize", "prepending", "customizable", "chatbots",
+    "modelfile", "subprocess", "app", "bot", "dict", "globals", "configs",
+    "shouldn", "backticks", "analyse", "filepath", "pclass", "skp",
+    "pte", "uncomment", "entrypoint", "pid", "resize",
+    "alibaba", "moby", "ebooks", "pdf", "ppt", "docx", "num",
+    "doesn", "removeprefix", "multiturn", "rechne", "direkt", "ich",
+}
+
+SPELL_KNOWN_FIXES = {
+    "Optinal": "Optional",
+    "trainig": "training",
+    "competive": "competitive",
+    "whicht": "which",
+    "simpilicity": "simplicity",
+    "managable": "manageable",
+    "randomnly": "randomly",
+    "enclused": "enclosed",
+    "effecient": "efficient",
+    "fibonnaci": "fibonacci",
+    "Fibonnaci": "Fibonacci",
+    "SHould": "Should",
+    "GTP-OSS": "GPT-OSS",
+    "stratgegy": "strategy",
+    "verifer": "verifier",
+    "verisons": "versions",
+    "datases": "datasets",
+}
+
+
+def check_spelling(notebook_content, notebook_name):
+    """Check spelling in markdown cells and code comments. Auto-fix known misspellings."""
+    spell = SpellChecker()
+    spell.word_frequency.load_words(SPELL_IGNORE_WORDS)
+    issues = []
+    fixed = False
+    for i, cell in enumerate(notebook_content.get("cells", [])):
+        source = cell.get("source", [])
+        if isinstance(source, str):
+            source = [source]
+        text = "".join(source)
+
+        # Apply known fixes
+        new_text = text
+        for wrong, right in SPELL_KNOWN_FIXES.items():
+            if wrong in new_text:
+                new_text = new_text.replace(wrong, right)
+        if new_text != text:
+            cell["source"] = new_text.splitlines(True)
+            fixed = True
+
+        # Check for unknown misspellings in markdown cells (use new_text which has known fixes applied)
+        if cell.get("cell_type") == "markdown":
+            # Strip HTML tags and URLs before extracting words
+            clean_text = re.sub(r'<[^>]+>', ' ', new_text)
+            clean_text = re.sub(r'https?://\S+', ' ', clean_text)
+            clean_text = re.sub(r'\[([^\]]*)\]\([^\)]*\)', r'\1', clean_text)
+            words = re.findall(r'\b[a-zA-Z]{3,}\b', clean_text)
+            # Filter out code identifiers (camelCase, snake_case, ALL_CAPS)
+            english_words = [
+                w for w in words
+                if w == w.lower() or w == w.capitalize()
+            ]
+            lower_words = [w.lower() for w in english_words]
+            misspelled = spell.unknown(lower_words)
+            misspelled -= SPELL_IGNORE_WORDS
+            if misspelled:
+                issues.append((i, misspelled))
+    return fixed, issues
+
+
+def validate_notebook_syntax(notebook_path):
+    """Validate Python syntax of all code cells in a notebook."""
+    try:
+        with open(notebook_path, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+    except Exception:
+        return []
+
+    errors = []
+    for i, cell in enumerate(nb.get("cells", [])):
+        if cell.get("cell_type") != "code":
+            continue
+        source = "".join(cell.get("source", []))
+        if not source.strip():
+            continue
+
+        # Remove IPython magics and shell commands for AST parsing
+        # Replace with 'pass' to avoid empty blocks (e.g., if COLAB: !pip install)
+        clean_lines = []
+        for line in source.splitlines():
+            stripped = line.lstrip()
+            if stripped.startswith(("!", "%", "%%")):
+                indent = line[:len(line) - len(stripped)]
+                clean_lines.append(indent + "pass")
+            else:
+                clean_lines.append(line)
+        clean_source = "\n".join(clean_lines)
+
+        if not clean_source.strip():
+            continue
+
+        try:
+            ast.parse(clean_source)
+        except SyntaxError as e:
+            errors.append((i, e.lineno, str(e)))
+
+    return errors
+
+
+def _get_base_name_from_filename(filename):
+    """Extract a base name from the notebook filename for dynamic model naming."""
+    name = os.path.splitext(os.path.basename(filename))[0]
+    for prefix in ("Kaggle-", "HuggingFace Course-"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+
+    lower = name.lower()
+    if re.match(r"gemma[-_]?3n", lower):
+        return "gemma_3n"
+    if re.match(r"gemma[-_]?3", lower):
+        return "gemma_3"
+
+    stop_match = re.search(r"[\(\[\{]", name)
+    trimmed = name[:stop_match.start()] if stop_match else name
+    trimmed = trimmed.strip(" _-") or name
+
+    segments = re.split(r"[^A-Za-z0-9]+", trimmed)
+    segments = [s for s in segments if s]
+    if not segments:
+        base = trimmed.lower()
+        base = base.replace("-", "_")
+        base = re.sub(r"__+", "_", base)
+        return base.strip("_")
+
+    max_len = 24
+    parts = []
+    for seg in segments:
+        if re.fullmatch(r"[A-Za-z]+", seg):
+            token = seg.lower()
+        elif re.fullmatch(r"[A-Za-z][0-9]", seg):
+            token = seg.lower()
+        else:
+            if not parts:
+                lead = re.match(r"[A-Za-z]+", seg)
+                if lead:
+                    token = lead.group(0).lower()
+                    parts.append(token)
+            break
+        candidate = "_".join(parts + [token]) if parts else token
+        if len(candidate) <= max_len:
+            parts.append(token)
+        else:
+            break
+
+    base = "_".join(parts) if parts else segments[0].lower()
+    return base
+
+
+def _strip_extra_trailing_blank_lines(lines):
+    """Remove consecutive trailing blank lines, keeping at most one."""
+    while len(lines) > 1 and lines[-1].strip() == "" and lines[-2].strip() == "":
+        lines.pop()
+    return lines
+
+
+def _space_equals_in_code(text):
+    """Add spaces around = in code, but preserve compound operators (+=, -=, etc.)."""
+    # Characters that form compound assignment operators when followed by =
+    # e.g., +=, -=, *=, /=, //=, **=, %=, |=, &=, ^=, :=, @=
+    COMPOUND_OP_CHARS = ("+", "-", "*", "/", "%", "|", "&", "^", ":", "@")
+
+    new_lines = []
+    in_shell_command = False
+    for line in text.splitlines(True):
+        stripped = line.lstrip()
+        # Track multi-line shell commands (lines starting with ! or continuations)
+        if stripped.startswith("!"):
+            in_shell_command = True
+        # Skip shell commands - they have their own syntax (pip URLs, version specs, etc.)
+        # Also skip lines containing URL fragments like #subdirectory= or #egg=
+        if in_shell_command or "#subdirectory=" in line or "#egg=" in line:
+            new_lines.append(line)
+            # Check if this line continues (ends with backslash)
+            if in_shell_command and not line.rstrip().endswith("\\"):
+                in_shell_command = False
+            continue
+        in_quote = None
+        escaped = False
+        out = []
+        for i, ch in enumerate(line):
+            if escaped:
+                out.append(ch)
+                escaped = False
+                continue
+            if ch == "\\":
+                out.append(ch)
+                escaped = True
+                continue
+            if in_quote:
+                out.append(ch)
+                if ch == in_quote:
+                    in_quote = None
+                continue
+            if ch in ("\"", "'"):
+                out.append(ch)
+                in_quote = ch
+                continue
+
+            if ch == "=":
+                prev_char = line[i - 1] if i > 0 else ""
+                next_char = line[i + 1] if i + 1 < len(line) else ""
+                # Don't add space before = if it's part of ==, <=, >=, !=
+                # or a compound operator like +=, -=, *=, /=, etc.
+                if prev_char not in ("=", "<", ">", "!") and prev_char not in COMPOUND_OP_CHARS and next_char != "=":
+                    if out and out[-1] not in (" ", "\t"):
+                        out.append(" ")
+                    out.append("=")
+                    if next_char not in (" ", "\t", "\n", ""):
+                        out.append(" ")
+                    continue
+            out.append(ch)
+        new_lines.append("".join(out))
+    return "".join(new_lines)
 
 
 def update_old_unsloth(filename):
-    with open(filename, "r", encoding = "utf-8") as f: f = f.read()
+    """Update notebook with various fixes using JSON-based cell manipulation."""
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            notebook_content = json.load(f)
+    except Exception:
+        return
 
-    # Convert versions like X.X.X to 2025.12.8
-    f = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2025.12.8\1", f)
+    base = _get_base_name_from_filename(filename)
+    if base.endswith("_finetune"):
+        base_gguf = base
+        base_lora = f"{base}_lora"
+        base_16 = f"{base}_16bit"
+        base_4 = f"{base}_4bit"
+    else:
+        base_gguf = f"{base}_finetune"
+        base_lora = f"{base}_lora"
+        base_16 = f"{base}_finetune_16bit"
+        base_4 = f"{base}_finetune_4bit"
 
-    # Fix all A=A to A = A
-    # "    id2label=id2label,\n",
-    f = re.sub(
-        r'(\"[ ]{4,}[^\= ]{2,})\=([^\= ]{2,}\,\\n\"\,)',
-        r"\1 = \2",
-        f,
-    )
+    def replace_hf_prefix(name, new_name):
+        if "/" in name:
+            prefix = name.split("/", 1)[0]
+            if prefix == "hf":
+                prefix = "HF_USERNAME"
+            return f"{prefix}/{new_name}"
+        return new_name
 
-    # Change gguf-quantization-options link
-    f = f.replace(
-        "https://github.com/unslothai/unsloth/wiki#gguf-quantization-options",
-        "https://docs.unsloth.ai/basics/inference-and-deployment/saving-to-gguf#locally"
-    )
-
-    # Fix dangling newlines like
-    """
-    if False:
-    model.push_to_hub("hf/model", token = "")
-    tokenizer.push_to_hub("hf/model", token = "")
-
-    """
-    f = re.sub(r"\)\\n([\"\']\n[ ]{2,}\])", r")\1", f)
-
-    # Redirect Alpaca dataset
-    f = f.replace(
-        "https://huggingface.co/datasets/yahma/alpaca-cleaned",
-        "https://huggingface.co/datasets/unsloth/alpaca-cleaned",
-    )
-    f = f.replace(
-        "Alpaca dataset from [yahma]",
-        "[Alpaca dataset]",
-    )
-
-    # Train on completions
-    f = f.replace(
-        "TRL's docs [here](https://huggingface.co/docs/trl/sft_trainer#train-on-completions-only).",
-        "our docs [here](https://docs.unsloth.ai/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide#training-on-completions-only-masking-out-inputs)",
-    )
-
-    # Conversational notebook
-    f = f.replace(
-        "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Alpaca.ipynb)",
-        "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb)",
-    )
-
-    # Fix Meta-Llama
-    f = f.replace(
-        "unsloth/Meta-Llama",
-        "unsloth/Llama",
-    )
-
-    # Move dtype into calling
-    if '"dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+\n",\n    ' in f and \
-        '"    dtype = dtype,\n",' in f:
-        f = f.replace(
-            '"dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+\n",\n    ',
-            '',
+    def replace_common(text):
+        """Apply common text replacements for both code and markdown cells."""
+        text = text.replace("</a></a>", "</a>")
+        text = text.replace(
+            "To install Unsloth on your local device",
+            "To install Unsloth on your local device",
         )
-        f = f.replace(
-            '"    dtype = dtype,\n",',
-            '"    dtype = dtype, # None for auto detection. Float16 for T4, Bfloat16 for Ampere, H100+\n",',
+        text = re.sub(r"!{2,}", "!", text)
+        text = text.replace("ee notice", "we notice")
+
+        # Convert versions like X.X.X to 2026.2.1
+        text = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2026.2.1\1", text)
+
+        # Change gguf-quantization-options link
+        text = text.replace(
+            "https://github.com/unslothai/unsloth/wiki#gguf-quantization-options",
+            "https://unsloth.ai/docs/basics/inference-and-deployment/saving-to-gguf",
+        )
+        text = text.replace("https://docs.unsloth.ai/", "https://unsloth.ai/docs/")
+
+        # Redirect Alpaca dataset
+        text = text.replace(
+            "https://huggingface.co/datasets/yahma/alpaca-cleaned",
+            "https://huggingface.co/datasets/unsloth/alpaca-cleaned",
+        )
+        text = text.replace("yahma/alpaca-cleaned", "unsloth/alpaca-cleaned")
+        text = text.replace("Alpaca dataset from [yahma]", "[Alpaca dataset]")
+
+        # Train on completions
+        text = text.replace(
+            "TRL's docs [here](https://huggingface.co/docs/trl/sft_trainer#train-on-completions-only).",
+            "our docs [here](https://unsloth.ai/docs/get-started/fine-tuning-llms-guide/lora-hyperparameters-guide#training-on-completions-only-masking-out-inputs)",
         )
 
-    # TRL's `DPOTrainer`
-    f = f.replace("TRL's `DPOTrainer`", "`DPOTrainer` and `GRPOTrainer` for reinforcement learning!")
+        # Fix incorrect conversational link pointing to Alpaca notebook
+        text = text.replace(
+            "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Alpaca.ipynb)",
+            "conversational [notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Conversational.ipynb)",
+        )
 
-    # Move packing = ...
-    packing = '''"    packing = False, # Can make training 5x faster for short sequences.\n",
-    "    args = SFTConfig(\n",'''
-    if packing in f:
-        f = f.replace(packing, "")
-        f = f.replace(
-            '''"        max_steps = 60,\n",
-    ''',
-            '''""        max_steps = 60,\n",
-    "        packing = False, # Makes training 2-5x faster for short sequences,\n",
-    ''')
+        # Fix Meta-Llama
+        text = text.replace("unsloth/Meta-Llama", "unsloth/Llama")
 
-    # VLLM to vLLM, but avoid underscores/dashes or word-part matches
-    f = re.sub(r'(?<![A-Za-z0-9_-])VLLM(?![A-Za-z0-9_-])', "vLLM", f)
-    f = f.replace(
-        "You can go to https://huggingface.co/settings/tokens for your personal tokens.",
-        "You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://docs.unsloth.ai/basics/inference-and-deployment) for more deployment options."
-    )
+        # TRL's `DPOTrainer`
+        text = text.replace("TRL's `DPOTrainer`", "`DPOTrainer` and `GRPOTrainer` for reinforcement learning!")
 
-    # Fix saving for LoRA adapters only
-    f = f.replace('model.save_pretrained(\"model\")', 'model.save_pretrained(\"lora_model\")')
-    f = f.replace('tokenizer.save_pretrained(\"model\")', 'tokenizer.save_pretrained(\"lora_model\")')
-    f = f.replace('model.push_to_hub(\"hf/model\", token = \"\")', 'model.push_to_hub(\"hf/lora_model\", token = \"\")')
-    f = f.replace('tokenizer.push_to_hub(\"hf/model\", token = \"\")', 'tokenizer.push_to_hub(\"hf/lora_model\", token = \"\")')
+        # Move packing = ...
+        text = re.sub(
+            r"(\n[ \t]*)packing\s*=\s*(True|False).*?\n(\1args\s*=\s*SFTConfig\(\n)",
+            r"\3\1    packing = \2, # Makes training 2-5x faster for short sequences,\n",
+            text,
+        )
 
-    # Fix 16bit
-    f = f.replace('model.save_pretrained_merged(\"model\", tokenizer, save_method = \"merged_16bit\",)', 'model.save_pretrained_merged(\"model_16bit\", tokenizer, save_method = \"merged_16bit\",)')
-    f = f.replace('model.push_to_hub_merged(\"hf/model\", tokenizer, save_method = \"merged_16bit\", token = \"\")', 'model.push_to_hub_merged(\"hf/model_16bit\", tokenizer, save_method = \"merged_16bit\", token = \"\")')
+        # Ensure GGUF usage line matches base name used in code
+        text = re.sub(
+            r"Now, use the `[^`]+\.Q8_0\.gguf` file or `[^`]+\.Q4_K_M\.gguf` file in llama\.cpp\.",
+            f"Now, use the `{base_gguf}.Q8_0.gguf` file or `{base_gguf}.Q4_K_M.gguf` file in llama.cpp.",
+            text,
+        )
 
-    # Fix 4bit
-    f = f.replace('model.save_pretrained_merged(\"model\", tokenizer, save_method = \"merged_4bit\",)', 'model.save_pretrained_merged(\"model_4bit\", tokenizer, save_method = \"merged_4bit\",)')
-    f = f.replace('model.push_to_hub_merged(\"hf/model\", tokenizer, save_method = \"merged_4bit\", token = \"\")', 'model.push_to_hub_merged(\"hf/model_4bit\", tokenizer, save_method = \"merged_4bit\", token = \"\")')
+        # Fix concatenated markdown line if it slipped in
+        text = text.replace("Unsloth!Now, use the", "Unsloth!\nNow, use the")
 
-    with open(filename, "w", encoding = "utf-8") as w: w.write(f)
+        # Update docs domain
+        text = text.replace("docs.unsloth.ai", "unsloth.ai/docs")
+        text = text.replace("[Wiki page]", "[docs page]")
+        text = text.replace("[wiki page]", "[docs page]")
+
+        text = text.replace(
+            "You can go to https://huggingface.co/settings/tokens for your personal tokens.",
+            "You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.",
+        )
+
+        # GGUF filename references
+        text = text.replace("model-unsloth-Q4_K_M.gguf", f"{base_gguf}.Q4_K_M.gguf")
+        text = text.replace("model-unsloth.Q4_K_M.gguf", f"{base_gguf}.Q4_K_M.gguf")
+        text = text.replace("model-unsloth.Q8_0.gguf", f"{base_gguf}.Q8_0.gguf")
+        text = text.replace("model-unsloth.gguf", f"{base_gguf}.Q8_0.gguf")
+
+        # Fix "Huggingface" -> "Hugging Face" (only capitalized, not in URLs/packages)
+        text = text.replace("Huggingface's", "Hugging Face's")
+        text = re.sub(r"Huggingface  (`[^`]+`)", r"Hugging Face \1", text)
+        text = text.replace("Huggingface TRL's", "Hugging Face TRL's")
+
+        # Fix instruction_part missing < before |end_of_role|>
+        text = text.replace(
+            '<|start_of_role|>user|end_of_role|>',
+            '<|start_of_role|>user<|end_of_role|>',
+        )
+
+        # Fix typos in specific phrases
+        text = text.replace("Prime and Prejudice", "Pride and Prejudice")
+        text = text.replace("2x Telsa T4s", "2x Tesla T4s")
+        text = text.replace("float32 s disable", "float32 so disable")
+        text = text.replace("and its amazing", "and it's amazing")
+        text = text.replace("look like this:", "looks like this:")
+        text = text.replace("Replace with out specific", "Replace without specific")
+        text = text.replace("AutoModelForPeftCausalLM", "AutoPeftModelForCausalLM")
+
+        # Remove @nocommit placeholders
+        text = re.sub(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?', '', text)
+
+        # Fix empty Open Math Reasoning URL
+        text = text.replace(
+            "[Open Math Reasoning]()",
+            "[Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini)"
+        )
+
+        # Fix footer heading
+        text = text.replace("Some other links:", "Some other resources:")
+
+        # Fix old installation URL paths (both variants)
+        text = text.replace(
+            "unsloth.ai/docs/get-started/installing-+-updating",
+            "unsloth.ai/docs/get-started/install"
+        )
+        text = text.replace(
+            "unsloth.ai/docs/get-started/install-and-update",
+            "unsloth.ai/docs/get-started/install"
+        )
+
+        # Fix footer numbering (6. → 4.)
+        text = re.sub(r'\n6\. See notebooks for DPO', r'\n4. See notebooks for DPO', text)
+
+        # Fix duplicate "See our docs" sentences (same line duplicates)
+        text = re.sub(
+            r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1',
+            r'\1',
+            text
+        )
+
+        # Fix Nemo → NeMo capitalization (but not Mistral-Nemo model names)
+        text = re.sub(r'\bNemo Gym\b', 'NeMo Gym', text)
+
+        return text
+
+    def replace_code(text):
+        """Apply code-specific replacements."""
+        # Update gguf save/push names
+        text = re.sub(
+            r"(save_pretrained_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+            rf"\1\2{base_gguf}\4",
+            text,
+            flags=re.DOTALL,
+        )
+
+        def _replace_push_gguf(match):
+            new_name = replace_hf_prefix(match.group(3), base_gguf)
+            return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}"
+
+        text = re.sub(
+            r"(push_to_hub_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+            _replace_push_gguf,
+            text,
+            flags=re.DOTALL,
+        )
+
+        # Update merged save/push names
+        def _replace_save_merged(match):
+            method = match.group(6)
+            new_name = base_16 if method == "merged_16bit" else base_4
+            return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}{match.group(5)}{method}{match.group(7)}"
+
+        text = re.sub(
+            r"(save_pretrained_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+            _replace_save_merged,
+            text,
+            flags=re.DOTALL,
+        )
+
+        def _replace_push_merged(match):
+            method = match.group(6)
+            new_name = base_16 if method == "merged_16bit" else base_4
+            replaced = replace_hf_prefix(match.group(3), new_name)
+            return f"{match.group(1)}{match.group(2)}{replaced}{match.group(4)}{match.group(5)}{method}{match.group(7)}"
+
+        text = re.sub(
+            r"(push_to_hub_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+            _replace_push_merged,
+            text,
+            flags=re.DOTALL,
+        )
+
+        # Update LoRA save/push names
+        text = re.sub(
+            r"(\b(?:model|tokenizer|processor)\.save_pretrained\(\s*)([\"\'])([^\"\']*)([\"\'])",
+            rf"\1\2{base_lora}\4",
+            text,
+        )
+
+        def _replace_push_lora(match):
+            new_name = replace_hf_prefix(match.group(3), base_lora)
+            return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}"
+
+        text = re.sub(
+            r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])",
+            _replace_push_lora,
+            text,
+        )
+
+        # LoRA load snippets
+        text = re.sub(
+            r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)",
+            rf"\1\2{base_lora}\4\5",
+            text,
+        )
+        text = re.sub(
+            r"([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)",
+            rf"\1{base_lora}\3\4",
+            text,
+        )
+        text = re.sub(r"([\"\'])lora_model([\"\'])", rf"\1{base_lora}\2", text)
+        text = re.sub(r"([\"\'])finetuned_model([\"\'])", rf"\1{base_lora}\2", text)
+
+        # Also handle AutoPeftModelForCausalLM.from_pretrained("xxx_lora")
+        # and AutoTokenizer.from_pretrained("xxx_lora") for load-back consistency
+        text = re.sub(
+            r"(Auto(?:PeftModel\w*|Tokenizer|Model\w*)\.from_pretrained\(\s*)([\"\'])([^\"\']*_lora[^\"\']*)([\"\'])",
+            rf"\1\2{base_lora}\4",
+            text,
+        )
+
+        # Update hf/ to HF_USERNAME/ in quoted strings
+        text = text.replace('"hf/', '"HF_USERNAME/')
+        text = text.replace("'hf/", "'HF_USERNAME/")
+
+        # Update tokens - only match string literals to avoid breaking token = get_token()
+        text = re.sub(
+            r'(\btoken\s*=\s*)([\"\'])([^\"\']*)([\"\'])',
+            r'\1"YOUR_HF_TOKEN"',
+            text,
+        )
+
+        # Preserve special tokens that should not be replaced by HF token
+        text = re.sub(
+            r"unsloth_eos_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']",
+            'unsloth_eos_token = "eos_token"',
+            text,
+        )
+        text = re.sub(
+            r"patch_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']",
+            'patch_token = "<|IMAGE_PLACEHOLDER|>"',
+            text,
+        )
+
+        # If dtype=None helper line is directly before from_pretrained and dtype=dtype is used,
+        # drop the helper line and inline dtype=None with the standard comment.
+        dtype_comment = "None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+"
+        dtype_line_re = re.compile(r"^[ \t]*dtype\s*=\s*None\s*#.*$")
+        dtype_param_re = re.compile(r"(\bdtype\s*=\s*)dtype\b\s*,?")
+
+        lines = text.splitlines(True)
+        updated_lines = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if dtype_line_re.match(line) and i + 1 < len(lines) and ".from_pretrained" in lines[i + 1]:
+                # Try to update dtype within the from_pretrained call
+                replaced = False
+                depth = 0
+                j = i + 1
+                while j < len(lines):
+                    current = lines[j]
+                    if j == i + 1 and ".from_pretrained" not in current:
+                        break
+                    new_current, count = dtype_param_re.subn(
+                        r"\1None, # " + dtype_comment,
+                        current,
+                    )
+                    if count:
+                        replaced = True
+                    lines[j] = new_current
+                    depth += current.count("(") - current.count(")")
+                    if depth <= 0 and ".from_pretrained" in lines[i + 1]:
+                        break
+                    j += 1
+                if replaced:
+                    # Drop the dtype helper line and continue from the call
+                    i += 1
+                    continue
+            updated_lines.append(line)
+            i += 1
+        text = "".join(updated_lines)
+
+        # Normalize vLLM naming in code where it is used as a package/path
+        # Use word boundary to preserve UNSLOTH_VLLM_STANDBY env var
+        text = re.sub(r'\bvLLM\b', 'vllm', text)
+        text = re.sub(r'\bVLLM\b(?!_)', 'vllm', text)
+
+        # Simplify gated models comment
+        text = re.sub(
+            r"# use one if using gated models.*",
+            "# HF Token for gated models",
+            text,
+        )
+
+        # Fix A=A to A = A in code
+        text = _space_equals_in_code(text)
+
+        return text
+
+    updated = False
+    for cell in notebook_content.get("cells", []):
+        if not isinstance(cell.get("source"), list):
+            continue
+        is_code = cell.get("cell_type") == "code"
+        text = "".join(cell["source"])
+        new_text = replace_common(text)
+        if is_code:
+            new_text = replace_code(new_text)
+        if new_text != text:
+            updated = True
+        cell["source"] = _strip_extra_trailing_blank_lines(new_text.splitlines(True))
+
+    if updated:
+        with open(filename, "w", encoding="utf-8") as w:
+            json.dump(notebook_content, w, indent=1)
+        os.chmod(filename, 0o644)
 pass
 
 
@@ -205,13 +706,6 @@ def update_or_append_pip_install(base_content, package_name, new_install_line):
         output = base_content.strip() + "\n" + new_install_line
     else:
         output = updated_content
-    # Convert pip install transformers==4.56.2\npip install --no-deps trl==0.22.2 to &&
-    finder = r"!pip install transformers==([\d\.]{3,})\n!pip install --no-deps trl==([\d\.]{3,})"
-    found = re.findall(finder, output)
-    if len(found) != 0:
-        transformers, trl = found[0]
-        new = f"!pip install transformers=={transformers} && pip install --no-deps trl=={trl}"
-        output = re.sub(finder, new, output)
     return output
 
 current_branch = get_current_git_branch()
@@ -223,10 +717,10 @@ general_announcement_content = """To run this, press "*Runtime*" and press "*Run
 <div class="align-center">
 <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-<a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+<a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 </div>
 
-To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 
 You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)"""
 
@@ -261,7 +755,7 @@ SPACES = " " * 4
 # INSTALLATION (MANY OF THIS IS SPECIFIC TO ONE OF THE NOTEBOOKS)
 # =======================================================
 
-XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.33.post1")"""
+XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
 
 installation_content = """%%capture
 import os, re
@@ -355,7 +849,8 @@ try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvid
 except: is_t4 = False
 _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
 !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
-!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"""
+!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"
+"""
 
 installation_grpo_kaggle_content = update_or_append_pip_install(
     installation_grpo_kaggle_content,
@@ -730,26 +1225,28 @@ installation_ministral_kaggle_content = update_or_append_pip_install(
 # =======================================================
 
 new_announcement = """
-New 3x faster training & 30% less VRAM. New kernels, padding-free & packing. [Blog](https://docs.unsloth.ai/new/3x-faster-training-packing)
+Train MoEs - DeepSeek, GLM, Qwen and gpt-oss faster with 32% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 
-You can now train with 500K context windows on a single 80GB GPU. [Blog](https://docs.unsloth.ai/new/500k-context-length-fine-tuning)
+You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
 
-Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
 
-New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) (faster, less VRAM RL) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
+3x faster LLM training with 30% less VRAM and 500K context. [3x faster](https://unsloth.ai/docs/new/3x-faster-training-packing) • [500K Context](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 
-Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks)."""
+New in Reinforcement Learning: [FP8 RL](https://docs.unsloth.ai/new/fp8-reinforcement-learning) • [Vision RL](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) • [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning)
+
+Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks)."""
 
 # =======================================================
 # LAST BLOCK CLOSE STATEMENT
 # =======================================================
 
 OTHER_RESOURCES = """Some other resources:
-1. Looking to use Unsloth locally? Read our [Installation Guide](https://docs.unsloth.ai/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
-2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://docs.unsloth.ai/get-started/reinforcement-learning-rl-guide).
-3. Read our guides and notebooks for [Text-to-speech (TTS)](https://docs.unsloth.ai/basics/text-to-speech-tts-fine-tuning) and [vision](https://docs.unsloth.ai/basics/vision-fine-tuning) model support.
-4. Explore our [LLM Tutorials Directory](https://docs.unsloth.ai/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
-5. Need help with Inference? Read our [Inference & Deployment page](https://docs.unsloth.ai/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
+1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 """
 
 text_for_last_cell_gguf = """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
@@ -758,7 +1255,7 @@ __OTHER_RESOURCES__
 <div class="align-center">
   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-  <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+  <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 
   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 
@@ -775,7 +1272,7 @@ __OTHER_RESOURCES__
 <div class="align-center">
   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-  <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+  <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 
   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 
@@ -1409,6 +1906,7 @@ def update_notebook_sections(
         if updated:
             with open(notebook_path, "w", encoding="utf-8") as f:
                 json.dump(notebook_content, f, indent=1)
+            os.chmod(notebook_path, 0o644)
             print(f"Updated: {notebook_path}")
         else:
             print(f"No sections found to update in: {notebook_path}")
@@ -1506,6 +2004,41 @@ def main():
         # update_unsloth_config(notebook_file)
         update_old_unsloth(notebook_file)
 
+    # Spelling check
+    print("\n=== Spelling Check ===")
+    spell_issues_found = False
+    for notebook_file in notebook_files:
+        try:
+            with open(notebook_file, "r", encoding="utf-8") as f:
+                nb_content = json.load(f)
+            fixed, issues = check_spelling(nb_content, os.path.basename(notebook_file))
+            if fixed:
+                with open(notebook_file, "w", encoding="utf-8") as f:
+                    json.dump(nb_content, f, indent=1)
+                os.chmod(notebook_file, 0o644)
+                print(f"  AUTO-FIXED spelling in {os.path.basename(notebook_file)}")
+            if issues:
+                spell_issues_found = True
+                for cell_idx, words in issues:
+                    print(f"  SPELLING: {os.path.basename(notebook_file)} cell {cell_idx}: {words}")
+        except Exception:
+            pass
+    if not spell_issues_found:
+        print("  No spelling issues found.")
+
+    # AST syntax check
+    print("\n=== AST Syntax Check ===")
+    syntax_issues_found = False
+    for notebook_file in notebook_files:
+        errors = validate_notebook_syntax(notebook_file)
+        if errors:
+            syntax_issues_found = True
+            for cell_idx, lineno, msg in errors:
+                print(f"  SYNTAX: {os.path.basename(notebook_file)} cell {cell_idx} line {lineno}: {msg}")
+    if not syntax_issues_found:
+        print("  No syntax issues found.")
+
+
 def add_colab_badge(notebooks_dir):
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
     paths = [x.replace("\\", "/") for x in paths]
@@ -1532,6 +2065,7 @@ def add_colab_badge(notebooks_dir):
 
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(notebook_content, f, indent=1)
+            os.chmod(path, 0o644)
 
 
 def update_readme(
@@ -1543,12 +2077,8 @@ def update_readme(
     type_order=None,      
     kaggle_accelerator="nvidiaTeslaT4",
 ):
-    if args.to_main_repo:
-        base_url_colab = "https://colab.research.google.com/github/unslothai/notebooks/blob/main/"
-        base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/"
-    else:
-        base_url_colab = f"https://colab.research.google.com/github/unslothai/notebooks/blob/{current_branch}/"
-        base_url_kaggle = f"https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/{current_branch}/"
+    base_url_colab = "https://colab.research.google.com/github/unslothai/notebooks/blob/main/"
+    base_url_kaggle = "https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/"
 
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
     paths = [x.replace("\\", "/") for x in paths]
@@ -1798,26 +2328,58 @@ def copy_and_update_notebooks(
     else:
         os.makedirs(destination_dir, exist_ok=True)
 
+    def _preserve_outputs(dest_path, template_path):
+        """Copy template to dest, preserving output cells from existing dest if cell count matches."""
+        existing_outputs = {}
+        existing_nb = None
+        if os.path.exists(dest_path):
+            try:
+                with open(dest_path, "r", encoding="utf-8") as f:
+                    existing_nb = json.load(f)
+                for idx, cell in enumerate(existing_nb.get("cells", [])):
+                    if cell.get("outputs"):
+                        existing_outputs[idx] = cell["outputs"]
+            except Exception:
+                existing_outputs = {}
+                existing_nb = None
+
+        shutil.copyfile(template_path, dest_path)
+        os.chmod(dest_path, 0o644)
+
+        if existing_outputs and existing_nb is not None:
+            try:
+                with open(dest_path, "r", encoding="utf-8") as f:
+                    new_nb = json.load(f)
+                if len(new_nb.get("cells", [])) == len(existing_nb.get("cells", [])):
+                    for idx, outputs in existing_outputs.items():
+                        if idx < len(new_nb["cells"]):
+                            new_nb["cells"][idx]["outputs"] = outputs
+                    with open(dest_path, "w", encoding="utf-8") as f:
+                        json.dump(new_nb, f, indent=1)
+                    os.chmod(dest_path, 0o644)
+            except Exception:
+                pass
+
     for template_notebook_path in template_notebooks:
         notebook_name = os.path.basename(template_notebook_path)
 
         colab_notebook_name = notebook_name
         destination_notebook_path = os.path.join(destination_dir, colab_notebook_name)
 
-        shutil.copy2(template_notebook_path, destination_notebook_path)
+        _preserve_outputs(destination_notebook_path, template_notebook_path)
         print(f"Copied '{colab_notebook_name}' to '{destination_dir}'")
 
         kaggle_notebook_name = "Kaggle-" + notebook_name
         destination_notebook_path = os.path.join(destination_dir, kaggle_notebook_name)
 
-        shutil.copy2(template_notebook_path, destination_notebook_path)
+        _preserve_outputs(destination_notebook_path, template_notebook_path)
 
         print(f"Copied '{kaggle_notebook_name}' to '{destination_dir}'")
 
         if "GRPO" in template_notebook_path:
             hf_course_notebook_name = f"{hf_course_name}-" + notebook_name
             destination_notebook_path = os.path.join(destination_dir, hf_course_notebook_name)
-            shutil.copy2(template_notebook_path, destination_notebook_path)
+            _preserve_outputs(destination_notebook_path, template_notebook_path)
             print(f"Copied f'{hf_course_name}-{notebook_name}' to '{destination_notebook_path}'")
 
         update_notebook_sections(
@@ -1983,6 +2545,83 @@ if __name__ == "__main__":
         KNOWN_TYPES_ORDERED,
         type_order
     )
+
+    # Apply targeted fixes to ALL notebooks (including DONT_UPDATE_EXCEPTIONS)
+    # These are safe fixes that should apply everywhere.
+    _ALL_NB_FIXES = {
+        "fibonnaci": "fibonacci",
+        "Fibonnaci": "Fibonacci",
+        "SHould": "Should",
+        "GTP-OSS": "GPT-OSS",
+        "stratgegy": "strategy",
+        "verifer": "verifier",
+        "verisons": "versions",
+        "datases": "datasets",
+        "Huggingface's": "Hugging Face's",
+        "Huggingface TRL's": "Hugging Face TRL's",
+        "Prime and Prejudice": "Pride and Prejudice",
+        "2x Telsa T4s": "2x Tesla T4s",
+        "float32 s disable": "float32 so disable",
+        "and its amazing": "and it's amazing",
+        "look like this:": "looks like this:",
+        "Replace with out specific": "Replace without specific",
+        "AutoModelForPeftCausalLM": "AutoPeftModelForCausalLM",
+        "<|start_of_role|>user|end_of_role|>": "<|start_of_role|>user<|end_of_role|>",
+        # New fixes
+        "[Open Math Reasoning]()": "[Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini)",
+        "Some other links:": "Some other resources:",
+        "unsloth.ai/docs/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+        "unsloth.ai/docs/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+        # Also handle old domain format that may be in exception files
+        "docs.unsloth.ai/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+        "docs.unsloth.ai/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+        # Handle intermediate format (domain changed but path not)
+        "unsloth.ai/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+        "unsloth.ai/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+        "Nemo Gym": "NeMo Gym",
+        # Fix old domain for exception files
+        "https://docs.unsloth.ai/": "https://unsloth.ai/docs/",
+    }
+    for nb_path in glob(os.path.join("nb", "*.ipynb")):
+        try:
+            with open(nb_path, "r", encoding="utf-8") as f:
+                raw = f.read()
+            new_raw = raw
+            new_raw = re.sub(
+                r"# use one if using gated models[^\n]*",
+                "# HF Token for gated models",
+                new_raw,
+            )
+            new_raw = re.sub(
+                r"Huggingface  (`[^`]+`)",
+                r"Hugging Face \1",
+                new_raw,
+            )
+            new_raw = re.sub(
+                r'\[@nocommit[^\]]*\]\([^\)]*\)\.?',
+                '',
+                new_raw,
+            )
+            for wrong, right in _ALL_NB_FIXES.items():
+                new_raw = new_raw.replace(wrong, right)
+            # Fix footer numbering (various formats)
+            new_raw = re.sub(r'\n6\. See notebooks for DPO', r'\n4. See notebooks for DPO', new_raw)
+            new_raw = re.sub(r'"6\. See notebooks for DPO', r'"4. See notebooks for DPO', new_raw)
+            # Fix duplicate "See our docs" sentences
+            new_raw = re.sub(
+                r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1',
+                r'\1',
+                new_raw
+            )
+            # Fix broken #Save link ONLY if file has NO <a name="Save"> anchor
+            if '[how to save it](#Save)' in new_raw and '<a name="Save">' not in new_raw:
+                new_raw = new_raw.replace('[how to save it](#Save)', 'how to save it')
+            if new_raw != raw:
+                with open(nb_path, "w", encoding="utf-8") as f:
+                    f.write(new_raw)
+        except Exception:
+            pass
+        os.chmod(nb_path, 0o644)
 
     if not args.disable_convert_to_script:
         convert_folder("nb", "python_scripts")

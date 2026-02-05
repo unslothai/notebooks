@@ -5,26 +5,28 @@
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
-# <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth your local device, follow [our guide](https://docs.unsloth.ai/get-started/install-and-update). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
-# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
 # 
 
 # ### News
 
 # 
-# Introducing FP8 precision training for faster RL inference. [Read Blog](https://docs.unsloth.ai/new/fp8-reinforcement-learning).
+# Train MoEs - DeepSeek, GLM, Qwen and gpt-oss faster with 32% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
-# Unsloth's [Docker image](https://hub.docker.com/r/unsloth/unsloth) is here! Start training with no setup & environment issues. [Read our Guide](https://docs.unsloth.ai/new/how-to-train-llms-with-unsloth-and-docker).
+# You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
 # 
-# [gpt-oss RL](https://docs.unsloth.ai/new/gpt-oss-reinforcement-learning) is now supported with the fastest inference & lowest VRAM. Try our [new notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb) which creates kernels!
+# Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
 # 
-# Introducing [Vision](https://docs.unsloth.ai/new/vision-reinforcement-learning-vlm-rl) and [Standby](https://docs.unsloth.ai/basics/memory-efficient-rl) for RL! Train Qwen, Gemma etc. VLMs with GSPO - even faster with less VRAM.
+# 3x faster LLM training with 30% less VRAM and 500K context. [3x faster](https://unsloth.ai/docs/new/3x-faster-training-packing) • [500K Context](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
-# Visit our docs for all our [model uploads](https://docs.unsloth.ai/get-started/all-our-models) and [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebooks).
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 # 
 
 # # ### Installation
@@ -32,7 +34,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = "xformers==" + ("0.0.33.post1" if v=="2.9" else "0.0.32.post2" if v=="2.8" else "0.0.29.post3")\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
 # 
 # 
 # # ### Unsloth
@@ -66,8 +68,8 @@ model, tokenizer = FastVisionModel.from_pretrained(
     "./deepseek_ocr",
     load_in_4bit = False, # Use 4bit to reduce memory use. False for 16bit LoRA.
     auto_model = AutoModel,
-    trust_remote_code=True,
-    unsloth_force_compile=True,
+    trust_remote_code = True,
+    unsloth_force_compile = True,
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for long context
 )
 
@@ -117,10 +119,10 @@ def evaluate_model(
     num_samples = min(num_samples, len(dataset))
 
     # Grab evenly spaced samples from the dataset
-    indices = np.linspace(0, len(dataset) - 1, num_samples, dtype=int)
+    indices = np.linspace(0, len(dataset) - 1, num_samples, dtype = int)
 
     # Use tqdm for a progress bar if verbose
-    iterator = tqdm(indices, desc="Evaluating") if verbose else indices
+    iterator = tqdm(indices, desc = "Evaluating") if verbose else indices
 
     for idx in iterator:
         sample = dataset[int(idx)]
@@ -136,15 +138,15 @@ def evaluate_model(
             # Run the actual inference
             prediction = model.infer(
                 tokenizer,
-                prompt="<image>\nFree OCR. ",
-                image_file=temp_image_path,
-                output_path="temp_output",
-                base_size=base_size,
-                image_size=image_size,
-                crop_mode=crop_mode,
-                eval_mode=True,
-                save_results=False,
-                test_compress=False
+                prompt = "<image>\nFree OCR. ",
+                image_file = temp_image_path,
+                output_path = "temp_output",
+                base_size = base_size,
+                image_size = image_size,
+                crop_mode = crop_mode,
+                eval_mode = True,
+                save_results = False,
+                test_compress = False
             )
 
             prediction = prediction.strip()
@@ -215,8 +217,8 @@ def print_evaluation_summary(results: Dict, title: str = "Evaluation Results"):
 
 def save_evaluation_results(results: Dict, filepath: str):
     """Save full results dictionary to a JSON file."""
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+    with open(filepath, 'w', encoding = 'utf-8') as f:
+        json.dump(results, f, ensure_ascii = False, indent = 2)
     print(f"\n✅ Results saved to {filepath}")
 
 
@@ -228,18 +230,18 @@ def save_evaluation_results(results: Dict, filepath: str):
 print("Loading evaluation dataset...")
 from datasets import load_dataset
 
-eval_dataset = load_dataset("hezarai/parsynth-ocr-200k", split="test")
+eval_dataset = load_dataset("hezarai/parsynth-ocr-200k", split = "test")
 
 print("\n Running Baseline Evaluation...")
 baseline_results = evaluate_model(
-    model=model,
-    tokenizer=tokenizer,
-    dataset=eval_dataset,
-    num_samples=200,
-    base_size=1024,
-    image_size=640,
-    crop_mode=True,
-    verbose=True
+    model = model,
+    tokenizer = tokenizer,
+    dataset = eval_dataset,
+    num_samples = 200,
+    base_size = 1024,
+    image_size = 640,
+    crop_mode = True,
+    verbose = True
 )
 
 print_evaluation_summary(baseline_results, "Baseline Model Performance")
@@ -259,7 +261,7 @@ save_evaluation_results(baseline_results, "baseline_evaluation.json")
 
 model = FastVisionModel.get_peft_model(
     model,
-    target_modules=[
+    target_modules = [
         "q_proj",
         "k_proj",
         "v_proj",
@@ -405,9 +407,9 @@ class DeepSeekOCRDataCollator:
         self.train_on_responses_only = train_on_responses_only
 
         self.image_transform = BasicImageTransform(
-            mean=(0.5, 0.5, 0.5),
-            std=(0.5, 0.5, 0.5),
-            normalize=True
+            mean = (0.5, 0.5, 0.5),
+            std = (0.5, 0.5, 0.5),
+            normalize = True
         )
         self.patch_size = 16
         self.downsample_ratio = 4
@@ -464,14 +466,14 @@ class DeepSeekOCRDataCollator:
                 images_crop_raw = []
             else:
                 images_crop_raw, crop_ratio = dynamic_preprocess(
-                    image, min_num=2, max_num=9,
-                    image_size=self.image_size, use_thumbnail=False
+                    image, min_num = 2, max_num = 9,
+                    image_size = self.image_size, use_thumbnail = False
                 )
 
             # Process global view with padding
             global_view = ImageOps.pad(
                 image, (self.base_size, self.base_size),
-                color=tuple(int(x * 255) for x in self.image_transform.mean)
+                color = tuple(int(x * 255) for x in self.image_transform.mean)
             )
             images_list.append(self.image_transform(global_view).to(self.dtype))
 
@@ -507,7 +509,7 @@ class DeepSeekOCRDataCollator:
             else:
                 global_view = ImageOps.pad(
                     image, (self.base_size, self.base_size),
-                    color=tuple(int(x * 255) for x in self.image_transform.mean)
+                    color = tuple(int(x * 255) for x in self.image_transform.mean)
                 )
                 images_list.append(self.image_transform(global_view).to(self.dtype))
 
@@ -569,7 +571,7 @@ class DeepSeekOCRDataCollator:
 
                 for i, text_sep in enumerate(text_splits):
                     # Tokenize the text part
-                    tokenized_sep = text_encode(self.tokenizer, text_sep, bos=False, eos=False)
+                    tokenized_sep = text_encode(self.tokenizer, text_sep, bos = False, eos = False)
                     tokenized_str.extend(tokenized_sep)
                     images_seq_mask.extend([False] * len(tokenized_sep))
 
@@ -607,17 +609,17 @@ class DeepSeekOCRDataCollator:
                 prompt_token_count = len(tokenized_str)
 
             # Prepare image tensors
-            images_ori = torch.stack(images_list, dim=0)
-            images_spatial_crop_tensor = torch.tensor(images_spatial_crop, dtype=torch.long)
+            images_ori = torch.stack(images_list, dim = 0)
+            images_spatial_crop_tensor = torch.tensor(images_spatial_crop, dtype = torch.long)
 
             if images_crop_list:
-                images_crop = torch.stack(images_crop_list, dim=0)
+                images_crop = torch.stack(images_crop_list, dim = 0)
             else:
-                images_crop = torch.zeros((1, 3, self.base_size, self.base_size), dtype=self.dtype)
+                images_crop = torch.zeros((1, 3, self.base_size, self.base_size), dtype = self.dtype)
 
             return {
-                "input_ids": torch.tensor(tokenized_str, dtype=torch.long),
-                "images_seq_mask": torch.tensor(images_seq_mask, dtype=torch.bool),
+                "input_ids": torch.tensor(tokenized_str, dtype = torch.long),
+                "images_seq_mask": torch.tensor(images_seq_mask, dtype = torch.bool),
                 "images_ori": images_ori,
                 "images_crop": images_crop,
                 "images_spatial_crop": images_spatial_crop_tensor,
@@ -646,8 +648,8 @@ class DeepSeekOCRDataCollator:
         prompt_token_counts = [item['prompt_token_count'] for item in batch_data]
 
         # Pad sequences
-        input_ids = pad_sequence(input_ids_list, batch_first=True, padding_value=self.tokenizer.pad_token_id)
-        images_seq_mask = pad_sequence(images_seq_mask_list, batch_first=True, padding_value=False)
+        input_ids = pad_sequence(input_ids_list, batch_first = True, padding_value = self.tokenizer.pad_token_id)
+        images_seq_mask = pad_sequence(images_seq_mask_list, batch_first = True, padding_value = False)
 
         # Create labels
         labels = input_ids.clone()
@@ -658,7 +660,7 @@ class DeepSeekOCRDataCollator:
         # Mask image tokens (model shouldn't predict these)
         labels[images_seq_mask] = -100
 
-        # Mask user prompt tokens when train_on_responses_only=True (only train on assistant responses)
+        # Mask user prompt tokens when train_on_responses_only = True (only train on assistant responses)
         if self.train_on_responses_only:
             for idx, prompt_count in enumerate(prompt_token_counts):
                 if prompt_count > 0:
@@ -673,7 +675,7 @@ class DeepSeekOCRDataCollator:
             images_batch.append((item['images_crop'], item['images_ori']))
 
         # Stack spatial crop info
-        images_spatial_crop = torch.cat([item['images_spatial_crop'] for item in batch_data], dim=0)
+        images_spatial_crop = torch.cat([item['images_spatial_crop'] for item in batch_data], dim = 0)
 
         return {
             "input_ids": input_ids,
@@ -687,7 +689,7 @@ class DeepSeekOCRDataCollator:
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support TRL's `DPOTrainer`!
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
 # 
 # We use our new `DeepSeekOCRDataCollator` which will help in our vision finetuning setup.
 
@@ -698,12 +700,12 @@ from transformers import Trainer, TrainingArguments
 from unsloth import is_bf16_supported
 FastVisionModel.for_training(model) # Enable for training!
 data_collator = DeepSeekOCRDataCollator(
-    tokenizer=tokenizer,
+    tokenizer = tokenizer,
     model = model,
-    image_size=640,
-    base_size=1024,
-    crop_mode=True,
-    train_on_responses_only=True,
+    image_size = 640,
+    base_size = 1024,
+    crop_mode = True,
+    train_on_responses_only = True,
 )
 trainer = Trainer(
     model = model,
@@ -726,7 +728,7 @@ trainer = Trainer(
         bf16 = is_bf16_supported(),  # Use bf16 if supported
         output_dir = "outputs",
         report_to = "none",     # For Weights and Biases
-        dataloader_num_workers=2,
+        dataloader_num_workers = 2,
         # You MUST put the below items for vision finetuning:
         remove_unused_columns = False,
     ),
@@ -758,14 +760,14 @@ trainer_stats = trainer.train()
 FastVisionModel.for_inference(model) # Enable for inference!
 
 finetuned_results = evaluate_model(
-    model=model,
-    tokenizer=tokenizer,
-    dataset=eval_dataset,
-    num_samples=200,
-    base_size=1024,
-    image_size=640,
-    crop_mode=True,
-    verbose=True
+    model = model,
+    tokenizer = tokenizer,
+    dataset = eval_dataset,
+    num_samples = 200,
+    base_size = 1024,
+    image_size = 640,
+    crop_mode = True,
+    verbose = True
 )
 
 print_evaluation_summary(finetuned_results, "Fine-tuned Model Performance")
@@ -830,28 +832,28 @@ output_path = 'your/output/dir'
 
 # Gundam: base_size = 1024, image_size = 640, crop_mode = True
 
-res = model.infer(tokenizer, prompt=prompt, image_file=image_file,
+res = model.infer(tokenizer, prompt = prompt, image_file = image_file,
     output_path = output_path,
-    image_size=640,
-    base_size=1024,
-    crop_mode=True,
+    image_size = 640,
+    base_size = 1024,
+    crop_mode = True,
     save_results = True,
     test_compress = False)
 
 
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
-# To save the final model as LoRA adapters, either use Huggingface's `push_to_hub` for an online save or `save_pretrained` for a local save.
+# To save the final model as LoRA adapters, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
 # In[ ]:
 
 
-model.save_pretrained("lora_model")  # Local saving
-tokenizer.save_pretrained("lora_model")
-# model.push_to_hub("your_name/lora_model", token = "...") # Online saving
-# tokenizer.push_to_hub("your_name/lora_model", token = "...") # Online saving
+model.save_pretrained("deepseek_ocr_lora")  # Local saving
+tokenizer.save_pretrained("deepseek_ocr_lora")
+# model.push_to_hub("your_name/deepseek_ocr_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/deepseek_ocr_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -862,11 +864,11 @@ tokenizer.save_pretrained("lora_model")
 if False:
     from unsloth import FastVisionModel
     model, tokenizer = FastVisionModel.from_pretrained(
-        model_name = "lora_model", # YOUR MODEL YOU USED FOR TRAINING
+        model_name = "deepseek_ocr_lora", # YOUR MODEL YOU USED FOR TRAINING
         load_in_4bit = False, # Use 4bit to reduce memory use. False for 16bit LoRA.
         auto_model = AutoModel,
-        trust_remote_code=True,
-        unsloth_force_compile=True,
+        trust_remote_code = True,
+        unsloth_force_compile = True,
         use_gradient_checkpointing = "unsloth", # True or "unsloth" for long context
     )
     FastVisionModel.for_inference(model) # Enable for inference!
@@ -882,18 +884,18 @@ output_path = 'your/output/dir'
 
 # Gundam: base_size = 1024, image_size = 640, crop_mode = True
 
-res = model.infer(tokenizer, prompt=prompt, image_file=image_file,
+res = model.infer(tokenizer, prompt = prompt, image_file = image_file,
     output_path = output_path,
-    image_size=640,
-    base_size=1024,
-    crop_mode=True,
+    image_size = 640,
+    base_size = 1024,
+    crop_mode = True,
     save_results = True,
     test_compress = False)
 
 
 # ### Saving to float16 for VLLM
 # 
-# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
@@ -904,21 +906,21 @@ res = model.infer(tokenizer, prompt=prompt, image_file=image_file,
 if False: model.save_pretrained_merged("unsloth_finetune", tokenizer,)
 
 # To export and save to your Hugging Face account
-if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "PUT_HERE")
+if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
+# Some other resources:
 # 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
 # 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 # 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://docs.unsloth.ai/get-started/unsloth-notebooks)!
+# 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 #   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
-#   <a href="https://docs.unsloth.ai/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 
