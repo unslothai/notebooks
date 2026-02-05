@@ -26,10 +26,10 @@
 # 
 # To install NeMo Gym, follow the guide [here](https://docs.nvidia.com/nemo/gym/latest/get-started/index.html).
 # 
-# To install Unsloth on your local device, follow the guide [here](https://unsloth.ai/docs/get-started/install-and-update).
+# To install Unsloth on your local device, follow the guide [here](https://unsloth.ai/docs/get-started/install).
 # 
 # 
-# This notebook was developed on 1 H100 GPU. If you are using a GPU with lower VRAM, you should adjust configuration parameters accordingly, such as max output length, quantization, or parameter efficient finetuning. Unsloth has a bunch of examples of low VRAM training that work with Nemo Gym training environments!
+# This notebook was developed on 1 H100 GPU. If you are using a GPU with lower VRAM, you should adjust configuration parameters accordingly, such as max output length, quantization, or parameter efficient finetuning. Unsloth has a bunch of examples of low VRAM training that work with NeMo Gym training environments!
 
 # # Load the model
 # 
@@ -73,9 +73,9 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # )
 
 
-# # Nemo Gym resources server setup
+# # NeMo Gym resources server setup
 # 
-# Nemo Gym resources servers provide tool implementations, logic to process actions, update state, provide observations, and calculate rewards for actions taken.
+# NeMo Gym resources servers provide tool implementations, logic to process actions, update state, provide observations, and calculate rewards for actions taken.
 # 
 # The reasoning gym resource server is an integration of [reasoning gym](https://github.com/open-thought/reasoning-gym), which is a library of procedural dataset generators and algorithmically verifiable reasoning environments for training reasoning models with reinforcement learning (RL). It includes more than 100 tasks over many domains with configurable difficulty, including but not limited to algebra, arithmetic, computation, cognition, geometry, graph theory, logic, and many common games. 
 # 
@@ -132,7 +132,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # ####################################################################################################
 # ```
 
-# Nemo Gym starts a head server on port 11000 by default, and the resources server port is selected at random from available ports, unless specified otherwise. We can automatically extract the resources servers ports using the head server:
+# NeMo Gym starts a head server on port 11000 by default, and the resources server port is selected at random from available ports, unless specified otherwise. We can automatically extract the resources servers ports using the head server:
 
 # In[ ]:
 
@@ -156,7 +156,7 @@ def get_verify_endpoint(server_name: str) -> str:
 
 # # Dataset prep
 # 
-# Next, let's create and load the dataset. We can generate a mini sudoku dataset using the create script in Nemo Gym, which uses the reasoning gym library.
+# Next, let's create and load the dataset. We can generate a mini sudoku dataset using the create script in NeMo Gym, which uses the reasoning gym library.
 # 
 # ```
 # cd ~/Gym
@@ -237,7 +237,7 @@ train_dataset = Dataset.from_list(train_data)
 
 # # Define reward function
 # 
-# Now lets create a reward function that uses Nemo Gym's verifiers, routing tasks to resources servers using the server names:
+# Now lets create a reward function that uses NeMo Gym's verifiers, routing tasks to resources servers using the server names:
 
 # In[ ]:
 
@@ -390,7 +390,7 @@ _ = model.generate(
 # <a name="Save"></a>
 # ### Saving to float16 or MXFP4 for vLLM
 # 
-# Unsloth supports saving to `float16` directly. Select `merged_16bit` for float16. Unsloth also supports saving in low or mixed precision such as `mxfp4`, and allows `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+# Unsloth supports saving to `float16` directly. Select `merged_16bit` for float16. Unsloth also supports saving in low or mixed precision such as `mxfp4`, and allows `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
 # In[ ]:
 
@@ -416,11 +416,11 @@ if False:  # Pushing to HF Hub
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
-# Some other links:
+# Some other resources:
 # 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
 # 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 # 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 6. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
+# 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>

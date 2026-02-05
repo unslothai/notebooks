@@ -401,6 +401,38 @@ def update_old_unsloth(filename):
         # Remove @nocommit placeholders
         text = re.sub(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?', '', text)
 
+        # Fix empty Open Math Reasoning URL
+        text = text.replace(
+            "[Open Math Reasoning]()",
+            "[Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini)"
+        )
+
+        # Fix footer heading
+        text = text.replace("Some other links:", "Some other resources:")
+
+        # Fix old installation URL paths (both variants)
+        text = text.replace(
+            "unsloth.ai/docs/get-started/installing-+-updating",
+            "unsloth.ai/docs/get-started/install"
+        )
+        text = text.replace(
+            "unsloth.ai/docs/get-started/install-and-update",
+            "unsloth.ai/docs/get-started/install"
+        )
+
+        # Fix footer numbering (6. → 4.)
+        text = re.sub(r'\n6\. See notebooks for DPO', r'\n4. See notebooks for DPO', text)
+
+        # Fix duplicate "See our docs" sentences (same line duplicates)
+        text = re.sub(
+            r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1',
+            r'\1',
+            text
+        )
+
+        # Fix Nemo → NeMo capitalization (but not Mistral-Nemo model names)
+        text = re.sub(r'\bNemo Gym\b', 'NeMo Gym', text)
+
         return text
 
     def replace_code(text):
@@ -2535,6 +2567,20 @@ if __name__ == "__main__":
         "Replace with out specific": "Replace without specific",
         "AutoModelForPeftCausalLM": "AutoPeftModelForCausalLM",
         "<|start_of_role|>user|end_of_role|>": "<|start_of_role|>user<|end_of_role|>",
+        # New fixes
+        "[Open Math Reasoning]()": "[Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini)",
+        "Some other links:": "Some other resources:",
+        "unsloth.ai/docs/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+        "unsloth.ai/docs/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+        # Also handle old domain format that may be in exception files
+        "docs.unsloth.ai/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+        "docs.unsloth.ai/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+        # Handle intermediate format (domain changed but path not)
+        "unsloth.ai/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+        "unsloth.ai/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+        "Nemo Gym": "NeMo Gym",
+        # Fix old domain for exception files
+        "https://docs.unsloth.ai/": "https://unsloth.ai/docs/",
     }
     for nb_path in glob(os.path.join("nb", "*.ipynb")):
         try:
@@ -2558,6 +2604,18 @@ if __name__ == "__main__":
             )
             for wrong, right in _ALL_NB_FIXES.items():
                 new_raw = new_raw.replace(wrong, right)
+            # Fix footer numbering (various formats)
+            new_raw = re.sub(r'\n6\. See notebooks for DPO', r'\n4. See notebooks for DPO', new_raw)
+            new_raw = re.sub(r'"6\. See notebooks for DPO', r'"4. See notebooks for DPO', new_raw)
+            # Fix duplicate "See our docs" sentences
+            new_raw = re.sub(
+                r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1',
+                r'\1',
+                new_raw
+            )
+            # Fix broken #Save link ONLY if file has NO <a name="Save"> anchor
+            if '[how to save it](#Save)' in new_raw and '<a name="Save">' not in new_raw:
+                new_raw = new_raw.replace('[how to save it](#Save)', 'how to save it')
             if new_raw != raw:
                 with open(nb_path, "w", encoding="utf-8") as f:
                     f.write(new_raw)
