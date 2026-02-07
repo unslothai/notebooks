@@ -130,10 +130,11 @@ def main():
     # Issue 5: tokenizer vs processor push_to_hub
     print("\n5: Fix tokenizer/processor push_to_hub")
 
-    # Gemma3_(4B)-Vision-GRPO.ipynb cell 33: uses model,tokenizer -> remove processor line
+    # Gemma3_(4B)-Vision-GRPO.ipynb cell 33: uses model,tokenizer -> replace processor with tokenizer
     fix_push_to_hub(
         "Gemma3_(4B)-Vision-GRPO.ipynb", 33,
         remove_line_containing="# processor.push_to_hub(",
+        replace_with="# tokenizer.push_to_hub(",
     )
 
     # Qwen3_VL_(8B)-Vision-GRPO.ipynb cell 36: uses model,tokenizer -> replace processor with tokenizer

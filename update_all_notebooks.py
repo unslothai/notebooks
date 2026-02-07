@@ -917,7 +917,7 @@ def _extract_pip_packages(install_text):
                 # git+https://... -- use the repo name as identifier
                 repo = token.rstrip("/").rsplit("/", 1)[-1]
                 repo = repo.split(".git")[0].split("@")[0]
-                packages.add(repo.lower())
+                packages.add(repo.lower().replace("-", "_"))
                 continue
             pm = _RE_PIP_PKG_TOKEN.match(token)
             if pm:
