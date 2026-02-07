@@ -523,10 +523,6 @@ def update_old_unsloth(filename):
     def replace_common(text):
         """Apply common text replacements for both code and markdown cells."""
         text = text.replace("</a></a>", "</a>")
-        text = text.replace(
-            "To install Unsloth on your local device",
-            "To install Unsloth on your local device",
-        )
         text = _RE_DOUBLE_EXCL.sub("!", text)
         text = text.replace("ee notice", "we notice")
 
@@ -902,7 +898,7 @@ _INSTALL_GUARD_IGNORE = frozenset({
     "unsloth", "unsloth_zoo", "bitsandbytes", "accelerate", "xformers",
     "peft", "trl", "triton", "cut_cross_entropy", "sentencepiece",
     "protobuf", "datasets", "huggingface_hub", "hf_transfer",
-    "transformers", "pip3-autoremove", "torch", "torchvision",
+    "transformers", "pip3_autoremove", "torch", "torchvision",
     "torchaudio", "pip",
 })
 
@@ -1551,8 +1547,6 @@ __OTHER_RESOURCES__
 
 text_for_last_cell_ollama = text_for_last_cell_gguf.replace("Now, ", "You can also ", 1)
 
-text_for_last_cell_gemma3 = text_for_last_cell_gguf.replace("model-unsloth", "gemma-3-finetune")
-
 text_for_last_cell_non_gguf = """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 
 __OTHER_RESOURCES__
@@ -2138,8 +2132,6 @@ def update_notebook_sections(
                 text_for_last_cell = text_for_last_cell_ollama
             elif is_gguf:
                 text_for_last_cell = text_for_last_cell_gguf
-            elif is_gemma3 and not is_vision and is_gguf: # Vision cannot be transformed to GGUF yet
-                text_for_last_cell = text_for_last_cell_gemma3
             else:
                 text_for_last_cell = text_for_last_cell_non_gguf
 
@@ -2195,6 +2187,10 @@ def update_notebook_sections(
             updated = True
         if "colab" not in notebook_content["metadata"]:
             notebook_content["metadata"]["colab"] = {"provenance": [], "gpuType" : "T4", "include_colab_link": True}
+            updated = True
+        # Override gpuType for A100 notebooks
+        if "A100" in notebook_path:
+            notebook_content["metadata"]["colab"]["gpuType"] = "A100"
             updated = True
         if "kernelspec" not in notebook_content["metadata"]:
             notebook_content["metadata"]["kernelspec"] = {
@@ -2981,6 +2977,8 @@ if __name__ == "__main__":
         "Nemo Gym": "NeMo Gym",
         # Fix old domain for exception files
         "https://docs.unsloth.ai/": "https://unsloth.ai/docs/",
+        # Fix ExecuTorch dangling sentence left after @nocommit removal
+        "ExecuTorch.  Follow the directions \\n": "ExecuTorch.\\n",
     }
 
     def _apply_global_fixes(nb_path):

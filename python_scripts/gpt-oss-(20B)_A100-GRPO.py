@@ -742,7 +742,7 @@ trainer = GRPOTrainer(
 
 # And let's train the model!
 # 
-# **NOTE** A T4 free GPU might take 5 minutes for one generation sadly since it's an old GPU - A100 or H100 will be much faster!
+# **NOTE** An A100 GPU should complete one generation quickly.
 
 # In[ ]:
 

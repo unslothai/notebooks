@@ -156,7 +156,25 @@ def main():
             remove_line_containing="# tokenizer.push_to_hub(",
         )
 
+    # Fix 6: A100 metadata for all A100 templates
+    print("\n6: Fix A100 gpuType metadata")
+    fix_a100_metadata()
+
     print("\n=== All template fixes applied ===")
+
+
+def fix_a100_metadata():
+    """Set gpuType to A100 in all A100 template notebooks."""
+    for name in os.listdir(TEMPLATE_DIR):
+        if "A100" in name and name.endswith(".ipynb"):
+            path, nb = load_nb(name)
+            colab = nb.get("metadata", {}).get("colab", {})
+            if colab.get("gpuType") != "A100":
+                nb.setdefault("metadata", {}).setdefault("colab", {})["gpuType"] = "A100"
+                save_nb(path, nb)
+                print(f"  Fixed {name}: gpuType -> A100")
+            else:
+                print(f"  {name}: gpuType already A100")
 
 
 if __name__ == "__main__":
