@@ -2594,11 +2594,11 @@ def update_readme(
 
     for section in sections:
         try:
-            sections[section]["Colab"]["rows"].sort(key=lambda x: extract_version_from_row(x), reverse=True)
+            sections[section]["Colab"]["rows"].sort(key=lambda x: (extract_version_from_row(x), x), reverse=True)
         except Exception as e:
             print(f"Warning: Could not sort Colab rows for section '{section}' by version: {e}")
         try:
-            sections[section]["Kaggle"]["rows"].sort(key=lambda x: extract_version_from_row(x), reverse=True)
+            sections[section]["Kaggle"]["rows"].sort(key=lambda x: (extract_version_from_row(x), x), reverse=True)
         except Exception as e:
             print(f"Warning: Could not sort Kaggle rows for section '{section}' by version: {e}")
 

@@ -164,17 +164,32 @@ def main():
 
 
 def fix_a100_metadata():
-    """Set gpuType to A100 in all A100 template notebooks."""
+    """Set gpuType to A100 and fix T4 announcement text in all A100 template notebooks."""
+    old_text = "a **free** Tesla T4 Google Colab instance"
+    new_text = "your A100 Google Colab Pro instance"
     for name in os.listdir(TEMPLATE_DIR):
         if "A100" in name and name.endswith(".ipynb"):
             path, nb = load_nb(name)
+            changed = False
+            # Fix gpuType metadata
             colab = nb.get("metadata", {}).get("colab", {})
             if colab.get("gpuType") != "A100":
                 nb.setdefault("metadata", {}).setdefault("colab", {})["gpuType"] = "A100"
-                save_nb(path, nb)
+                changed = True
                 print(f"  Fixed {name}: gpuType -> A100")
             else:
                 print(f"  {name}: gpuType already A100")
+            # Fix announcement cell text (T4 -> A100)
+            for cell in nb.get("cells", []):
+                if cell.get("cell_type") != "markdown":
+                    continue
+                for i, line in enumerate(cell.get("source", [])):
+                    if old_text in line:
+                        cell["source"][i] = line.replace(old_text, new_text)
+                        changed = True
+                        print(f"  Fixed {name}: T4 announcement -> A100")
+            if changed:
+                save_nb(path, nb)
 
 
 if __name__ == "__main__":
