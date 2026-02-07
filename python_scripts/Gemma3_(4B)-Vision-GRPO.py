@@ -11,7 +11,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # ### News
 
@@ -27,7 +26,6 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
@@ -233,21 +231,24 @@ train_dataset = train_dataset.remove_columns("image")
 train_dataset = train_dataset.rename_column("decoded_image", "image")
 
 
-
 # Applying Chat Template across the entire dataset
 
 # In[11]:
 
 
-train_dataset = train_dataset.map(
-    lambda example: {
-        "prompt": tokenizer.apply_chat_template(
-            example["prompt"],
-            tokenize = False,
-            add_generation_prompt = False
-        )
-    }
-)
+from unsloth_zoo.utils import Version
+
+# Only apply chat template for TRL < 0.24.0, otherwise TRL handles it
+if Version("trl") < Version("0.24.0"):
+    train_dataset = train_dataset.map(
+        lambda example: {
+            "prompt": tokenizer.apply_chat_template(
+                example["prompt"],
+                tokenize = False,
+                add_generation_prompt = False
+            )
+        }
+    )
 
 
 # We use a basic formatting functions to see if reasoning starts and ends as well as if the answers were written correctly.
@@ -339,7 +340,6 @@ training_args = GRPOConfig(
 # | 1    | 0.000000      | 0.125000  | 0.000000   | 200.000000        | 0.000000 |
 # | 2    | 0.000000      | 0.072375  | 0.248112   | 200.000000        | 0.000000 |
 # | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
-# 
 
 # In[15]:
 
@@ -407,7 +407,7 @@ result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128
 model.save_pretrained("gemma_3_lora")  # Local saving
 tokenizer.save_pretrained("gemma_3_lora")
 # model.push_to_hub("your_name/gemma_3_lora", token = "YOUR_HF_TOKEN") # Online saving
-# processor.push_to_hub("your_name/gemma_3_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/gemma_3_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -494,4 +494,3 @@ if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, 
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
 # </div>
-# 

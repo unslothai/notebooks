@@ -11,7 +11,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # ### News
 
@@ -27,7 +26,6 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
@@ -90,7 +88,6 @@ model, tokenizer = FastModel.from_pretrained(
 
 
 # We now add LoRA adapters so we only need to update a small amount of parameters!
-# 
 
 # In[2]:
 
@@ -118,7 +115,6 @@ model = FastModel.get_peft_model(
 # We now use the [Emotion dataset](https://huggingface.co/datasets/dair-ai/emotion) from `dair-ai`, which contains text labeled by emotion. In this example, we load the **unsplit** version and use only the first 30,000 samples.  
 # 
 # We then split the dataset into training (80%) and validation (20%), and apply tokenization to prepare the text for training.
-# 
 
 # In[3]:
 
@@ -172,7 +168,6 @@ class_weights
 # Here we use **accuracy** from scikit-learn, which compares predicted labels with the ground truth.  
 # 
 # **[NOTE]** Accuracy is a good baseline, but for imbalanced datasets you may also want to track metrics like **F1-score**, **precision**, or **recall**.  
-# 
 
 # In[7]:
 
@@ -250,7 +245,6 @@ classifier(sentence1)
 # <a name="Save"></a>
 # ### Saving finetuned models
 # To save the final model, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
-# 
 
 # In[15]:
 
@@ -278,4 +272,3 @@ tokenizer.save_pretrained("bert_classification_lora")
 # </div>
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
-# 

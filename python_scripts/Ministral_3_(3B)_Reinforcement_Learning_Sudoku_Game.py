@@ -13,7 +13,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # # Goal: Make Ministral solve Sudoku puzzles with Reinforcement Learning
 # 
@@ -22,7 +21,6 @@
 # and completing valid puzzles.
 # 
 # <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Sudoku_Puzzle_by_L2G-20050714_solution_standardized_layout.svg/1280px-Sudoku_Puzzle_by_L2G-20050714_solution_standardized_layout.svg.png" height="300" />
-# 
 
 # # Installation
 # We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Ministral. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster.
@@ -438,7 +436,6 @@ print(info)
 # # Data & RL task setup
 # 
 # Create the prompt that instructs the model to generate a Sudoku solving strategy. You can customize this to some other task for another RL task.
-# 
 
 # In[ ]:
 
@@ -725,7 +722,6 @@ training_args = GRPOConfig(
 # | 1    | 0.000000      | 0.125000  | 0.000000   | 200.000000        | 0.000000 |
 # | 2    | 0.000000      | 0.072375  | 0.248112   | 200.000000        | 0.000000 |
 # | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
-# 
 
 # In[ ]:
 
@@ -761,7 +757,6 @@ trainer.train()
 
 
 # And now with the LoRA we just trained with GRPO - we first save the LoRA first!
-# 
 
 # In[ ]:
 
@@ -771,7 +766,6 @@ tokenizer.save_pretrained("grpo_saved_lora")
 
 
 # Verify LoRA is actually trained!
-# 
 
 # In[ ]:
 
@@ -891,4 +885,3 @@ if False:
 # </div>
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
-# 

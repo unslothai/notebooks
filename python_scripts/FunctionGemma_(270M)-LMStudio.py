@@ -13,7 +13,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # ## Unsloth + LM Studio
 # <img src="https://user-uploads.lmstudio.ai/umbrella-editor-assets/2025/12/22/5gwufx8h-image.png" width="400" />
@@ -25,7 +24,6 @@
 # LM Studio is a powerful yet friendly desktop application that makes it easy to discover, download, and run models locally, creating a smooth end-to-end workflow for fine-tuning and deployment.
 # 
 # <b>First, let's install `LM Studio` from [here](https://lmstudio.ai/download)!</b>
-# 
 
 # ### Install Unsloth and other dependencies
 
@@ -36,7 +34,6 @@ get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "
 
 
 # ### Unsloth
-# 
 
 # In[2]:
 
@@ -92,7 +89,6 @@ model = FastLanguageModel.get_peft_model(
 # Formatting is very important in the `functiongemma` for tool-calling.
 
 # For the general conversation,  each role (`developer`, `user`, `model`) is wrapped with `<start_of_turn>{role} ... <end_of_turn>`
-# 
 
 # In[4]:
 
@@ -114,7 +110,6 @@ print(rendered_1)
 
 
 # For tool calling, in the `developer` turn, `<start_function_declaration>declaration:get_weather{...}<end_function_declaration>` encodes the full function spec (name, description, parameters) so the model knows *what* tools it can call and how to format arguments.
-# 
 
 # In[5]:
 
@@ -156,7 +151,6 @@ print(rendered_2)
 
 
 # For tool calling + result of the tool call + LLM answer, the user turn is plain text; the next `model` turn embeds `<start_function_call>call:get_weather{...}<end_function_call>` and a matching `<start_function_response>response:get_weather{...}<end_function_response>`, modeling the whole “call tool → receive result → answer user” loop inside the prompt.
-# 
 
 # In[6]:
 
@@ -338,8 +332,6 @@ dataset[0]["messages"]
 
 
 # If we look closely, our dataset is in the form of string. Secondly, the format of this dataset is different with the one that is required for `functiongemma`. Especially the one when we need to pass the tools. We will use our defined function to do this :
-# 
-# 
 
 # In[10]:
 
@@ -759,4 +751,3 @@ if False: # Change to True to upload GGUF
 # </div>
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
-# 

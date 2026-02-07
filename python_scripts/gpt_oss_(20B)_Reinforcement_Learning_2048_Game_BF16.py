@@ -441,7 +441,6 @@ print(info)
 
 
 # We also disallow global variable access. We'll use Unsloth's `create_locked_down_function` function
-# 
 
 # In[ ]:
 
@@ -709,7 +708,6 @@ training_args = GRPOConfig(
 # | 1    | 0.000000      | 0.125000  | 0.000000   | 200.000000        | 0.000000 |
 # | 2    | 0.000000      | 0.072375  | 0.248112   | 200.000000        | 0.000000 |
 # | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
-# 
 
 # In[ ]:
 

@@ -52,7 +52,6 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 
 
 # If you want to try out LoRA, uncomment the code below, and make sure that full_finetuning is set to False above. LoRA is a parameter-efficient training method that reduces computational cost by only training a small percentage of the full model parameters.
-# 
 
 # In[ ]:
 
@@ -393,4 +392,3 @@ if False:  # Pushing to HF Hub
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
 # </div>
-# 

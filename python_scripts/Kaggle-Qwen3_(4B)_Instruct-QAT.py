@@ -11,7 +11,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # ### News
 
@@ -27,7 +26,6 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
@@ -38,7 +36,6 @@
 # 
 # 
 # # ### Unsloth
-# 
 
 # In[2]:
 
@@ -165,7 +162,6 @@ dataset = dataset.map(formatting_prompts_func, batched = True)
 
 
 # Let's see how the chat template did!
-# 
 
 # In[10]:
 
@@ -353,7 +349,6 @@ model.save_pretrained_torchao(
 # We also support exporting to TorchAO-quantized checkpoints with custom configs to allow inference in vLLM or other inference engines.
 # 
 # For a deeper dive into TorchAO configuration, you can refer to Hugging Face Transformers official documentation: https://huggingface.co/docs/transformers/main/quantization/torchao
-# 
 
 # In[23]:
 
@@ -407,4 +402,3 @@ if False: # Pushing to HF Hub
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
 # </div>
-# 

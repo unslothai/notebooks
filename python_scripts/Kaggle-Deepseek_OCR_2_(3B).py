@@ -29,24 +29,24 @@
 
 # # ### Installation
 # 
-# # In[ ]:
+# # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install jiwer\n!pip install einops addict easydict\n')
 # 
 # 
 # # ### Unsloth
 
 # Let's prepare the OCR model to our local first
 
-# In[ ]:
+# In[2]:
 
 
 from huggingface_hub import snapshot_download
-snapshot_download("unsloth/DeepSeek-OCR", local_dir = "deepseek_ocr")
+snapshot_download("unsloth/DeepSeek-OCR-2", local_dir = "deepseek_ocr2")
 
 
-# In[ ]:
+# In[3]:
 
 
 from unsloth import FastVisionModel # FastLanguageModel for LLMs
@@ -63,7 +63,7 @@ fourbit_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastVisionModel.from_pretrained(
-    "./deepseek_ocr",
+    "./deepseek_ocr2",
     load_in_4bit = False, # Use 4bit to reduce memory use. False for 16bit LoRA.
     auto_model = AutoModel,
     trust_remote_code = True,
@@ -74,46 +74,46 @@ model, tokenizer = FastVisionModel.from_pretrained(
 
 # ### Let's Evaluate Deepseek-OCR Baseline Performance on Persian Transcription
 
-# In[ ]:
+# In[4]:
 
 
 from datasets import load_dataset
 dataset = load_dataset("hezarai/parsynth-ocr-200k", split = "train[:2000]")
 
 
-# In[ ]:
+# In[5]:
 
 
 # Save an image that will not be used during training for evaluation purposes
 dataset[1523]['image_path'].save("your_image.jpg")
 
 
-# In[ ]:
+# In[6]:
 
 
 dataset[1523]['image_path']
 
 
-# In[ ]:
+# In[7]:
 
 
 # prompt = "<image>\nFree OCR. "
 prompt = "<image>\nFree OCR. "
 image_file = 'your_image.jpg'
 output_path = 'your/output/dir'
-# infer(self, tokenizer, prompt = '', image_file = '', output_path = ' ', base_size = 1024, image_size = 640, crop_mode = True, test_compress = False, save_results = False):
+# infer(self, tokenizer, prompt = '', image_file = '', output_path = ' ', base_size = 1024, image_size = 768, crop_mode = True, test_compress = False, save_results = False):
 
 # Tiny: base_size = 512, image_size = 512, crop_mode = False
-# Small: base_size = 640, image_size = 640, crop_mode = False
+# Small: base_size = 768, image_size = 768, crop_mode = False
 # Base: base_size = 1024, image_size = 1024, crop_mode = False
 # Large: base_size = 1280, image_size = 1280, crop_mode = False
 
-# Gundam: base_size = 1024, image_size = 640, crop_mode = True
+# Gundam: base_size = 1024, image_size = 768, crop_mode = True
 
-res = model.infer(tokenizer, prompt = prompt, image_file = image_file, output_path = output_path, base_size = 1024, image_size = 640, crop_mode = True, save_results = True, test_compress = False)
+res = model.infer(tokenizer, prompt = prompt, image_file = image_file, output_path = output_path, base_size = 1024, image_size = 768, crop_mode = True, save_results = True, test_compress = False)
 
 
-# In[ ]:
+# In[8]:
 
 
 dataset[1523]["text"]
@@ -127,7 +127,7 @@ dataset[1523]["text"]
 # 
 # **[NEW]** We also support finetuning ONLY the vision part of the model, or ONLY the language part. Or you can select both! You can also select to finetune the attention or the MLP layers!
 
-# In[ ]:
+# In[9]:
 
 
 model = FastVisionModel.get_peft_model(
@@ -173,7 +173,7 @@ model = FastVisionModel.get_peft_model(
 # ]
 # ```
 
-# In[ ]:
+# In[10]:
 
 
 instruction = "<image>\nFree OCR. "
@@ -200,7 +200,7 @@ dataset = dataset.rename_column("image_path", "image")
 
 # Let's convert the dataset into the "correct" format for finetuning:
 
-# In[ ]:
+# In[11]:
 
 
 converted_dataset = [convert_to_conversation(sample) for sample in dataset]
@@ -208,13 +208,13 @@ converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 
 # We look at how the conversations are structured for the first example:
 
-# In[ ]:
+# In[12]:
 
 
 converted_dataset[0]
 
 
-# In[ ]:
+# In[13]:
 
 
 # @title Create datacollator
@@ -227,7 +227,7 @@ from PIL import Image, ImageOps
 from torch.nn.utils.rnn import pad_sequence
 import io
 
-from deepseek_ocr.modeling_deepseekocr import (
+from deepseek_ocr2.modeling_deepseekocr2 import (
     format_messages,
     text_encode,
     BasicImageTransform,
@@ -235,19 +235,19 @@ from deepseek_ocr.modeling_deepseekocr import (
 )
 
 @dataclass
-class DeepSeekOCRDataCollator:
+class DeepSeekOCR2DataCollator:
     """
     Args:
         tokenizer: Tokenizer
         model: Model
-        image_size: Size for image patches (default: 640)
+        image_size: Size for image patches (default: 768)
         base_size: Size for global view (default: 1024)
         crop_mode: Whether to use dynamic cropping for large images
         train_on_responses_only: If True, only train on assistant responses (mask user prompts)
     """
     tokenizer: Any
     model: Any
-    image_size: int = 640
+    image_size: int = 768
     base_size: int = 1024
     crop_mode: bool = True
     image_token_id: int = 128815
@@ -257,7 +257,7 @@ class DeepSeekOCRDataCollator:
         self,
         tokenizer,
         model,
-        image_size: int = 640,
+        image_size: int = 768,
         base_size: int = 1024,
         crop_mode: bool = True,
         train_on_responses_only: bool = True,
@@ -307,7 +307,7 @@ class DeepSeekOCRDataCollator:
         if self.crop_mode:
             img_tokens = num_queries_base * num_queries_base + 1
             if width_crop_num > 1 or height_crop_num > 1:
-                img_tokens += (num_queries * width_crop_num + 1) * (num_queries * height_crop_num)
+                img_tokens += (num_queries * width_crop_num) * (num_queries * height_crop_num)
         else:
             img_tokens = num_queries * num_queries + 1
 
@@ -326,12 +326,12 @@ class DeepSeekOCRDataCollator:
 
         if self.crop_mode:
             # Determine crop ratio based on image size
-            if image.size[0] <= 640 and image.size[1] <= 640:
+            if image.size[0] <= 768 and image.size[1] <= 768:
                 crop_ratio = (1, 1)
                 images_crop_raw = []
             else:
                 images_crop_raw, crop_ratio = dynamic_preprocess(
-                    image, min_num = 2, max_num = 9,
+                    image, min_num = 2, max_num = 6,
                     image_size = self.image_size, use_thumbnail = False
                 )
 
@@ -356,11 +356,11 @@ class DeepSeekOCRDataCollator:
             num_queries = math.ceil((self.image_size // self.patch_size) / self.downsample_ratio)
             num_queries_base = math.ceil((self.base_size // self.patch_size) / self.downsample_ratio)
 
-            tokenized_image = ([self.image_token_id] * num_queries_base + [self.image_token_id]) * num_queries_base
+            tokenized_image = ([self.image_token_id] * num_queries_base) * num_queries_base
             tokenized_image += [self.image_token_id]
 
             if width_crop_num > 1 or height_crop_num > 1:
-                tokenized_image += ([self.image_token_id] * (num_queries * width_crop_num) + [self.image_token_id]) * (
+                tokenized_image += ([self.image_token_id] * (num_queries * width_crop_num)) * (
                     num_queries * height_crop_num)
 
         else:  # crop_mode = False
@@ -368,7 +368,7 @@ class DeepSeekOCRDataCollator:
             images_spatial_crop.append([1, 1])
 
             # For smaller base sizes, resize; for larger, pad
-            if self.base_size <= 640:
+            if self.base_size <= 768:
                 resized_image = image.resize((self.base_size, self.base_size), Image.LANCZOS)
                 images_list.append(self.image_transform(resized_image).to(self.dtype))
             else:
@@ -379,114 +379,114 @@ class DeepSeekOCRDataCollator:
                 images_list.append(self.image_transform(global_view).to(self.dtype))
 
             num_queries = math.ceil((self.base_size // self.patch_size) / self.downsample_ratio)
-            tokenized_image = ([self.image_token_id] * num_queries + [self.image_token_id]) * num_queries
+            tokenized_image = ([self.image_token_id] * num_queries) * num_queries
             tokenized_image += [self.image_token_id]
 
         return images_list, images_crop_list, images_spatial_crop, tokenized_image, crop_ratio
 
     def process_single_sample(self, messages: List[Dict]) -> Dict[str, Any]:
-            """
-            Process a single conversation into model inputs.
-            """
+        """
+        Process a single conversation into model inputs.
+        """
 
-            # --- 1. Setup ---
-            images = []
-            for message in messages:
-                if "images" in message and message["images"]:
-                    for img_data in message["images"]:
-                        if img_data is not None:
-                            pil_image = self.deserialize_image(img_data)
-                            images.append(pil_image)
+        # --- 1. Setup ---
+        images = []
+        for message in messages:
+            if "images" in message and message["images"]:
+                for img_data in message["images"]:
+                    if img_data is not None:
+                        pil_image = self.deserialize_image(img_data)
+                        images.append(pil_image)
 
-            if not images:
-                raise ValueError("No images found in sample. Please ensure all samples contain images.")
+        if not images:
+            raise ValueError("No images found in sample. Please ensure all samples contain images.")
 
-            tokenized_str = []
-            images_seq_mask = []
-            images_list, images_crop_list, images_spatial_crop = [], [], []
+        tokenized_str = []
+        images_seq_mask = []
+        images_list, images_crop_list, images_spatial_crop = [], [], []
 
-            prompt_token_count = -1 # Index to start training
-            assistant_started = False
-            image_idx = 0
+        prompt_token_count = -1 # Index to start training
+        assistant_started = False
+        image_idx = 0
 
-            # Add BOS token at the very beginning
-            tokenized_str.append(self.bos_id)
-            images_seq_mask.append(False)
+        # Add BOS token at the very beginning
+        tokenized_str.append(self.bos_id)
+        images_seq_mask.append(False)
 
-            for message in messages:
-                role = message["role"]
-                content = message["content"]
+        for message in messages:
+            role = message["role"]
+            content = message["content"]
 
-                # Check if this is the assistant's turn
-                if role == "<|Assistant|>":
-                    if not assistant_started:
-                        # This is the split point. All tokens added *so far*
-                        # are part of the prompt.
-                        prompt_token_count = len(tokenized_str)
-                        assistant_started = True
+            # Check if this is the assistant's turn
+            if role == "<|Assistant|>":
+                if not assistant_started:
+                    # This is the split point. All tokens added *so far*
+                    # are part of the prompt.
+                    prompt_token_count = len(tokenized_str)
+                    assistant_started = True
 
-                    # Append the EOS token string to the *end* of assistant content
-                    content = f"{content.strip()} {self.tokenizer.eos_token}"
+                # Append the EOS token string to the *end* of assistant content
+                content = f"{content.strip()} {self.tokenizer.eos_token}"
 
-                # Split this message's content by the image token
-                text_splits = content.split('<image>')
+            # Split this message's content by the image token
+            text_splits = content.split('<image>')
 
-                for i, text_sep in enumerate(text_splits):
-                    # Tokenize the text part
-                    tokenized_sep = text_encode(self.tokenizer, text_sep, bos = False, eos = False)
-                    tokenized_str.extend(tokenized_sep)
-                    images_seq_mask.extend([False] * len(tokenized_sep))
+            for i, text_sep in enumerate(text_splits):
+                # Tokenize the text part
+                tokenized_sep = text_encode(self.tokenizer, text_sep, bos = False, eos = False)
+                tokenized_str.extend(tokenized_sep)
+                images_seq_mask.extend([False] * len(tokenized_sep))
 
-                    # If this text is followed by an <image> tag
-                    if i < len(text_splits) - 1:
-                        if image_idx >= len(images):
-                            raise ValueError(
-                                f"Data mismatch: Found '<image>' token but no corresponding image."
-                            )
+                # If this text is followed by an <image> tag
+                if i < len(text_splits) - 1:
+                    if image_idx >= len(images):
+                        raise ValueError(
+                            f"Data mismatch: Found '<image>' token but no corresponding image."
+                        )
 
-                        # Process the image
-                        image = images[image_idx]
-                        img_list, crop_list, spatial_crop, tok_img, _ = self.process_image(image)
+                    # Process the image
+                    image = images[image_idx]
+                    img_list, crop_list, spatial_crop, tok_img, _ = self.process_image(image)
 
-                        images_list.extend(img_list)
-                        images_crop_list.extend(crop_list)
-                        images_spatial_crop.extend(spatial_crop)
+                    images_list.extend(img_list)
+                    images_crop_list.extend(crop_list)
+                    images_spatial_crop.extend(spatial_crop)
 
-                        # Add image placeholder tokens
-                        tokenized_str.extend(tok_img)
-                        images_seq_mask.extend([True] * len(tok_img))
+                    # Add image placeholder tokens
+                    tokenized_str.extend(tok_img)
+                    images_seq_mask.extend([True] * len(tok_img))
 
-                        image_idx += 1 # Move to the next image
+                    image_idx += 1 # Move to the next image
 
-            # --- 3. Validation and Final Prep ---
-            if image_idx != len(images):
-                raise ValueError(
-                    f"Data mismatch: Found {len(images)} images but only {image_idx} '<image>' tokens were used."
-                )
+        # --- 3. Validation and Final Prep ---
+        if image_idx != len(images):
+            raise ValueError(
+                f"Data mismatch: Found {len(images)} images but only {image_idx} '<image>' tokens were used."
+            )
 
-            # If we never found an assistant message, we're in a weird state
-            # (e.g., user-only prompt). We mask everything.
-            if not assistant_started:
-                print("Warning: No assistant message found in sample. Masking all tokens.")
-                prompt_token_count = len(tokenized_str)
+        # If we never found an assistant message, we're in a weird state
+        # (e.g., user-only prompt). We mask everything.
+        if not assistant_started:
+            print("Warning: No assistant message found in sample. Masking all tokens.")
+            prompt_token_count = len(tokenized_str)
 
-            # Prepare image tensors
-            images_ori = torch.stack(images_list, dim = 0)
-            images_spatial_crop_tensor = torch.tensor(images_spatial_crop, dtype = torch.long)
+        # Prepare image tensors
+        images_ori = torch.stack(images_list, dim = 0)
+        images_spatial_crop_tensor = torch.tensor(images_spatial_crop, dtype = torch.long)
 
-            if images_crop_list:
-                images_crop = torch.stack(images_crop_list, dim = 0)
-            else:
-                images_crop = torch.zeros((1, 3, self.base_size, self.base_size), dtype = self.dtype)
+        if images_crop_list:
+            images_crop = torch.stack(images_crop_list, dim = 0)
+        else:
+            images_crop = torch.zeros((1, 3, self.base_size, self.base_size), dtype = self.dtype)
 
-            return {
-                "input_ids": torch.tensor(tokenized_str, dtype = torch.long),
-                "images_seq_mask": torch.tensor(images_seq_mask, dtype = torch.bool),
-                "images_ori": images_ori,
-                "images_crop": images_crop,
-                "images_spatial_crop": images_spatial_crop_tensor,
-                "prompt_token_count": prompt_token_count, # This is now accurate
-            }
+        return {
+            "input_ids": torch.tensor(tokenized_str, dtype = torch.long),
+            "images_seq_mask": torch.tensor(images_seq_mask, dtype = torch.bool),
+            "images_ori": images_ori,
+            "images_crop": images_crop,
+            "images_spatial_crop": images_spatial_crop_tensor,
+            "prompt_token_count": prompt_token_count, # This is now accurate
+        }
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         """Collate batch of samples"""
@@ -553,18 +553,18 @@ class DeepSeekOCRDataCollator:
 # ### Train the model
 # Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
 # 
-# We use our new `DeepSeekOCRDataCollator` which will help in our vision finetuning setup.
+# We use our new `DeepSeekOCR2DataCollator` which will help in our vision finetuning setup.
 
-# In[ ]:
+# In[14]:
 
 
 from transformers import Trainer, TrainingArguments
 from unsloth import is_bf16_supported
 FastVisionModel.for_training(model) # Enable for training!
-data_collator = DeepSeekOCRDataCollator(
+data_collator = DeepSeekOCR2DataCollator(
     tokenizer = tokenizer,
     model = model,
-    image_size = 640,
+    image_size = 768,
     base_size = 1024,
     crop_mode = True,
     train_on_responses_only = True,
@@ -597,7 +597,7 @@ trainer = Trainer(
 )
 
 
-# In[ ]:
+# In[15]:
 
 
 # @title Show current memory stats
@@ -608,13 +608,13 @@ print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
 
-# In[ ]:
+# In[16]:
 
 
 trainer_stats = trainer.train()
 
 
-# In[ ]:
+# In[17]:
 
 
 # @title Show final memory and time stats
@@ -636,7 +636,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # ### Inference
 # Let's run the model!
 
-# In[ ]:
+# In[18]:
 
 
 prompt = "<image>\nFree OCR. "
@@ -644,15 +644,15 @@ image_file = 'your_image.jpg'
 output_path = 'your/output/dir'
 
 # Tiny: base_size = 512, image_size = 512, crop_mode = False
-# Small: base_size = 640, image_size = 640, crop_mode = False
+# Small: base_size = 768, image_size = 768, crop_mode = False
 # Base: base_size = 1024, image_size = 1024, crop_mode = False
 # Large: base_size = 1280, image_size = 1280, crop_mode = False
 
-# Gundam: base_size = 1024, image_size = 640, crop_mode = True
+# Gundam: base_size = 1024, image_size = 768, crop_mode = True
 
 res = model.infer(tokenizer, prompt = prompt, image_file = image_file,
     output_path = output_path,
-    image_size = 640,
+    image_size = 768,
     base_size = 1024,
     crop_mode = True,
     save_results = True,
@@ -673,7 +673,7 @@ res = model.infer(tokenizer, prompt = prompt, image_file = image_file,
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
-# In[ ]:
+# In[19]:
 
 
 model.save_pretrained("deepseek_ocr_lora")  # Local saving
@@ -684,7 +684,7 @@ tokenizer.save_pretrained("deepseek_ocr_lora")
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
-# In[ ]:
+# In[20]:
 
 
 if False:
@@ -704,15 +704,15 @@ image_file = 'your_image.jpg'
 output_path = 'your/output/dir'
 
 # Tiny: base_size = 512, image_size = 512, crop_mode = False
-# Small: base_size = 640, image_size = 640, crop_mode = False
+# Small: base_size = 768, image_size = 768, crop_mode = False
 # Base: base_size = 1024, image_size = 1024, crop_mode = False
 # Large: base_size = 1280, image_size = 1280, crop_mode = False
 
-# Gundam: base_size = 1024, image_size = 640, crop_mode = True
+# Gundam: base_size = 1024, image_size = 768, crop_mode = True
 
 res = model.infer(tokenizer, prompt = prompt, image_file = image_file,
     output_path = output_path,
-    image_size = 640,
+    image_size = 768,
     base_size = 1024,
     crop_mode = True,
     save_results = True,
@@ -723,7 +723,7 @@ res = model.infer(tokenizer, prompt = prompt, image_file = image_file,
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
-# In[ ]:
+# In[21]:
 
 
 # Select ONLY 1 to save! (Both not needed!)
@@ -738,11 +738,10 @@ if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
-# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
-# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
-# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
-# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
-# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
+# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
+# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
+# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
+# 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>

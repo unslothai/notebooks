@@ -11,7 +11,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # ### News
 
@@ -27,7 +26,6 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
@@ -212,15 +210,19 @@ train_dataset = train_dataset.rename_column("decoded_image", "image")
 # In[ ]:
 
 
-train_dataset = train_dataset.map(
-    lambda example: {
-        "prompt": tokenizer.apply_chat_template(
-            example["prompt"],
-            tokenize = False,
-            add_generation_prompt = True, # Must add assistant
-        )
-    }
-)
+from unsloth_zoo.utils import Version
+
+# Only apply chat template for TRL < 0.24.0, otherwise TRL handles it
+if Version("trl") < Version("0.24.0"):
+    train_dataset = train_dataset.map(
+        lambda example: {
+            "prompt": tokenizer.apply_chat_template(
+                example["prompt"],
+                tokenize = False,
+                add_generation_prompt = True, # Must add assistant
+            )
+        }
+    )
 
 
 # ## Reward functions
@@ -285,7 +287,6 @@ train_dataset[0]["prompt"]
 # <a name="Inference"></a>
 # ### Inference
 # Now let's try the model on the hundredth sample of the train dataset without training.
-# 
 
 # In[ ]:
 
@@ -377,8 +378,6 @@ trainer.train()
 
 # <a name="Inference"></a>
 # ### Inference
-# 
-# 
 
 # And now with the LoRA we just trained with GRPO - we first save the LoRA first!
 
@@ -507,5 +506,5 @@ if False:
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # </div>
-#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
+#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
