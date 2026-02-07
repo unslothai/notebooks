@@ -3,7 +3,7 @@
 
 # <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)_A100-GRPO.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-# To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
+# To run this, press "*Runtime*" and press "*Run all*" on your A100 Google Colab Pro instance!
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
@@ -13,7 +13,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # ### News
 
@@ -29,7 +28,6 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
@@ -294,7 +292,6 @@ output_function["matmul"]
 
 
 # We also disallow global variable access via `types.FunctionType(f.__code__, {})`
-# 
 
 # In[ ]:
 
@@ -718,7 +715,6 @@ training_args = GRPOConfig(
 # | 1    | 0.000000      | 0.125000  | 0.000000   | 200.000000        | 0.000000 |
 # | 2    | 0.000000      | 0.072375  | 0.248112   | 200.000000        | 0.000000 |
 # | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
-# 
 
 # In[ ]:
 
@@ -746,7 +742,7 @@ trainer = GRPOTrainer(
 
 # And let's train the model!
 # 
-# **NOTE** A T4 free GPU might take 5 minutes for one generation sadly since it's an old GPU - A100 or H100 will be much faster!
+# **NOTE** An A100 GPU should complete one generation quickly.
 
 # In[ ]:
 
@@ -814,4 +810,3 @@ if False: # Pushing to HF Hub
 # </div>
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
-# 

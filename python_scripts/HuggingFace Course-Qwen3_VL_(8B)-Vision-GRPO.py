@@ -13,7 +13,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # ### News
 
@@ -29,7 +28,6 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
@@ -217,15 +215,19 @@ train_dataset = train_dataset.rename_column("decoded_image", "image")
 # In[9]:
 
 
-train_dataset = train_dataset.map(
-    lambda example: {
-        "prompt": tokenizer.apply_chat_template(
-            example["prompt"],
-            tokenize = False,
-            add_generation_prompt = True, # Must add assistant
-        )
-    }
-)
+from unsloth_zoo.utils import Version
+
+# Only apply chat template for TRL < 0.24.0, otherwise TRL handles it
+if Version("trl") < Version("0.24.0"):
+    train_dataset = train_dataset.map(
+        lambda example: {
+            "prompt": tokenizer.apply_chat_template(
+                example["prompt"],
+                tokenize = False,
+                add_generation_prompt = True, # Must add assistant
+            )
+        }
+    )
 
 
 # ## Reward functions
@@ -296,7 +298,6 @@ train_dataset[100]["prompt"]
 # <a name="Inference"></a>
 # ### Inference
 # Now let's try the model on the hundredth sample of the train dataset without training.
-# 
 
 # In[13]:
 
@@ -387,8 +388,6 @@ trainer.train()
 
 # <a name="Inference"></a>
 # ### Inference
-# 
-# 
 
 # Let's run the model! You can modify the instruction and input.
 
@@ -423,7 +422,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 1024,
 model.save_pretrained("qwen_lora")  # Local saving
 tokenizer.save_pretrained("qwen_lora")
 # model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
-# processor.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Verify LoRA is actually trained!
@@ -504,7 +503,8 @@ if False:
     )
 
 
-# Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
+# Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!
+# And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
 # 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
@@ -522,4 +522,3 @@ if False:
 # 
 #   <b>This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)</b>
 # </div>
-# 

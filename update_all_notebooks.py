@@ -1,15 +1,235 @@
 import argparse
 import ast
+import concurrent.futures
 import json
 import os
+import platform
 import re
 import shutil
+import stat
 import subprocess
+import sys
 from datetime import datetime
 from glob import glob
 from nbconvert import PythonExporter
 import nbformat
 from spellchecker import SpellChecker
+
+
+# Pre-compiled regex patterns (used in hot paths per-cell per-notebook)
+_RE_HTML_TAGS = re.compile(r'<[^>]+>')
+_RE_URLS = re.compile(r'https?://\S+')
+_RE_MD_LINKS = re.compile(r'\[([^\]]*)\]\([^\)]*\)')
+_RE_ENGLISH_WORDS = re.compile(r'\b[a-zA-Z]{3,}\b')
+_RE_DOUBLE_EXCL = re.compile(r"!{2,}")
+_RE_VERSION = re.compile(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])")
+_RE_PACKING = re.compile(
+    r"(\n[ \t]*)packing\s*=\s*(True|False).*?\n(\1args\s*=\s*SFTConfig\(\n)"
+)
+_RE_GGUF_USAGE = re.compile(
+    r"Now, use the `[^`]+\.Q8_0\.gguf` file or `[^`]+\.Q4_K_M\.gguf` file in llama\.cpp\."
+)
+_RE_HUGGINGFACE_BACKTICK = re.compile(r"Huggingface  (`[^`]+`)")
+_RE_NOCOMMIT = re.compile(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?')
+_RE_FOOTER_NUM = re.compile(r'\n6\. See notebooks for DPO')
+_RE_DUP_DOCS = re.compile(
+    r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1'
+)
+_RE_NEMO_GYM = re.compile(r'\bNemo Gym\b')
+_RE_SAVE_GGUF = re.compile(
+    r"(save_pretrained_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+    re.DOTALL,
+)
+_RE_PUSH_GGUF = re.compile(
+    r"(push_to_hub_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+    re.DOTALL,
+)
+_RE_SAVE_MERGED = re.compile(
+    r"(save_pretrained_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+    re.DOTALL,
+)
+_RE_PUSH_MERGED = re.compile(
+    r"(push_to_hub_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+    re.DOTALL,
+)
+_RE_SAVE_LORA = re.compile(
+    r"(\b(?:model|tokenizer|processor)\.save_pretrained\(\s*)([\"\'])([^\"\']*)([\"\'])"
+)
+_RE_PUSH_LORA = re.compile(
+    r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])"
+)
+_RE_LORA_LOAD = re.compile(
+    r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
+)
+_RE_LORA_LOAD2 = re.compile(
+    r"([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
+)
+_RE_LORA_MODEL = re.compile(r"([\"\'])lora_model([\"\'])")
+_RE_FINETUNED_MODEL = re.compile(r"([\"\'])finetuned_model([\"\'])")
+_RE_AUTO_LORA = re.compile(
+    r"(Auto(?:PeftModel\w*|Tokenizer|Model\w*)\.from_pretrained\(\s*)([\"\'])([^\"\']*_lora[^\"\']*)([\"\'])"
+)
+_RE_TOKEN = re.compile(r'(\btoken\s*=\s*)([\"\'])([^\"\']*)([\"\'])')
+_RE_EOS_TOKEN = re.compile(r"unsloth_eos_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']")
+_RE_PATCH_TOKEN = re.compile(r"patch_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']")
+_RE_DTYPE_LINE = re.compile(r"^[ \t]*dtype\s*=\s*None\s*#.*$")
+_RE_DTYPE_PARAM = re.compile(r"(\bdtype\s*=\s*)dtype\b\s*,?")
+_RE_VLLM = re.compile(r'\bvLLM\b')
+_RE_VLLM_UPPER = re.compile(r'\bVLLM\b(?!_)')
+_RE_GATED_COMMENT = re.compile(r"# use one if using gated models.*")
+_RE_GEMMA3N = re.compile(r"gemma[-_]?3n")
+_RE_GEMMA3 = re.compile(r"gemma[-_]?3")
+_RE_STOP_BRACKET = re.compile(r"[\(\[\{]")
+_RE_MULTI_UNDERSCORE = re.compile(r"__+")
+_RE_ALPHA_ONLY = re.compile(r"[A-Za-z]+")
+_RE_ALPHA_DIGIT = re.compile(r"[A-Za-z][0-9]")
+_RE_ALPHA_LEAD = re.compile(r"[A-Za-z]+")
+# Global fix pass patterns
+_RE_GATED_GLOBAL = re.compile(r"# use one if using gated models[^\n]*")
+_RE_HUGGINGFACE_GLOBAL = re.compile(r"Huggingface  (`[^`]+`)")
+_RE_NOCOMMIT_GLOBAL = re.compile(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?')
+_RE_FOOTER_NUM_NL = re.compile(r'\n6\. See notebooks for DPO')
+_RE_FOOTER_NUM_Q = re.compile(r'"6\. See notebooks for DPO')
+_RE_DUP_DOCS_GLOBAL = re.compile(
+    r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1'
+)
+
+
+def _set_file_permissions(filepath):
+    """Set file permissions to 0o644 on non-Windows platforms."""
+    if platform.system() != "Windows":
+        os.chmod(filepath, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+
+_NOTEBOOK_FORMAT_CACHE = {}
+_ORIGINAL_OUTPUTS_CACHE = {}
+
+
+def _detect_notebook_indent(filepath):
+    """Detect the JSON indent level used in a notebook file."""
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.lstrip()
+                if stripped and not stripped.startswith("{"):
+                    indent = len(line) - len(stripped)
+                    return indent if indent > 0 else 1
+    except (OSError, UnicodeDecodeError):
+        pass
+    return 1
+
+
+def _file_has_trailing_newline(filepath):
+    """Check if a file ends with a newline character."""
+    try:
+        with open(filepath, "rb") as f:
+            f.seek(-1, 2)
+            return f.read(1) == b"\n"
+    except OSError:
+        return True
+
+
+def _cache_notebook_format(filepath):
+    """Cache the original indent and EOF-newline of a notebook file (first call wins)."""
+    if filepath not in _NOTEBOOK_FORMAT_CACHE:
+        _NOTEBOOK_FORMAT_CACHE[filepath] = (
+            _detect_notebook_indent(filepath),
+            _file_has_trailing_newline(filepath),
+        )
+    return _NOTEBOOK_FORMAT_CACHE[filepath]
+
+
+def _source_lines(text):
+    """Split text into a Jupyter source array.
+
+    Each line keeps its trailing ``\\n`` except the very last one,
+    matching the convention used by ``nbformat``.
+    """
+    lines = text.splitlines(True)
+    if lines and lines[-1].endswith("\n"):
+        lines[-1] = lines[-1][:-1]
+    return lines
+
+
+def _write_notebook(filepath, content):
+    """Write notebook JSON, preserving original indent and trailing newline."""
+    indent, trailing_nl = _cache_notebook_format(filepath)
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(content, f, indent=indent, ensure_ascii=False)
+        if trailing_nl:
+            f.write("\n")
+    _set_file_permissions(filepath)
+
+
+def _cache_original_outputs(filepath):
+    """Cache output cells and widget state from a notebook before it is overwritten (first call wins)."""
+    if filepath not in _ORIGINAL_OUTPUTS_CACHE:
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                nb = json.load(f)
+            cells = nb.get("cells", [])
+            outputs = {idx: cell["outputs"] for idx, cell in enumerate(cells) if cell.get("outputs")}
+            widget_state = nb.get("metadata", {}).get("widgets", None)
+            _ORIGINAL_OUTPUTS_CACHE[filepath] = (len(cells), outputs, widget_state)
+        except Exception:
+            _ORIGINAL_OUTPUTS_CACHE[filepath] = (0, {}, None)
+
+
+def _restore_original_outputs(filepath):
+    """Restore output cells and widget state from the cached original if cell count matches."""
+    if filepath not in _ORIGINAL_OUTPUTS_CACHE:
+        return
+    orig_count, orig_outputs, orig_widgets = _ORIGINAL_OUTPUTS_CACHE[filepath]
+    if not orig_outputs and orig_widgets is None:
+        return
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+        if len(nb.get("cells", [])) != orig_count:
+            return
+        for idx, outputs in orig_outputs.items():
+            if idx < len(nb["cells"]):
+                nb["cells"][idx]["outputs"] = outputs
+        if orig_widgets is not None:
+            nb.setdefault("metadata", {})["widgets"] = orig_widgets
+        elif "widgets" in nb.get("metadata", {}):
+            del nb["metadata"]["widgets"]
+        _write_notebook(filepath, nb)
+    except Exception:
+        pass
+
+
+def _normalize_lgpl_blank_line(filepath):
+    """Ensure a blank line before the LGPL marker in the last cell's source array."""
+    lgpl_marker = "This notebook and all Unsloth notebooks are licensed [LGPL-3.0]"
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+        last_cell = nb.get("cells", [{}])[-1]
+        if last_cell.get("cell_type") != "markdown":
+            return
+        source = last_cell.get("source", [])
+        for j, line in enumerate(source):
+            if lgpl_marker in line and j > 0 and source[j - 1] != "\n":
+                source.insert(j, "\n")
+                _write_notebook(filepath, nb)
+                return
+    except Exception:
+        pass
+
+
+def _rmtree_robust(path):
+    """Remove a directory tree, handling read-only files on Windows."""
+    def _on_error(func, fpath, exc_info):
+        os.chmod(fpath, stat.S_IWRITE)
+        func(fpath)
+    def _on_exc(func, fpath, exc):
+        os.chmod(fpath, stat.S_IWRITE)
+        func(fpath)
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_on_exc)
+    else:
+        shutil.rmtree(path, onerror=_on_error)
 
 
 SPELL_IGNORE_WORDS = {
@@ -74,10 +294,11 @@ SPELL_KNOWN_FIXES = {
 }
 
 
-def check_spelling(notebook_content, notebook_name):
+def check_spelling(notebook_content, notebook_name, spell=None):
     """Check spelling in markdown cells and code comments. Auto-fix known misspellings."""
-    spell = SpellChecker()
-    spell.word_frequency.load_words(SPELL_IGNORE_WORDS)
+    if spell is None:
+        spell = SpellChecker()
+        spell.word_frequency.load_words(SPELL_IGNORE_WORDS)
     issues = []
     fixed = False
     for i, cell in enumerate(notebook_content.get("cells", [])):
@@ -92,16 +313,16 @@ def check_spelling(notebook_content, notebook_name):
             if wrong in new_text:
                 new_text = new_text.replace(wrong, right)
         if new_text != text:
-            cell["source"] = new_text.splitlines(True)
+            cell["source"] = _source_lines(new_text)
             fixed = True
 
         # Check for unknown misspellings in markdown cells (use new_text which has known fixes applied)
         if cell.get("cell_type") == "markdown":
             # Strip HTML tags and URLs before extracting words
-            clean_text = re.sub(r'<[^>]+>', ' ', new_text)
-            clean_text = re.sub(r'https?://\S+', ' ', clean_text)
-            clean_text = re.sub(r'\[([^\]]*)\]\([^\)]*\)', r'\1', clean_text)
-            words = re.findall(r'\b[a-zA-Z]{3,}\b', clean_text)
+            clean_text = _RE_HTML_TAGS.sub(' ', new_text)
+            clean_text = _RE_URLS.sub(' ', clean_text)
+            clean_text = _RE_MD_LINKS.sub(r'\1', clean_text)
+            words = _RE_ENGLISH_WORDS.findall(clean_text)
             # Filter out code identifiers (camelCase, snake_case, ALL_CAPS)
             english_words = [
                 w for w in words
@@ -163,12 +384,12 @@ def _get_base_name_from_filename(filename):
             break
 
     lower = name.lower()
-    if re.match(r"gemma[-_]?3n", lower):
+    if _RE_GEMMA3N.match(lower):
         return "gemma_3n"
-    if re.match(r"gemma[-_]?3", lower):
+    if _RE_GEMMA3.match(lower):
         return "gemma_3"
 
-    stop_match = re.search(r"[\(\[\{]", name)
+    stop_match = _RE_STOP_BRACKET.search(name)
     trimmed = name[:stop_match.start()] if stop_match else name
     trimmed = trimmed.strip(" _-") or name
 
@@ -177,19 +398,19 @@ def _get_base_name_from_filename(filename):
     if not segments:
         base = trimmed.lower()
         base = base.replace("-", "_")
-        base = re.sub(r"__+", "_", base)
+        base = _RE_MULTI_UNDERSCORE.sub("_", base)
         return base.strip("_")
 
     max_len = 24
     parts = []
     for seg in segments:
-        if re.fullmatch(r"[A-Za-z]+", seg):
+        if _RE_ALPHA_ONLY.fullmatch(seg):
             token = seg.lower()
-        elif re.fullmatch(r"[A-Za-z][0-9]", seg):
+        elif _RE_ALPHA_DIGIT.fullmatch(seg):
             token = seg.lower()
         else:
             if not parts:
-                lead = re.match(r"[A-Za-z]+", seg)
+                lead = _RE_ALPHA_LEAD.match(seg)
                 if lead:
                     token = lead.group(0).lower()
                     parts.append(token)
@@ -302,15 +523,11 @@ def update_old_unsloth(filename):
     def replace_common(text):
         """Apply common text replacements for both code and markdown cells."""
         text = text.replace("</a></a>", "</a>")
-        text = text.replace(
-            "To install Unsloth on your local device",
-            "To install Unsloth on your local device",
-        )
-        text = re.sub(r"!{2,}", "!", text)
+        text = _RE_DOUBLE_EXCL.sub("!", text)
         text = text.replace("ee notice", "we notice")
 
         # Convert versions like X.X.X to 2026.2.1
-        text = re.sub(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])", r"2026.2.1\1", text)
+        text = _RE_VERSION.sub(r"2026.2.1\1", text)
 
         # Change gguf-quantization-options link
         text = text.replace(
@@ -346,15 +563,13 @@ def update_old_unsloth(filename):
         text = text.replace("TRL's `DPOTrainer`", "`DPOTrainer` and `GRPOTrainer` for reinforcement learning!")
 
         # Move packing = ...
-        text = re.sub(
-            r"(\n[ \t]*)packing\s*=\s*(True|False).*?\n(\1args\s*=\s*SFTConfig\(\n)",
+        text = _RE_PACKING.sub(
             r"\3\1    packing = \2, # Makes training 2-5x faster for short sequences,\n",
             text,
         )
 
         # Ensure GGUF usage line matches base name used in code
-        text = re.sub(
-            r"Now, use the `[^`]+\.Q8_0\.gguf` file or `[^`]+\.Q4_K_M\.gguf` file in llama\.cpp\.",
+        text = _RE_GGUF_USAGE.sub(
             f"Now, use the `{base_gguf}.Q8_0.gguf` file or `{base_gguf}.Q4_K_M.gguf` file in llama.cpp.",
             text,
         )
@@ -380,7 +595,7 @@ def update_old_unsloth(filename):
 
         # Fix "Huggingface" -> "Hugging Face" (only capitalized, not in URLs/packages)
         text = text.replace("Huggingface's", "Hugging Face's")
-        text = re.sub(r"Huggingface  (`[^`]+`)", r"Hugging Face \1", text)
+        text = _RE_HUGGINGFACE_BACKTICK.sub(r"Hugging Face \1", text)
         text = text.replace("Huggingface TRL's", "Hugging Face TRL's")
 
         # Fix instruction_part missing < before |end_of_role|>
@@ -395,11 +610,10 @@ def update_old_unsloth(filename):
         text = text.replace("float32 s disable", "float32 so disable")
         text = text.replace("and its amazing", "and it's amazing")
         text = text.replace("look like this:", "looks like this:")
-        text = text.replace("Replace with out specific", "Replace without specific")
         text = text.replace("AutoModelForPeftCausalLM", "AutoPeftModelForCausalLM")
 
         # Remove @nocommit placeholders
-        text = re.sub(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?', '', text)
+        text = _RE_NOCOMMIT.sub('', text)
 
         # Fix empty Open Math Reasoning URL
         text = text.replace(
@@ -421,39 +635,31 @@ def update_old_unsloth(filename):
         )
 
         # Fix footer numbering (6. → 4.)
-        text = re.sub(r'\n6\. See notebooks for DPO', r'\n4. See notebooks for DPO', text)
+        text = _RE_FOOTER_NUM.sub(r'\n4. See notebooks for DPO', text)
 
         # Fix duplicate "See our docs" sentences (same line duplicates)
-        text = re.sub(
-            r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1',
-            r'\1',
-            text
-        )
+        text = _RE_DUP_DOCS.sub(r'\1', text)
 
         # Fix Nemo → NeMo capitalization (but not Mistral-Nemo model names)
-        text = re.sub(r'\bNemo Gym\b', 'NeMo Gym', text)
+        text = _RE_NEMO_GYM.sub('NeMo Gym', text)
 
         return text
 
     def replace_code(text):
         """Apply code-specific replacements."""
         # Update gguf save/push names
-        text = re.sub(
-            r"(save_pretrained_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+        text = _RE_SAVE_GGUF.sub(
             rf"\1\2{base_gguf}\4",
             text,
-            flags=re.DOTALL,
         )
 
         def _replace_push_gguf(match):
             new_name = replace_hf_prefix(match.group(3), base_gguf)
             return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}"
 
-        text = re.sub(
-            r"(push_to_hub_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+        text = _RE_PUSH_GGUF.sub(
             _replace_push_gguf,
             text,
-            flags=re.DOTALL,
         )
 
         # Update merged save/push names
@@ -462,11 +668,9 @@ def update_old_unsloth(filename):
             new_name = base_16 if method == "merged_16bit" else base_4
             return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}{match.group(5)}{method}{match.group(7)}"
 
-        text = re.sub(
-            r"(save_pretrained_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+        text = _RE_SAVE_MERGED.sub(
             _replace_save_merged,
             text,
-            flags=re.DOTALL,
         )
 
         def _replace_push_merged(match):
@@ -475,48 +679,45 @@ def update_old_unsloth(filename):
             replaced = replace_hf_prefix(match.group(3), new_name)
             return f"{match.group(1)}{match.group(2)}{replaced}{match.group(4)}{match.group(5)}{method}{match.group(7)}"
 
-        text = re.sub(
-            r"(push_to_hub_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+        text = _RE_PUSH_MERGED.sub(
             _replace_push_merged,
             text,
-            flags=re.DOTALL,
         )
 
-        # Update LoRA save/push names
-        text = re.sub(
-            r"(\b(?:model|tokenizer|processor)\.save_pretrained\(\s*)([\"\'])([^\"\']*)([\"\'])",
-            rf"\1\2{base_lora}\4",
-            text,
-        )
+        # Update LoRA save/push names (skip phone_model names)
+        def _replace_save_lora(match):
+            if "phone_model" in match.group(3):
+                return match.group(0)
+            return f"{match.group(1)}{match.group(2)}{base_lora}{match.group(4)}"
+
+        text = _RE_SAVE_LORA.sub(_replace_save_lora, text)
 
         def _replace_push_lora(match):
+            if "phone_model" in match.group(3):
+                return match.group(0)
             new_name = replace_hf_prefix(match.group(3), base_lora)
             return f"{match.group(1)}{match.group(2)}{new_name}{match.group(4)}"
 
-        text = re.sub(
-            r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])",
+        text = _RE_PUSH_LORA.sub(
             _replace_push_lora,
             text,
         )
 
         # LoRA load snippets
-        text = re.sub(
-            r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)",
+        text = _RE_LORA_LOAD.sub(
             rf"\1\2{base_lora}\4\5",
             text,
         )
-        text = re.sub(
-            r"([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)",
+        text = _RE_LORA_LOAD2.sub(
             rf"\1{base_lora}\3\4",
             text,
         )
-        text = re.sub(r"([\"\'])lora_model([\"\'])", rf"\1{base_lora}\2", text)
-        text = re.sub(r"([\"\'])finetuned_model([\"\'])", rf"\1{base_lora}\2", text)
+        text = _RE_LORA_MODEL.sub(rf"\1{base_lora}\2", text)
+        text = _RE_FINETUNED_MODEL.sub(rf"\1{base_lora}\2", text)
 
         # Also handle AutoPeftModelForCausalLM.from_pretrained("xxx_lora")
         # and AutoTokenizer.from_pretrained("xxx_lora") for load-back consistency
-        text = re.sub(
-            r"(Auto(?:PeftModel\w*|Tokenizer|Model\w*)\.from_pretrained\(\s*)([\"\'])([^\"\']*_lora[^\"\']*)([\"\'])",
+        text = _RE_AUTO_LORA.sub(
             rf"\1\2{base_lora}\4",
             text,
         )
@@ -526,20 +727,17 @@ def update_old_unsloth(filename):
         text = text.replace("'hf/", "'HF_USERNAME/")
 
         # Update tokens - only match string literals to avoid breaking token = get_token()
-        text = re.sub(
-            r'(\btoken\s*=\s*)([\"\'])([^\"\']*)([\"\'])',
+        text = _RE_TOKEN.sub(
             r'\1"YOUR_HF_TOKEN"',
             text,
         )
 
         # Preserve special tokens that should not be replaced by HF token
-        text = re.sub(
-            r"unsloth_eos_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']",
+        text = _RE_EOS_TOKEN.sub(
             'unsloth_eos_token = "eos_token"',
             text,
         )
-        text = re.sub(
-            r"patch_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']",
+        text = _RE_PATCH_TOKEN.sub(
             'patch_token = "<|IMAGE_PLACEHOLDER|>"',
             text,
         )
@@ -547,15 +745,13 @@ def update_old_unsloth(filename):
         # If dtype=None helper line is directly before from_pretrained and dtype=dtype is used,
         # drop the helper line and inline dtype=None with the standard comment.
         dtype_comment = "None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+"
-        dtype_line_re = re.compile(r"^[ \t]*dtype\s*=\s*None\s*#.*$")
-        dtype_param_re = re.compile(r"(\bdtype\s*=\s*)dtype\b\s*,?")
 
         lines = text.splitlines(True)
         updated_lines = []
         i = 0
         while i < len(lines):
             line = lines[i]
-            if dtype_line_re.match(line) and i + 1 < len(lines) and ".from_pretrained" in lines[i + 1]:
+            if _RE_DTYPE_LINE.match(line) and i + 1 < len(lines) and ".from_pretrained" in lines[i + 1]:
                 # Try to update dtype within the from_pretrained call
                 replaced = False
                 depth = 0
@@ -564,7 +760,7 @@ def update_old_unsloth(filename):
                     current = lines[j]
                     if j == i + 1 and ".from_pretrained" not in current:
                         break
-                    new_current, count = dtype_param_re.subn(
+                    new_current, count = _RE_DTYPE_PARAM.subn(
                         r"\1None, # " + dtype_comment,
                         current,
                     )
@@ -585,12 +781,11 @@ def update_old_unsloth(filename):
 
         # Normalize vLLM naming in code where it is used as a package/path
         # Use word boundary to preserve UNSLOTH_VLLM_STANDBY env var
-        text = re.sub(r'\bvLLM\b', 'vllm', text)
-        text = re.sub(r'\bVLLM\b(?!_)', 'vllm', text)
+        text = _RE_VLLM.sub('vllm', text)
+        text = _RE_VLLM_UPPER.sub('vllm', text)
 
         # Simplify gated models comment
-        text = re.sub(
-            r"# use one if using gated models.*",
+        text = _RE_GATED_COMMENT.sub(
             "# HF Token for gated models",
             text,
         )
@@ -611,12 +806,10 @@ def update_old_unsloth(filename):
             new_text = replace_code(new_text)
         if new_text != text:
             updated = True
-        cell["source"] = _strip_extra_trailing_blank_lines(new_text.splitlines(True))
+            cell["source"] = _strip_extra_trailing_blank_lines(_source_lines(new_text))
 
     if updated:
-        with open(filename, "w", encoding="utf-8") as w:
-            json.dump(notebook_content, w, indent=1)
-        os.chmod(filename, 0o644)
+        _write_notebook(filename, notebook_content)
 pass
 
 
@@ -697,6 +890,49 @@ def get_current_git_branch():
         return None
 
 
+_RE_PIP_INSTALL_LINE = re.compile(r"^!(?:uv )?pip install\s+(.+)$", re.MULTILINE)
+_RE_PIP_PKG_TOKEN = re.compile(r"^([A-Za-z0-9_][A-Za-z0-9._-]*)")
+_INSTALL_FLAG_PREFIXES = ("--", "-", "{", "\"", "'")
+_INSTALL_GUARD_IGNORE = frozenset({
+    # Standard packages present in the default install cell; safe to swap
+    "unsloth", "unsloth_zoo", "bitsandbytes", "accelerate", "xformers",
+    "peft", "trl", "triton", "cut_cross_entropy", "sentencepiece",
+    "protobuf", "datasets", "huggingface_hub", "hf_transfer",
+    "transformers", "pip3_autoremove", "torch", "torchvision",
+    "torchaudio", "pip",
+})
+
+def _extract_pip_packages(install_text):
+    """Extract base package names from pip install lines in install cell text."""
+    packages = set()
+    for m in _RE_PIP_INSTALL_LINE.finditer(install_text):
+        for token in m.group(1).split():
+            if any(token.startswith(p) for p in _INSTALL_FLAG_PREFIXES):
+                continue
+            if "git+" in token or "://" in token:
+                # git+https://... -- use the repo name as identifier
+                repo = token.rstrip("/").rsplit("/", 1)[-1]
+                repo = repo.split(".git")[0].split("@")[0]
+                packages.add(repo.lower().replace("-", "_"))
+                continue
+            pm = _RE_PIP_PKG_TOKEN.match(token)
+            if pm:
+                packages.add(pm.group(1).lower().replace("-", "_"))
+    return packages
+
+def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
+    """Warn if the new install cell is missing packages that the old cell had."""
+    old_pkgs = _extract_pip_packages(old_cell_text) - _INSTALL_GUARD_IGNORE
+    new_pkgs = _extract_pip_packages(new_cell_text) - _INSTALL_GUARD_IGNORE
+    dropped = old_pkgs - new_pkgs
+    if dropped:
+        print(
+            f"WARNING: {notebook_path} -- install cell dropped packages: "
+            f"{', '.join(sorted(dropped))}. "
+            f"Add a dedicated installation_* entry in the script."
+        )
+
+
 def update_or_append_pip_install(base_content, package_name, new_install_line):
     pattern = re.compile(rf"^!(uv )?pip install .*?{package_name}.*$", re.MULTILINE)
 
@@ -708,7 +944,6 @@ def update_or_append_pip_install(base_content, package_name, new_install_line):
         output = updated_content
     return output
 
-current_branch = get_current_git_branch()
 # =======================================================
 # GENERAL ANNOUNCEMENTS (THE VERY TOP)
 # =======================================================
@@ -1210,15 +1445,63 @@ installation_ministral_content = installation_content
 installation_ministral_content = update_or_append_pip_install(
     installation_ministral_content,
     "transformers",
-    "!pip install git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce"
+    "!pip install transformers==5.0.0"
 )
 
 installation_ministral_kaggle_content = installation_kaggle_content
 installation_ministral_kaggle_content = update_or_append_pip_install(
     installation_ministral_kaggle_content,
     "transformers",
-    "!pip install git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce"
+    "!pip install transformers==5.0.0"
 )
+
+# =======================================================
+# GLM Flash Notebook
+# =======================================================
+installation_glm_flash_content = installation_content
+installation_glm_flash_content = update_or_append_pip_install(
+    installation_glm_flash_content,
+    "transformers",
+    "!pip install transformers==5.0.0"
+)
+
+installation_glm_flash_kaggle_content = installation_kaggle_content
+installation_glm_flash_kaggle_content = update_or_append_pip_install(
+    installation_glm_flash_kaggle_content,
+    "transformers",
+    "!pip install transformers==5.0.0"
+)
+
+# =======================================================
+# Phone Deployment Notebook (ExecuTorch)
+# =======================================================
+installation_phone_content = installation_content
+installation_phone_content = update_or_append_pip_install(
+    installation_phone_content,
+    "transformers",
+    "!pip install transformers==4.57.3"
+)
+installation_phone_content = update_or_append_pip_install(
+    installation_phone_content,
+    "trl",
+    "!pip install --no-deps trl==0.25.1"
+)
+installation_phone_content += """\n!pip install torchao==0.14.0 optimum==1.24.0 pytorch-tokenizers executorch
+!pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
+
+installation_phone_kaggle_content = installation_kaggle_content
+installation_phone_kaggle_content = update_or_append_pip_install(
+    installation_phone_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.57.3"
+)
+installation_phone_kaggle_content = update_or_append_pip_install(
+    installation_phone_kaggle_content,
+    "trl",
+    "!pip install --no-deps trl==0.25.1"
+)
+installation_phone_kaggle_content += """\n!pip install torchao==0.14.0 optimum==1.24.0 pytorch-tokenizers executorch
+!pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
 
 # =======================================================
 # NEWS (WILL KEEP CHANGING THIS)
@@ -1263,8 +1546,6 @@ __OTHER_RESOURCES__
 </div>""".replace("__OTHER_RESOURCES__", OTHER_RESOURCES)
 
 text_for_last_cell_ollama = text_for_last_cell_gguf.replace("Now, ", "You can also ", 1)
-
-text_for_last_cell_gemma3 = text_for_last_cell_gguf.replace("model-unsloth", "gemma-3-finetune")
 
 text_for_last_cell_non_gguf = """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 
@@ -1520,7 +1801,7 @@ def copy_folder(source_path, new_name, destination_path=None, replace=False):
 
     try:
         if replace and os.path.exists(new_path):
-            shutil.rmtree(new_path)
+            _rmtree_robust(new_path)
             print(f"Removed existing folder: '{new_path}'")
 
         shutil.copytree(source_path, new_path)
@@ -1593,7 +1874,7 @@ def update_notebook_sections(
                     break
 
         if f"{hf_course_name}-" in notebook_path: 
-            full_model_name = notebook_path.split("/")[-1].replace(".ipynb", "")
+            full_model_name = os.path.basename(notebook_path).replace(".ipynb", "")
             full_model_name = full_model_name.split("-")
             full_model_name = " ".join(full_model_name[1:]).replace("_", " ")
             general_announcement = general_announcement_content_hf_course.format(full_model_name=full_model_name)
@@ -1612,26 +1893,19 @@ def update_notebook_sections(
                         {
                             "cell_type": "markdown",
                             "metadata": {},
-                            "source": [
-                                f"{line}\n"
-                                for line in general_announcement.splitlines()
-                            ],
+                            "source": _source_lines(general_announcement),
                         },
                     )
                     updated = True
                     news_markdown_index += 1  # Adjust index since a new cell is added
                 else:
-                    notebook_content["cells"][first_markdown_index]["source"] = [
-                        f"{line}\n" for line in general_announcement.splitlines()
-                    ]
+                    notebook_content["cells"][first_markdown_index]["source"] = _source_lines(general_announcement)
                     updated = True
             elif not "".join(
                 notebook_content["cells"][first_markdown_index]["source"]
             ).strip():
                 # First markdown is empty, replace it
-                notebook_content["cells"][first_markdown_index]["source"] = [
-                    f"{line}\n" for line in general_announcement.splitlines()
-                ]
+                notebook_content["cells"][first_markdown_index]["source"] = _source_lines(general_announcement)
                 updated = True
 
         i = 0 if news_markdown_index == -1 else news_markdown_index
@@ -1660,9 +1934,7 @@ def update_notebook_sections(
                         and notebook_content["cells"][i + 1]["cell_type"] == "markdown"
                     ):
                         announcement = new_announcement
-                        notebook_content["cells"][i + 1]["source"] = [
-                            f"{line}\n" for line in announcement.splitlines()
-                        ]
+                        notebook_content["cells"][i + 1]["source"] = _source_lines(announcement)
                         updated = True
                         i += 1
                 elif source_str == "### Installation":
@@ -1810,7 +2082,38 @@ def update_notebook_sections(
                                 installation = installation_nemotron_nano_kaggle_content
                             else:
                                 installation = installation_nemotron_nano_content
-                                
+
+                        # MINISTRAL INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["ministral"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_ministral_kaggle_content
+                            else:
+                                installation = installation_ministral_content
+
+                        # GLM FLASH INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["glm_flash", "glm-flash"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_glm_flash_kaggle_content
+                            else:
+                                installation = installation_glm_flash_content
+
+                        # PHONE DEPLOYMENT INSTALLATION (ExecuTorch)
+                        if is_path_contains_any(notebook_path.lower(), ["phone_deployment", "phone-deployment"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_phone_kaggle_content
+                            else:
+                                installation = installation_phone_content
+
+                        # Guard: warn if the replacement drops packages
+                        old_install_src = notebook_content["cells"][i + 1].get("source", "")
+                        if isinstance(old_install_src, list):
+                            old_install_src = "".join(old_install_src)
+                        if isinstance(installation, list):
+                            new_install_text = "".join(installation)
+                        else:
+                            new_install_text = installation
+                        _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
+
                         notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
                         # TODO: Remove after GRPO numpy bug fixed! 
@@ -1829,8 +2132,6 @@ def update_notebook_sections(
                 text_for_last_cell = text_for_last_cell_ollama
             elif is_gguf:
                 text_for_last_cell = text_for_last_cell_gguf
-            elif is_gemma3 and not is_vision and is_gguf: # Vision cannot be transformed to GGUF yet
-                text_for_last_cell = text_for_last_cell_gemma3
             else:
                 text_for_last_cell = text_for_last_cell_non_gguf
 
@@ -1857,11 +2158,15 @@ def update_notebook_sections(
                     # If there's partial footer but missing LGPL, only add the LGPL line
                     if has_partial_footer and not has_lgpl:
                         # Add just the LGPL license line
-                        last_cell["source"].append("\n  This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).\n")
+                        if last_cell["source"] and not last_cell["source"][-1].endswith("\n"):
+                            last_cell["source"][-1] += "\n"
+                        last_cell["source"].extend(_source_lines("\n  This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)."))
                     else:
                         # Add complete footer
+                        if last_cell["source"] and not last_cell["source"][-1].endswith("\n"):
+                            last_cell["source"][-1] += "\n"
                         last_cell["source"].extend(
-                            [f"{line}\n" for line in text_for_last_cell.splitlines()]
+                            _source_lines(text_for_last_cell)
                         )
                     updated = True  # Mark as updated only if content was added
             else:
@@ -1869,9 +2174,7 @@ def update_notebook_sections(
                     {
                         "cell_type": "markdown",
                         "metadata": {},
-                        "source": [
-                            f"{line}\n" for line in text_for_last_cell.splitlines()
-                        ],
+                        "source": _source_lines(text_for_last_cell),
                     }
                 )
                 updated = True
@@ -1884,6 +2187,10 @@ def update_notebook_sections(
             updated = True
         if "colab" not in notebook_content["metadata"]:
             notebook_content["metadata"]["colab"] = {"provenance": [], "gpuType" : "T4", "include_colab_link": True}
+            updated = True
+        # Override gpuType for A100 notebooks
+        if "A100" in notebook_path:
+            notebook_content["metadata"]["colab"]["gpuType"] = "A100"
             updated = True
         if "kernelspec" not in notebook_content["metadata"]:
             notebook_content["metadata"]["kernelspec"] = {
@@ -1904,9 +2211,7 @@ def update_notebook_sections(
             updated = True
 
         if updated:
-            with open(notebook_path, "w", encoding="utf-8") as f:
-                json.dump(notebook_content, f, indent=1)
-            os.chmod(notebook_path, 0o644)
+            _write_notebook(notebook_path, notebook_content)
             print(f"Updated: {notebook_path}")
         else:
             print(f"No sections found to update in: {notebook_path}")
@@ -1976,7 +2281,119 @@ def update_unsloth_config(filename):
 pass
 
 
-def main():
+_MODEL_NAME_PREFIX_CACHE = {}
+
+_RE_MODEL_NAME_ASSIGN = re.compile(
+    r'(model_name\s*=\s*["\'])([A-Za-z0-9_-]+)/([A-Za-z0-9._-]+)(["\'])'
+)
+_RE_FROM_PRETRAINED_INLINE = re.compile(
+    r'(from_pretrained\(\s*["\'])([A-Za-z0-9_-]+)/([A-Za-z0-9._-]+)(["\'])'
+)
+_RE_FROM_PRETRAINED_MULTILINE = re.compile(
+    r'(from_pretrained\(\s*\n\s*["\'])([A-Za-z0-9_-]+)/([A-Za-z0-9._-]+)(["\'])'
+)
+
+_MODEL_PREFIX_SKIP_ORGS = {"unsloth", "LiquidAI"}
+_MODEL_PREFIX_SKIP_EXACT = {"meta-llama/Llama-3.2-3B-Instruct"}
+_MODEL_PREFIX_SKIP_PATTERNS = {"bert-base-uncased"}
+
+
+def _unsloth_model_exists(model_name):
+    """Check if unsloth/<model_name> exists on HF Hub. Results are cached."""
+    if model_name in _MODEL_NAME_PREFIX_CACHE:
+        return _MODEL_NAME_PREFIX_CACHE[model_name]
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi()
+        api.model_info(f"unsloth/{model_name}")
+        _MODEL_NAME_PREFIX_CACHE[model_name] = True
+    except Exception:
+        _MODEL_NAME_PREFIX_CACHE[model_name] = False
+    return _MODEL_NAME_PREFIX_CACHE[model_name]
+
+
+def fix_model_name_prefix(notebook_file):
+    """Replace non-unsloth model name prefixes with unsloth/ where the model exists."""
+    try:
+        with open(notebook_file, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+    except Exception:
+        return False
+
+    changed = False
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        source = cell.get("source", [])
+        if isinstance(source, str):
+            source = [source]
+        text = "".join(source)
+
+        new_text = text
+        for pattern in [_RE_MODEL_NAME_ASSIGN, _RE_FROM_PRETRAINED_INLINE,
+                        _RE_FROM_PRETRAINED_MULTILINE]:
+            def _replace_model(m):
+                prefix, org, model, suffix = m.group(1), m.group(2), m.group(3), m.group(4)
+                full_name = f"{org}/{model}"
+                if org in _MODEL_PREFIX_SKIP_ORGS:
+                    return m.group(0)
+                if full_name in _MODEL_PREFIX_SKIP_EXACT:
+                    return m.group(0)
+                if any(p in model.lower() for p in _MODEL_PREFIX_SKIP_PATTERNS):
+                    return m.group(0)
+                if _unsloth_model_exists(model):
+                    return f"{prefix}unsloth/{model}{suffix}"
+                return m.group(0)
+            new_text = pattern.sub(_replace_model, new_text)
+
+        if new_text != text:
+            cell["source"] = _source_lines(new_text)
+            changed = True
+
+    if changed:
+        _write_notebook(notebook_file, nb)
+    return changed
+
+
+def _process_single_notebook(notebook_file):
+    """Process a single notebook: update sections, fix content, check spelling & syntax."""
+    _cache_notebook_format(notebook_file)
+    update_notebook_sections(
+        notebook_file,
+        general_announcement_content,
+        installation_content,
+        installation_kaggle_content,
+        new_announcement,
+    )
+    update_old_unsloth(notebook_file)
+    fix_model_name_prefix(notebook_file)
+
+    spell_issues = []
+    syntax_errors = []
+    spell_fixed = False
+
+    # Spelling check (create SpellChecker per call for thread safety)
+    try:
+        with open(notebook_file, "r", encoding="utf-8") as f:
+            nb_content = json.load(f)
+        spell = SpellChecker()
+        spell.word_frequency.load_words(SPELL_IGNORE_WORDS)
+        fixed, issues = check_spelling(nb_content, os.path.basename(notebook_file), spell=spell)
+        if fixed:
+            _write_notebook(notebook_file, nb_content)
+            spell_fixed = True
+        spell_issues = issues
+    except Exception:
+        pass
+
+    # AST syntax check
+    errors = validate_notebook_syntax(notebook_file)
+    syntax_errors = errors
+
+    return notebook_file, spell_fixed, spell_issues, syntax_errors
+
+
+def main(max_workers=1):
     notebook_directory = "nb"
     notebook_pattern = "*.ipynb"
 
@@ -1993,48 +2410,34 @@ def main():
         )
         return
 
-    for notebook_file in notebook_files:
-        update_notebook_sections(
-            notebook_file,
-            general_announcement_content,
-            installation_content,
-            installation_kaggle_content,
-            new_announcement,
-        )
-        # update_unsloth_config(notebook_file)
-        update_old_unsloth(notebook_file)
-
-    # Spelling check
-    print("\n=== Spelling Check ===")
     spell_issues_found = False
-    for notebook_file in notebook_files:
-        try:
-            with open(notebook_file, "r", encoding="utf-8") as f:
-                nb_content = json.load(f)
-            fixed, issues = check_spelling(nb_content, os.path.basename(notebook_file))
-            if fixed:
-                with open(notebook_file, "w", encoding="utf-8") as f:
-                    json.dump(nb_content, f, indent=1)
-                os.chmod(notebook_file, 0o644)
-                print(f"  AUTO-FIXED spelling in {os.path.basename(notebook_file)}")
-            if issues:
-                spell_issues_found = True
-                for cell_idx, words in issues:
-                    print(f"  SPELLING: {os.path.basename(notebook_file)} cell {cell_idx}: {words}")
-        except Exception:
-            pass
+    syntax_issues_found = False
+
+    if max_workers <= 1:
+        # Sequential processing
+        results = [_process_single_notebook(nf) for nf in notebook_files]
+    else:
+        # Parallel processing
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(_process_single_notebook, notebook_files))
+
+    for notebook_file, spell_fixed, spell_issues, syntax_errors in results:
+        if spell_fixed:
+            print(f"  AUTO-FIXED spelling in {os.path.basename(notebook_file)}")
+        if spell_issues:
+            spell_issues_found = True
+            for cell_idx, words in spell_issues:
+                print(f"  SPELLING: {os.path.basename(notebook_file)} cell {cell_idx}: {words}")
+        if syntax_errors:
+            syntax_issues_found = True
+            for cell_idx, lineno, msg in syntax_errors:
+                print(f"  SYNTAX: {os.path.basename(notebook_file)} cell {cell_idx} line {lineno}: {msg}")
+
+    print("\n=== Spelling Check ===")
     if not spell_issues_found:
         print("  No spelling issues found.")
 
-    # AST syntax check
     print("\n=== AST Syntax Check ===")
-    syntax_issues_found = False
-    for notebook_file in notebook_files:
-        errors = validate_notebook_syntax(notebook_file)
-        if errors:
-            syntax_issues_found = True
-            for cell_idx, lineno, msg in errors:
-                print(f"  SYNTAX: {os.path.basename(notebook_file)} cell {cell_idx} line {lineno}: {msg}")
     if not syntax_issues_found:
         print("  No syntax issues found.")
 
@@ -2056,16 +2459,11 @@ def add_colab_badge(notebooks_dir):
                 {
                     "cell_type": "markdown",
                     "metadata": {},
-                    "source": [
-                        f"{line}\n"
-                        for line in badge.splitlines()
-                    ],
+                    "source": _source_lines(badge),
                 },
             )
 
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(notebook_content, f, indent=1)
-            os.chmod(path, 0o644)
+            _write_notebook(path, notebook_content)
 
 
 def update_readme(
@@ -2196,11 +2594,11 @@ def update_readme(
 
     for section in sections:
         try:
-            sections[section]["Colab"]["rows"].sort(key=lambda x: extract_version_from_row(x), reverse=True)
+            sections[section]["Colab"]["rows"].sort(key=lambda x: (extract_version_from_row(x), x), reverse=True)
         except Exception as e:
             print(f"Warning: Could not sort Colab rows for section '{section}' by version: {e}")
         try:
-            sections[section]["Kaggle"]["rows"].sort(key=lambda x: extract_version_from_row(x), reverse=True)
+            sections[section]["Kaggle"]["rows"].sort(key=lambda x: (extract_version_from_row(x), x), reverse=True)
         except Exception as e:
             print(f"Warning: Could not sort Kaggle rows for section '{section}' by version: {e}")
 
@@ -2315,7 +2713,7 @@ def copy_and_update_notebooks(
     temp_location = os.path.join(destination_dir, ".temp_backup")
     if os.path.exists(destination_dir):
         if os.path.exists(temp_location):
-            shutil.rmtree(temp_location)
+            _rmtree_robust(temp_location)
         os.makedirs(temp_location, exist_ok=True)
         # Move everything currently in destination_dir into .temp_backup
         for entry in os.listdir(destination_dir):
@@ -2329,36 +2727,11 @@ def copy_and_update_notebooks(
         os.makedirs(destination_dir, exist_ok=True)
 
     def _preserve_outputs(dest_path, template_path):
-        """Copy template to dest, preserving output cells from existing dest if cell count matches."""
-        existing_outputs = {}
-        existing_nb = None
-        if os.path.exists(dest_path):
-            try:
-                with open(dest_path, "r", encoding="utf-8") as f:
-                    existing_nb = json.load(f)
-                for idx, cell in enumerate(existing_nb.get("cells", [])):
-                    if cell.get("outputs"):
-                        existing_outputs[idx] = cell["outputs"]
-            except Exception:
-                existing_outputs = {}
-                existing_nb = None
-
+        """Copy template to dest, caching original outputs for deferred restoration."""
+        _cache_original_outputs(dest_path)
         shutil.copyfile(template_path, dest_path)
-        os.chmod(dest_path, 0o644)
-
-        if existing_outputs and existing_nb is not None:
-            try:
-                with open(dest_path, "r", encoding="utf-8") as f:
-                    new_nb = json.load(f)
-                if len(new_nb.get("cells", [])) == len(existing_nb.get("cells", [])):
-                    for idx, outputs in existing_outputs.items():
-                        if idx < len(new_nb["cells"]):
-                            new_nb["cells"][idx]["outputs"] = outputs
-                    with open(dest_path, "w", encoding="utf-8") as f:
-                        json.dump(new_nb, f, indent=1)
-                    os.chmod(dest_path, 0o644)
-            except Exception:
-                pass
+        _set_file_permissions(dest_path)
+        _cache_notebook_format(dest_path)
 
     for template_notebook_path in template_notebooks:
         notebook_name = os.path.basename(template_notebook_path)
@@ -2410,7 +2783,7 @@ def copy_and_update_notebooks(
             print(f"Warning: '{entry}' not found in '{temp_location}'")
     
     # finally remove the temp_location
-    shutil.rmtree(temp_location)
+    _rmtree_robust(temp_location)
 
 def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -> list[str]:
     nb_abs = os.path.abspath(nb)
@@ -2459,19 +2832,29 @@ def convert_notebook_to_script(notebook_path: str, output_path: str):
 
     print(f"Converted {notebook_path} to {output_path}")
 
-def convert_folder(input_folder: str, output_folder: str):
+def convert_folder(input_folder: str, output_folder: str, max_workers: int = 1):
     if os.path.exists(output_folder):
-        shutil.rmtree(output_folder)
+        _rmtree_robust(output_folder)
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
+    tasks = []
     for filename in os.listdir(input_folder):
         if filename.endswith('.ipynb'):
             notebook_path = os.path.join(input_folder, filename)
             script_filename = filename.replace('.ipynb', '.py')
             output_path = os.path.join(output_folder, script_filename)
+            tasks.append((notebook_path, output_path))
+
+    if max_workers <= 1:
+        for notebook_path, output_path in tasks:
             convert_notebook_to_script(notebook_path, output_path)
+    else:
+        def _convert(args):
+            convert_notebook_to_script(args[0], args[1])
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            list(executor.map(_convert, tasks))
 
 
 if __name__ == "__main__":
@@ -2496,7 +2879,16 @@ if __name__ == "__main__":
         action="store_true",
         help="If true, it will not convert the notebooks to scripts",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel workers (0 = auto-detect from CPU count, 1 = sequential). Default: 1.",
+    )
     args = parser.parse_args()
+
+    if args.workers == 0:
+        args.workers = os.cpu_count() or 4
 
     if args.check_missing_files:
         original_template = "original_template"
@@ -2513,6 +2905,11 @@ if __name__ == "__main__":
                 if file not in DONT_UPDATE_EXCEPTIONS:
                     print(file)
         exit(0)
+    # Cache format of existing notebooks before they are replaced by templates.
+    # This preserves the original indent / trailing-newline of files already in nb/.
+    for _nb_path in glob(os.path.join("nb", "*.ipynb")):
+        _cache_notebook_format(_nb_path)
+
     copy_and_update_notebooks(
         "original_template",
         "nb",
@@ -2521,7 +2918,7 @@ if __name__ == "__main__":
         installation_kaggle_content,
         new_announcement,
     )
-    main()
+    main(max_workers=args.workers)
 
     notebook_directory = "nb"
     readme_path = "README.md"
@@ -2564,7 +2961,6 @@ if __name__ == "__main__":
         "float32 s disable": "float32 so disable",
         "and its amazing": "and it's amazing",
         "look like this:": "looks like this:",
-        "Replace with out specific": "Replace without specific",
         "AutoModelForPeftCausalLM": "AutoPeftModelForCausalLM",
         "<|start_of_role|>user|end_of_role|>": "<|start_of_role|>user<|end_of_role|>",
         # New fixes
@@ -2581,38 +2977,34 @@ if __name__ == "__main__":
         "Nemo Gym": "NeMo Gym",
         # Fix old domain for exception files
         "https://docs.unsloth.ai/": "https://unsloth.ai/docs/",
+        # Fix ExecuTorch dangling sentence left after @nocommit removal
+        "ExecuTorch.  Follow the directions \\n": "ExecuTorch.\\n",
     }
-    for nb_path in glob(os.path.join("nb", "*.ipynb")):
+
+    def _apply_global_fixes(nb_path):
         try:
             with open(nb_path, "r", encoding="utf-8") as f:
                 raw = f.read()
             new_raw = raw
-            new_raw = re.sub(
-                r"# use one if using gated models[^\n]*",
+            new_raw = _RE_GATED_GLOBAL.sub(
                 "# HF Token for gated models",
                 new_raw,
             )
-            new_raw = re.sub(
-                r"Huggingface  (`[^`]+`)",
+            new_raw = _RE_HUGGINGFACE_GLOBAL.sub(
                 r"Hugging Face \1",
                 new_raw,
             )
-            new_raw = re.sub(
-                r'\[@nocommit[^\]]*\]\([^\)]*\)\.?',
+            new_raw = _RE_NOCOMMIT_GLOBAL.sub(
                 '',
                 new_raw,
             )
             for wrong, right in _ALL_NB_FIXES.items():
                 new_raw = new_raw.replace(wrong, right)
             # Fix footer numbering (various formats)
-            new_raw = re.sub(r'\n6\. See notebooks for DPO', r'\n4. See notebooks for DPO', new_raw)
-            new_raw = re.sub(r'"6\. See notebooks for DPO', r'"4. See notebooks for DPO', new_raw)
+            new_raw = _RE_FOOTER_NUM_NL.sub(r'\n4. See notebooks for DPO', new_raw)
+            new_raw = _RE_FOOTER_NUM_Q.sub(r'"4. See notebooks for DPO', new_raw)
             # Fix duplicate "See our docs" sentences
-            new_raw = re.sub(
-                r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1',
-                r'\1',
-                new_raw
-            )
+            new_raw = _RE_DUP_DOCS_GLOBAL.sub(r'\1', new_raw)
             # Fix broken #Save link ONLY if file has NO <a name="Save"> anchor
             if '[how to save it](#Save)' in new_raw and '<a name="Save">' not in new_raw:
                 new_raw = new_raw.replace('[how to save it](#Save)', 'how to save it')
@@ -2621,7 +3013,49 @@ if __name__ == "__main__":
                     f.write(new_raw)
         except Exception:
             pass
-        os.chmod(nb_path, 0o644)
+        try:
+            _set_file_permissions(nb_path)
+        except OSError:
+            pass
+
+    all_nb_paths = glob(os.path.join("nb", "*.ipynb"))
+    if args.workers <= 1:
+        for nb_path in all_nb_paths:
+            _apply_global_fixes(nb_path)
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
+            list(executor.map(_apply_global_fixes, all_nb_paths))
+
+    # Normalize LGPL blank line after all source modifications (update_old_unsloth
+    # joins and re-splits source arrays, which can merge the blank line away).
+    for nb_path in all_nb_paths:
+        _normalize_lgpl_blank_line(nb_path)
+
+    # Strip trailing empty strings from source arrays and ensure the last
+    # element does not end with \n (nbformat convention).
+    for nb_path in all_nb_paths:
+        try:
+            with open(nb_path, "r", encoding="utf-8") as f:
+                nb_data = json.load(f)
+            changed = False
+            for cell in nb_data.get("cells", []):
+                source = cell.get("source", [])
+                if isinstance(source, list):
+                    while source and source[-1] == "":
+                        source.pop()
+                        changed = True
+                    if source and source[-1].endswith("\n"):
+                        source[-1] = source[-1][:-1]
+                        changed = True
+            if changed:
+                _write_notebook(nb_path, nb_data)
+        except Exception:
+            pass
+
+    # Restore original output cells now that all processing is done and cell
+    # counts should match the originals (templates gain cells during processing).
+    for nb_path in all_nb_paths:
+        _restore_original_outputs(nb_path)
 
     if not args.disable_convert_to_script:
-        convert_folder("nb", "python_scripts")
+        convert_folder("nb", "python_scripts", max_workers=args.workers)

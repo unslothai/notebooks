@@ -26,7 +26,6 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
@@ -47,7 +46,6 @@
 # Beep was a healthy car because he always had good fuel....
 # ```
 # Instead of `Alpaca`'s Question Answer format, one only needs 1 column - the `"text"` column. This means you can finetune on any dataset and let your model act as a text completion model, like for novel writing.
-# 
 
 # In[ ]:
 
@@ -268,4 +266,3 @@ pass
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
 # </div>
-# 

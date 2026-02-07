@@ -13,7 +13,6 @@
 # To install Unsloth on your own computer, follow the installation instructions on our Github page [here](https://unsloth.ai/docs/get-started/install).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # ### News
 
@@ -29,7 +28,6 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
@@ -370,7 +368,6 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # <a name="Inference"></a>
 # ### Inference
 # Let's run the model! You can change the prompts
-# 
 
 # In[10]:
 
@@ -562,4 +559,3 @@ if False:
 # </div>
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
-# 

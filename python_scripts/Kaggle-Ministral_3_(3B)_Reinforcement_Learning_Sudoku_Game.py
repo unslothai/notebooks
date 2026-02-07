@@ -11,7 +11,6 @@
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
-# 
 
 # # Goal: Make Ministral solve Sudoku puzzles with Reinforcement Learning
 # 
@@ -20,7 +19,6 @@
 # and completing valid puzzles.
 # 
 # <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Sudoku_Puzzle_by_L2G-20050714_solution_standardized_layout.svg/1280px-Sudoku_Puzzle_by_L2G-20050714_solution_standardized_layout.svg.png" height="300" />
-# 
 
 # ### News
 
@@ -36,14 +34,13 @@
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
-# 
 
 # # ### Installation
 # 
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==5.0.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -451,7 +448,6 @@ print(info)
 # # Data & RL task setup
 # 
 # Create the prompt that instructs the model to generate a Sudoku solving strategy. You can customize this to some other task for another RL task.
-# 
 
 # In[ ]:
 
@@ -738,7 +734,6 @@ training_args = GRPOConfig(
 # | 1    | 0.000000      | 0.125000  | 0.000000   | 200.000000        | 0.000000 |
 # | 2    | 0.000000      | 0.072375  | 0.248112   | 200.000000        | 0.000000 |
 # | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
-# 
 
 # In[ ]:
 
@@ -774,7 +769,6 @@ trainer.train()
 
 
 # And now with the LoRA we just trained with GRPO - we first save the LoRA first!
-# 
 
 # In[ ]:
 
@@ -784,7 +778,6 @@ tokenizer.save_pretrained("ministral_lora")
 
 
 # Verify LoRA is actually trained!
-# 
 
 # In[ ]:
 
@@ -904,4 +897,3 @@ if False:
 # </div>
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
-# 
