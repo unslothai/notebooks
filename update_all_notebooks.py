@@ -894,6 +894,49 @@ def get_current_git_branch():
         return None
 
 
+_RE_PIP_INSTALL_LINE = re.compile(r"^!(?:uv )?pip install\s+(.+)$", re.MULTILINE)
+_RE_PIP_PKG_TOKEN = re.compile(r"^([A-Za-z0-9_][A-Za-z0-9._-]*)")
+_INSTALL_FLAG_PREFIXES = ("--", "-", "{", "\"", "'")
+_INSTALL_GUARD_IGNORE = frozenset({
+    # Standard packages present in the default install cell; safe to swap
+    "unsloth", "unsloth_zoo", "bitsandbytes", "accelerate", "xformers",
+    "peft", "trl", "triton", "cut_cross_entropy", "sentencepiece",
+    "protobuf", "datasets", "huggingface_hub", "hf_transfer",
+    "transformers", "pip3-autoremove", "torch", "torchvision",
+    "torchaudio", "pip",
+})
+
+def _extract_pip_packages(install_text):
+    """Extract base package names from pip install lines in install cell text."""
+    packages = set()
+    for m in _RE_PIP_INSTALL_LINE.finditer(install_text):
+        for token in m.group(1).split():
+            if any(token.startswith(p) for p in _INSTALL_FLAG_PREFIXES):
+                continue
+            if "git+" in token or "://" in token:
+                # git+https://... -- use the repo name as identifier
+                repo = token.rstrip("/").rsplit("/", 1)[-1]
+                repo = repo.split(".git")[0].split("@")[0]
+                packages.add(repo.lower())
+                continue
+            pm = _RE_PIP_PKG_TOKEN.match(token)
+            if pm:
+                packages.add(pm.group(1).lower().replace("-", "_"))
+    return packages
+
+def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
+    """Warn if the new install cell is missing packages that the old cell had."""
+    old_pkgs = _extract_pip_packages(old_cell_text) - _INSTALL_GUARD_IGNORE
+    new_pkgs = _extract_pip_packages(new_cell_text) - _INSTALL_GUARD_IGNORE
+    dropped = old_pkgs - new_pkgs
+    if dropped:
+        print(
+            f"WARNING: {notebook_path} -- install cell dropped packages: "
+            f"{', '.join(sorted(dropped))}. "
+            f"Add a dedicated installation_* entry in the script."
+        )
+
+
 def update_or_append_pip_install(base_content, package_name, new_install_line):
     pattern = re.compile(rf"^!(uv )?pip install .*?{package_name}.*$", re.MULTILINE)
 
@@ -1406,15 +1449,63 @@ installation_ministral_content = installation_content
 installation_ministral_content = update_or_append_pip_install(
     installation_ministral_content,
     "transformers",
-    "!pip install git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce"
+    "!pip install transformers==5.0.0"
 )
 
 installation_ministral_kaggle_content = installation_kaggle_content
 installation_ministral_kaggle_content = update_or_append_pip_install(
     installation_ministral_kaggle_content,
     "transformers",
-    "!pip install git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce"
+    "!pip install transformers==5.0.0"
 )
+
+# =======================================================
+# GLM Flash Notebook
+# =======================================================
+installation_glm_flash_content = installation_content
+installation_glm_flash_content = update_or_append_pip_install(
+    installation_glm_flash_content,
+    "transformers",
+    "!pip install transformers==5.0.0"
+)
+
+installation_glm_flash_kaggle_content = installation_kaggle_content
+installation_glm_flash_kaggle_content = update_or_append_pip_install(
+    installation_glm_flash_kaggle_content,
+    "transformers",
+    "!pip install transformers==5.0.0"
+)
+
+# =======================================================
+# Phone Deployment Notebook (ExecuTorch)
+# =======================================================
+installation_phone_content = installation_content
+installation_phone_content = update_or_append_pip_install(
+    installation_phone_content,
+    "transformers",
+    "!pip install transformers==4.57.3"
+)
+installation_phone_content = update_or_append_pip_install(
+    installation_phone_content,
+    "trl",
+    "!pip install --no-deps trl==0.25.1"
+)
+installation_phone_content += """\n!pip install torchao==0.14.0 optimum==1.24.0 pytorch-tokenizers executorch
+!pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
+
+installation_phone_kaggle_content = installation_kaggle_content
+installation_phone_kaggle_content = update_or_append_pip_install(
+    installation_phone_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.57.3"
+)
+installation_phone_kaggle_content = update_or_append_pip_install(
+    installation_phone_kaggle_content,
+    "trl",
+    "!pip install --no-deps trl==0.25.1"
+)
+installation_phone_kaggle_content += """\n!pip install torchao==0.14.0 optimum==1.24.0 pytorch-tokenizers executorch
+!pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
 
 # =======================================================
 # NEWS (WILL KEEP CHANGING THIS)
@@ -1997,7 +2088,38 @@ def update_notebook_sections(
                                 installation = installation_nemotron_nano_kaggle_content
                             else:
                                 installation = installation_nemotron_nano_content
-                                
+
+                        # MINISTRAL INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["ministral"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_ministral_kaggle_content
+                            else:
+                                installation = installation_ministral_content
+
+                        # GLM FLASH INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["glm_flash", "glm-flash"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_glm_flash_kaggle_content
+                            else:
+                                installation = installation_glm_flash_content
+
+                        # PHONE DEPLOYMENT INSTALLATION (ExecuTorch)
+                        if is_path_contains_any(notebook_path.lower(), ["phone_deployment", "phone-deployment"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_phone_kaggle_content
+                            else:
+                                installation = installation_phone_content
+
+                        # Guard: warn if the replacement drops packages
+                        old_install_src = notebook_content["cells"][i + 1].get("source", "")
+                        if isinstance(old_install_src, list):
+                            old_install_src = "".join(old_install_src)
+                        if isinstance(installation, list):
+                            new_install_text = "".join(installation)
+                        else:
+                            new_install_text = installation
+                        _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
+
                         notebook_content["cells"][i + 1]["source"] = installation
                         updated = True
                         # TODO: Remove after GRPO numpy bug fixed! 
