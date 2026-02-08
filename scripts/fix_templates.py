@@ -7,7 +7,7 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "original_template"
 
 def _detect_indent(path):
     """Detect JSON indent level from a notebook file."""
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", newline="") as f:
         for line in f:
             stripped = line.lstrip()
             if stripped and stripped != line:
@@ -17,13 +17,13 @@ def _detect_indent(path):
 
 def load_nb(name):
     path = os.path.join(TEMPLATE_DIR, name)
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", newline="") as f:
         return path, json.load(f)
 
 
 def save_nb(path, data):
     indent = _detect_indent(path)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="") as f:
         json.dump(data, f, indent=indent, ensure_ascii=False)
         f.write("\n")
 
@@ -160,6 +160,10 @@ def main():
     print("\n6: Fix A100 gpuType metadata")
     fix_a100_metadata()
 
+    # Fix 7: Hide memory stats cells behind cellView form
+    print("\n7: Hide memory stats cells")
+    fix_memory_stats_cellview()
+
     print("\n=== All template fixes applied ===")
 
 
@@ -190,6 +194,30 @@ def fix_a100_metadata():
                         print(f"  Fixed {name}: T4 announcement -> A100")
             if changed:
                 save_nb(path, nb)
+
+
+def fix_memory_stats_cellview():
+    """Set metadata.cellView = 'form' on cells containing memory stats display code."""
+    memory_markers = ["Show current memory stats", "Show final memory"]
+    fixed_count = 0
+    for name in sorted(os.listdir(TEMPLATE_DIR)):
+        if not name.endswith(".ipynb"):
+            continue
+        path, nb = load_nb(name)
+        changed = False
+        for idx, cell in enumerate(nb.get("cells", [])):
+            if cell.get("cell_type") != "code":
+                continue
+            text = "".join(cell.get("source", []))
+            if any(marker in text for marker in memory_markers):
+                if cell.get("metadata", {}).get("cellView") != "form":
+                    cell.setdefault("metadata", {})["cellView"] = "form"
+                    changed = True
+                    fixed_count += 1
+                    print(f"  Fixed {name} cell {idx}: added cellView=form")
+        if changed:
+            save_nb(path, nb)
+    print(f"  Total memory stats cells fixed: {fixed_count}")
 
 
 if __name__ == "__main__":
