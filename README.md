@@ -32,49 +32,11 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | **Llama 3.2 (3B) by Meta** | Synthetic Data | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Meta_Synthetic_Data_Llama3_2_%283B%29.ipynb)    |
 | **Sesame-CSM (1B)**        | TTS            | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Sesame_CSM_%281B%29-TTS.ipynb)                  |
 
-### Text-to-Speech (TTS) Notebooks
-
-| Model                | Type | Notebook Link                                                                                                                                                                         |
-| -------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sesame-CSM**       | TTS  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Sesame_CSM_%281B%29-TTS.ipynb) |
-| **Orpheus-TTS**      | TTS  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Orpheus_%283B%29-TTS.ipynb)    |
-| **Spark-TTS**        | TTS  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Spark_TTS_%280_5B%29.ipynb)    |
-| **Oute-TTS**         | TTS  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Oute_TTS_%281B%29.ipynb)       |
-| **Llasa TTS (1B)**   | TTS  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llasa_TTS_%281B%29.ipynb)      |
-| **Llasa TTS (3B)**   | TTS  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llasa_TTS_%283B%29.ipynb)      |
-| **Whisper-Large-V3** | STT  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Whisper.ipynb)                 |
-
-### Vision (Multimodal) Notebooks
-
-| Model               | Type   | Notebook Link                                                                                                                                                                            |
-| ------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Llama 3.2 (11B)** | Vision | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_%2811B%29-Vision.ipynb)  |
-| **Qwen2.5 VL (7B)** | Vision | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_VL_%287B%29-Vision.ipynb) |
-| **Pixtral (12B)**   | Vision | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Pixtral_%2812B%29-Vision.ipynb)   |
-
-### BERT Notebooks
-
-| Model                  | Notebook Link                                                                                                                                                                            |
-| -------------------  | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ModernBERT-large**  |  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/bert_classification.ipynb)  |
-
-### Specific use-case Notebooks
-| Usecase             | Model                         | Notebook Link |
-|---------------------|-------------------------------|---------------|
-| Text Classification | Llama 3.1 (8B)                        | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timothelaborie/text_classification_scripts/blob/main/unsloth_classification.ipynb) |
-| Tool Calling        | Qwen2.5-Coder (1.5B)           | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |
-| Multiple Datasets   |                   | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1njCCbE1YVal9xC83hjdo2hiGItpY_D6t?usp=sharing) |
-| KTO                 | Qwen2.5-Instruct (1.5B)                  | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1MRgGtLWuZX4ypSfGguFgC-IblTvO2ivM?usp=sharing) |
-| Inference Chat UI   | LLaMa 3.2 Vision               | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb) |
-| Conversational      | LLaMa 3.2 (1B and 3B)          | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb) |
-| ChatML              | Mistral (7B)                 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/15F1xyn8497_dUbxZP4zWmPZ3PJx1Oymv?usp=sharing) |
-| Text Completion     | Mistral (7B)                   | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_(7B)-Text_Completion.ipynb) |
-
 <!-- 🛑 🚨 DO NOT EDIT MANUALLY THIS SECTION UNTIL `end of notebook links`!! 🛑 🚨 -->
 <!-- 🛑 🚨 THIS SECTION IS GENERATED BY `update_all_notebooks.py` AUTOMATICALLY 🛑 🚨  -->
 
 <!-- START OF EDITING -->
-### GRPO Notebooks
+### GRPO & Reinforcement Learning Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **(A100) gpt oss** **(20B)** | GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)_A100-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -90,6 +52,58 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | **LFM2.5** **(1.2B)** | GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_(1.2B)-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **DeepSeek R1 0528 Qwen3** **(8B)** | GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Mistral v0.3** **(7B)** | GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_v0.3_(7B)-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+
+### Text-to-Speech (TTS) Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Orpheus** **(3B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Orpheus_(3B)-TTS.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Llasa TTS** **(3B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llasa_TTS_(3B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Sesame CSM** **(1B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Sesame_CSM_(1B)-TTS.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Oute TTS** **(1B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Oute_TTS_(1B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Llasa TTS** **(1B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llasa_TTS_(1B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Spark TTS** **(0.5B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Spark_TTS_(0_5B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+
+### Vision (Multimodal) Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Pixtral** **(12B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Pixtral_(12B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **ERNIE 4 5 VL 28B A3B PT**  | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Llama3.2** **(11B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3 VL** **(8B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_VL_(8B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3 VL** **(8B)** | Vision GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Ministral3 VL** **(3B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Ministral_3_VL_(3B)_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Gemma3N** **(4B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3N_(4B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Gemma3** **(4B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(4B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Gemma3** **(4B)** | Vision GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(4B)-Vision-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen2.5 VL** **(7B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_VL_(7B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen2.5 VL** **(7B)** | Vision GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_5_7B_VL_GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **LFM2.5 VL** **(1.6B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_VL_(1.6B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen2 VL** **(7B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_VL_(7B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+
+### Embedding Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **EmbeddingGemma** **(300M)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/EmbeddingGemma_(300M).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **All MiniLM L6 v2**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/All_MiniLM_L6_v2.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3 Embedding** **(4B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_Embedding_(4B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3 Embedding** **(0 6B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_Embedding_(0_6B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **BGE M3**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/BGE_M3.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **ModernBert**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ModernBert.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **ModernBERT** **(Large)** | Classification | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/bert_classification.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+
+### Speech-to-Text (STT) Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Whisper** **(Large)** | Fine Tuning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Whisper.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+
+### OCR Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Deepseek OCR** **(3B)** | Fine Tuning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Deepseek_OCR_(3B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Deepseek OCR** **(3B)** | Evaluation | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Deepseek_OCR_(3B)-Evaluation.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Deepseek OCR** **(3B)** | Eval | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Deepseek_OCR_(3B)-Eval.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Deepseek OCR 2** **(3B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Deepseek_OCR_2_(3B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Paddle OCR** **(1B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Paddle_OCR_(1B)_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
 ### BERT Notebooks
 | Model | Type | Notebook Link |
@@ -110,17 +124,6 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | --- | --- | --- |
 | **ERNIE 4 5 VL 28B A3B PT**  | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **ERNIE 4 5 21B A3B PT**  | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_21B_A3B_PT-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-
-### Embedding Notebooks
-| Model | Type | Notebook Link |
-| --- | --- | --- |
-| **EmbeddingGemma** **(300M)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/EmbeddingGemma_(300M).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **All MiniLM L6 v2**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/All_MiniLM_L6_v2.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Qwen3 Embedding** **(4B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_Embedding_(4B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Qwen3 Embedding** **(0 6B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_Embedding_(0_6B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **BGE M3**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/BGE_M3.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **ModernBert**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ModernBert.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **ModernBERT** **(Large)** | Classification | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/bert_classification.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
 ### GLM Notebooks
 | Model | Type | Notebook Link |
@@ -251,42 +254,17 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | **Qwen2** **(7B)** | Alpaca | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_(7B)-Alpaca.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen2 VL** **(7B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_VL_(7B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
-### STT (Speech-to-Text) Notebooks
-| Model | Type | Notebook Link |
+### Specific use-case Notebooks
+| Usecase | Model | Notebook Link |
 | --- | --- | --- |
-| **Whisper** **(Large)** | Fine Tuning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Whisper.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-
-### TTS Notebooks
-| Model | Type | Notebook Link |
-| --- | --- | --- |
-| **Orpheus** **(3B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Orpheus_(3B)-TTS.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Llasa TTS** **(3B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llasa_TTS_(3B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Sesame CSM** **(1B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Sesame_CSM_(1B)-TTS.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Oute TTS** **(1B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Oute_TTS_(1B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Llasa TTS** **(1B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llasa_TTS_(1B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Spark TTS** **(0.5B)** | TTS | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Spark_TTS_(0_5B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-
-### Vision (Multimodal) Notebooks
-| Model | Type | Notebook Link |
-| --- | --- | --- |
-| **Pixtral** **(12B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Pixtral_(12B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **ERNIE 4 5 VL 28B A3B PT**  | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Llama3.2** **(11B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Qwen3 VL** **(8B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_VL_(8B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Qwen3 VL** **(8B)** | Vision GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Ministral3 VL** **(3B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Ministral_3_VL_(3B)_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Gemma3N** **(4B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3N_(4B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Gemma3** **(4B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(4B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Gemma3** **(4B)** | Vision GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(4B)-Vision-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Deepseek OCR** **(3B)** | Fine Tuning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Deepseek_OCR_(3B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Deepseek OCR** **(3B)** | Evaluation | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Deepseek_OCR_(3B)-Evaluation.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Deepseek OCR** **(3B)** | Eval | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Deepseek_OCR_(3B)-Eval.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Qwen2.5 VL** **(7B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_VL_(7B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Qwen2.5 VL** **(7B)** | Vision GRPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_5_7B_VL_GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **LFM2.5 VL** **(1.6B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_VL_(1.6B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Qwen2 VL** **(7B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_VL_(7B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Deepseek OCR 2** **(3B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Deepseek_OCR_2_(3B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **Paddle OCR** **(1B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Paddle_OCR_(1B)_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| Text Classification | Llama 3.1 (8B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timothelaborie/text_classification_scripts/blob/main/unsloth_classification.ipynb) |
+| Tool Calling | Qwen2.5-Coder (1.5B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |
+| Multiple Datasets | | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1njCCbE1YVal9xC83hjdo2hiGItpY_D6t?usp=sharing) |
+| KTO | Qwen2.5-Instruct (1.5B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1MRgGtLWuZX4ypSfGguFgC-IblTvO2ivM?usp=sharing) |
+| Inference Chat UI | LLaMa 3.2 Vision | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb) |
+| Conversational | LLaMa 3.2 (1B and 3B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb) |
+| ChatML | Mistral (7B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/15F1xyn8497_dUbxZP4zWmPZ3PJx1Oymv?usp=sharing) |
+| Text Completion | Mistral (7B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_(7B)-Text_Completion.ipynb) |
 
 ### Other Notebooks
 | Model | Type | Notebook Link |
@@ -307,7 +285,7 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
     Click for all our Kaggle notebooks categorized by model:
   </summary>
 
-### GRPO Notebooks
+### GRPO & Reinforcement Learning Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **(A100) gpt oss** **(20B)** | GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-gpt-oss-(20B)_A100-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
@@ -322,6 +300,57 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | **Qwen2.5** **(3B)** | GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_(3B)-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **DeepSeek R1 0528 Qwen3** **(8B)** | GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Mistral v0.3** **(7B)** | GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Mistral_v0.3_(7B)-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+
+### Text-to-Speech (TTS) Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Orpheus** **(3B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Orpheus_(3B)-TTS.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Llasa TTS** **(3B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llasa_TTS_(3B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Sesame CSM** **(1B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Sesame_CSM_(1B)-TTS.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Oute TTS** **(1B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Oute_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Llasa TTS** **(1B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llasa_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Spark TTS** **(0.5B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Spark_TTS_(0_5B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+
+### Vision (Multimodal) Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Pixtral** **(12B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Pixtral_(12B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **ERNIE 4 5 VL 28B A3B PT**  | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Llama3.2** **(11B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.2_(11B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3 VL** **(8B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_VL_(8B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3 VL** **(8B)** | Vision GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_VL_(8B)-Vision-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Ministral3 VL** **(3B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Ministral_3_VL_(3B)_Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Gemma3N** **(4B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3N_(4B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Gemma3** **(4B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(4B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Gemma3** **(4B)** | Vision GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(4B)-Vision-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen2.5 VL** **(7B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen2.5 VL** **(7B)** | Vision GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_5_7B_VL_GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen2 VL** **(7B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+
+### Embedding Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **EmbeddingGemma** **(300M)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-EmbeddingGemma_(300M).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **All MiniLM L6 v2**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-All_MiniLM_L6_v2.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3 Embedding** **(4B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_Embedding_(4B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3 Embedding** **(0 6B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_Embedding_(0_6B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **BGE M3**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-BGE_M3.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **ModernBert**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-ModernBert.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **ModernBERT** **(Large)** | Classification | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-bert_classification.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+
+### Speech-to-Text (STT) Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Whisper** **(Large)** | Fine Tuning | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Whisper.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+
+### OCR Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
+| **Deepseek OCR** **(3B)** | Fine Tuning | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Deepseek_OCR_(3B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Deepseek OCR** **(3B)** | Evaluation | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Deepseek_OCR_(3B)-Evaluation.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Deepseek OCR** **(3B)** | Eval | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Deepseek_OCR_(3B)-Eval.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Deepseek OCR 2** **(3B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Deepseek_OCR_2_(3B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Paddle OCR** **(1B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Paddle_OCR_(1B)_Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### BERT Notebooks
 | Model | Type | Notebook Link |
@@ -342,17 +371,6 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | --- | --- | --- |
 | **ERNIE 4 5 VL 28B A3B PT**  | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **ERNIE 4 5 21B A3B PT**  | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-ERNIE_4_5_21B_A3B_PT-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-
-### Embedding Notebooks
-| Model | Type | Notebook Link |
-| --- | --- | --- |
-| **EmbeddingGemma** **(300M)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-EmbeddingGemma_(300M).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **All MiniLM L6 v2**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-All_MiniLM_L6_v2.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Qwen3 Embedding** **(4B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_Embedding_(4B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Qwen3 Embedding** **(0 6B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_Embedding_(0_6B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **BGE M3**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-BGE_M3.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **ModernBert**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-ModernBert.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **ModernBERT** **(Large)** | Classification | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-bert_classification.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### GPT-OSS Notebooks
 | Model | Type | Notebook Link |
@@ -463,42 +481,6 @@ Below are our notebooks for Google Colab categorized by model. You can view our 
 | **Qwen2.5 Coder** **(1.5B)** | Tool Calling | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen2** **(7B)** | Alpaca | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen2 VL** **(7B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-
-### STT (Speech-to-Text) Notebooks
-| Model | Type | Notebook Link |
-| --- | --- | --- |
-| **Whisper** **(Large)** | Fine Tuning | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Whisper.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-
-### TTS Notebooks
-| Model | Type | Notebook Link |
-| --- | --- | --- |
-| **Orpheus** **(3B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Orpheus_(3B)-TTS.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Llasa TTS** **(3B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llasa_TTS_(3B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Sesame CSM** **(1B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Sesame_CSM_(1B)-TTS.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Oute TTS** **(1B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Oute_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Llasa TTS** **(1B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llasa_TTS_(1B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Spark TTS** **(0.5B)** | TTS | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Spark_TTS_(0_5B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-
-### Vision (Multimodal) Notebooks
-| Model | Type | Notebook Link |
-| --- | --- | --- |
-| **Pixtral** **(12B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Pixtral_(12B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **ERNIE 4 5 VL 28B A3B PT**  | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Llama3.2** **(11B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.2_(11B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Qwen3 VL** **(8B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_VL_(8B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Qwen3 VL** **(8B)** | Vision GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_VL_(8B)-Vision-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Ministral3 VL** **(3B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Ministral_3_VL_(3B)_Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Gemma3N** **(4B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3N_(4B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Gemma3** **(4B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(4B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Gemma3** **(4B)** | Vision GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(4B)-Vision-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Deepseek OCR** **(3B)** | Fine Tuning | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Deepseek_OCR_(3B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Deepseek OCR** **(3B)** | Evaluation | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Deepseek_OCR_(3B)-Evaluation.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Deepseek OCR** **(3B)** | Eval | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Deepseek_OCR_(3B)-Eval.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Qwen2.5 VL** **(7B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Qwen2.5 VL** **(7B)** | Vision GRPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_5_7B_VL_GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Qwen2 VL** **(7B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_VL_(7B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Deepseek OCR 2** **(3B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Deepseek_OCR_2_(3B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Paddle OCR** **(1B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Paddle_OCR_(1B)_Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### Other Notebooks
 | Model | Type | Notebook Link |

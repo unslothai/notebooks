@@ -669,14 +669,14 @@ ARCHITECTURE_MAPPING = {
     "Ministral" : "Mistral",
 
     # Whisper
-    "whisper": "STT (Speech-to-Text)",
+    "whisper": "Speech-to-Text (STT)",
 
     # Text-to-Speech Models (Group or keep separate?)
-    "oute": "TTS", 
-    "llasa": "TTS",
-    "spark": "TTS",
-    "orpheus": "TTS",
-    "sesame": "TTS",
+    "oute": "Text-to-Speech (TTS)",
+    "llasa": "Text-to-Speech (TTS)",
+    "spark": "Text-to-Speech (TTS)",
+    "orpheus": "Text-to-Speech (TTS)",
+    "sesame": "Text-to-Speech (TTS)",
 
     # gpt oss
     "gpt oss": "GPT-OSS",
@@ -2386,14 +2386,25 @@ def update_readme(
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
     paths = [x.replace("\\", "/") for x in paths]
 
-    list_models = ['GRPO'] 
+    # Priority sections appear first in the README, in this order
+    priority_sections = [
+        "GRPO & Reinforcement Learning",
+        "Text-to-Speech (TTS)",
+        "Vision (Multimodal)",
+        "Embedding",
+        "Speech-to-Text (STT)",
+        "OCR",
+    ]
+
     unique_architectures = sorted(list(set(architecture_mapping.values())))
+    # Build section list: priority first, then remaining architectures alphabetically
+    list_models = list(priority_sections)
     for arch in unique_architectures:
         if arch not in list_models:
             list_models.append(arch)
 
     # Cross-cutting sections (notebooks can appear in multiple sections)
-    for cross_section in ["Vision (Multimodal)", "Embedding"]:
+    for cross_section in ["Vision (Multimodal)", "Embedding", "OCR"]:
         if cross_section not in list_models:
             list_models.append(cross_section)
 
@@ -2454,18 +2465,24 @@ def update_readme(
         # Primary section (architecture-based)
         section_name = "Other"
         if model_type == 'GRPO':
-            section_name = 'GRPO'
+            section_name = 'GRPO & Reinforcement Learning'
         elif architecture and architecture in list_models:
             section_name = architecture
 
         # Build list of sections this notebook belongs to (primary + cross-cutting)
         sections_for_notebook = [section_name]
 
-        # Cross-cutting: Vision (Multimodal)
+        # Cross-cutting: Vision (Multimodal) -- excludes OCR notebooks
         name_lower = os.path.basename(path).lower()
-        if any(kw in name_lower for kw in ["vision", "_vl_", "_vl.", "-vl-", "-vl.", "multimodal", "ocr"]):
+        is_ocr = "ocr" in name_lower
+        if not is_ocr and any(kw in name_lower for kw in ["vision", "_vl_", "_vl.", "-vl-", "-vl.", "multimodal"]):
             if "Vision (Multimodal)" not in sections_for_notebook:
                 sections_for_notebook.append("Vision (Multimodal)")
+
+        # Cross-cutting: OCR
+        if is_ocr:
+            if "OCR" not in sections_for_notebook:
+                sections_for_notebook.append("OCR")
 
         # Cross-cutting: Embedding
         if any(kw in name_lower for kw in ["embedding", "minilm", "bge", "modernbert", "bert_classification"]):
@@ -2565,7 +2582,27 @@ def update_readme(
             "</summary>\n\n"
         )
 
+        # Static "Specific use-case Notebooks" section (Colab only, before "Other")
+        specific_usecase_section = (
+            "### Specific use-case Notebooks\n"
+            "| Usecase | Model | Notebook Link |\n"
+            "| --- | --- | --- |\n"
+            '| Text Classification | Llama 3.1 (8B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timothelaborie/text_classification_scripts/blob/main/unsloth_classification.ipynb) |\n'
+            '| Tool Calling | Qwen2.5-Coder (1.5B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |\n'
+            '| Multiple Datasets | | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1njCCbE1YVal9xC83hjdo2hiGItpY_D6t?usp=sharing) |\n'
+            '| KTO | Qwen2.5-Instruct (1.5B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1MRgGtLWuZX4ypSfGguFgC-IblTvO2ivM?usp=sharing) |\n'
+            '| Inference Chat UI | LLaMa 3.2 Vision | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb) |\n'
+            '| Conversational | LLaMa 3.2 (1B and 3B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb) |\n'
+            '| ChatML | Mistral (7B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/15F1xyn8497_dUbxZP4zWmPZ3PJx1Oymv?usp=sharing) |\n'
+            '| Text Completion | Mistral (7B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_(7B)-Text_Completion.ipynb) |\n'
+            "\n"
+        )
+
         for section in list_models:
+            # Insert "Specific use-case Notebooks" just before "Other"
+            if section == "Other":
+                colab_updated_notebooks_links += specific_usecase_section
+
             if sections[section]["Colab"]["rows"]:
                 colab_updated_notebooks_links += sections[section]["Colab"]["header"]
                 colab_updated_notebooks_links += colab_table_header
