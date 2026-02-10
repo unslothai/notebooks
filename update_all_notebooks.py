@@ -235,7 +235,7 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}"""
 
@@ -259,7 +259,7 @@ try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=
 except: _numpy = "numpy"; _pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
 !uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"
 """
@@ -287,7 +287,7 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
     !uv pip install synthetic-data-kit==0.0.3"""
@@ -310,7 +310,7 @@ try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=
 except: _numpy = "numpy"; _pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.10.2', 'triton')
+_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 !uv pip install -qqq --upgrade unsloth {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers
 !uv pip install -qqq {_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"
