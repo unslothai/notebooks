@@ -8,7 +8,7 @@
 # <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
 # </div>
 # 
-# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# To install Unsloth your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
 
@@ -28,13 +28,13 @@
 
 # # ### Installation
 # 
-# # In[ ]:
+# # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install or uv pip install\n    !pip install unsloth vllm\nelse:\n    pass # For Colab / Kaggle, we need extra instructions hidden below \\/\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
-# # In[ ]:
+# # In[2]:
 # 
 # 
 # #@title Colab Extra Install { display-mode: "form" }
@@ -45,38 +45,51 @@
 #     # If you're not in Colab, just use pip install!
 #     get_ipython().system('pip install unsloth vllm')
 # else:
-#     try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
-#     except: _numpy = "numpy"; _pil = "pillow"
+#     try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
+#     except: get_numpy = "numpy"; get_pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
-#     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
-#     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
-#     get_ipython().system('uv pip install -qqq {_triton}')
-# get_ipython().system('uv pip install transformers==4.56.2')
-# get_ipython().system('uv pip install --no-deps trl==0.22.2')
+#     get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+#     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_numpy} {get_pil} torchvision bitsandbytes xformers')
+#     get_ipython().system('uv pip install -qqq {get_triton}')
+# get_ipython().system('uv pip install transformers')
+# get_ipython().system('uv pip install --no-deps trl')
 # 
 # 
 # # ### Unsloth
 
-# Goal: To convert `Qwen3-4B-Base` into a reasoning model via GRPO by using OpenR1's Math dataset.
+# Goal: To convert `unsloth/Qwen3-30B-A3B-Instruct-2507` into a reasoning model via GRPO by using OpenR1's Math dataset.
 # 
 # We first pre fine-tune the model to make GRPO skip trying to match formatting - this speeds GRPO up.
 
-# In[3]:
+# In[5]:
+
+
+import os, torch
+# os.environ['UNSLOTH_MOE_BACKEND'] = 'grouped_mm' # switch to 'unsloth_triton' or 'native_torch'
+# grouped_mm is only supported on torch 2.9 or newer.
+# Make sure that we have at least 64GB VRAM because the model itself takes 60GB in 16bit
+
+
+# In[ ]:
+
+
+model_name = "unsloth/Qwen3-30B-A3B-Instruct-2507" # This is a very big model, might take a while for downloading
+max_seq_length = 2048 # Can increase for longer reasoning traces
+lora_rank = 32 # Larger rank = smarter, but slower
+
+
+# In[ ]:
 
 
 from unsloth import FastLanguageModel
 import torch
-max_seq_length = 2048 # Can increase for longer reasoning traces
-lora_rank = 32 # Larger rank = smarter, but slower
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/Qwen3-4B-Base",
+    model_name,
     max_seq_length = max_seq_length,
-    load_in_4bit = False, # False for LoRA 16bit
-    fast_inference = True, # Enable vllm fast inference
-    max_lora_rank = lora_rank,
-    gpu_memory_utilization = 0.9, # Reduce if out of memory
+    load_in_4bit = False,
+    fast_inference = False, # Not supported for MoE (yet!)
 )
 
 model = FastLanguageModel.get_peft_model(
@@ -84,11 +97,12 @@ model = FastLanguageModel.get_peft_model(
     r = lora_rank, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     target_modules = [
         "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
+        "gate_proj", "up_proj", "down_proj", "gate_up_proj", #Enable LoRA on MoE layers
     ],
     lora_alpha = lora_rank*2, # *2 speeds up training
-    use_gradient_checkpointing = "unsloth", # Reduces memory usage
+    use_gradient_checkpointing = True, # Reduces memory usage
     random_state = 3407,
+    bias = "none",
 )
 
 
@@ -97,7 +111,7 @@ model = FastLanguageModel.get_peft_model(
 # 1. DeepSeek uses `<think>` and `</think>`, but this is **not** necessary - you can customize it however you like!
 # 2. A `system_prompt` is recommended to at least guide the model's responses.
 
-# In[4]:
+# In[8]:
 
 
 reasoning_start = "<start_working_out>" # Acts as <think>
@@ -115,7 +129,7 @@ system_prompt
 
 # We create a simple chat template below. Notice `add_generation_prompt` includes prepending `<start_working_out>` to guide the model to start its reasoning process.
 
-# In[5]:
+# In[ ]:
 
 
 chat_template = \
@@ -145,7 +159,7 @@ tokenizer.chat_template = chat_template
 
 # Let's see how our chat template behaves on an example:
 
-# In[6]:
+# In[10]:
 
 
 tokenizer.apply_chat_template([
@@ -160,7 +174,7 @@ tokenizer.apply_chat_template([
 # 
 # We'll only filter ~59 or so examples to first "prime" / pre fine-tune the model to understand our custom GRPO formatting.
 
-# In[7]:
+# In[11]:
 
 
 from datasets import load_dataset
@@ -182,7 +196,7 @@ dataset
 
 # We have to format the dataset to follow our GRPO style formatting:
 
-# In[8]:
+# In[12]:
 
 
 def format_dataset(x):
@@ -210,7 +224,7 @@ dataset["Messages"] = dataset.apply(format_dataset, axis = 1)
 
 # Check to see if it worked:
 
-# In[9]:
+# In[13]:
 
 
 tokenizer.apply_chat_template(dataset["Messages"][0], tokenize = False)
@@ -220,10 +234,10 @@ tokenizer.apply_chat_template(dataset["Messages"][0], tokenize = False)
 # 
 # Note this might take 2 minutes!
 
-# In[10]:
+# In[14]:
 
 
-dataset["N"] = dataset["Messages"].apply(lambda x: len(tokenizer.apply_chat_template(x)))
+dataset["N"] = dataset["Messages"].apply(lambda x: len(tokenizer.apply_chat_template(x)['input_ids']))
 
 dataset = dataset.loc[dataset["N"] <= max_seq_length/2].copy()
 dataset.shape
@@ -231,7 +245,7 @@ dataset.shape
 
 # We then tokenize the messages and convert it to a Hugging Face compatible dataset format:
 
-# In[11]:
+# In[15]:
 
 
 from datasets import Dataset
@@ -243,7 +257,7 @@ dataset
 
 # Let's now pre fine-tune the model so it follows our custom GRPO formatting!
 
-# In[12]:
+# In[16]:
 
 
 from trl import SFTTrainer, SFTConfig
@@ -256,7 +270,8 @@ trainer = SFTTrainer(
         per_device_train_batch_size = 1,
         gradient_accumulation_steps = 1, # Use GA to mimic batch size!
         warmup_steps = 5,
-        num_train_epochs = 2, # Set this for 1 full training run.
+        # num_train_epochs = 1, # Set this for 1 full training run.
+        max_steps = 50,
         learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
         logging_steps = 5,
         optim = "adamw_8bit",
@@ -268,7 +283,7 @@ trainer = SFTTrainer(
 )
 
 
-# In[13]:
+# In[17]:
 
 
 trainer.train()
@@ -276,7 +291,7 @@ trainer.train()
 
 # Let's check if the model has learnt to follow the custom format:
 
-# In[14]:
+# In[ ]:
 
 
 text = tokenizer.apply_chat_template(
@@ -288,15 +303,16 @@ text = tokenizer.apply_chat_template(
 from transformers import TextStreamer
 _ = model.generate(
     **tokenizer(text, return_tensors = "pt").to("cuda"),
-    temperature = 0,
-    max_new_tokens = 1024,
+    temperature = 0.1,
+    max_new_tokens = 128,
     streamer = TextStreamer(tokenizer, skip_prompt = False),
+    use_cache = True
 )
 
 
 # Yes it did follow the formatting! Great! Let's remove some items before the GRPO step
 
-# In[15]:
+# In[24]:
 
 
 del dataset
@@ -305,437 +321,12 @@ import gc
 gc.collect()
 
 
-# ### Data Prep
-# <a name="Data"></a>
-# 
-# We're using Hugging Face's [Open R1 Math dataset](https://huggingface.co/datasets/open-r1/DAPO-Math-17k-Processed). You can also utilize OpenAI's famous [GSM8K dataset](https://huggingface.co/datasets/openai/gsm8k)
-
-# In[16]:
-
-
-from datasets import load_dataset
-dataset = load_dataset("open-r1/DAPO-Math-17k-Processed", "en", split = "train")
-dataset
-
-
-# Let's look at the first row:
-
-# In[17]:
-
-
-dataset[0]["prompt"]
-
-
-# In[18]:
-
-
-dataset[0]["solution"]
-
-
-# In GSM8K, we notice all answers like about have a ####, so we extract it. But for the Open R1 dataset, we can skip the below.
-
-# In[19]:
-
-
-def extract_hash_answer(text):
-    # if "####" not in text: return None
-    # return text.split("####")[1].strip()
-    return text
-extract_hash_answer(dataset[0]["solution"])
-
-
-# Let's map the dataset! and see the first row:
-
-# In[20]:
-
-
-dataset = dataset.map(lambda x: {
-    "prompt" : [
-        {"role": "system", "content": system_prompt},
-        {"role": "user",   "content": x["prompt"]},
-    ],
-    "answer": extract_hash_answer(x["solution"]),
-})
-dataset[0]
-
-
-# We create a regex format to match the reasoning sections and answers:
-
-# In[21]:
-
-
-import re
-
-# Add optional EOS token matching
-solution_end_regex = r"</SOLUTION>[\s]{0,}" + \
-    "(?:" + re.escape(tokenizer.eos_token) + ")?"
-
-match_format = re.compile(
-    rf"{reasoning_end}.*?"\
-    rf"{solution_start}(.+?){solution_end_regex}"\
-    rf"[\s]{{0,}}$",
-    flags = re.MULTILINE | re.DOTALL
-)
-match_format
-
-
-# We verify it works:
-
-# In[22]:
-
-
-match_format.findall(
-    "Let me think!<end_working_out>"\
-    f"<SOLUTION>\n2\n</SOLUTION>",
-)
-
-
-# In[23]:
-
-
-match_format.findall(
-    "<start_working_out>Let me think!<end_working_out>"\
-    f"<SOLUTION>  2  </SOLUTION>\n\n",
-)
-
-
-# We now want to create a reward function to match the format exactly - we reward it with 3 points if it succeeds:
-
-# In[24]:
-
-
-def match_format_exactly(completions, **kwargs):
-    scores = []
-    for completion in completions:
-        score = 0
-        response = completion[0]["content"]
-        # Match if format is seen exactly!
-        if match_format.search(response) is not None: score += 3.0
-        scores.append(score)
-    return scores
-
-
-# If it fails, we want to reward the model if it at least follows the format partially, by counting each symbol:
-
-# In[25]:
-
-
-def match_format_approximately(completions, **kwargs):
-    scores = []
-    for completion in completions:
-        score = 0
-        response = completion[0]["content"]
-        # Count how many keywords are seen - we penalize if too many!
-        # If we see 1, then plus some points!
-
-        # No need to reward <start_working_out> since we always prepend it!
-        # score += 0.5 if response.count(reasoning_start) == 1 else -1.0
-        score += 0.5 if response.count(reasoning_end)   == 1 else -1.0
-        score += 0.5 if response.count(solution_start)  == 1 else -1.0
-        score += 0.5 if response.count(solution_end)    == 1 else -1.0
-        scores.append(score)
-    return scores
-
-
-# Finally, we want to extract the generated answer, and reward or penalize it! We also reward it based on how close the answer is to the true one via ratios:
-
-# In[26]:
-
-
-def check_answer(prompts, completions, answer, **kwargs):
-    question = prompts[0][-1]["content"]
-    responses = [completion[0]["content"] for completion in completions]
-
-    extracted_responses = [
-        guess.group(1)
-        if (guess := match_format.search(r)) is not None else None \
-        for r in responses
-    ]
-
-    scores = []
-    for guess, true_answer in zip(extracted_responses, answer):
-        score = 0
-        if guess is None:
-            scores.append(-2.0)
-            continue
-        # Correct answer gets 5 points!
-        if guess == true_answer:
-            score += 5.0
-        # Match if spaces are seen, but less reward
-        elif guess.strip() == true_answer.strip():
-            score += 3.5
-        else:
-            # We also reward it if the answer is close via ratios!
-            # Ie if the answer is within some range, reward it!
-            try:
-                ratio = float(guess) / float(true_answer)
-                if   ratio >= 0.9 and ratio <= 1.1: score += 2.0
-                elif ratio >= 0.8 and ratio <= 1.2: score += 1.5
-                else: score -= 2.5 # Penalize wrong answers
-            except:
-                score -= 4.5 # Penalize
-        scores.append(score)
-    return scores
-
-
-# Also sometimes it might not be 1 number as the answer, but like a sentence for example "The solution is $20" -> we extract 20.
-# 
-# We also remove possible commas for example as in 123,456
-
-# In[27]:
-
-
-match_numbers = re.compile(
-    solution_start + r".*?[\s]{0,}([-]?[\d\.\,]{1,})",
-    flags = re.MULTILINE | re.DOTALL
-)
-print(match_numbers.findall("<SOLUTION>  0.34  </SOLUTION>"))
-print(match_numbers.findall("<SOLUTION>  123,456  </SOLUTION>"))
-print(match_numbers.findall("<SOLUTION>  -0.234  </SOLUTION>"))
-print(match_numbers.findall("<SOLUTION>17</SOLUTION>"))
-
-
-# We now prepare our main function which will print out the generated responses and the true answer, along with another reward function which converts text to float via `float` and sees if it's the same.
-
-# In[28]:
-
-
-global PRINTED_TIMES
-PRINTED_TIMES = 0
-global PRINT_EVERY_STEPS
-PRINT_EVERY_STEPS = 5
-
-def check_numbers(prompts, completions, answer, **kwargs):
-    question = prompts[0][-1]["content"]
-    responses = [completion[0]["content"] for completion in completions]
-
-    extracted_responses = [
-        guess.group(1)
-        if (guess := match_numbers.search(r)) is not None else None \
-        for r in responses
-    ]
-
-    scores = []
-    # Print only every few steps
-    global PRINTED_TIMES
-    global PRINT_EVERY_STEPS
-    if PRINTED_TIMES % PRINT_EVERY_STEPS == 0:
-        print(
-            '*'*20 + f"Question:\n{question}", f"\nAnswer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}"
-        )
-    PRINTED_TIMES += 1
-
-    for guess, true_answer in zip(extracted_responses, answer):
-        if guess is None:
-            scores.append(-2.5)
-            continue
-        # Convert to numbers
-        try:
-            true_answer = float(true_answer.strip())
-            # Remove commas like in 123,456
-            guess       = float(guess.strip().replace(",", ""))
-            scores.append(3.5 if guess == true_answer else -1.5)
-        except:
-            scores.append(0)
-            continue
-    return scores
-
-
-# Get the top 90% prompt length so we don't accidentally truncate them!
-# 
-# Ie we'll remove the top 10% long prompts.
-
-# In[29]:
-
-
-tokenized = dataset.map(
-    lambda x: {"tokens" : tokenizer.apply_chat_template(x["prompt"], add_generation_prompt = True, tokenize = True)},
-    batched = True,
-)
-print(tokenizer.decode(tokenized[0]["tokens"]))
-tokenized = tokenized.map(lambda x: {"L" : len(x["tokens"])})
-
-import numpy as np
-maximum_length = int(np.quantile(tokenized["L"], 0.9))
-print("Max Length = ", maximum_length)
-
-# Filter only samples smaller than 90% max length
-dataset = dataset.select(np.where(np.array(tokenized["L"]) <= maximum_length)[0])
-del tokenized
-
-
-# <a name="Train"></a>
-# ### Train the model
-# 
-# Now set up GRPO Trainer and all configurations!
-
-# In[30]:
-
-
-max_prompt_length = maximum_length + 1 # + 1 just in case!
-max_completion_length = max_seq_length - max_prompt_length
-
-from vllm import SamplingParams
-vllm_sampling_params = SamplingParams(
-    min_p = 0.1,
-    top_p = 1.0,
-    top_k = -1,
-    seed = 3407,
-    stop = [tokenizer.eos_token],
-    include_stop_str_in_output = True,
-)
-
-from trl import GRPOConfig, GRPOTrainer
-training_args = GRPOConfig(
-    vllm_sampling_params = vllm_sampling_params,
-    temperature = 1.0,
-    learning_rate = 5e-6,
-    weight_decay = 0.001,
-    warmup_ratio = 0.1,
-    lr_scheduler_type = "linear",
-    optim = "adamw_8bit",
-    logging_steps = 1,
-    per_device_train_batch_size = 1,
-    gradient_accumulation_steps = 1, # Increase to 4 for smoother training
-    num_generations = 4, # Decrease if out of memory
-    max_prompt_length = max_prompt_length,
-    max_completion_length = max_completion_length,
-    # num_train_epochs = 1, # Set to 1 for a full training run
-    max_steps = 100,
-    save_steps = 100,
-    report_to = "none", # Can use Weights & Biases
-    output_dir = "outputs",
-
-    # For optional training + evaluation
-    # fp16_full_eval = True,
-    # per_device_eval_batch_size = 4,
-    # eval_accumulation_steps = 1,
-    # eval_strategy = "steps",
-    # eval_steps = 1,
-)
-
-
-# And let's run the trainer! If you scroll up, you'll see a table of rewards. The goal is to see the `reward` column increase!
-# 
-# You might have to wait 150 to 200 steps for any action. You'll probably get 0 reward for the first 100 steps. Please be patient!
-# 
-# | Step | Training Loss | reward    | reward_std | completion_length | kl       |
-# |------|---------------|-----------|------------|-------------------|----------|
-# | 1    | 0.000000      | 0.125000  | 0.000000   | 200.000000        | 0.000000 |
-# | 2    | 0.000000      | 0.072375  | 0.248112   | 200.000000        | 0.000000 |
-# | 3    | 0.000000      | -0.079000 | 0.163776   | 182.500000        | 0.000005 |
-
-# In[31]:
-
-
-# For optional training + evaluation
-# new_dataset = dataset.train_test_split(test_size = 0.01)
-
-trainer = GRPOTrainer(
-    model = model,
-    processing_class = tokenizer,
-    reward_funcs = [
-        match_format_exactly,
-        match_format_approximately,
-        check_answer,
-        check_numbers,
-    ],
-    args = training_args,
-    train_dataset = dataset,
-
-    # For optional training + evaluation
-    # train_dataset = new_dataset["train"],
-    # eval_dataset = new_dataset["test"],
-)
-trainer.train()
-
-
-# <a name="Inference"></a>
-# ### Inference
-# Now let's try the model we just trained! First, let's first try the model without any GRPO trained:
-
-# In[32]:
-
-
-text = "What is the sqrt of 101?"
-
-from vllm import SamplingParams
-sampling_params = SamplingParams(
-    temperature = 1.0,
-    top_k = 50,
-    max_tokens = 1024,
-)
-output = model.fast_generate(
-    [text],
-    sampling_params = sampling_params,
-    lora_request = None,
-)[0].outputs[0].text
-
-output
-
-
-# And now with the LoRA we just trained with GRPO - we first save the LoRA first!
-
-# In[33]:
-
-
-model.save_lora("grpo_saved_lora")
-
-
-# Verify LoRA is actually trained!
-
-# In[34]:
-
-
-from safetensors import safe_open
-
-tensors = {}
-with safe_open("grpo_saved_lora/adapter_model.safetensors", framework = "pt") as f:
-    # Verify both A and B are non zero
-    for key in f.keys():
-        tensor = f.get_tensor(key)
-        n_zeros = (tensor == 0).sum() / tensor.numel()
-        assert(n_zeros.item() != tensor.numel())
-
-
-# Now we load the LoRA and test:
-
-# In[35]:
-
-
-messages = [
-    {"role": "system", "content": system_prompt},
-    {"role": "user",   "content": "What is the sqrt of 101?"},
-]
-
-text = tokenizer.apply_chat_template(
-    messages,
-    add_generation_prompt = True, # Must add for generation
-    tokenize = False,
-)
-from vllm import SamplingParams
-sampling_params = SamplingParams(
-    temperature = 1.0,
-    top_k = 50,
-    max_tokens = 2048,
-)
-output = model.fast_generate(
-    text,
-    sampling_params = sampling_params,
-    lora_request = model.load_lora("grpo_saved_lora"),
-)[0].outputs[0].text
-
-output
-
-
-# Our reasoning model is much better - it's not always correct, since we only trained it for an hour or so - it'll be better if we extend the sequence length and train for longer!
-
 # <a name="Save"></a>
 # ### Saving to float16 for VLLM
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
-# In[36]:
+# In[25]:
 
 
 # Merge to 16bit
@@ -765,7 +356,7 @@ if False:
 # 
 # [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 
-# In[37]:
+# In[ ]:
 
 
 # Save to 8bit Q8_0
