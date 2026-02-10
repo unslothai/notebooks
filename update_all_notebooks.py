@@ -31,85 +31,6 @@ from nbconvert import PythonExporter
 import nbformat
 from spellchecker import SpellChecker
 
-
-# Pre-compiled regex patterns (used in hot paths per-cell per-notebook)
-_RE_HTML_TAGS = re.compile(r'<[^>]+>')
-_RE_URLS = re.compile(r'https?://\S+')
-_RE_MD_LINKS = re.compile(r'\[([^\]]*)\]\([^\)]*\)')
-_RE_ENGLISH_WORDS = re.compile(r'\b[a-zA-Z]{3,}\b')
-_RE_DOUBLE_EXCL = re.compile(r"!{2,}")
-_RE_VERSION = re.compile(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])")
-_RE_PACKING = re.compile(
-    r"(\n[ \t]*)packing\s*=\s*(True|False).*?\n(\1args\s*=\s*SFTConfig\(\n)"
-)
-_RE_GGUF_USAGE = re.compile(
-    r"Now, use the `[^`]+\.Q8_0\.gguf` file or `[^`]+\.Q4_K_M\.gguf` file in llama\.cpp\."
-)
-_RE_HUGGINGFACE_BACKTICK = re.compile(r"Huggingface  (`[^`]+`)")
-_RE_NOCOMMIT = re.compile(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?')
-_RE_FOOTER_NUM = re.compile(r'\n6\. See notebooks for DPO')
-_RE_DUP_DOCS = re.compile(
-    r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1'
-)
-_RE_NEMO_GYM = re.compile(r'\bNemo Gym\b')
-_RE_SAVE_GGUF = re.compile(
-    r"(save_pretrained_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
-    re.DOTALL,
-)
-_RE_PUSH_GGUF = re.compile(
-    r"(push_to_hub_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
-    re.DOTALL,
-)
-_RE_SAVE_MERGED = re.compile(
-    r"(save_pretrained_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
-    re.DOTALL,
-)
-_RE_PUSH_MERGED = re.compile(
-    r"(push_to_hub_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
-    re.DOTALL,
-)
-_RE_SAVE_LORA = re.compile(
-    r"(\b(?:model|tokenizer|processor)\.save_pretrained\(\s*)([\"\'])([^\"\']*)([\"\'])"
-)
-_RE_PUSH_LORA = re.compile(
-    r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])"
-)
-_RE_LORA_LOAD = re.compile(
-    r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
-)
-_RE_LORA_LOAD2 = re.compile(
-    r"([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
-)
-_RE_LORA_MODEL = re.compile(r"([\"\'])lora_model([\"\'])")
-_RE_FINETUNED_MODEL = re.compile(r"([\"\'])finetuned_model([\"\'])")
-_RE_AUTO_LORA = re.compile(
-    r"(Auto(?:PeftModel\w*|Tokenizer|Model\w*)\.from_pretrained\(\s*)([\"\'])([^\"\']*_lora[^\"\']*)([\"\'])"
-)
-_RE_TOKEN = re.compile(r'(\btoken\s*=\s*)([\"\'])([^\"\']*)([\"\'])')
-_RE_EOS_TOKEN = re.compile(r"unsloth_eos_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']")
-_RE_PATCH_TOKEN = re.compile(r"patch_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']")
-_RE_DTYPE_LINE = re.compile(r"^[ \t]*dtype\s*=\s*None\s*#.*$")
-_RE_DTYPE_PARAM = re.compile(r"(\bdtype\s*=\s*)dtype\b\s*,?")
-_RE_VLLM = re.compile(r'\bvLLM\b')
-_RE_VLLM_UPPER = re.compile(r'\bVLLM\b(?!_)')
-_RE_GATED_COMMENT = re.compile(r"# use one if using gated models.*")
-_RE_GEMMA3N = re.compile(r"gemma[-_]?3n")
-_RE_GEMMA3 = re.compile(r"gemma[-_]?3")
-_RE_STOP_BRACKET = re.compile(r"[\(\[\{]")
-_RE_MULTI_UNDERSCORE = re.compile(r"__+")
-_RE_ALPHA_ONLY = re.compile(r"[A-Za-z]+")
-_RE_ALPHA_DIGIT = re.compile(r"[A-Za-z][0-9]")
-_RE_ALPHA_LEAD = re.compile(r"[A-Za-z]+")
-# Global fix pass patterns
-_RE_GATED_GLOBAL = re.compile(r"# use one if using gated models[^\n]*")
-_RE_HUGGINGFACE_GLOBAL = re.compile(r"Huggingface  (`[^`]+`)")
-_RE_NOCOMMIT_GLOBAL = re.compile(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?')
-_RE_FOOTER_NUM_NL = re.compile(r'\n6\. See notebooks for DPO')
-_RE_FOOTER_NUM_Q = re.compile(r'"6\. See notebooks for DPO')
-_RE_DUP_DOCS_GLOBAL = re.compile(
-    r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1'
-)
-
 new_announcement = """You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
 
 Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
@@ -645,6 +566,84 @@ __OTHER_RESOURCES__
 
   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
 </div>""".replace("__OTHER_RESOURCES__", OTHER_RESOURCES)
+
+# Pre-compiled regex patterns (used in hot paths per-cell per-notebook)
+_RE_HTML_TAGS = re.compile(r'<[^>]+>')
+_RE_URLS = re.compile(r'https?://\S+')
+_RE_MD_LINKS = re.compile(r'\[([^\]]*)\]\([^\)]*\)')
+_RE_ENGLISH_WORDS = re.compile(r'\b[a-zA-Z]{3,}\b')
+_RE_DOUBLE_EXCL = re.compile(r"!{2,}")
+_RE_VERSION = re.compile(r"[\d]{4}\.[\d]{1,2}\.[\d]{1,2}([^\d])")
+_RE_PACKING = re.compile(
+    r"(\n[ \t]*)packing\s*=\s*(True|False).*?\n(\1args\s*=\s*SFTConfig\(\n)"
+)
+_RE_GGUF_USAGE = re.compile(
+    r"Now, use the `[^`]+\.Q8_0\.gguf` file or `[^`]+\.Q4_K_M\.gguf` file in llama\.cpp\."
+)
+_RE_HUGGINGFACE_BACKTICK = re.compile(r"Huggingface  (`[^`]+`)")
+_RE_NOCOMMIT = re.compile(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?')
+_RE_FOOTER_NUM = re.compile(r'\n6\. See notebooks for DPO')
+_RE_DUP_DOCS = re.compile(
+    r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1'
+)
+_RE_NEMO_GYM = re.compile(r'\bNemo Gym\b')
+_RE_SAVE_GGUF = re.compile(
+    r"(save_pretrained_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+    re.DOTALL,
+)
+_RE_PUSH_GGUF = re.compile(
+    r"(push_to_hub_gguf\(\s*)([\"\'])([^\"\']*)([\"\'])",
+    re.DOTALL,
+)
+_RE_SAVE_MERGED = re.compile(
+    r"(save_pretrained_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+    re.DOTALL,
+)
+_RE_PUSH_MERGED = re.compile(
+    r"(push_to_hub_merged\(\s*)([\"\'])([^\"\']*)([\"\'])(.*?save_method\s*=\s*[\"\'])(merged_16bit|merged_4bit|mxfp4)([\"\'])",
+    re.DOTALL,
+)
+_RE_SAVE_LORA = re.compile(
+    r"(\b(?:model|tokenizer|processor)\.save_pretrained\(\s*)([\"\'])([^\"\']*)([\"\'])"
+)
+_RE_PUSH_LORA = re.compile(
+    r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])"
+)
+_RE_LORA_LOAD = re.compile(
+    r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
+)
+_RE_LORA_LOAD2 = re.compile(
+    r"([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
+)
+_RE_LORA_MODEL = re.compile(r"([\"\'])lora_model([\"\'])")
+_RE_FINETUNED_MODEL = re.compile(r"([\"\'])finetuned_model([\"\'])")
+_RE_AUTO_LORA = re.compile(
+    r"(Auto(?:PeftModel\w*|Tokenizer|Model\w*)\.from_pretrained\(\s*)([\"\'])([^\"\']*_lora[^\"\']*)([\"\'])"
+)
+_RE_TOKEN = re.compile(r'(\btoken\s*=\s*)([\"\'])([^\"\']*)([\"\'])')
+_RE_EOS_TOKEN = re.compile(r"unsloth_eos_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']")
+_RE_PATCH_TOKEN = re.compile(r"patch_token\s*=\s*[\"\']YOUR_HF_TOKEN[\"\']")
+_RE_DTYPE_LINE = re.compile(r"^[ \t]*dtype\s*=\s*None\s*#.*$")
+_RE_DTYPE_PARAM = re.compile(r"(\bdtype\s*=\s*)dtype\b\s*,?")
+_RE_VLLM = re.compile(r'\bvLLM\b')
+_RE_VLLM_UPPER = re.compile(r'\bVLLM\b(?!_)')
+_RE_GATED_COMMENT = re.compile(r"# use one if using gated models.*")
+_RE_GEMMA3N = re.compile(r"gemma[-_]?3n")
+_RE_GEMMA3 = re.compile(r"gemma[-_]?3")
+_RE_STOP_BRACKET = re.compile(r"[\(\[\{]")
+_RE_MULTI_UNDERSCORE = re.compile(r"__+")
+_RE_ALPHA_ONLY = re.compile(r"[A-Za-z]+")
+_RE_ALPHA_DIGIT = re.compile(r"[A-Za-z][0-9]")
+_RE_ALPHA_LEAD = re.compile(r"[A-Za-z]+")
+# Global fix pass patterns
+_RE_GATED_GLOBAL = re.compile(r"# use one if using gated models[^\n]*")
+_RE_HUGGINGFACE_GLOBAL = re.compile(r"Huggingface  (`[^`]+`)")
+_RE_NOCOMMIT_GLOBAL = re.compile(r'\[@nocommit[^\]]*\]\([^\)]*\)\.?')
+_RE_FOOTER_NUM_NL = re.compile(r'\n6\. See notebooks for DPO')
+_RE_FOOTER_NUM_Q = re.compile(r'"6\. See notebooks for DPO')
+_RE_DUP_DOCS_GLOBAL = re.compile(
+    r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1'
+)
 
 ARCHITECTURE_MAPPING = {
     # Gemma Family
