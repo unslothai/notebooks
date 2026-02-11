@@ -17,9 +17,11 @@
 import argparse
 import ast
 import concurrent.futures
+import concurrent.futures.process
 import json
 import multiprocessing
 import os
+import pickle
 import platform
 import re
 import shutil
@@ -2382,6 +2384,7 @@ _MODEL_PREFIX_SKIP_ORGS = {"unsloth", "LiquidAI"}
 _MODEL_PREFIX_SKIP_EXACT = {"meta-llama/Llama-3.2-3B-Instruct"}
 _MODEL_PREFIX_SKIP_PATTERNS = {"bert-base-uncased"}
 _PROGRESS_ENABLED = False
+_WINDOWS_PROCESSPOOL_MAX_WORKERS = 61
 
 
 def _set_progress(enabled):
@@ -2398,6 +2401,57 @@ def _progress_iter(iterable, total=None, desc=None):
     if _PROGRESS_ENABLED and _tqdm is not None:
         return _tqdm(iterable, total=total, desc=desc, dynamic_ncols=True, leave=False)
     return iterable
+
+
+def _effective_worker_count(requested_workers, total_items, executor_type, platform_name=None, cpu_count=None):
+    """Clamp worker counts for stability and platform limits."""
+    if platform_name is None:
+        platform_name = os.name
+    if cpu_count is None:
+        cpu_count = os.cpu_count() or 1
+
+    requested = max(1, int(requested_workers))
+    workers = requested
+    workers = min(workers, max(1, int(cpu_count)))
+
+    if total_items is not None and total_items > 0:
+        workers = min(workers, int(total_items))
+
+    if executor_type == "process" and platform_name == "nt":
+        workers = min(workers, _WINDOWS_PROCESSPOOL_MAX_WORKERS)
+
+    return max(1, workers)
+
+
+def _should_fallback_process_error(exc):
+    """Return True for process-pool bootstrap/pickling errors suitable for thread fallback."""
+    if isinstance(exc, concurrent.futures.process.BrokenProcessPool):
+        return True
+    if isinstance(exc, (pickle.PicklingError, OSError)):
+        return True
+
+    msg = str(exc).lower()
+    markers = (
+        "can't pickle",
+        "cannot pickle",
+        "pickl",
+        "brokenprocesspool",
+        "freeze_support",
+        "bootstrapping phase",
+        "cannot find",
+        "__main__",
+    )
+    return any(marker in msg for marker in markers)
+
+
+def _can_use_process_executor():
+    """Return False for interactive/non-file entrypoints where spawn cannot import __main__."""
+    main_mod = sys.modules.get("__main__")
+    main_file = getattr(main_mod, "__file__", None)
+    if not main_file:
+        return False
+    bad_markers = ("<stdin>", "<string>")
+    return not any(marker in str(main_file) for marker in bad_markers)
 
 
 def _unsloth_model_exists(model_name):
@@ -2497,22 +2551,37 @@ def _process_single_notebook(notebook_file):
 
 def _map_with_executor(func, items, max_workers=1, executor_type="process", progress_desc=None):
     items = list(items)
-    if max_workers <= 1:
+    if not items:
+        return []
+
+    effective_workers = _effective_worker_count(max_workers, len(items), executor_type)
+    if effective_workers != max_workers:
+        print(
+            f"  [INFO] Adjusted worker count from {max_workers} to {effective_workers} "
+            f"for executor={executor_type} (items={len(items)})."
+        )
+
+    if effective_workers <= 1:
         return [func(item) for item in _progress_iter(items, total=len(items), desc=progress_desc)]
 
     if executor_type == "process":
-        chunksize = max(1, len(items) // max(1, max_workers * 8))
-        try:
-            with concurrent.futures.ProcessPoolExecutor(
-                max_workers=max_workers,
-                mp_context=multiprocessing.get_context("spawn"),
-            ) as executor:
-                mapped = executor.map(func, items, chunksize=chunksize)
-                return list(_progress_iter(mapped, total=len(items), desc=progress_desc))
-        except Exception as e:
-            print(f"WARNING: process executor failed ({e}); falling back to thread executor.")
+        if not _can_use_process_executor():
+            print("  [WARN] Process executor unavailable for interactive/__main__ context; using thread executor.")
+        else:
+            chunksize = max(1, len(items) // max(1, effective_workers * 8))
+            try:
+                with concurrent.futures.ProcessPoolExecutor(
+                    max_workers=effective_workers,
+                    mp_context=multiprocessing.get_context("spawn"),
+                ) as executor:
+                    mapped = executor.map(func, items, chunksize=chunksize)
+                    return list(_progress_iter(mapped, total=len(items), desc=progress_desc))
+            except Exception as e:
+                if not _should_fallback_process_error(e):
+                    raise
+                print(f"WARNING: process executor failed ({e}); falling back to thread executor.")
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=effective_workers) as executor:
         mapped = executor.map(func, items)
         return list(_progress_iter(mapped, total=len(items), desc=progress_desc))
 
