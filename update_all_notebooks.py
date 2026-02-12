@@ -969,7 +969,7 @@ def _ensure_cell_ids(notebook_content):
         if not isinstance(cell, dict):
             continue
         if not cell.get("id"):
-            cell["id"] = uuid.uuid4().hex[:8]
+            cell["id"] = uuid.uuid4().hex[:12]
             changed = True
     return changed
 
@@ -1245,7 +1245,8 @@ def _validate_vllm_install_usage(notebook_path):
     try:
         with open(notebook_path, "r", encoding="utf-8", newline="") as f:
             nb = json.load(f)
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        print(f"WARNING: Could not read or parse notebook '{notebook_path}': {e}")
         return None
 
     cells = nb.get("cells", [])
@@ -1273,12 +1274,17 @@ def _validate_vllm_install_usage(notebook_path):
     return None
 
 
-def _assert_vllm_install_usage_or_fast_inference(notebook_files):
-    issues = []
-    for notebook_path in notebook_files:
-        issue = _validate_vllm_install_usage(notebook_path)
-        if issue is not None:
-            issues.append(issue)
+def _assert_vllm_install_usage_or_fast_inference(notebook_files, max_workers=1, executor_type="process"):
+    issues = [
+        issue for issue in _map_with_executor(
+            _validate_vllm_install_usage,
+            notebook_files,
+            max_workers=max_workers,
+            executor_type=executor_type,
+            progress_desc="Validate vllm usage",
+        )
+        if issue is not None
+    ]
 
     if not issues:
         return
@@ -1776,7 +1782,7 @@ def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
             f"Add a dedicated installation_* entry in the script."
         )
 
-def _normalize_transformers_5x_pin(old_cell_text, new_cell_text):
+def _preserve_transformers_v5_pin(old_cell_text, new_cell_text):
     """Force transformers==5.1.0 only when the previous install cell pinned transformers==5.*."""
     if not _RE_TRANSFORMERS_EQ_PIN_5.search(old_cell_text):
         return new_cell_text
@@ -2200,7 +2206,7 @@ def update_notebook_sections(
                             new_install_text = "".join(installation)
                         else:
                             new_install_text = installation
-                        new_install_text = _normalize_transformers_5x_pin(old_install_src, new_install_text)
+                        new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
                         _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
 
                         notebook_content["cells"][i + 1]["source"] = new_install_text
@@ -3177,8 +3183,8 @@ def _apply_global_fixes(nb_path):
         if new_raw != raw:
             with open(nb_path, "w", encoding="utf-8", newline="") as f:
                 f.write(new_raw)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"WARNING: Failed to apply global fixes to {nb_path}: {e}")
     try:
         _set_file_permissions(nb_path)
     except OSError:
@@ -3369,7 +3375,11 @@ if __name__ == "__main__":
     )
     main(max_workers=args.workers, executor_type=args.executor)
     all_nb_paths = glob(os.path.join("nb", "*.ipynb"))
-    _assert_vllm_install_usage_or_fast_inference(all_nb_paths)
+    _assert_vllm_install_usage_or_fast_inference(
+        all_nb_paths,
+        max_workers=args.workers,
+        executor_type=args.executor,
+    )
 
     notebook_directory = "nb"
     readme_path = "README.md"
