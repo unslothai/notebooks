@@ -110,10 +110,15 @@ from datasets import load_dataset,Audio,concatenate_datasets
 dataset = load_dataset("kadirnar/Emilia-DE-B000000", split = "train")
 
 # Select a single audio sample to reserve for testing.
-# This index is chosen from the full dataset before we create the smaller training split.
-test_audio = dataset[7546]
+# Use a bounded index so this works on smaller dataset slices too.
+dataset_len = len(dataset)
+if dataset_len == 0:
+    raise ValueError("Loaded dataset is empty; cannot select test audio or training subset.")
 
-dataset = dataset.select(range(3000))
+test_audio_index = min(7546, dataset_len - 1)
+test_audio = dataset[test_audio_index]
+
+dataset = dataset.select(range(min(3000, dataset_len)))
 
 dataset = dataset.cast_column("audio", Audio(sampling_rate = 16000))
 
