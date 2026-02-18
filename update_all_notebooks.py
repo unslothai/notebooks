@@ -17,19 +17,28 @@
 import argparse
 import ast
 import concurrent.futures
+import concurrent.futures.process
 import json
+import multiprocessing
 import os
+import pickle
 import platform
 import re
 import shutil
 import stat
 import subprocess
 import sys
+import uuid
 from datetime import datetime
 from glob import glob
 from nbconvert import PythonExporter
 import nbformat
 from spellchecker import SpellChecker
+
+try:
+    from tqdm.auto import tqdm as _tqdm
+except Exception:
+    _tqdm = None
 
 new_announcement = """Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 
@@ -646,6 +655,51 @@ _RE_FOOTER_NUM_Q = re.compile(r'"6\. See notebooks for DPO')
 _RE_DUP_DOCS_GLOBAL = re.compile(
     r'(See \[our docs\]\([^)]+\) for more deployment options\.)\s*\1'
 )
+_RE_TRANSFORMERS_V5_PIN = re.compile(
+    r"(?<![A-Za-z0-9_.-])transformers\s*==\s*5(?:\.\d+){0,2}(?![A-Za-z0-9_.-])"
+)
+
+
+def _normalize_transformers_v5_pin(text):
+    """Normalize transformers 5.x pins to transformers==5.1.0."""
+    return _RE_TRANSFORMERS_V5_PIN.sub("transformers==5.1.0", text)
+
+
+_ALL_NB_FIXES = {
+    "fibonnaci": "fibonacci",
+    "Fibonnaci": "Fibonacci",
+    "SHould": "Should",
+    "GTP-OSS": "GPT-OSS",
+    "stratgegy": "strategy",
+    "verifer": "verifier",
+    "verisons": "versions",
+    "datases": "datasets",
+    "Huggingface's": "Hugging Face's",
+    "Huggingface TRL's": "Hugging Face TRL's",
+    "Prime and Prejudice": "Pride and Prejudice",
+    "2x Telsa T4s": "2x Tesla T4s",
+    "float32 s disable": "float32 so disable",
+    "and its amazing": "and it's amazing",
+    "look like this:": "looks like this:",
+    "AutoModelForPeftCausalLM": "AutoPeftModelForCausalLM",
+    "<|start_of_role|>user|end_of_role|>": "<|start_of_role|>user<|end_of_role|>",
+    # New fixes
+    "[Open Math Reasoning]()": "[Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini)",
+    "Some other links:": "Some other resources:",
+    "unsloth.ai/docs/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+    "unsloth.ai/docs/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+    # Also handle old domain format that may be in exception files
+    "docs.unsloth.ai/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+    "docs.unsloth.ai/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+    # Handle intermediate format (domain changed but path not)
+    "unsloth.ai/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
+    "unsloth.ai/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
+    "Nemo Gym": "NeMo Gym",
+    # Fix old domain for exception files
+    "https://docs.unsloth.ai/": "https://unsloth.ai/docs/",
+    # Fix ExecuTorch dangling sentence left after @nocommit removal
+    "ExecuTorch.  Follow the directions \\n": "ExecuTorch.\\n",
+}
 
 ARCHITECTURE_MAPPING = {
     # Gemma Family
@@ -900,11 +954,24 @@ def _source_lines(text):
 def _write_notebook(filepath, content):
     """Write notebook JSON, preserving original indent and trailing newline."""
     indent, trailing_nl = _cache_notebook_format(filepath)
+    _ensure_cell_ids(content)
     with open(filepath, "w", encoding="utf-8", newline="") as f:
         json.dump(content, f, indent=indent, ensure_ascii=False)
         if trailing_nl:
             f.write("\n")
     _set_file_permissions(filepath)
+
+
+def _ensure_cell_ids(notebook_content):
+    """Ensure every notebook cell has an id (required by newer nbformat validation)."""
+    changed = False
+    for cell in notebook_content.get("cells", []):
+        if not isinstance(cell, dict):
+            continue
+        if not cell.get("id"):
+            cell["id"] = uuid.uuid4().hex[:12]
+            changed = True
+    return changed
 
 
 def _cache_original_outputs(filepath):
@@ -1037,6 +1104,10 @@ SPELL_KNOWN_FIXES = {
     "verifer": "verifier",
     "verisons": "versions",
     "datases": "datasets",
+    "optimisations": "optimizations",
+    "initialised": "initialized",
+    "optimisation": "optimization",
+    "initialise": "initialize",
 }
 
 
@@ -1101,13 +1172,34 @@ def validate_notebook_syntax(notebook_path):
         # Remove IPython magics and shell commands for AST parsing
         # Replace with 'pass' to avoid empty blocks (e.g., if COLAB: !pip install)
         clean_lines = []
+        in_shell_continuation = False
+        in_cell_magic = False
+        shell_block_indent = ""
         for line in source.splitlines():
             stripped = line.lstrip()
-            if stripped.startswith(("!", "%", "%%")):
-                indent = line[:len(line) - len(stripped)]
-                clean_lines.append(indent + "pass")
-            else:
-                clean_lines.append(line)
+            indent = line[:len(line) - len(stripped)]
+            if in_cell_magic:
+                clean_lines.append(shell_block_indent + "pass")
+                continue
+            if in_shell_continuation:
+                clean_lines.append(shell_block_indent + "pass")
+                in_shell_continuation = line.rstrip().endswith("\\")
+                if not in_shell_continuation:
+                    shell_block_indent = ""
+                continue
+            if stripped.startswith("%%"):
+                shell_block_indent = indent
+                clean_lines.append(shell_block_indent + "pass")
+                in_cell_magic = True
+                continue
+            if stripped.startswith(("!", "%")):
+                shell_block_indent = indent
+                clean_lines.append(shell_block_indent + "pass")
+                in_shell_continuation = line.rstrip().endswith("\\")
+                if not in_shell_continuation:
+                    shell_block_indent = ""
+                continue
+            clean_lines.append(line)
         clean_source = "\n".join(clean_lines)
 
         if not clean_source.strip():
@@ -1119,6 +1211,88 @@ def validate_notebook_syntax(notebook_path):
             errors.append((i, e.lineno, str(e)))
 
     return errors
+
+
+_RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
+_RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
+
+
+def _cell_source_text(cell):
+    source = cell.get("source", "")
+    if isinstance(source, list):
+        return "".join(source)
+    if isinstance(source, str):
+        return source
+    return str(source)
+
+
+def _is_install_like_cell(cells, idx, source_text):
+    lower = source_text.lower()
+    if "pip install" in lower or "uv pip install" in lower or "pip3_autoremove" in lower:
+        return True
+    prev_md = ""
+    if idx > 0 and cells[idx - 1].get("cell_type") == "markdown":
+        prev_md = _cell_source_text(cells[idx - 1])
+    if _RE_INSTALL_SECTION_MD.search(prev_md):
+        return True
+    # Most install blocks live near the top and include setup/capture boilerplate.
+    if idx <= 6 and ("%%capture" in lower or "colab" in lower) and ("unsloth" in lower or "pip" in lower):
+        return True
+    return False
+
+
+def _validate_vllm_install_usage(notebook_path):
+    try:
+        with open(notebook_path, "r", encoding="utf-8", newline="") as f:
+            nb = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        print(f"WARNING: Could not read or parse notebook '{notebook_path}': {e}")
+        return None
+
+    cells = nb.get("cells", [])
+    install_vllm_cells = []
+    has_fast_inference_true = False
+    has_vllm_mention_outside_install = False
+
+    for idx, cell in enumerate(cells):
+        text = _cell_source_text(cell)
+        lower = text.lower()
+        if _RE_FAST_INFERENCE_TRUE.search(text):
+            has_fast_inference_true = True
+        if "vllm" not in lower:
+            continue
+        if cell.get("cell_type") == "code" and _is_install_like_cell(cells, idx, text):
+            install_vllm_cells.append(idx)
+        else:
+            has_vllm_mention_outside_install = True
+
+    if install_vllm_cells and not (has_fast_inference_true or has_vllm_mention_outside_install):
+        return {
+            "notebook": os.path.basename(notebook_path),
+            "cells": install_vllm_cells,
+        }
+    return None
+
+
+def _assert_vllm_install_usage_or_fast_inference(notebook_files, max_workers=1, executor_type="process"):
+    issues = [
+        issue for issue in _map_with_executor(
+            _validate_vllm_install_usage,
+            notebook_files,
+            max_workers=max_workers,
+            executor_type=executor_type,
+            progress_desc="Validate vllm usage",
+        )
+        if issue is not None
+    ]
+
+    if not issues:
+        return
+
+    print("\nERROR: Found notebooks with vllm install cells but no fast_inference=True and no non-install vllm usage:")
+    for issue in issues:
+        print(f"  - {issue['notebook']} (install cells: {issue['cells']})")
+    raise RuntimeError("vllm install validation failed")
 
 
 def _get_base_name_from_filename(filename):
@@ -1268,6 +1442,7 @@ def update_old_unsloth(filename):
 
     def replace_common(text):
         """Apply common text replacements for both code and markdown cells."""
+        text = _normalize_transformers_v5_pin(text)
         text = text.replace("</a></a>", "</a>")
         text = _RE_DOUBLE_EXCL.sub("!", text)
         text = text.replace("ee notice", "we notice")
@@ -1561,6 +1736,12 @@ pass
 
 _RE_PIP_INSTALL_LINE = re.compile(r"^!(?:uv )?pip install\s+(.+)$", re.MULTILINE)
 _RE_PIP_PKG_TOKEN = re.compile(r"^([A-Za-z0-9_][A-Za-z0-9._-]*)")
+_RE_TRANSFORMERS_EQ_PIN = re.compile(
+    r"(?<![A-Za-z0-9_.-])(transformers\s*==\s*)(\d+(?:\.\d+){0,2})(?![A-Za-z0-9_.-])"
+)
+_RE_TRANSFORMERS_EQ_PIN_5 = re.compile(
+    r"(?<![A-Za-z0-9_.-])transformers\s*==\s*5(?:\.\d+){0,2}(?![A-Za-z0-9_.-])"
+)
 _INSTALL_FLAG_PREFIXES = ("--", "-", "{", "\"", "'")
 _INSTALL_GUARD_IGNORE = frozenset({
     # Standard packages present in the default install cell; safe to swap
@@ -1600,6 +1781,12 @@ def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
             f"{', '.join(sorted(dropped))}. "
             f"Add a dedicated installation_* entry in the script."
         )
+
+def _preserve_transformers_v5_pin(old_cell_text, new_cell_text):
+    """Force transformers==5.1.0 only when the previous install cell pinned transformers==5.*."""
+    if not _RE_TRANSFORMERS_EQ_PIN_5.search(old_cell_text):
+        return new_cell_text
+    return _RE_TRANSFORMERS_EQ_PIN.sub(r"\g<1>5.1.0", new_cell_text)
 
 
 badge_section = '<a href="{link_colab}" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>'
@@ -2019,9 +2206,10 @@ def update_notebook_sections(
                             new_install_text = "".join(installation)
                         else:
                             new_install_text = installation
+                        new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
                         _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
 
-                        notebook_content["cells"][i + 1]["source"] = installation
+                        notebook_content["cells"][i + 1]["source"] = new_install_text
                         updated = True
                         # TODO: Remove after GRPO numpy bug fixed! 
                         # Error: ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
@@ -2201,6 +2389,75 @@ _RE_FROM_PRETRAINED_MULTILINE = re.compile(
 _MODEL_PREFIX_SKIP_ORGS = {"unsloth", "LiquidAI"}
 _MODEL_PREFIX_SKIP_EXACT = {"meta-llama/Llama-3.2-3B-Instruct"}
 _MODEL_PREFIX_SKIP_PATTERNS = {"bert-base-uncased"}
+_PROGRESS_ENABLED = False
+_WINDOWS_PROCESSPOOL_MAX_WORKERS = 61
+
+
+def _set_progress(enabled):
+    """Enable/disable progress bars globally (best-effort if tqdm is unavailable)."""
+    global _PROGRESS_ENABLED
+    _PROGRESS_ENABLED = bool(enabled)
+    if _PROGRESS_ENABLED and _tqdm is None:
+        print("  [WARN] tqdm is not installed; progress bars are disabled.")
+        _PROGRESS_ENABLED = False
+
+
+def _progress_iter(iterable, total=None, desc=None):
+    """Wrap an iterable with tqdm when progress is enabled."""
+    if _PROGRESS_ENABLED and _tqdm is not None:
+        return _tqdm(iterable, total=total, desc=desc, dynamic_ncols=True, leave=False)
+    return iterable
+
+
+def _effective_worker_count(requested_workers, total_items, executor_type, platform_name=None, cpu_count=None):
+    """Clamp worker counts for stability and platform limits."""
+    if platform_name is None:
+        platform_name = os.name
+    if cpu_count is None:
+        cpu_count = os.cpu_count() or 1
+
+    requested = max(1, int(requested_workers))
+    workers = requested
+    workers = min(workers, max(1, int(cpu_count)))
+
+    if total_items is not None and total_items > 0:
+        workers = min(workers, int(total_items))
+
+    if executor_type == "process" and platform_name == "nt":
+        workers = min(workers, _WINDOWS_PROCESSPOOL_MAX_WORKERS)
+
+    return max(1, workers)
+
+
+def _should_fallback_process_error(exc):
+    """Return True for process-pool bootstrap/pickling errors suitable for thread fallback."""
+    if isinstance(exc, concurrent.futures.process.BrokenProcessPool):
+        return True
+    if isinstance(exc, (pickle.PicklingError, OSError)):
+        return True
+
+    msg = str(exc).lower()
+    markers = (
+        "can't pickle",
+        "cannot pickle",
+        "pickl",
+        "brokenprocesspool",
+        "freeze_support",
+        "bootstrapping phase",
+        "cannot find",
+        "__main__",
+    )
+    return any(marker in msg for marker in markers)
+
+
+def _can_use_process_executor():
+    """Return False for interactive/non-file entrypoints where spawn cannot import __main__."""
+    main_mod = sys.modules.get("__main__")
+    main_file = getattr(main_mod, "__file__", None)
+    if not main_file:
+        return False
+    bad_markers = ("<stdin>", "<string>")
+    return not any(marker in str(main_file) for marker in bad_markers)
 
 
 def _unsloth_model_exists(model_name):
@@ -2298,7 +2555,44 @@ def _process_single_notebook(notebook_file):
     return notebook_file, spell_fixed, spell_issues, syntax_errors
 
 
-def main(max_workers=1):
+def _map_with_executor(func, items, max_workers=1, executor_type="process", progress_desc=None):
+    items = list(items)
+    if not items:
+        return []
+
+    effective_workers = _effective_worker_count(max_workers, len(items), executor_type)
+    if effective_workers != max_workers:
+        print(
+            f"  [INFO] Adjusted worker count from {max_workers} to {effective_workers} "
+            f"for executor={executor_type} (items={len(items)})."
+        )
+
+    if effective_workers <= 1:
+        return [func(item) for item in _progress_iter(items, total=len(items), desc=progress_desc)]
+
+    if executor_type == "process":
+        if not _can_use_process_executor():
+            print("  [WARN] Process executor unavailable for interactive/__main__ context; using thread executor.")
+        else:
+            chunksize = max(1, len(items) // max(1, effective_workers * 8))
+            try:
+                with concurrent.futures.ProcessPoolExecutor(
+                    max_workers=effective_workers,
+                    mp_context=multiprocessing.get_context("spawn"),
+                ) as executor:
+                    mapped = executor.map(func, items, chunksize=chunksize)
+                    return list(_progress_iter(mapped, total=len(items), desc=progress_desc))
+            except Exception as e:
+                if not _should_fallback_process_error(e):
+                    raise
+                print(f"WARNING: process executor failed ({e}); falling back to thread executor.")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=effective_workers) as executor:
+        mapped = executor.map(func, items)
+        return list(_progress_iter(mapped, total=len(items), desc=progress_desc))
+
+
+def main(max_workers=1, executor_type="process"):
     notebook_directory = "nb"
     notebook_pattern = "*.ipynb"
 
@@ -2318,13 +2612,13 @@ def main(max_workers=1):
     spell_issues_found = False
     syntax_issues_found = False
 
-    if max_workers <= 1:
-        # Sequential processing
-        results = [_process_single_notebook(nf) for nf in notebook_files]
-    else:
-        # Parallel processing
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = list(executor.map(_process_single_notebook, notebook_files))
+    results = _map_with_executor(
+        _process_single_notebook,
+        notebook_files,
+        max_workers=max_workers,
+        executor_type=executor_type,
+        progress_desc="Notebook processing",
+    )
 
     for notebook_file, spell_fixed, spell_issues, syntax_errors in results:
         if spell_fixed:
@@ -2786,7 +3080,12 @@ def remove_unwanted_section(script_content):
 def convert_notebook_to_script(notebook_path: str, output_path: str):
     exporter = PythonExporter()
     with open(notebook_path, 'r', encoding='utf-8', newline='') as f:
-        notebook_content = nbformat.read(f, as_version=4)
+        notebook_json = json.load(f)
+
+    if _ensure_cell_ids(notebook_json):
+        _write_notebook(notebook_path, notebook_json)
+
+    notebook_content = nbformat.reads(json.dumps(notebook_json), as_version=4)
 
     (body, resources) = exporter.from_notebook_node(notebook_content)
 
@@ -2797,7 +3096,18 @@ def convert_notebook_to_script(notebook_path: str, output_path: str):
 
     print(f"Converted {notebook_path} to {output_path}")
 
-def convert_folder(input_folder: str, output_folder: str, max_workers: int = 1):
+
+def _convert_notebook_task(task):
+    notebook_path, output_path = task
+    convert_notebook_to_script(notebook_path, output_path)
+
+
+def convert_folder(
+    input_folder: str,
+    output_folder: str,
+    max_workers: int = 1,
+    executor_type: str = "process",
+):
     if os.path.exists(output_folder):
         _rmtree_robust(output_folder)
 
@@ -2812,14 +3122,13 @@ def convert_folder(input_folder: str, output_folder: str, max_workers: int = 1):
             output_path = os.path.join(output_folder, script_filename)
             tasks.append((notebook_path, output_path))
 
-    if max_workers <= 1:
-        for notebook_path, output_path in tasks:
-            convert_notebook_to_script(notebook_path, output_path)
-    else:
-        def _convert(args):
-            convert_notebook_to_script(args[0], args[1])
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            list(executor.map(_convert, tasks))
+    _map_with_executor(
+        _convert_notebook_task,
+        tasks,
+        max_workers=max_workers,
+        executor_type=executor_type,
+        progress_desc="Notebook -> script",
+    )
 
 
 def _ensure_memory_stats_hidden(nb_path):
@@ -2840,6 +3149,45 @@ def _ensure_memory_stats_hidden(nb_path):
         if changed:
             _write_notebook(nb_path, nb)
     except Exception:
+        pass
+
+
+def _apply_global_fixes(nb_path):
+    try:
+        with open(nb_path, "r", encoding="utf-8", newline="") as f:
+            raw = f.read()
+        new_raw = raw
+        new_raw = _normalize_transformers_v5_pin(new_raw)
+        new_raw = _RE_GATED_GLOBAL.sub(
+            "# HF Token for gated models",
+            new_raw,
+        )
+        new_raw = _RE_HUGGINGFACE_GLOBAL.sub(
+            r"Hugging Face \1",
+            new_raw,
+        )
+        new_raw = _RE_NOCOMMIT_GLOBAL.sub(
+            '',
+            new_raw,
+        )
+        for wrong, right in _ALL_NB_FIXES.items():
+            new_raw = new_raw.replace(wrong, right)
+        # Fix footer numbering (various formats)
+        new_raw = _RE_FOOTER_NUM_NL.sub(r'\n4. See notebooks for DPO', new_raw)
+        new_raw = _RE_FOOTER_NUM_Q.sub(r'"4. See notebooks for DPO', new_raw)
+        # Fix duplicate "See our docs" sentences
+        new_raw = _RE_DUP_DOCS_GLOBAL.sub(r'\1', new_raw)
+        # Fix broken #Save link ONLY if file has NO <a name="Save"> anchor
+        if '[how to save it](#Save)' in new_raw and '<a name="Save">' not in new_raw:
+            new_raw = new_raw.replace('[how to save it](#Save)', 'how to save it')
+        if new_raw != raw:
+            with open(nb_path, "w", encoding="utf-8", newline="") as f:
+                f.write(new_raw)
+    except Exception as e:
+        print(f"WARNING: Failed to apply global fixes to {nb_path}: {e}")
+    try:
+        _set_file_permissions(nb_path)
+    except OSError:
         pass
 
 
@@ -2968,10 +3316,34 @@ if __name__ == "__main__":
         default=0,
         help="Number of parallel workers (0 = auto-detect from CPU count, 1 = sequential). Default: 0 (auto).",
     )
+    parser.add_argument(
+        "--executor",
+        choices=["thread", "process"],
+        default="process",
+        help="Executor backend for parallel sections. Default: process.",
+    )
+    progress_group = parser.add_mutually_exclusive_group()
+    progress_group.add_argument(
+        "--progress",
+        action="store_true",
+        help="Show tqdm progress bars for long phases.",
+    )
+    progress_group.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable tqdm progress bars.",
+    )
     args = parser.parse_args()
 
     if args.workers == 0:
         args.workers = max(2, min(os.cpu_count() or 4, 32))
+
+    if args.no_progress:
+        _set_progress(False)
+    elif args.progress:
+        _set_progress(True)
+    else:
+        _set_progress(sys.stderr.isatty())
 
     if args.check_missing_files:
         original_template = "original_template"
@@ -3001,7 +3373,13 @@ if __name__ == "__main__":
         installation_kaggle_content,
         new_announcement,
     )
-    main(max_workers=args.workers)
+    main(max_workers=args.workers, executor_type=args.executor)
+    all_nb_paths = glob(os.path.join("nb", "*.ipynb"))
+    _assert_vllm_install_usage_or_fast_inference(
+        all_nb_paths,
+        max_workers=args.workers,
+        executor_type=args.executor,
+    )
 
     notebook_directory = "nb"
     readme_path = "README.md"
@@ -3028,99 +3406,26 @@ if __name__ == "__main__":
 
     # Apply targeted fixes to ALL notebooks (including DONT_UPDATE_EXCEPTIONS)
     # These are safe fixes that should apply everywhere.
-    _ALL_NB_FIXES = {
-        "fibonnaci": "fibonacci",
-        "Fibonnaci": "Fibonacci",
-        "SHould": "Should",
-        "GTP-OSS": "GPT-OSS",
-        "stratgegy": "strategy",
-        "verifer": "verifier",
-        "verisons": "versions",
-        "datases": "datasets",
-        "Huggingface's": "Hugging Face's",
-        "Huggingface TRL's": "Hugging Face TRL's",
-        "Prime and Prejudice": "Pride and Prejudice",
-        "2x Telsa T4s": "2x Tesla T4s",
-        "float32 s disable": "float32 so disable",
-        "and its amazing": "and it's amazing",
-        "look like this:": "looks like this:",
-        "AutoModelForPeftCausalLM": "AutoPeftModelForCausalLM",
-        "<|start_of_role|>user|end_of_role|>": "<|start_of_role|>user<|end_of_role|>",
-        # New fixes
-        "[Open Math Reasoning]()": "[Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini)",
-        "Some other links:": "Some other resources:",
-        "unsloth.ai/docs/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
-        "unsloth.ai/docs/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
-        # Also handle old domain format that may be in exception files
-        "docs.unsloth.ai/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
-        "docs.unsloth.ai/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
-        # Handle intermediate format (domain changed but path not)
-        "unsloth.ai/get-started/installing-+-updating": "unsloth.ai/docs/get-started/install",
-        "unsloth.ai/get-started/install-and-update": "unsloth.ai/docs/get-started/install",
-        "Nemo Gym": "NeMo Gym",
-        # Fix old domain for exception files
-        "https://docs.unsloth.ai/": "https://unsloth.ai/docs/",
-        # Fix ExecuTorch dangling sentence left after @nocommit removal
-        "ExecuTorch.  Follow the directions \\n": "ExecuTorch.\\n",
-    }
-
-    def _apply_global_fixes(nb_path):
-        try:
-            with open(nb_path, "r", encoding="utf-8", newline="") as f:
-                raw = f.read()
-            new_raw = raw
-            new_raw = _RE_GATED_GLOBAL.sub(
-                "# HF Token for gated models",
-                new_raw,
-            )
-            new_raw = _RE_HUGGINGFACE_GLOBAL.sub(
-                r"Hugging Face \1",
-                new_raw,
-            )
-            new_raw = _RE_NOCOMMIT_GLOBAL.sub(
-                '',
-                new_raw,
-            )
-            for wrong, right in _ALL_NB_FIXES.items():
-                new_raw = new_raw.replace(wrong, right)
-            # Fix footer numbering (various formats)
-            new_raw = _RE_FOOTER_NUM_NL.sub(r'\n4. See notebooks for DPO', new_raw)
-            new_raw = _RE_FOOTER_NUM_Q.sub(r'"4. See notebooks for DPO', new_raw)
-            # Fix duplicate "See our docs" sentences
-            new_raw = _RE_DUP_DOCS_GLOBAL.sub(r'\1', new_raw)
-            # Fix broken #Save link ONLY if file has NO <a name="Save"> anchor
-            if '[how to save it](#Save)' in new_raw and '<a name="Save">' not in new_raw:
-                new_raw = new_raw.replace('[how to save it](#Save)', 'how to save it')
-            if new_raw != raw:
-                with open(nb_path, "w", encoding="utf-8", newline="") as f:
-                    f.write(new_raw)
-        except Exception:
-            pass
-        try:
-            _set_file_permissions(nb_path)
-        except OSError:
-            pass
-
-    all_nb_paths = glob(os.path.join("nb", "*.ipynb"))
-    if args.workers <= 1:
-        for nb_path in all_nb_paths:
-            _apply_global_fixes(nb_path)
-    else:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
-            list(executor.map(_apply_global_fixes, all_nb_paths))
+    _map_with_executor(
+        _apply_global_fixes,
+        all_nb_paths,
+        max_workers=args.workers,
+        executor_type=args.executor,
+        progress_desc="Global notebook fixes",
+    )
 
     # Ensure memory stats cells are hidden behind cellView form
-    for nb_path in all_nb_paths:
+    for nb_path in _progress_iter(all_nb_paths, total=len(all_nb_paths), desc="Hide memory stats"):
         _ensure_memory_stats_hidden(nb_path)
 
     # Normalize LGPL blank line after all source modifications (update_old_unsloth
     # joins and re-splits source arrays, which can merge the blank line away).
-    for nb_path in all_nb_paths:
+    for nb_path in _progress_iter(all_nb_paths, total=len(all_nb_paths), desc="Normalize LGPL"):
         _normalize_lgpl_blank_line(nb_path)
 
     # Strip trailing empty strings from source arrays and ensure the last
     # element does not end with \n (nbformat convention).
-    for nb_path in all_nb_paths:
+    for nb_path in _progress_iter(all_nb_paths, total=len(all_nb_paths), desc="Normalize sources"):
         try:
             with open(nb_path, "r", encoding="utf-8", newline="") as f:
                 nb_data = json.load(f)
@@ -3141,10 +3446,15 @@ if __name__ == "__main__":
 
     # Restore original output cells now that all processing is done and cell
     # counts should match the originals (templates gain cells during processing).
-    for nb_path in all_nb_paths:
+    for nb_path in _progress_iter(all_nb_paths, total=len(all_nb_paths), desc="Restore outputs"):
         _restore_original_outputs(nb_path)
 
     if not args.disable_convert_to_script:
-        convert_folder("nb", "python_scripts", max_workers=args.workers)
+        convert_folder(
+            "nb",
+            "python_scripts",
+            max_workers=args.workers,
+            executor_type=args.executor,
+        )
 
     _summarize_git_diff()
