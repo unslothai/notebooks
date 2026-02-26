@@ -31,33 +31,55 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==5.1.0\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+# 
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', '! pip uninstall unsloth unsloth_zoo -y\n! pip install git+https://github.com/unslothai/unsloth-zoo.git --no-deps\n! pip install git+https://github.com/unslothai/unsloth.git --no-deps\n')
 # 
 # 
 # # ### Unsloth
 
-# Goal: To demonstrate unsloth's MoE optimizations on T4 for `imdatta0/tiny_qwen3_moe_2.8B_0.7B` by finetuning on by OpenR1's Math dataset.
+# Goal: To convert `unsloth/Qwen3-30B-A3B-Instruct-2507` into a reasoning model via GRPO by using OpenR1's Math dataset.
+# 
+# We first pre fine-tune the model to make GRPO skip trying to match formatting - this speeds GRPO up.
 
 # In[4]:
 
 
-model_name = "imdatta0/tiny_qwen3_moe_2.8B_0.7B" # This is dummy model of qwen3moe architecture created to fit in T4
+import os, torch
+# os.environ['UNSLOTH_MOE_BACKEND'] = 'grouped_mm' # switch to 'unsloth_triton' or 'native_torch'
+# grouped_mm is only supported on torch 2.9 or newer.
+# Make sure that we have at least 64GB VRAM because the model itself takes 60GB in 16bit
+
+
+# In[5]:
+
+
+model_name = "unsloth/Qwen3.5-35B-A3B" # This is a very big model, might take a while for downloading
 max_seq_length = 2048 # Can increase for longer reasoning traces
-lora_rank = 32 # Larger rank = smarter, but slower
+lora_rank = 16 # Larger rank = smarter, but slower
 
 
-# In[ ]:
+# In[6]:
 
 
 from unsloth import FastLanguageModel
 import torch
 
-model, tokenizer = FastLanguageModel.from_pretrained(
+model, processor = FastLanguageModel.from_pretrained(
     model_name,
     max_seq_length = max_seq_length,
     load_in_4bit = False,
-    fast_inference = False,  # Not supported for MoE (yet!)
+    fast_inference = False, # Not supported for MoE (yet!)
 )
+tokenizer = processor.tokenizer # To tokenize text
+
+
+# In[7]:
+
 
 model = FastLanguageModel.get_peft_model(
     model,
@@ -78,7 +100,7 @@ model = FastLanguageModel.get_peft_model(
 # 1. DeepSeek uses `<think>` and `</think>`, but this is **not** necessary - you can customize it however you like!
 # 2. A `system_prompt` is recommended to at least guide the model's responses.
 
-# In[6]:
+# In[8]:
 
 
 reasoning_start = "<start_working_out>" # Acts as <think>
@@ -96,7 +118,7 @@ system_prompt
 
 # We create a simple chat template below. Notice `add_generation_prompt` includes prepending `<start_working_out>` to guide the model to start its reasoning process.
 
-# In[ ]:
+# In[9]:
 
 
 chat_template = \
@@ -126,7 +148,7 @@ tokenizer.chat_template = chat_template
 
 # Let's see how our chat template behaves on an example:
 
-# In[8]:
+# In[10]:
 
 
 tokenizer.apply_chat_template([
@@ -141,7 +163,7 @@ tokenizer.apply_chat_template([
 # 
 # We'll only filter ~59 or so examples to first "prime" / pre fine-tune the model to understand our custom GRPO formatting.
 
-# In[9]:
+# In[11]:
 
 
 from datasets import load_dataset
@@ -163,7 +185,7 @@ dataset
 
 # We have to format the dataset to follow our GRPO style formatting:
 
-# In[10]:
+# In[12]:
 
 
 def format_dataset(x):
@@ -191,7 +213,7 @@ dataset["Messages"] = dataset.apply(format_dataset, axis = 1)
 
 # Check to see if it worked:
 
-# In[11]:
+# In[13]:
 
 
 tokenizer.apply_chat_template(dataset["Messages"][0], tokenize = False)
@@ -201,7 +223,7 @@ tokenizer.apply_chat_template(dataset["Messages"][0], tokenize = False)
 # 
 # Note this might take 2 minutes!
 
-# In[12]:
+# In[14]:
 
 
 dataset["N"] = dataset["Messages"].apply(lambda x: len(tokenizer.apply_chat_template(x)['input_ids']))
@@ -212,7 +234,7 @@ dataset.shape
 
 # We then tokenize the messages and convert it to a Hugging Face compatible dataset format:
 
-# In[13]:
+# In[15]:
 
 
 from datasets import Dataset
@@ -224,7 +246,7 @@ dataset
 
 # Let's now pre fine-tune the model so it follows our custom GRPO formatting!
 
-# In[14]:
+# In[16]:
 
 
 from trl import SFTTrainer, SFTConfig
@@ -250,15 +272,16 @@ trainer = SFTTrainer(
 )
 
 
-# In[15]:
+# In[17]:
 
 
+# Compilation can take 2-3 minutes of time, so please be patient :)
 trainer.train()
 
 
-# The model would generate gibberish here as we initialized a dummy model from random weights. Prolonged training can help but this is just for a demo.
+# Let's check if the model has learnt to follow the custom format:
 
-# In[ ]:
+# In[18]:
 
 
 text = tokenizer.apply_chat_template(
@@ -279,7 +302,7 @@ _ = model.generate(
 
 # Yes it did follow the formatting! Great! Let's remove some items before the GRPO step
 
-# In[17]:
+# In[19]:
 
 
 del dataset
@@ -293,24 +316,24 @@ gc.collect()
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
-# In[18]:
+# In[20]:
 
 
 # Merge to 16bit
-if False: model.save_pretrained_merged("tinyqwen_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/tinyqwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_merged("qwen_finetune_16bit", tokenizer, save_method = "merged_16bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
-if False: model.save_pretrained_merged("tinyqwen_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/tinyqwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_merged("qwen_finetune_4bit", tokenizer, save_method = "merged_4bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("tinyqwen_lora")
-    tokenizer.save_pretrained("tinyqwen_lora")
+    model.save_pretrained("qwen_lora")
+    tokenizer.save_pretrained("qwen_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/tinyqwen_lora", token = "YOUR_HF_TOKEN")
-    tokenizer.push_to_hub("HF_USERNAME/tinyqwen_lora", token = "YOUR_HF_TOKEN")
+    model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -323,34 +346,34 @@ if False:
 # 
 # [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 
-# In[19]:
+# In[ ]:
 
 
 # Save to 8bit Q8_0
-if False: model.save_pretrained_gguf("tinyqwen_finetune", tokenizer,)
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/tinyqwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
-if False: model.save_pretrained_gguf("tinyqwen_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/tinyqwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "f16")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
-if False: model.save_pretrained_gguf("tinyqwen_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/tinyqwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
     model.push_to_hub_gguf(
-        "HF_USERNAME/tinyqwen_finetune", # Change hf to your username!
+        "HF_USERNAME/qwen_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN",
     )
 
 
-# Now, use the `tinyqwen_finetune.Q8_0.gguf` file or `tinyqwen_finetune.Q4_K_M.gguf` file in llama.cpp.
+# Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
 # 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 

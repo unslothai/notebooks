@@ -94,6 +94,35 @@ SPACES = " " * 4
 
 XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
 
+QAT_TORCHAO_BY_TORCH_MINOR = {
+    "2.10": "0.16.0",
+    "2.9": "0.15.0",
+    "2.8": "0.14.1",
+}
+QAT_DEFAULT_TORCHAO_VERSION = "0.16.0"
+QAT_FBGEMM_GENAI_VERSION = "1.5.0"
+
+
+def build_qat_native_install_block(
+    torchao_by_torch_minor=None,
+    default_torchao=QAT_DEFAULT_TORCHAO_VERSION,
+    fbgemm_genai=QAT_FBGEMM_GENAI_VERSION,
+):
+    """Build runtime torchao/fbgemm native install block for QAT notebooks."""
+    if torchao_by_torch_minor is None:
+        torchao_by_torch_minor = QAT_TORCHAO_BY_TORCH_MINOR
+    mapping_literal = json.dumps(
+        torchao_by_torch_minor, sort_keys=True, separators=(",", ":")
+    )
+    return f"""try:
+    import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
+except Exception:
+    _qat_torch_minor = ""
+_qat_torchao_map = {mapping_literal}
+_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
+!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={fbgemm_genai}"""
+
+
 def update_or_append_pip_install(base_content, package_name, new_install_line):
     pattern = re.compile(rf"^!(uv )?pip install .*?{package_name}.*$", re.MULTILINE)
 
@@ -482,8 +511,12 @@ else:
     __XFORMERS_INSTALL__
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-!pip install torchao==0.14.0 fbgemm-gpu-genai==1.4.2
-!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+__QAT_NATIVE_INSTALL__
+!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2""".replace(
+    "__XFORMERS_INSTALL__", XFORMERS_INSTALL
+).replace(
+    "__QAT_NATIVE_INSTALL__", build_qat_native_install_block()
+)
 installation_qat_kaggle_content = installation_qat_content
 
 installation_ministral_content = installation_content
@@ -3093,6 +3126,7 @@ def convert_notebook_to_script(notebook_path: str, output_path: str):
 
     with open(output_path, 'w', encoding='utf-8', newline='') as f:
         f.write(body)
+    _set_file_permissions(output_path)
 
     print(f"Converted {notebook_path} to {output_path}")
 
