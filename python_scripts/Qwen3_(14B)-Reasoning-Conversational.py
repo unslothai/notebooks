@@ -233,7 +233,7 @@ combined_dataset = combined_dataset.shuffle(seed = 3407)
 # ### Train the model
 # Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 
-# In[ ]:
+# In[16]:
 
 
 from trl import SFTTrainer, SFTConfig

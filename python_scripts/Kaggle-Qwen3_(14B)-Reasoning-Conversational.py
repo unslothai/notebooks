@@ -256,6 +256,7 @@ trainer = SFTTrainer(
         lr_scheduler_type = "linear",
         seed = 3407,
         report_to = "none", # Use TrackIO/WandB etc
+        padding_free  = False, # Set to True if > 17 GB VRAM
     ),
 )
 
