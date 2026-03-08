@@ -58,13 +58,11 @@ fourbit_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/GLM-4.7-Flash",
+    model_name = "unsloth/Qwen3.5-27B",
     max_seq_length = 2048, # Choose any for long context!
     load_in_4bit = False,  # 4 bit quantization to reduce memory
     load_in_8bit = False, # [NEW!] A bit more accurate, uses 2x memory
     full_finetuning = False, # [NEW!] We have full finetuning now!
-    trust_remote_code = True,
-    unsloth_force_compile = False,
 )
 
 
@@ -92,15 +90,15 @@ model = FastLanguageModel.get_peft_model(
 
 # <a name="Data"></a>
 # ### Data Prep
-# We now use the `GLM Flash` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy. GLM 4.7 renders multi turn conversations like below:
+# We now use the `Qwen 3.5` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy. Qwen 3.5 renders multi turn conversations like below:
+# 
 # 
 # ```
-# [gMASK]<sop><|system|>
-# You are a helpful math tutor.<|user|>
-# Hello, how are you?<|assistant|>
-# <think></think>
-# I am ready to help with math.<|user|>
-# What is 2+2?<|assistant|>
+# <|im_start|>user
+# Hello!<|im_end|>
+# <|im_start|>assistant
+# Hey there!<|im_end|>
+# 
 # ```
 
 # In[4]:
@@ -129,7 +127,7 @@ def generate_conversation(examples):
 dataset = dataset.map(generate_conversation, batched = True)
 
 
-# We now have to apply the chat template for `GLM 4.7` onto the conversations, and save it to `text`.
+# We now have to apply the chat template for `Qwen 3.5` onto the conversations, and save it to `text`.
 
 # In[6]:
 
@@ -191,8 +189,8 @@ trainer = SFTTrainer(
 from unsloth.chat_templates import train_on_responses_only
 trainer = train_on_responses_only(
     trainer,
-    instruction_part = "[gMASK]<sop><|user|>", # Updated for GLM
-    response_part = "<|assistant|><think>",
+    instruction_part = "<|im_start|>user\n",
+    response_part = "<|im_start|>assistant\n<think>",
 )
 
 
@@ -256,18 +254,22 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # In[15]:
 
 
-messages = [
-    {"role" : "user", "content" : "Continue the sequence: 1, 1, 2, 3, 5, 8,"}
-]
-text = tokenizer.apply_chat_template(
+messages = [{
+    "role": "user",
+    "content": [{"type" : "text", "text" : "Continue the sequence: 1, 1, 2, 3, 5, 8,",}]
+}]
+
+inputs = tokenizer.apply_chat_template(
     messages,
-    tokenize = False,
     add_generation_prompt = True, # Must add for generation
+    tokenize = True,
+    return_tensors = "pt",
+    return_dict = True,
 )
 
 from transformers import TextStreamer
 _ = model.generate(
-    **tokenizer(text, return_tensors = "pt").to("cuda"),
+    **inputs.to("cuda"),
     max_new_tokens = 512, # Increase for longer outputs!
     temperature = 0.7, top_p = 0.8, top_k = 20,
     use_cache = True,
@@ -284,10 +286,10 @@ _ = model.generate(
 # In[16]:
 
 
-model.save_pretrained("glm_flash_lora")  # Local saving
-tokenizer.save_pretrained("glm_flash_lora")
-# model.push_to_hub("your_name/glm_flash_lora", token = "YOUR_HF_TOKEN") # Online saving
-# tokenizer.push_to_hub("your_name/glm_flash_lora", token = "YOUR_HF_TOKEN") # Online saving
+model.save_pretrained("qwen_lora")  # Local saving
+tokenizer.save_pretrained("qwen_lora")
+# model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -298,7 +300,7 @@ tokenizer.save_pretrained("glm_flash_lora")
 if False:
     from unsloth import FastLanguageModel
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name = "glm_flash_lora", # YOUR MODEL YOU USED FOR TRAINING
+        model_name = "qwen_lora", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 2048,
         load_in_4bit = True,
     )
@@ -313,23 +315,23 @@ if False:
 
 # Merge to 16bit
 if False:
-    model.save_pretrained_merged("glm_flash_finetune_16bit", tokenizer, save_method = "merged_16bit",)
+    model.save_pretrained_merged("qwen_finetune_16bit", tokenizer, save_method = "merged_16bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/glm_flash_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
+    model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
 if False:
-    model.save_pretrained_merged("glm_flash_finetune_4bit", tokenizer, save_method = "merged_4bit",)
+    model.save_pretrained_merged("qwen_finetune_4bit", tokenizer, save_method = "merged_4bit",)
 if False: # Pushing to HF Hub
-    model.push_to_hub_merged("HF_USERNAME/glm_flash_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
+    model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("glm_flash_lora")
-    tokenizer.save_pretrained("glm_flash_lora")
+    model.save_pretrained("qwen_lora")
+    tokenizer.save_pretrained("qwen_lora")
 if False: # Pushing to HF Hub
-    model.push_to_hub("HF_USERNAME/glm_flash_lora", token = "YOUR_HF_TOKEN")
-    tokenizer.push_to_hub("HF_USERNAME/glm_flash_lora", token = "YOUR_HF_TOKEN")
+    model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -349,35 +351,35 @@ if False: # Pushing to HF Hub
 
 # Save to 8bit Q8_0
 if False:
-    model.save_pretrained_gguf("glm_flash_finetune", tokenizer,)
+    model.save_pretrained_gguf("qwen_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
 if False:
-    model.push_to_hub_gguf("HF_USERNAME/glm_flash_finetune", tokenizer, token = "YOUR_HF_TOKEN")
+    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
 if False:
-    model.save_pretrained_gguf("glm_flash_finetune", tokenizer, quantization_method = "f16")
+    model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "f16")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/glm_flash_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
+    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
 if False:
-    model.save_pretrained_gguf("glm_flash_finetune", tokenizer, quantization_method = "q4_k_m")
+    model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
 if False: # Pushing to HF Hub
-    model.push_to_hub_gguf("HF_USERNAME/glm_flash_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
+    model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
     model.push_to_hub_gguf(
-        "HF_USERNAME/glm_flash_finetune", # Change hf to your username!
+        "HF_USERNAME/qwen_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
 
 
-# Now, use the `glm_flash_finetune.Q8_0.gguf` file or `glm_flash_finetune.Q4_K_M.gguf` file in llama.cpp.
+# Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
 # 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 

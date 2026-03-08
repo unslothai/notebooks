@@ -31,29 +31,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
-# 
-# 
-# # In[2]:
-# 
-# 
-# #@title Colab Extra Install { display-mode: "form" }
-# get_ipython().run_line_magic('%capture', '')
-# import os
-# get_ipython().system('pip install --upgrade -qqq uv')
-# if "COLAB_" not in "".join(os.environ.keys()):
-#     # If you're not in Colab, just use pip install!
-#     get_ipython().system('pip install unsloth vllm')
-# else:
-#     try: import numpy, PIL; get_numpy = f"numpy=={numpy.__version__}"; get_pil = f"pillow=={PIL.__version__}"
-#     except: get_numpy = "numpy"; get_pil = "pillow"
-#     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-#     except: is_t4 = False
-#     get_vllm, get_triton = ("vllm==0.9.2", "triton==3.2.0") if is_t4 else ("vllm", "triton")
-#     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_numpy} {get_pil} torchvision bitsandbytes xformers')
-#     get_ipython().system('uv pip install -qqq {get_triton}')
-# get_ipython().system('uv pip install transformers')
-# get_ipython().system('uv pip install --no-deps trl')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==5.1.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
