@@ -28,10 +28,10 @@
 
 # # ### Installation
 # 
-# # In[ ]:
+# # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install transformers==5.1.0\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==5.1.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -42,22 +42,26 @@
 from unsloth import FastVisionModel # FastLanguageModel for LLMs
 import torch
 
-ministral_models = [
-    "unsloth/Ministral-3-3B-Instruct-2512", # Ministral instruct models
-    "unsloth/Ministral-3-8B-Instruct-2512",
-    "unsloth/Ministral-3-14B-Instruct-2512",
+# 4bit pre quantized models we support for 4x faster downloading + no OOMs.
+fourbit_models = [
+    "unsloth/Llama-3.2-11B-Vision-Instruct-bnb-4bit", # Llama 3.2 vision support
+    "unsloth/Llama-3.2-11B-Vision-bnb-4bit",
+    "unsloth/Llama-3.2-90B-Vision-Instruct-bnb-4bit", # Can fit in a 80GB card!
+    "unsloth/Llama-3.2-90B-Vision-bnb-4bit",
 
-    "unsloth/Ministral-3-3B-Reasoning-2512", # Ministral reasoning models
-    "unsloth/Ministral-3-8B-Reasoning-2512",
-    "unsloth/Ministral-3-14B-Reasoning-2512",
+    "unsloth/Pixtral-12B-2409-bnb-4bit",              # Pixtral fits in 16GB!
+    "unsloth/Pixtral-12B-Base-2409-bnb-4bit",         # Pixtral base model
 
-    "unsloth/Ministral-3-3B-Base-2512", # Ministral base models
-    "unsloth/Ministral-3-8B-Base-2512",
-    "unsloth/Ministral-3-14B-Base-2512",
+    "unsloth/Qwen2-VL-2B-Instruct-bnb-4bit",          # Qwen2 VL support
+    "unsloth/Qwen2-VL-7B-Instruct-bnb-4bit",
+    "unsloth/Qwen2-VL-72B-Instruct-bnb-4bit",
+
+    "unsloth/llava-v1.6-mistral-7b-hf-bnb-4bit",      # Any Llava variant works!
+    "unsloth/llava-1.5-7b-hf-bnb-4bit",
 ] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastVisionModel.from_pretrained(
-    "unsloth/Ministral-3-3B-Instruct-2512",
+    "unsloth/Qwen3.5-0.8B",
     load_in_4bit = False, # Use 4bit to reduce memory use. False for 16bit LoRA.
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for long context
 )
@@ -77,8 +81,8 @@ model = FastVisionModel.get_peft_model(
     finetune_attention_modules = True, # False if not finetuning attention layers
     finetune_mlp_modules       = True, # False if not finetuning MLP layers
 
-    r = 32,           # The larger, the higher the accuracy, but might overfit
-    lora_alpha = 32,  # Recommended alpha == r at least
+    r = 16,           # The larger, the higher the accuracy, but might overfit
+    lora_alpha = 16,  # Recommended alpha == r at least
     lora_dropout = 0,
     bias = "none",
     random_state = 3407,
@@ -208,13 +212,13 @@ inputs = tokenizer(
 
 from transformers import TextStreamer
 text_streamer = TextStreamer(tokenizer, skip_prompt = True)
-_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 1000,
+_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
                    use_cache = True, temperature = 1.5, min_p = 0.1)
 
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!
 # 
 # We use our new `UnslothVisionDataCollator` which will help in our vision finetuning setup.
 
@@ -223,7 +227,8 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 1000,
 
 from unsloth.trainer import UnslothVisionDataCollator
 from trl import SFTTrainer, SFTConfig
-from unsloth import is_bf16_supported
+
+FastVisionModel.for_training(model) # Enable for training!
 
 trainer = SFTTrainer(
     model = model,
@@ -231,21 +236,19 @@ trainer = SFTTrainer(
     data_collator = UnslothVisionDataCollator(model, tokenizer), # Must use!
     train_dataset = converted_dataset,
     args = SFTConfig(
-        per_device_train_batch_size = 4,
-        gradient_accumulation_steps = 2,
+        per_device_train_batch_size = 2,
+        gradient_accumulation_steps = 4,
         warmup_steps = 5,
         max_steps = 30,
         # num_train_epochs = 1, # Set this instead of max_steps for full training runs
         learning_rate = 2e-4,
         logging_steps = 1,
         optim = "adamw_8bit",
-        fp16 = not is_bf16_supported(), # Use fp16 if bf16 is not supported
-        bf16 = is_bf16_supported(), # Use bf16 if supported
         weight_decay = 0.001,
         lr_scheduler_type = "linear",
         seed = 3407,
         output_dir = "outputs",
-        report_to = "tensorboard",     # For Weights and Biases
+        report_to = "none",     # For Weights and Biases
 
         # You MUST put the below items for vision finetuning:
         remove_unused_columns = False,
@@ -334,10 +337,10 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 # In[18]:
 
 
-model.save_pretrained("ministral_lora")  # Local saving
-tokenizer.save_pretrained("ministral_lora")
-# model.push_to_hub("your_name/ministral_lora", token = "YOUR_HF_TOKEN") # Online saving
-# tokenizer.push_to_hub("your_name/ministral_lora", token = "YOUR_HF_TOKEN") # Online saving
+model.save_pretrained("qwen_lora")  # Local saving
+tokenizer.save_pretrained("qwen_lora")
+# model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -348,7 +351,7 @@ tokenizer.save_pretrained("ministral_lora")
 if False:
     from unsloth import FastVisionModel
     model, tokenizer = FastVisionModel.from_pretrained(
-        model_name = "ministral_lora", # YOUR MODEL YOU USED FOR TRAINING
+        model_name = "qwen_lora", # YOUR MODEL YOU USED FOR TRAINING
         load_in_4bit = True, # Set to False for 16bit LoRA
     )
     FastVisionModel.for_inference(model) # Enable for inference!
@@ -406,38 +409,37 @@ if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, 
 
 
 # Save to 8bit Q8_0
-if False: model.save_pretrained_gguf("ministral_finetune", tokenizer,)
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, token = "YOUR_HF_TOKEN")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
-if False: model.save_pretrained_gguf("ministral_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "f16")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
-if False: model.save_pretrained_gguf("ministral_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/ministral_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
     model.push_to_hub_gguf(
-        "HF_USERNAME/ministral_finetune", # Change hf to your username!
+        "HF_USERNAME/qwen_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN",
     )
 
 
-# Now, use the `ministral_finetune.Q8_0.gguf` file or `ministral_finetune.Q4_K_M.gguf` file in llama.cpp.
-# 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
-# 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
@@ -446,5 +448,5 @@ if False:
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 
-#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+#   <b>This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)</b>
 # </div>

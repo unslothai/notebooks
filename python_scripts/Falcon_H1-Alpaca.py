@@ -39,12 +39,6 @@ get_ipython().system('pip install "unsloth[colab-new] @ git+https://github.com/u
 # In[ ]:
 
 
-get_ipython().system('pip install vllm')
-
-
-# In[ ]:
-
-
 get_ipython().system('pip install --force-reinstall git+https://github.com/huggingface/transformers.git')
 
 
