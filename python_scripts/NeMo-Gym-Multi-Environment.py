@@ -24,12 +24,25 @@
 # - train using Unsloth and multiple NeMo Gym environments
 # - test and save the trained model
 # 
-# To install NeMo Gym, follow the guide [here](https://docs.nvidia.com/nemo/gym/latest/get-started/index.html).
 # 
-# To install Unsloth on your local device, follow the guide [here](https://unsloth.ai/docs/get-started/install).
+# This notebook was developed on 1 H100 GPU through NVIDIA Brev. 
 # 
-# 
-# This notebook was developed on 1 H100 GPU. If you are using a GPU with lower VRAM, you should adjust configuration parameters accordingly, such as max output length, quantization, or parameter efficient finetuning. Unsloth has a bunch of examples of low VRAM training that work with NeMo Gym training environments!
+# If you are using a GPU with lower VRAM, you should adjust configuration parameters accordingly, such as max output length, quantization, or parameter efficient finetuning. Unsloth has a bunch of examples of low VRAM training that work with NeMo Gym training environments!
+
+# ## Installation
+# If you are using Google Colab, please visit [Unsloth installation docs](https://unsloth.ai/docs/get-started/install) rather than the pip install below. 
+
+# In[ ]:
+
+
+get_ipython().system('pip install unsloth unsloth_zoo omegaconf')
+
+# If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:
+# !source /home/ubuntu/.venv/bin/activate
+# !python -m ensurepip --upgrade
+# !python -m pip install -U pip
+# !python -m pip install -U unsloth
+
 
 # # Load the model
 # 
@@ -79,6 +92,8 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # The reasoning gym resource server is an integration of [reasoning gym](https://github.com/open-thought/reasoning-gym), which is a library of procedural dataset generators and algorithmically verifiable reasoning environments for training reasoning models with reinforcement learning (RL). It includes more than 100 tasks over many domains with configurable difficulty, including but not limited to algebra, arithmetic, computation, cognition, geometry, graph theory, logic, and many common games. 
 # 
 # The instruction following resources server evaluates language model responses against instruction-following criteria using Open-Instruct and IFEval constraints.
+# 
+# If you are using Google Colab, add the flag `uv_pip_set_python=true` to `ng_run` command.
 # 
 # First, start the resources servers in a terminal:
 # 
@@ -157,11 +172,11 @@ def get_verify_endpoint(server_name: str) -> str:
 # 
 # Next, let's create and load the dataset. We can generate a mini sudoku dataset using the create script in NeMo Gym, which uses the reasoning gym library.
 # 
+# Install reasoning gym outside of the NeMo Gym venv to avoid conflicts: 
 # ```
 # cd ~/Gym
-# 
-# uv add reasoning-gym
-# 
+# deactivate
+# pip install reasoning-gym
 # python resources_servers/reasoning_gym/scripts/create_dataset.py \
 #     --task mini_sudoku \
 #     --size 2000 \

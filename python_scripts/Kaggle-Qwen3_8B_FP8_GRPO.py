@@ -121,8 +121,8 @@ output
 # In[ ]:
 
 
-reasoning_start = "<start_working_out>" # Acts as <think>
-reasoning_end   = "<end_working_out>"   # Acts as </think>
+reasoning_start = "<start_working_out>" # Acts as think-open tag
+reasoning_end   = "<end_working_out>"   # Acts as think-close tag
 solution_start  = "<SOLUTION>"
 solution_end    = "</SOLUTION>"
 
@@ -210,7 +210,7 @@ def format_dataset(x):
     expected_answer = x["expected_answer"]
     problem = x["problem"]
 
-    # Remove generated <think> and </think>
+    # Remove generated think tags
     thoughts = x["generated_solution"]
     thoughts = thoughts.replace("<think>", "").replace("</think>", "")
 
@@ -480,7 +480,7 @@ def match_format_approximately(completions, **kwargs):
         # Count how many keywords are seen - we penalize if too many!
         # If we see 1, then plus some points!
 
-        # No need to reward <start_working_out> since we always prepend it!
+        # No need to reward the opening tag since we always prepend it!
         # score += 0.5 if response.count(reasoning_start) == 1 else -1.0
         score += 0.5 if response.count(reasoning_end)   == 1 else -1.0
         score += 0.5 if response.count(solution_start)  == 1 else -1.0

@@ -257,7 +257,7 @@ def match_format_approximately(completions, **kwargs):
         # Count how many keywords are seen - we penalize if too many!
         # If we see 1, then plus some points!
 
-        # No need to reward <think> since we always prepend it!
+        # No need to reward the think tag since we always prepend it!
         score += 0.5 if response.count(reasoning_start) == 1 else -1.0
         score += 0.5 if response.count(reasoning_end)   == 1 else -1.0
         scores.append(score)

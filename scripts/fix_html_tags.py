@@ -153,7 +153,8 @@ def fix_outputs(nb, dry_run=False):
             else:
                 new_outputs.append(output)
 
-        cell["outputs"] = new_outputs
+        if "outputs" in cell:
+            cell["outputs"] = new_outputs
     return fixes
 
 
