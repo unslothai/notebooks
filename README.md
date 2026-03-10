@@ -13,7 +13,7 @@
 </div>
 
 ## 📒 Fine-tuning Notebooks
-Below are our Google Colab notebooks, organized by model. You can also view [notebooks in our docs](https://unsloth.ai/docs/get-started/unsloth-notebooks).<br>The notebooks guide you through data prep, training, inference and saving. View main [GitHub repo here](https://github.com/unslothai/unsloth).
+Below are Colab notebooks, organized by model. You can also view all [notebooks in our docs](https://unsloth.ai/docs/get-started/unsloth-notebooks).<br>The notebooks run locally and feature data prep, training and inference. Read our [fine-tuning guide](https://unsloth.ai/docs/get-started/fine-tuning-llms-guide).
 
 ### Main Notebooks
 | Model                        | Type           | Notebook Link                                                                                                                                                                                         |
