@@ -844,6 +844,13 @@ DONT_UPDATE_EXCEPTIONS = [
     "Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb",       # Custom Sudoku RL environment
 ]
 
+# Notebooks excluded from automatic README.md listing. You can use a basename,
+# repo-relative path, or absolute path.
+README_SKIP_NOTEBOOKS = [
+    "Meta-Synthetic-Data-Llama3.1_(8B).ipynb",
+    "Meta_Synthetic_Data_Llama3_2_(3B).ipynb"
+]
+
 
 FIRST_MAPPING_NAME = {
     "gpt-oss-(20B)-Fine-tuning.ipynb" : "gpt_oss_(20B)-Fine-tuning.ipynb",
@@ -897,6 +904,37 @@ def _set_file_permissions(filepath):
     """Set file permissions to 0o644 on non-Windows platforms."""
     if platform.system() != "Windows":
         os.chmod(filepath, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+
+def _should_skip_readme_notebook(path):
+    """Return True when a notebook is configured to be omitted from README.md."""
+    normalized_path = path.replace("\\", "/")
+    absolute_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), normalized_path)
+    ).replace("\\", "/")
+    basename = os.path.basename(normalized_path)
+    base_variants = {
+        normalized_path,
+        absolute_path,
+        basename,
+    }
+
+    if basename.startswith("Kaggle-"):
+        kaggle_stripped = basename[len("Kaggle-"):]
+        base_variants.add(kaggle_stripped)
+        base_variants.add(
+            normalized_path[: -len(basename)] + kaggle_stripped
+        )
+        base_variants.add(
+            absolute_path[: -len(basename)] + kaggle_stripped
+        )
+
+    for skipped in README_SKIP_NOTEBOOKS:
+        normalized_skipped = skipped.replace("\\", "/")
+        if normalized_skipped in base_variants:
+            return True
+
+    return False
 
 
 _NOTEBOOK_FORMAT_CACHE = {}
@@ -2721,6 +2759,8 @@ def update_readme(
     for path in paths:
         # Ignore HF course and Advanced notebooks
         if is_path_contains_any(path.lower(), [hf_course_name.lower(), "Advanced".lower()]):
+            continue
+        if _should_skip_readme_notebook(path):
             continue
 
         notebook_name = os.path.basename(path)
