@@ -95,56 +95,140 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # 
 # If you are using Google Colab, add the flag `uv_pip_set_python=true` to `ng_run` command.
 # 
-# First, start the resources servers in a terminal:
+# The cell below will automatically:
+# 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (requires Python 3.12+ and `uv` on the system)
+# 2. Set up the virtual environment and install dependencies
+# 3. Create the mini sudoku training dataset
+# 4. Download the instruction following dataset
+# 5. Start both resources servers in the background
 # 
-# ```
-# cd ~/Gym
-# uv venv
-# source .venv/bin/activate
-# uv sync --active
-# ng_run "+config_paths=[resources_servers/reasoning_gym/configs/resources_only.yaml,resources_servers/instruction_following/configs/resources_only.yaml]"
-# ```
+# Google Colab is auto-detected and the `uv_pip_set_python=true` flag is added when needed.
 # 
-# 
-# You should see a similar output in the terminal:
-# 
-# ```
-# All 2 / 2 servers ready! Polling every 60s
-# 
-# ####################################################################################################
-# #
-# # Server Instances
-# #
-# ####################################################################################################
-# 
-# [1] reasoning_gym (resources_servers/reasoning_gym)
-# {
-#     'config_path': 'reasoning_gym',
-#     'dir_path': '/home/ubuntu/Gym/resources_servers/reasoning_gym',
-#     'entrypoint': 'app.py',
-#     'host': '127.0.0.1',
-#     'name': 'reasoning_gym',
-#     'pid': 186628,
-#     'port': 47151,
-#     'process_name': 'reasoning_gym',
-#     'server_type': 'resources_servers',
-#     'url': 'http://127.0.0.1:47151',
-# }
-# [2] instruction_following (resources_servers/instruction_following)
-# {
-#     'config_path': 'instruction_following',
-#     'dir_path': '/home/ubuntu/Gym/resources_servers/instruction_following',
-#     'entrypoint': 'app.py',
-#     'host': '127.0.0.1',
-#     'name': 'instruction_following',
-#     'pid': 186629,
-#     'port': 58173,
-#     'process_name': 'instruction_following',
-#     'server_type': 'resources_servers',
-#     'url': 'http://127.0.0.1:58173',
-# }
-# ####################################################################################################
-# ```
+# Note: The instruction_following config also starts an agent server alongside the resources server. The agent server is unused during training and can be ignored.
+
+# In[ ]:
+
+
+import subprocess
+import os
+import time
+import atexit
+import requests
+
+GYM_DIR = os.path.expanduser("~/Gym")
+
+# Detect Google Colab
+try:
+    import google.colab
+    _on_colab = True
+except ImportError:
+    _on_colab = False
+
+# Step 1: Clone NeMo Gym
+if not os.path.exists(GYM_DIR):
+    print("Cloning NeMo Gym...")
+    subprocess.run(
+        ["git", "clone", "https://github.com/NVIDIA-NeMo/Gym.git", GYM_DIR],
+        check = True,
+    )
+
+# Step 2: Create venv and install dependencies
+if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
+    print("Setting up NeMo Gym environment (this may take a few minutes)...")
+    subprocess.run(["uv", "venv", "--python", "3.12"], cwd = GYM_DIR, check = True)
+    subprocess.run(
+        ["bash", "-c", "source .venv/bin/activate && uv sync"],
+        cwd = GYM_DIR, check = True,
+    )
+    subprocess.run(
+        ["bash", "-c", "source .venv/bin/activate && uv pip install reasoning-gym"],
+        cwd = GYM_DIR, check = True,
+    )
+# Step 3: Create sudoku dataset
+sudoku_path = os.path.join(
+    GYM_DIR, "resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl"
+)
+if not os.path.exists(sudoku_path):
+    print("Creating mini_sudoku dataset (2000 examples)...")
+    subprocess.run(
+        [
+            "bash", "-c",
+            "source .venv/bin/activate && python "
+            "resources_servers/reasoning_gym/scripts/create_dataset.py "
+            "--task mini_sudoku --size 2000 --seed 42 "
+            f"--output {sudoku_path}",
+        ],
+        cwd = GYM_DIR, check = True,
+    )
+
+# Step 4: Download instruction_following dataset
+import shutil
+from huggingface_hub import hf_hub_download
+
+if_path = os.path.join(
+    GYM_DIR,
+    "resources_servers/instruction_following/data/instruction_following.jsonl",
+)
+if not os.path.exists(if_path):
+    print("Downloading instruction_following dataset...")
+    src = hf_hub_download(
+        repo_id = "nvidia/Nemotron-RL-instruction_following",
+        filename = "instruction_following.jsonl",
+        repo_type = "dataset",
+    )
+    os.makedirs(os.path.dirname(if_path), exist_ok = True)
+    shutil.copy(src, if_path)
+# Start NeMo Gym servers if not already running
+try:
+    requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2)
+    print("NeMo Gym servers already running on port 11000.")
+except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+    _colab_flag = " uv_pip_set_python=true" if _on_colab else ""
+    print("Starting NeMo Gym servers...")
+    _ng_log = open(os.path.join(GYM_DIR, "ng_run.log"), "w")
+    ng_process = subprocess.Popen(
+        [
+            "bash", "-c",
+            "source .venv/bin/activate && ng_run "
+            '"+config_paths=[resources_servers/reasoning_gym/configs/resources_only.yaml,resources_servers/instruction_following/configs/instruction_following.yaml]"'
+            + _colab_flag,
+        ],
+        cwd = GYM_DIR,
+        stdout = _ng_log,
+        stderr = subprocess.STDOUT,
+    )
+
+    def _cleanup_ng():
+        if ng_process.poll() is None:
+            ng_process.terminate()
+            try:
+                ng_process.wait(timeout = 10)
+            except subprocess.TimeoutExpired:
+                ng_process.kill()
+        _ng_log.close()
+    atexit.register(_cleanup_ng)
+
+    print("Waiting for servers", end = "", flush = True)
+    for _ in range(120):
+        try:
+            requests.get(
+                "http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2
+            )
+            break
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if ng_process.poll() is not None:
+                raise RuntimeError(
+                    "Server process exited unexpectedly. "
+                    f"Check {GYM_DIR}/ng_run.log for details."
+                )
+            print(".", end = "", flush = True)
+            time.sleep(3)
+    else:
+        raise RuntimeError(
+            "NeMo Gym servers did not start within 6 minutes."
+        )
+    print("\nHead server ready!")
+
 
 # NeMo Gym starts a head server on port 11000 by default, and the resources server port is selected at random from available ports, unless specified otherwise. We can automatically extract the resources servers ports using the head server:
 
@@ -157,38 +241,58 @@ from omegaconf import OmegaConf
 
 
 head_port = 11000
-response = requests.get(
-    f"http://127.0.0.1:{head_port}/global_config_dict_yaml", timeout = 5
-)
+try:
+    response = requests.get(
+        f"http://127.0.0.1:{head_port}/global_config_dict_yaml", timeout = 5
+    )
+    response.raise_for_status()
+except requests.exceptions.ConnectionError:
+    raise RuntimeError(
+        "Could not connect to NeMo Gym head server on port 11000. "
+        "Make sure the setup cell above ran successfully."
+    )
 global_config_dict = OmegaConf.create(yaml.safe_load(response.text))
 
+# Verify all required servers are present
+_required_servers = {"reasoning_gym", "instruction_following"}
+_missing = _required_servers - set(global_config_dict.keys())
+if _missing:
+    raise RuntimeError(
+        f"Head server is missing required server configs: {_missing}. "
+        "Please stop any existing NeMo Gym server and re-run the setup cell above."
+    )
 
 def get_verify_endpoint(server_name: str) -> str:
     config = global_config_dict[server_name].resources_servers[server_name]
     return f"http://{config.host}:{config.port}/verify"
+
+# Wait for all resources servers to be fully ready
+for _srv in global_config_dict:
+    try:
+        _cfg = global_config_dict[_srv].resources_servers[_srv]
+    except (KeyError, AttributeError):
+        print(f"Warning: skipping {_srv} (no resources_server config found)")
+        continue
+    print(f"Waiting for {_srv} at {_cfg.host}:{_cfg.port}", end = "", flush = True)
+    for _i in range(90):
+        try:
+            requests.get(f"http://{_cfg.host}:{_cfg.port}/", timeout = 2)
+            break
+        except requests.exceptions.ConnectionError:
+            print(".", end = "", flush = True)
+            time.sleep(2)
+    else:
+        raise RuntimeError(
+            f"{_srv} server at {_cfg.host}:{_cfg.port} did not start within 3 minutes."
+        )
+    print(f"\n{_srv} ready!")
 
 
 # # Dataset prep
 # 
 # Next, let's create and load the dataset. We can generate a mini sudoku dataset using the create script in NeMo Gym, which uses the reasoning gym library.
 # 
-# Install reasoning gym outside of the NeMo Gym venv to avoid conflicts: 
-# ```
-# cd ~/Gym
-# deactivate
-# pip install reasoning-gym
-# python resources_servers/reasoning_gym/scripts/create_dataset.py \
-#     --task mini_sudoku \
-#     --size 2000 \
-#     --seed 42 \
-#     --output resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl
-# ```
-# 
-# Next, we need to download the instruction following dataset from https://huggingface.co/datasets/nvidia/Nemotron-RL-instruction_following
-# 
-# Once downloaded, place it in `~/Gym/resources_servers/instruction_following/data/instruction_following.jsonl`
-# 
-# Now load the datasets! We will limit each dataset to 1000 samples to create an even task distribution.
+# Both datasets were created automatically by the setup cell above. Now load them! We will limit each dataset to 1000 samples to create an even task distribution.
 
 # In[ ]:
 
@@ -215,7 +319,14 @@ examples_by_server = {}
 max_length_seen = 0
 max_per_dataset = 1000
 for dataset_path, server_name in dataset_configs:
-    lines = open(os.path.expanduser(dataset_path), "r").readlines()
+    expanded_path = os.path.expanduser(dataset_path)
+    if not os.path.exists(expanded_path):
+        raise FileNotFoundError(
+            f"Dataset not found at {expanded_path}. "
+            "Run the setup cell above first."
+        )
+    with open(expanded_path, "r") as f:
+        lines = f.readlines()
     if len(lines) > max_per_dataset:
         lines = random.sample(lines, max_per_dataset)
     for line in lines:
@@ -274,7 +385,7 @@ def reward_fn(completions, prompts = None, **kwargs):
         }
         verify_request["response"] = {
             "id": "resp",
-            "created_at": 0.0,
+            "created_at": 0,
             "model": model_name,
             "object": "response",
             "output": [
@@ -299,7 +410,8 @@ def reward_fn(completions, prompts = None, **kwargs):
         try:
             resp = requests.post(verify_endpoint, json = verify_request, timeout = 30)
             reward = resp.json().get("reward", 0.0) if resp.status_code == 200 else 0.0
-        except:
+        except requests.exceptions.RequestException as e:
+            print(f"Warning: verify request failed: {e}")
             reward = 0.0
         scores.append(reward)
     return np.array(scores)
@@ -395,6 +507,7 @@ from transformers import TextStreamer
 
 _ = model.generate(
     **tokenizer(text, return_tensors = "pt").to("cuda"),
+    do_sample = True,
     temperature = 1.0,
     max_new_tokens = 4096,
     streamer = TextStreamer(tokenizer, skip_prompt = False),
