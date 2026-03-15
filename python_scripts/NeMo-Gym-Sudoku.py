@@ -158,7 +158,7 @@ try:
     requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2)
     print("NeMo Gym server already running on port 11000.")
 except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-    _colab_flag = " uv_pip_set_python=true" if _on_colab else ""
+    _colab_flag = " +uv_pip_set_python=true"
     print("Starting NeMo Gym server...")
     _ng_log = open(os.path.join(GYM_DIR, "ng_run.log"), "w")
     ng_process = subprocess.Popen(
