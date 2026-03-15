@@ -101,27 +101,40 @@ QAT_TORCHAO_BY_TORCH_MINOR = {
     "2.8": "0.14.1",
 }
 QAT_DEFAULT_TORCHAO_VERSION = "0.16.0"
-QAT_FBGEMM_GENAI_VERSION = "1.5.0"
+QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
+    "2.10": "1.5.0",
+    "2.9": "1.4.2",
+    "2.8": "1.3.0",
+}
+QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.5.0"
 
 
 def build_qat_native_install_block(
     torchao_by_torch_minor=None,
     default_torchao=QAT_DEFAULT_TORCHAO_VERSION,
-    fbgemm_genai=QAT_FBGEMM_GENAI_VERSION,
+    fbgemm_genai_by_torch_minor=None,
+    default_fbgemm_genai=QAT_DEFAULT_FBGEMM_GENAI_VERSION,
 ):
     """Build runtime torchao/fbgemm native install block for QAT notebooks."""
     if torchao_by_torch_minor is None:
         torchao_by_torch_minor = QAT_TORCHAO_BY_TORCH_MINOR
-    mapping_literal = json.dumps(
+    if fbgemm_genai_by_torch_minor is None:
+        fbgemm_genai_by_torch_minor = QAT_FBGEMM_GENAI_BY_TORCH_MINOR
+    torchao_mapping = json.dumps(
         torchao_by_torch_minor, sort_keys=True, separators=(",", ":")
+    )
+    fbgemm_mapping = json.dumps(
+        fbgemm_genai_by_torch_minor, sort_keys=True, separators=(",", ":")
     )
     return f"""try:
     import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
 except Exception:
     _qat_torch_minor = ""
-_qat_torchao_map = {mapping_literal}
+_qat_torchao_map = {torchao_mapping}
 _qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
-!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={fbgemm_genai}"""
+_qat_fbgemm_map = {fbgemm_mapping}
+_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
+!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}}"""
 
 
 def update_or_append_pip_install(base_content, package_name, new_install_line):
@@ -524,28 +537,28 @@ installation_ministral_content = installation_content
 installation_ministral_content = update_or_append_pip_install(
     installation_ministral_content,
     "transformers",
-    "!pip install transformers==5.0.0"
+    "!pip install transformers==5.3.0"
 )
 
 installation_ministral_kaggle_content = installation_kaggle_content
 installation_ministral_kaggle_content = update_or_append_pip_install(
     installation_ministral_kaggle_content,
     "transformers",
-    "!pip install transformers==5.0.0"
+    "!pip install transformers==5.3.0"
 )
 
 installation_glm_flash_content = installation_content
 installation_glm_flash_content = update_or_append_pip_install(
     installation_glm_flash_content,
     "transformers",
-    "!pip install transformers==5.0.0"
+    "!pip install transformers==5.3.0"
 )
 
 installation_glm_flash_kaggle_content = installation_kaggle_content
 installation_glm_flash_kaggle_content = update_or_append_pip_install(
     installation_glm_flash_kaggle_content,
     "transformers",
-    "!pip install transformers==5.0.0"
+    "!pip install transformers==5.3.0"
 )
 
 installation_phone_content = installation_content
@@ -695,8 +708,8 @@ _RE_TRANSFORMERS_V5_PIN = re.compile(
 
 
 def _normalize_transformers_v5_pin(text):
-    """Normalize transformers 5.x pins to transformers==5.1.0."""
-    return _RE_TRANSFORMERS_V5_PIN.sub("transformers==5.1.0", text)
+    """Normalize transformers 5.x pins to transformers==5.3.0."""
+    return _RE_TRANSFORMERS_V5_PIN.sub("transformers==5.3.0", text)
 
 
 _ALL_NB_FIXES = {
@@ -1821,10 +1834,10 @@ def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
         )
 
 def _preserve_transformers_v5_pin(old_cell_text, new_cell_text):
-    """Force transformers==5.1.0 only when the previous install cell pinned transformers==5.*."""
+    """Force transformers==5.3.0 only when the previous install cell pinned transformers==5.*."""
     if not _RE_TRANSFORMERS_EQ_PIN_5.search(old_cell_text):
         return new_cell_text
-    return _RE_TRANSFORMERS_EQ_PIN.sub(r"\g<1>5.1.0", new_cell_text)
+    return _RE_TRANSFORMERS_EQ_PIN.sub(r"\g<1>5.3.0", new_cell_text)
 
 
 badge_section = '<a href="{link_colab}" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>'
