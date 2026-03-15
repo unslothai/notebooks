@@ -572,7 +572,7 @@ installation_phone_content = update_or_append_pip_install(
     "trl",
     "!pip install --no-deps trl==0.25.1"
 )
-installation_phone_content += """\n!pip install torchao==0.14.0 optimum==1.24.0 pytorch-tokenizers executorch
+installation_phone_content += """\n!pip install torchao==0.15.0 optimum==1.24.0 pytorch-tokenizers executorch==1.1.0
 !pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
 
 installation_phone_kaggle_content = installation_kaggle_content
@@ -586,7 +586,7 @@ installation_phone_kaggle_content = update_or_append_pip_install(
     "trl",
     "!pip install --no-deps trl==0.25.1"
 )
-installation_phone_kaggle_content += """\n!pip install torchao==0.14.0 optimum==1.24.0 pytorch-tokenizers executorch
+installation_phone_kaggle_content += """\n!pip install torchao==0.15.0 optimum==1.24.0 pytorch-tokenizers executorch==1.1.0
 !pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
 
 OTHER_RESOURCES = """Some other resources:
