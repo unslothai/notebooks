@@ -18,6 +18,7 @@ import argparse
 import ast
 import concurrent.futures
 import concurrent.futures.process
+import copy
 import json
 import multiprocessing
 import os
@@ -28,7 +29,7 @@ import shutil
 import stat
 import subprocess
 import sys
-import uuid
+import hashlib
 from datetime import datetime
 from glob import glob
 from nbconvert import PythonExporter
@@ -93,6 +94,48 @@ UV_PIN_TRL = PIN_TRL.replace("pip", "uv pip")
 SPACES = " " * 4
 
 XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
+
+QAT_TORCHAO_BY_TORCH_MINOR = {
+    "2.10": "0.16.0",
+    "2.9": "0.15.0",
+    "2.8": "0.14.1",
+}
+QAT_DEFAULT_TORCHAO_VERSION = "0.16.0"
+QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
+    "2.10": "1.5.0",
+    "2.9": "1.4.2",
+    "2.8": "1.3.0",
+}
+QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.5.0"
+
+
+def build_qat_native_install_block(
+    torchao_by_torch_minor=None,
+    default_torchao=QAT_DEFAULT_TORCHAO_VERSION,
+    fbgemm_genai_by_torch_minor=None,
+    default_fbgemm_genai=QAT_DEFAULT_FBGEMM_GENAI_VERSION,
+):
+    """Build runtime torchao/fbgemm native install block for QAT notebooks."""
+    if torchao_by_torch_minor is None:
+        torchao_by_torch_minor = QAT_TORCHAO_BY_TORCH_MINOR
+    if fbgemm_genai_by_torch_minor is None:
+        fbgemm_genai_by_torch_minor = QAT_FBGEMM_GENAI_BY_TORCH_MINOR
+    torchao_mapping = json.dumps(
+        torchao_by_torch_minor, sort_keys=True, separators=(",", ":")
+    )
+    fbgemm_mapping = json.dumps(
+        fbgemm_genai_by_torch_minor, sort_keys=True, separators=(",", ":")
+    )
+    return f"""try:
+    import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
+except Exception:
+    _qat_torch_minor = ""
+_qat_torchao_map = {torchao_mapping}
+_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
+_qat_fbgemm_map = {fbgemm_mapping}
+_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
+!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}}"""
+
 
 def update_or_append_pip_install(base_content, package_name, new_install_line):
     pattern = re.compile(rf"^!(uv )?pip install .*?{package_name}.*$", re.MULTILINE)
@@ -482,36 +525,40 @@ else:
     __XFORMERS_INSTALL__
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-!pip install torchao==0.14.0 fbgemm-gpu-genai==1.4.2
-!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+__QAT_NATIVE_INSTALL__
+!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2""".replace(
+    "__XFORMERS_INSTALL__", XFORMERS_INSTALL
+).replace(
+    "__QAT_NATIVE_INSTALL__", build_qat_native_install_block()
+)
 installation_qat_kaggle_content = installation_qat_content
 
 installation_ministral_content = installation_content
 installation_ministral_content = update_or_append_pip_install(
     installation_ministral_content,
     "transformers",
-    "!pip install transformers==5.0.0"
+    "!pip install transformers==5.3.0"
 )
 
 installation_ministral_kaggle_content = installation_kaggle_content
 installation_ministral_kaggle_content = update_or_append_pip_install(
     installation_ministral_kaggle_content,
     "transformers",
-    "!pip install transformers==5.0.0"
+    "!pip install transformers==5.3.0"
 )
 
 installation_glm_flash_content = installation_content
 installation_glm_flash_content = update_or_append_pip_install(
     installation_glm_flash_content,
     "transformers",
-    "!pip install transformers==5.0.0"
+    "!pip install transformers==5.3.0"
 )
 
 installation_glm_flash_kaggle_content = installation_kaggle_content
 installation_glm_flash_kaggle_content = update_or_append_pip_install(
     installation_glm_flash_kaggle_content,
     "transformers",
-    "!pip install transformers==5.0.0"
+    "!pip install transformers==5.3.0"
 )
 
 installation_phone_content = installation_content
@@ -525,7 +572,7 @@ installation_phone_content = update_or_append_pip_install(
     "trl",
     "!pip install --no-deps trl==0.25.1"
 )
-installation_phone_content += """\n!pip install torchao==0.14.0 optimum==1.24.0 pytorch-tokenizers executorch
+installation_phone_content += """\n!pip install torchao==0.15.0 optimum==1.24.0 pytorch-tokenizers executorch==1.1.0
 !pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
 
 installation_phone_kaggle_content = installation_kaggle_content
@@ -539,7 +586,7 @@ installation_phone_kaggle_content = update_or_append_pip_install(
     "trl",
     "!pip install --no-deps trl==0.25.1"
 )
-installation_phone_kaggle_content += """\n!pip install torchao==0.14.0 optimum==1.24.0 pytorch-tokenizers executorch
+installation_phone_kaggle_content += """\n!pip install torchao==0.15.0 optimum==1.24.0 pytorch-tokenizers executorch==1.1.0
 !pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
 
 OTHER_RESOURCES = """Some other resources:
@@ -661,8 +708,8 @@ _RE_TRANSFORMERS_V5_PIN = re.compile(
 
 
 def _normalize_transformers_v5_pin(text):
-    """Normalize transformers 5.x pins to transformers==5.1.0."""
-    return _RE_TRANSFORMERS_V5_PIN.sub("transformers==5.1.0", text)
+    """Normalize transformers 5.x pins to transformers==5.3.0."""
+    return _RE_TRANSFORMERS_V5_PIN.sub("transformers==5.3.0", text)
 
 
 _ALL_NB_FIXES = {
@@ -992,7 +1039,6 @@ def _source_lines(text):
 def _write_notebook(filepath, content):
     """Write notebook JSON, preserving original indent and trailing newline."""
     indent, trailing_nl = _cache_notebook_format(filepath)
-    _ensure_cell_ids(content)
     with open(filepath, "w", encoding="utf-8", newline="") as f:
         json.dump(content, f, indent=indent, ensure_ascii=False)
         if trailing_nl:
@@ -1003,17 +1049,18 @@ def _write_notebook(filepath, content):
 def _ensure_cell_ids(notebook_content):
     """Ensure every notebook cell has an id (required by newer nbformat validation)."""
     changed = False
-    for cell in notebook_content.get("cells", []):
+    for idx, cell in enumerate(notebook_content.get("cells", [])):
         if not isinstance(cell, dict):
             continue
         if not cell.get("id"):
-            cell["id"] = uuid.uuid4().hex[:12]
+            src = "".join(cell.get("source", []))
+            cell["id"] = hashlib.md5(f"{idx}:{src}".encode()).hexdigest()[:12]
             changed = True
     return changed
 
 
 def _cache_original_outputs(filepath):
-    """Cache output cells and widget state from a notebook before it is overwritten (first call wins)."""
+    """Cache output cells, widget state, and cell IDs from a notebook before it is overwritten (first call wins)."""
     if filepath not in _ORIGINAL_OUTPUTS_CACHE:
         try:
             with open(filepath, "r", encoding="utf-8", newline="") as f:
@@ -1021,17 +1068,18 @@ def _cache_original_outputs(filepath):
             cells = nb.get("cells", [])
             outputs = {idx: cell["outputs"] for idx, cell in enumerate(cells) if cell.get("outputs")}
             widget_state = nb.get("metadata", {}).get("widgets", None)
-            _ORIGINAL_OUTPUTS_CACHE[filepath] = (len(cells), outputs, widget_state)
+            cell_ids = {idx: cell["id"] for idx, cell in enumerate(cells) if cell.get("id")}
+            _ORIGINAL_OUTPUTS_CACHE[filepath] = (len(cells), outputs, widget_state, cell_ids)
         except Exception:
-            _ORIGINAL_OUTPUTS_CACHE[filepath] = (0, {}, None)
+            _ORIGINAL_OUTPUTS_CACHE[filepath] = (0, {}, None, {})
 
 
 def _restore_original_outputs(filepath):
-    """Restore output cells and widget state from the cached original if cell count matches."""
+    """Restore output cells, widget state, and cell IDs from the cached original if cell count matches."""
     if filepath not in _ORIGINAL_OUTPUTS_CACHE:
         return
-    orig_count, orig_outputs, orig_widgets = _ORIGINAL_OUTPUTS_CACHE[filepath]
-    if not orig_outputs and orig_widgets is None:
+    orig_count, orig_outputs, orig_widgets, orig_cell_ids = _ORIGINAL_OUTPUTS_CACHE[filepath]
+    if not orig_outputs and orig_widgets is None and not orig_cell_ids:
         return
     try:
         with open(filepath, "r", encoding="utf-8", newline="") as f:
@@ -1041,6 +1089,9 @@ def _restore_original_outputs(filepath):
         for idx, outputs in orig_outputs.items():
             if idx < len(nb["cells"]):
                 nb["cells"][idx]["outputs"] = outputs
+        for idx, cell_id in orig_cell_ids.items():
+            if idx < len(nb["cells"]):
+                nb["cells"][idx]["id"] = cell_id
         if orig_widgets is not None:
             nb.setdefault("metadata", {})["widgets"] = orig_widgets
         elif "widgets" in nb.get("metadata", {}):
@@ -1821,10 +1872,10 @@ def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
         )
 
 def _preserve_transformers_v5_pin(old_cell_text, new_cell_text):
-    """Force transformers==5.1.0 only when the previous install cell pinned transformers==5.*."""
+    """Force transformers==5.3.0 only when the previous install cell pinned transformers==5.*."""
     if not _RE_TRANSFORMERS_EQ_PIN_5.search(old_cell_text):
         return new_cell_text
-    return _RE_TRANSFORMERS_EQ_PIN.sub(r"\g<1>5.1.0", new_cell_text)
+    return _RE_TRANSFORMERS_EQ_PIN.sub(r"\g<1>5.3.0", new_cell_text)
 
 
 badge_section = '<a href="{link_colab}" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>'
@@ -2340,8 +2391,9 @@ def update_notebook_sections(
             }
             updated = True
         if notebook_content["metadata"]["widgets"].get("application/vnd.jupyter.widget-state+json", None) is not None:
-            notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"]["state"] = {}
-            updated = True
+            if notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"].get("state") != {}:
+                notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"]["state"] = {}
+                updated = True
 
         if updated:
             _write_notebook(notebook_path, notebook_content)
@@ -3122,10 +3174,12 @@ def convert_notebook_to_script(notebook_path: str, output_path: str):
     with open(notebook_path, 'r', encoding='utf-8', newline='') as f:
         notebook_json = json.load(f)
 
-    if _ensure_cell_ids(notebook_json):
-        _write_notebook(notebook_path, notebook_json)
+    # Add cell IDs only to the in-memory copy for nbformat validation;
+    # do not write them back to the .ipynb file on disk.
+    notebook_for_export = copy.deepcopy(notebook_json)
+    _ensure_cell_ids(notebook_for_export)
 
-    notebook_content = nbformat.reads(json.dumps(notebook_json), as_version=4)
+    notebook_content = nbformat.reads(json.dumps(notebook_for_export), as_version=4)
 
     (body, resources) = exporter.from_notebook_node(notebook_content)
 
@@ -3133,6 +3187,7 @@ def convert_notebook_to_script(notebook_path: str, output_path: str):
 
     with open(output_path, 'w', encoding='utf-8', newline='') as f:
         f.write(body)
+    _set_file_permissions(output_path)
 
     print(f"Converted {notebook_path} to {output_path}")
 

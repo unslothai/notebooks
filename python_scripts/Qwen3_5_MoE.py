@@ -28,23 +28,35 @@
 
 # # ### Installation
 # 
-# # In[1]:
+# # In[ ]:
 # 
 # 
 # get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==5.3.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', '! pip uninstall unsloth unsloth_zoo -y\n! pip install git+https://github.com/unslothai/unsloth-zoo.git --no-deps\n! pip install git+https://github.com/unslothai/unsloth.git --no-deps\n')
+# 
+# 
+# # In[ ]:
+# 
+# 
+# import os
+# # Note that to get best performance on A100, we needed to install causal-conv1d
+# # For this to not take too long, we had to downgrade to torch 2.8 (from torch 2.9)
+# # This means we wouldn't be able to use torch's grouped_mm here
+# # so we fallback to unsloth triton kernels for MoE
+# # We need to disable autotuning to save both time and memory for the colab notebook.
+# # If you are trying this elsewhere, we might recommend
+# # you install Flash Attention, Flash Linear Attention and CausalConv1d with torch 2.9
+# # `!uv pip install --no-build-isolation flash-attn flash-linear-attention causal_conv1d==1.6.`
+# # You can even try playing around with the below env var for faster performance but make sure you have enough VRAM to try autotuning.
+# os.environ['UNSLOTH_MOE_DISABLE_AUTOTUNE'] = '1'
+# 
+# 
 # # ### Unsloth
-
-# Goal: To demonstrate unsloth's MoE optimizations on T4 for `imdatta0/tiny_qwen3_moe_2.8B_0.7B` by finetuning on by OpenR1's Math dataset.
-
-# In[4]:
-
-
-model_name = "imdatta0/tiny_qwen3_moe_2.8B_0.7B" # This is dummy model of qwen3moe architecture created to fit in T4
-max_seq_length = 2048 # Can increase for longer reasoning traces
-lora_rank = 32 # Larger rank = smarter, but slower
-
 
 # In[ ]:
 
@@ -52,12 +64,20 @@ lora_rank = 32 # Larger rank = smarter, but slower
 from unsloth import FastLanguageModel
 import torch
 
-model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name,
+max_seq_length = 2048 # Can increase for longer reasoning traces
+lora_rank = 16 # Larger rank = smarter, but slower
+
+model, processor = FastLanguageModel.from_pretrained(
+    "unsloth/Qwen3.5-35B-A3B", # This is a very big model, might take a while for downloading
     max_seq_length = max_seq_length,
     load_in_4bit = False,
-    fast_inference = False,  # Not supported for MoE (yet!)
+    fast_inference = False, # Not supported for MoE (yet!)
 )
+tokenizer = processor.tokenizer # To tokenize text
+
+
+# In[7]:
+
 
 model = FastLanguageModel.get_peft_model(
     model,
@@ -73,158 +93,62 @@ model = FastLanguageModel.get_peft_model(
 )
 
 
-# ### GRPO chat template
-# Since we're using a base model, we should set a chat template. You can make your own chat template as well!
-# 1. DeepSeek uses `<think>` and `</think>`, but this is **not** necessary - you can customize it however you like!
-# 2. A `system_prompt` is recommended to at least guide the model's responses.
-
-# In[6]:
-
-
-reasoning_start = "<start_working_out>" # Acts as <think>
-reasoning_end   = "<end_working_out>"   # Acts as </think>
-solution_start  = "<SOLUTION>"
-solution_end    = "</SOLUTION>"
-
-system_prompt = \
-f"""You are given a problem.
-Think about the problem and provide your working out.
-Place it between {reasoning_start} and {reasoning_end}.
-Then, provide your solution between {solution_start}{solution_end}"""
-system_prompt
-
-
-# We create a simple chat template below. Notice `add_generation_prompt` includes prepending `<start_working_out>` to guide the model to start its reasoning process.
+# <a name="Data"></a>
+# ### Data Prep
+# We now use the `Qwen 3.5` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy. 
 
 # In[ ]:
 
 
-chat_template = \
-    "{% if messages[0]['role'] == 'system' %}"\
-        "{{ messages[0]['content'] + eos_token }}"\
-        "{% set loop_messages = messages[1:] %}"\
-    "{% else %}"\
-        "{{ '{system_prompt}' + eos_token }}"\
-        "{% set loop_messages = messages %}"\
-    "{% endif %}"\
-    "{% for message in loop_messages %}"\
-        "{% if message['role'] == 'user' %}"\
-            "{{ message['content'] }}"\
-        "{% elif message['role'] == 'assistant' %}"\
-            "{{ message['content'] + eos_token }}"\
-        "{% endif %}"\
-    "{% endfor %}"\
-    "{% if add_generation_prompt %}{{ '{reasoning_start}' }}"\
-    "{% endif %}"
-
-# Replace with our specific template:
-chat_template = chat_template\
-    .replace("'{system_prompt}'",   f"'{system_prompt}'")\
-    .replace("'{reasoning_start}'", f"'{reasoning_start}'")
-tokenizer.chat_template = chat_template
-
-
-# Let's see how our chat template behaves on an example:
-
-# In[8]:
-
-
-tokenizer.apply_chat_template([
-    {"role" : "user", "content" : "What is 1+1?"},
-    {"role" : "assistant", "content" : f"{reasoning_start}I think it's 2.{reasoning_end}{solution_start}2{solution_end}"},
-    {"role" : "user", "content" : "What is 2+2?"},
-], tokenize = False, add_generation_prompt = True)
-
-
-# ### Pre fine-tuning for formatting
-# We now use a subset of NVIDIA's [Open Math Reasoning dataset](https://huggingface.co/datasets/nvidia/OpenMathReasoning) which was filtered to only include high quality DeepSeek R1 traces.
-# 
-# We'll only filter ~59 or so examples to first "prime" / pre fine-tune the model to understand our custom GRPO formatting.
-
-# In[9]:
-
-
 from datasets import load_dataset
-import pandas as pd
-import numpy as np
-
 dataset = load_dataset("unsloth/OpenMathReasoning-mini", split = "cot")
-dataset = dataset.to_pandas()[
-    ["expected_answer", "problem", "generated_solution"]
-]
-
-# Try converting to number - if not, replace with NaN
-is_number = pd.to_numeric(pd.Series(dataset["expected_answer"]), errors = "coerce").notnull()
-# Select only numbers
-dataset = dataset.iloc[np.where(is_number)[0]]
-
-dataset
 
 
-# We have to format the dataset to follow our GRPO style formatting:
+# We now convert the reasoning dataset into conversational format:
 
-# In[10]:
-
-
-def format_dataset(x):
-    expected_answer = x["expected_answer"]
-    problem = x["problem"]
-
-    # Remove generated <think> and </think>
-    thoughts = x["generated_solution"]
-    thoughts = thoughts.replace("<think>", "").replace("</think>", "")
-
-    # Strip newlines on left and right
-    thoughts = thoughts.strip()
-    # Add our custom formatting
-    final_prompt = \
-        reasoning_start + thoughts + reasoning_end + \
-        solution_start + expected_answer + solution_end
-    return [
-        {"role" : "system",    "content" : system_prompt},
-        {"role" : "user",      "content" : problem},
-        {"role" : "assistant", "content" : final_prompt},
-    ]
-
-dataset["Messages"] = dataset.apply(format_dataset, axis = 1)
+# In[ ]:
 
 
-# Check to see if it worked:
+def generate_conversation(examples):
+    problems  = examples["problem"]
+    solutions = examples["generated_solution"]
+    conversations = []
+    for problem, solution in zip(problems, solutions):
+        conversations.append([
+            {"role" : "user",      "content" : problem},
+            {"role" : "assistant", "content" : solution},
+        ])
+    return { "conversations": conversations, }
 
-# In[11]:
-
-
-tokenizer.apply_chat_template(dataset["Messages"][0], tokenize = False)
-
-
-# Let's truncate the pre fine-tuning dataset to `max_seq_length/2` since we don't want too long reasoning traces.
-# 
-# Note this might take 2 minutes!
-
-# In[12]:
-
-
-dataset["N"] = dataset["Messages"].apply(lambda x: len(tokenizer.apply_chat_template(x)['input_ids']))
-
-dataset = dataset.loc[dataset["N"] <= max_seq_length/2].copy()
-dataset.shape
+dataset = dataset.map(generate_conversation, batched = True)
 
 
-# We then tokenize the messages and convert it to a Hugging Face compatible dataset format:
+# We now have to apply the chat template for `Qwen 3.5` onto the conversations, and save it to `text`.
 
-# In[13]:
-
-
-from datasets import Dataset
-
-dataset["text"] = tokenizer.apply_chat_template(dataset["Messages"].values.tolist(), tokenize = False)
-dataset = Dataset.from_pandas(dataset)
-dataset
+# In[ ]:
 
 
-# Let's now pre fine-tune the model so it follows our custom GRPO formatting!
+def formatting_prompts_func(examples):
+   convos = examples["conversations"]
+   texts = [tokenizer.apply_chat_template(convo, tokenize = False, add_generation_prompt = False) for convo in convos]
+   return { "text" : texts, }
 
-# In[14]:
+dataset = dataset.map(formatting_prompts_func, batched = True)
+
+
+# Let's see how the chat template did!
+
+# In[ ]:
+
+
+dataset[100]['text']
+
+
+# <a name="Train"></a>
+# ### Train the model
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
+
+# In[16]:
 
 
 from trl import SFTTrainer, SFTConfig
@@ -250,19 +174,88 @@ trainer = SFTTrainer(
 )
 
 
-# In[15]:
+# In[ ]:
 
 
-trainer.train()
+dataset[100]['text']
 
 
-# The model would generate gibberish here as we initialized a dummy model from random weights. Prolonged training can help but this is just for a demo.
+# <a name="Train"></a>
+# ### Train the model
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 
 # In[ ]:
 
 
+from trl import SFTTrainer, SFTConfig
+trainer = SFTTrainer(
+    model = model,
+    tokenizer = tokenizer,
+    train_dataset = dataset,
+    args = SFTConfig(
+        dataset_text_field = "text",
+        per_device_train_batch_size = 1,
+        gradient_accumulation_steps = 1, # Use GA to mimic batch size!
+        warmup_steps = 5,
+        # num_train_epochs = 1, # Set this for 1 full training run.
+        max_steps = 50,
+        learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
+        logging_steps = 5,
+        optim = "adamw_8bit",
+        weight_decay = 0.001,
+        lr_scheduler_type = "linear",
+        seed = 3407,
+        report_to = "none", # Use TrackIO/WandB etc
+    ),
+)
+
+
+# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
+
+# In[ ]:
+
+
+from unsloth.chat_templates import train_on_responses_only
+trainer = train_on_responses_only(
+    trainer,
+    instruction_part = "<|im_start|>user\n",
+    response_part = "<|im_start|>assistant\n<think>",
+)
+
+
+# Let's verify masking the instruction part is done! Let's print the 100th row again.
+
+# In[ ]:
+
+
+tokenizer.decode(trainer.train_dataset[100]["input_ids"])
+
+
+# Now let's print the masked out example - you should see only the answer is present:
+
+# In[ ]:
+
+
+tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
+
+
+# In[ ]:
+
+
+# Compilation can take 2-3 minutes of time, so please be patient :)
+trainer.train()
+
+
+# Let's check if the model has learnt to follow the custom format:
+
+# In[ ]:
+
+
+messages = [
+    {"role" : "user", "content" : "Continue the sequence: 1, 1, 2, 3, 5, 8,"}
+]
 text = tokenizer.apply_chat_template(
-    dataset[0]["Messages"][:2],
+    messages,
     tokenize = False,
     add_generation_prompt = True, # Must add for generation
 )
@@ -270,16 +263,15 @@ text = tokenizer.apply_chat_template(
 from transformers import TextStreamer
 _ = model.generate(
     **tokenizer(text, return_tensors = "pt").to("cuda"),
-    temperature = 0.1,
-    max_new_tokens = 128,
-    streamer = TextStreamer(tokenizer, skip_prompt = False),
-    use_cache = True
+    max_new_tokens = 1000, # Increase for longer outputs!
+    temperature = 0.7, top_p = 0.8, top_k = 20, # For non thinking
+    streamer = TextStreamer(tokenizer, skip_prompt = True),
 )
 
 
 # Yes it did follow the formatting! Great! Let's remove some items before the GRPO step
 
-# In[17]:
+# In[19]:
 
 
 del dataset
@@ -293,24 +285,24 @@ gc.collect()
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
-# In[18]:
+# In[20]:
 
 
 # Merge to 16bit
-if False: model.save_pretrained_merged("tinyqwen_finetune_16bit", tokenizer, save_method = "merged_16bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/tinyqwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_merged("qwen_finetune_16bit", tokenizer, save_method = "merged_16bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
 
 # Merge to 4bit
-if False: model.save_pretrained_merged("tinyqwen_finetune_4bit", tokenizer, save_method = "merged_4bit",)
-if False: model.push_to_hub_merged("HF_USERNAME/tinyqwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_merged("qwen_finetune_4bit", tokenizer, save_method = "merged_4bit",)
+if False: model.push_to_hub_merged("HF_USERNAME/qwen_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
 
 # Just LoRA adapters
 if False:
-    model.save_pretrained("tinyqwen_lora")
-    tokenizer.save_pretrained("tinyqwen_lora")
+    model.save_pretrained("qwen_lora")
+    tokenizer.save_pretrained("qwen_lora")
 if False:
-    model.push_to_hub("HF_USERNAME/tinyqwen_lora", token = "YOUR_HF_TOKEN")
-    tokenizer.push_to_hub("HF_USERNAME/tinyqwen_lora", token = "YOUR_HF_TOKEN")
+    model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
 
 
 # ### GGUF / llama.cpp Conversion
@@ -323,34 +315,34 @@ if False:
 # 
 # [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 
-# In[19]:
+# In[ ]:
 
 
 # Save to 8bit Q8_0
-if False: model.save_pretrained_gguf("tinyqwen_finetune", tokenizer,)
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer,)
 # Remember to go to https://huggingface.co/settings/tokens for a token!
 # And change hf to your username!
-if False: model.push_to_hub_gguf("HF_USERNAME/tinyqwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, token = "YOUR_HF_TOKEN")
 
 # Save to 16bit GGUF
-if False: model.save_pretrained_gguf("tinyqwen_finetune", tokenizer, quantization_method = "f16")
-if False: model.push_to_hub_gguf("HF_USERNAME/tinyqwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "f16")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
 
 # Save to q4_k_m GGUF
-if False: model.save_pretrained_gguf("tinyqwen_finetune", tokenizer, quantization_method = "q4_k_m")
-if False: model.push_to_hub_gguf("HF_USERNAME/tinyqwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
+if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
+if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
 
 # Save to multiple GGUF options - much faster if you want multiple!
 if False:
     model.push_to_hub_gguf(
-        "HF_USERNAME/tinyqwen_finetune", # Change hf to your username!
+        "HF_USERNAME/qwen_finetune", # Change hf to your username!
         tokenizer,
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN",
     )
 
 
-# Now, use the `tinyqwen_finetune.Q8_0.gguf` file or `tinyqwen_finetune.Q4_K_M.gguf` file in llama.cpp.
+# Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
 # 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 

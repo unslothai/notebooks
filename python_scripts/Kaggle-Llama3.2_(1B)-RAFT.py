@@ -209,7 +209,7 @@ model = FastLanguageModel.get_peft_model(
 
 def formatting_prompts_func(examples):
     """Define a formatter that injects the retrieved context:"""
-
+    
     texts = []
     for qn, ctx, oracle, instr, ans in zip(
         examples['question'],
@@ -286,7 +286,7 @@ trainer = SFTTrainer(
     eval_dataset = eval_ds, 
     args = training_args,
     dataset_text_field = "text",
-
+    
 )
 
 

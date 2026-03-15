@@ -22,12 +22,25 @@
 # - train using Unsloth and NeMo Gym 
 # - test and save the trained model
 # 
-# To install NeMo Gym, follow the guide [here](https://docs.nvidia.com/nemo/gym/latest/get-started/index.html).
 # 
-# To install Unsloth on your local device, follow the guide [here](https://unsloth.ai/docs/get-started/install). 
+# This notebook was developed on 1 H100 GPU through NVIDIA Brev. 
 # 
-# 
-# This notebook was developed on 1 H100 GPU. If you are using a GPU with lower VRAM, you should adjust configuration parameters accordingly, such as max output length, quantization, or parameter efficient finetuning. Unsloth has a bunch of examples of low VRAM training that work with NeMo Gym training environments! 
+# If you are using a GPU with lower VRAM, you should adjust configuration parameters accordingly, such as max output length, quantization, or parameter efficient finetuning. Unsloth has a bunch of examples of low VRAM training that work with NeMo Gym training environments! 
+
+# ## Installation
+# If you are using Google Colab, please visit [Unsloth installation docs](https://unsloth.ai/docs/get-started/install) rather than the pip install below. 
+
+# In[ ]:
+
+
+get_ipython().system('pip install unsloth unsloth_zoo omegaconf')
+
+# If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:
+# !source /home/ubuntu/.venv/bin/activate
+# !python -m ensurepip --upgrade
+# !python -m pip install -U pip
+# !python -m pip install -U unsloth
+
 
 # # Load the model
 # 
@@ -74,47 +87,123 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # 
 # NeMo Gym resources servers provide tool implementations, logic to process actions, update state, provide observations, and calculate rewards for actions taken. 
 # 
-# The reasoning gym resource server is an integration of [reasoning gym](https://github.com/open-thought/reasoning-gym), which is a library of procedural dataset generators and algorithmically verifiable reasoning environments for training reasoning models with reinforcement learning (RL). It includes more than 100 tasks over many domains with configurable difficulty, including but not limited to algebra, arithmetic, computation, cognition, geometry, graph theory, logic, and many common games. 
+# The reasoning gym resources server is an integration of [reasoning gym](https://github.com/open-thought/reasoning-gym), which is a library of procedural dataset generators and algorithmically verifiable reasoning environments for training reasoning models with reinforcement learning (RL). It includes more than 100 tasks over many domains with configurable difficulty, including but not limited to algebra, arithmetic, computation, cognition, geometry, graph theory, logic, and many common games. 
 # 
-# First, start the reasoning_gym resources server in a terminal: 
+# If you are using Google Colab, add the flag `uv_pip_set_python=true` to `ng_run` command.
 # 
-# ```
-# cd ~/Gym
-# uv venv
-# source .venv/bin/activate
-# uv sync --active
-# ng_run "+config_paths=[resources_servers/reasoning_gym/configs/resources_only.yaml]"
-# ```
+# The cell below will automatically:
+# 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (requires Python 3.12+ and `uv` on the system)
+# 2. Set up the virtual environment and install dependencies
+# 3. Create the mini sudoku training dataset
+# 4. Start the resources server in the background
 # 
-# 
-# You should see a similar output in the terminal: 
-# 
-# ```
-# All 1 / 1 servers ready! Polling every 60s
-# 
-# ####################################################################################################
-# #
-# # Server Instances
-# #
-# ####################################################################################################
-# 
-# [1] reasoning_gym (resources_servers/reasoning_gym)
-# {
-#     'process_name': 'reasoning_gym',
-#     'server_type': 'resources_servers',
-#     'name': 'reasoning_gym',
-#     'dir_path': (
-#         '/home/ubuntu/Gym/resources_servers/reasoning_gym'
-#     ),
-#     'entrypoint': 'app.py',
-#     'host': '127.0.0.1',
-#     'port': 19815,
-#     'pid': 801468,
-#     'config_path': 'reasoning_gym',
-#     'url': 'http://127.0.0.1:19815',
-# }
-# ####################################################################################################
-# ```
+# Google Colab is auto-detected and the `uv_pip_set_python=true` flag is added when needed.
+
+# In[ ]:
+
+
+import subprocess
+import os
+import time
+import atexit
+import requests
+
+GYM_DIR = os.path.expanduser("~/Gym")
+
+# Detect Google Colab
+try:
+    import google.colab
+    _on_colab = True
+except ImportError:
+    _on_colab = False
+
+# Step 1: Clone NeMo Gym
+if not os.path.exists(GYM_DIR):
+    print("Cloning NeMo Gym...")
+    subprocess.run(
+        ["git", "clone", "https://github.com/NVIDIA-NeMo/Gym.git", GYM_DIR],
+        check = True,
+    )
+
+# Step 2: Create venv and install dependencies
+if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
+    print("Setting up NeMo Gym environment (this may take a few minutes)...")
+    subprocess.run(["uv", "venv", "--python", "3.12"], cwd = GYM_DIR, check = True)
+    subprocess.run(
+        ["bash", "-c", "source .venv/bin/activate && uv sync"],
+        cwd = GYM_DIR, check = True,
+    )
+    subprocess.run(
+        ["bash", "-c", "source .venv/bin/activate && uv pip install reasoning-gym"],
+        cwd = GYM_DIR, check = True,
+    )
+# Step 3: Create dataset
+_sudoku_ds = os.path.join(
+    GYM_DIR, "resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl"
+)
+if not os.path.exists(_sudoku_ds):
+    print("Creating mini_sudoku dataset (2000 examples)...")
+    subprocess.run(
+        [
+            "bash", "-c",
+            "source .venv/bin/activate && python "
+            "resources_servers/reasoning_gym/scripts/create_dataset.py "
+            "--task mini_sudoku --size 2000 --seed 42 "
+            f"--output {_sudoku_ds}",
+        ],
+        cwd = GYM_DIR, check = True,
+    )
+# Start NeMo Gym server if not already running
+try:
+    requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2)
+    print("NeMo Gym server already running on port 11000.")
+except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+    _colab_flag = " uv_pip_set_python=true" if _on_colab else ""
+    print("Starting NeMo Gym server...")
+    _ng_log = open(os.path.join(GYM_DIR, "ng_run.log"), "w")
+    ng_process = subprocess.Popen(
+        [
+            "bash", "-c",
+            "source .venv/bin/activate && ng_run "
+            '"+config_paths=[resources_servers/reasoning_gym/configs/resources_only.yaml]"'
+            + _colab_flag,
+        ],
+        cwd = GYM_DIR,
+        stdout = _ng_log,
+        stderr = subprocess.STDOUT,
+    )
+
+    def _cleanup_ng():
+        if ng_process.poll() is None:
+            ng_process.terminate()
+            try:
+                ng_process.wait(timeout = 10)
+            except subprocess.TimeoutExpired:
+                ng_process.kill()
+        _ng_log.close()
+    atexit.register(_cleanup_ng)
+
+    print("Waiting for server", end = "", flush = True)
+    for _ in range(120):
+        try:
+            requests.get(
+                "http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2
+            )
+            break
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if ng_process.poll() is not None:
+                raise RuntimeError(
+                    "Server process exited unexpectedly. "
+                    f"Check {GYM_DIR}/ng_run.log for details."
+                )
+            print(".", end = "", flush = True)
+            time.sleep(3)
+    else:
+        raise RuntimeError(
+            "NeMo Gym server did not start within 6 minutes."
+        )
+    print("\nHead server ready!")
+
 
 # NeMo Gym starts a head server on port 11000 by default, and the resources server port is selected at random from available ports, unless specified otherwise. We can automatically extract the resources server port using the head server:
 
@@ -133,9 +222,16 @@ head_port = 11000
 resources_server_name = "reasoning_gym"
 
 # Retrieve the server config which contains the port that the resources server is hosted on
-response = requests.get(
-    f"http://127.0.0.1:{head_port}/global_config_dict_yaml", timeout = 5
-)
+try:
+    response = requests.get(
+        f"http://127.0.0.1:{head_port}/global_config_dict_yaml", timeout = 5
+    )
+    response.raise_for_status()
+except requests.exceptions.ConnectionError:
+    raise RuntimeError(
+        "Could not connect to NeMo Gym head server on port 11000. "
+        "Make sure the setup cell above ran successfully."
+    )
 
 # Extract the host ip and port of the resources server
 global_config_dict = OmegaConf.create(yaml.safe_load(response.text))
@@ -144,28 +240,29 @@ config = global_config_dict[resources_server_name].resources_servers[
 ]
 verify_endpoint = f"http://{config.host}:{config.port}/verify"
 
+# Wait for the resources server to be fully ready
+print(f"Waiting for resources server at {config.host}:{config.port}", end = "", flush = True)
+for _i in range(90):
+    try:
+        requests.get(f"http://{config.host}:{config.port}/", timeout = 2)
+        break
+    except requests.exceptions.ConnectionError:
+        print(".", end = "", flush = True)
+        time.sleep(2)
+else:
+    raise RuntimeError(
+        f"Resources server at {config.host}:{config.port} did not start within 3 minutes."
+    )
+print("\nResources server ready!")
+
 verify_endpoint
 
 
 # # Dataset prep
 # 
-# Next, let's create and load the dataset. We can generate a mini sudoku dataset using the script in NeMo Gym. 
+# Next, let's create and load the dataset. We can generate a mini sudoku dataset using the script in NeMo Gym.
 # 
-# ```
-# cd ~/Gym
-# 
-# uv add reasoning-gym
-# 
-# python resources_servers/reasoning_gym/scripts/create_dataset.py \
-#     --task mini_sudoku \
-#     --size 2000 \
-#     --seed 42 \
-#     --output resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl
-# ```
-# 
-# 
-# 
-# Now load the dataset!
+# The dataset was created automatically by the setup cell above. Now load it!
 
 # In[ ]:
 
@@ -175,10 +272,17 @@ import json
 from datasets import Dataset
 
 dataset_path = "~/Gym/resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl"
+dataset_path = os.path.expanduser(dataset_path)
+
+if not os.path.exists(dataset_path):
+    raise FileNotFoundError(
+        f"Dataset not found at {dataset_path}. "
+        "Run the setup cell above first."
+    )
 
 train_data = []
 max_length_seen = 0
-with open(os.path.expanduser(dataset_path), "r") as f:
+with open(dataset_path, "r") as f:
     for line in f:
         data = json.loads(line)
 
@@ -230,7 +334,7 @@ def reward_fn(completions, prompts = None, **kwargs):
             },
             "response": {
                 "id": "resp",
-                "created_at": 0.0,
+                "created_at": 0,
                 "model": model_name,
                 "object": "response",
                 "output": [
@@ -260,7 +364,8 @@ def reward_fn(completions, prompts = None, **kwargs):
             # send verify request to NeMo Gym resources server
             resp = requests.post(verify_endpoint, json = verify_request, timeout = 30)
             reward = resp.json().get("reward", 0.0) if resp.status_code == 200 else 0.0
-        except:
+        except requests.exceptions.RequestException as e:
+            print(f"Warning: verify request failed: {e}")
             reward = 0.0
         scores.append(reward)
     return np.array(scores)
@@ -342,6 +447,7 @@ from transformers import TextStreamer
 
 _ = model.generate(
     **tokenizer(text, return_tensors = "pt").to("cuda"),
+    do_sample = True,
     temperature = 1.0,
     max_new_tokens = 4096,
     streamer = TextStreamer(tokenizer, skip_prompt = False),
