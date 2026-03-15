@@ -39,12 +39,12 @@ for file_path in ft_files:
     # Load the JSON file
     with open(file_path, 'r') as f:
         ft_data = json.load(f)
-
+    
     # Convert each item
     for item in ft_data:
         if 'messages' not in item:
             continue
-
+        
         # Extract only user and assistant messages
         conversation = []
         for msg in item['messages']:
@@ -53,7 +53,7 @@ for file_path in ft_files:
                     "role": msg['role'],
                     "content": msg['content']
                 })
-
+        
         # Add to our data if we have at least one exchange
         if len(conversation) > 0:
             all_data.append({
@@ -197,7 +197,7 @@ if tokenizer.pad_token is None:
 def formatting_prompts_func(examples):
     convos = examples["conversations"]
     texts = []
-
+    
     for convo in convos:
         # Ensure conversation is in correct format
         if isinstance(convo, list) and all(isinstance(msg, dict) for msg in convo):
@@ -206,7 +206,7 @@ def formatting_prompts_func(examples):
         else:
             print(f"⚠️  Skipping malformed conversation: {type(convo)}")
             continue
-
+    
     return {"text": texts}
 
 dataset = standardize_sharegpt(dataset)
