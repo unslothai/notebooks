@@ -100,11 +100,10 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # 2. Set up the virtual environment and install dependencies
 # 3. Create the mini sudoku training dataset
 # 4. Download the instruction following dataset
-# 5. Start both resources servers in the background
+# 5. Ensure resources-only configs exist for both servers
+# 6. Start both resources servers in the background
 # 
 # Google Colab is auto-detected and the `uv_pip_set_python=true` flag is added when needed.
-# 
-# Note: The instruction_following config also starts an agent server alongside the resources server. The agent server is unused during training and can be ignored.
 
 # In[ ]:
 
@@ -178,19 +177,33 @@ if not os.path.exists(if_path):
     )
     os.makedirs(os.path.dirname(if_path), exist_ok = True)
     shutil.copy(src, if_path)
+# Step 5: Create resources_only.yaml for instruction_following if missing
+_if_resources_only = os.path.join(
+    GYM_DIR, "resources_servers/instruction_following/configs/resources_only.yaml"
+)
+if not os.path.exists(_if_resources_only):
+    with open(_if_resources_only, "w") as _f:
+        _f.write(
+            "instruction_following:\\n"
+            "  resources_servers:\\n"
+            "    instruction_following:\\n"
+            "      entrypoint: app.py\\n"
+            "      domain: instruction_following\\n"
+            "      verified: false\\n"
+        )
 # Start NeMo Gym servers if not already running
 try:
     requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2)
     print("NeMo Gym servers already running on port 11000.")
 except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-    _colab_flag = " uv_pip_set_python=true" if _on_colab else ""
+    _colab_flag = " +uv_pip_set_python=true"
     print("Starting NeMo Gym servers...")
     _ng_log = open(os.path.join(GYM_DIR, "ng_run.log"), "w")
     ng_process = subprocess.Popen(
         [
             "bash", "-c",
             "source .venv/bin/activate && ng_run "
-            '"+config_paths=[resources_servers/reasoning_gym/configs/resources_only.yaml,resources_servers/instruction_following/configs/instruction_following.yaml]"'
+            '"+config_paths=[resources_servers/reasoning_gym/configs/resources_only.yaml,resources_servers/instruction_following/configs/resources_only.yaml]"'
             + _colab_flag,
         ],
         cwd = GYM_DIR,
