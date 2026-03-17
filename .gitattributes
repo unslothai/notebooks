@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.ipynb text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.svg binary
