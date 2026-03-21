@@ -31,14 +31,30 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n!pip install transformers==5.3.0\n!pip install --no-deps trl==0.22.2\n')
-# 
+# %%capture
+# import os, importlib.util
+# !pip install --upgrade -qqq uv
+# if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
+#     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
+#     except: _numpy = "numpy"; _pil = "pillow"
+#     !uv pip install -qqq \
+#         "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \
+#         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
+#         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
+# elif importlib.util.find_spec("unsloth") is None:
+#     !uv pip install -qqq unsloth
+# !uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo
+# !uv pip install transformers==5.2.0
+# # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
+# !uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
 # 
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', '! pip uninstall unsloth unsloth_zoo -y\n! pip install git+https://github.com/unslothai/unsloth-zoo.git --no-deps\n! pip install git+https://github.com/unslothai/unsloth.git --no-deps\n')
-# 
+# %%capture
+# ! pip uninstall unsloth unsloth_zoo -y
+# ! pip install git+https://github.com/unslothai/unsloth-zoo.git --no-deps
+# ! pip install git+https://github.com/unslothai/unsloth.git --no-deps
 # 
 # # In[ ]:
 # 
@@ -54,7 +70,6 @@
 # # `!uv pip install --no-build-isolation flash-attn flash-linear-attention causal_conv1d==1.6.`
 # # You can even try playing around with the below env var for faster performance but make sure you have enough VRAM to try autotuning.
 # os.environ['UNSLOTH_MOE_DISABLE_AUTOTUNE'] = '1'
-# 
 # 
 # # ### Unsloth
 
@@ -75,7 +90,6 @@ model, processor = FastLanguageModel.from_pretrained(
 )
 tokenizer = processor.tokenizer # To tokenize text
 
-
 # In[7]:
 
 
@@ -92,7 +106,6 @@ model = FastLanguageModel.get_peft_model(
     bias = "none",
 )
 
-
 # <a name="Data"></a>
 # ### Data Prep
 # We now use the `Qwen 3.5` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy. 
@@ -102,7 +115,6 @@ model = FastLanguageModel.get_peft_model(
 
 from datasets import load_dataset
 dataset = load_dataset("unsloth/OpenMathReasoning-mini", split = "cot")
-
 
 # We now convert the reasoning dataset into conversational format:
 
@@ -122,7 +134,6 @@ def generate_conversation(examples):
 
 dataset = dataset.map(generate_conversation, batched = True)
 
-
 # We now have to apply the chat template for `Qwen 3.5` onto the conversations, and save it to `text`.
 
 # In[ ]:
@@ -135,14 +146,12 @@ def formatting_prompts_func(examples):
 
 dataset = dataset.map(formatting_prompts_func, batched = True)
 
-
 # Let's see how the chat template did!
 
 # In[ ]:
 
 
 dataset[100]['text']
-
 
 # <a name="Train"></a>
 # ### Train the model
@@ -173,12 +182,10 @@ trainer = SFTTrainer(
     ),
 )
 
-
 # In[ ]:
 
 
 dataset[100]['text']
-
 
 # <a name="Train"></a>
 # ### Train the model
@@ -209,7 +216,6 @@ trainer = SFTTrainer(
     ),
 )
 
-
 # We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
 
 # In[ ]:
@@ -222,14 +228,12 @@ trainer = train_on_responses_only(
     response_part = "<|im_start|>assistant\n<think>",
 )
 
-
 # Let's verify masking the instruction part is done! Let's print the 100th row again.
 
 # In[ ]:
 
 
 tokenizer.decode(trainer.train_dataset[100]["input_ids"])
-
 
 # Now let's print the masked out example - you should see only the answer is present:
 
@@ -238,13 +242,11 @@ tokenizer.decode(trainer.train_dataset[100]["input_ids"])
 
 tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
 
-
 # In[ ]:
 
 
 # Compilation can take 2-3 minutes of time, so please be patient :)
 trainer.train()
-
 
 # Let's check if the model has learnt to follow the custom format:
 
@@ -268,7 +270,6 @@ _ = model.generate(
     streamer = TextStreamer(tokenizer, skip_prompt = True),
 )
 
-
 # Yes it did follow the formatting! Great! Let's remove some items before the GRPO step
 
 # In[19]:
@@ -278,7 +279,6 @@ del dataset
 torch.cuda.empty_cache()
 import gc
 gc.collect()
-
 
 # <a name="Save"></a>
 # ### Saving to float16 for VLLM
@@ -303,7 +303,6 @@ if False:
 if False:
     model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
     tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
-
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
@@ -340,7 +339,6 @@ if False:
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN",
     )
-
 
 # Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
 # 

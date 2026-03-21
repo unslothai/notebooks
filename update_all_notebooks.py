@@ -473,6 +473,25 @@ installation_qwen3_vl_kaggle_content  = update_or_append_pip_install(
     "!pip install transformers==4.57.1",
 )
 
+installation_qwen3_5_content = """%%capture
+import os, importlib.util
+!pip install --upgrade -qqq uv
+if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
+    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
+    except: _numpy = "numpy"; _pil = "pillow"
+    !uv pip install -qqq \\
+        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\
+        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
+        "unsloth[base] @ git+https://github.com/unslothai/unsloth"
+elif importlib.util.find_spec("unsloth") is None:
+    !uv pip install -qqq unsloth
+!uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo
+!uv pip install transformers==5.2.0
+# causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
+!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0"""
+
+installation_qwen3_5_kaggle_content = installation_qwen3_5_content
+
 installation_sglang_content = """%%capture
 import sys
 import os
@@ -1531,7 +1550,8 @@ def update_old_unsloth(filename):
 
     def replace_common(text):
         """Apply common text replacements for both code and markdown cells."""
-        text = _normalize_transformers_v5_pin(text)
+        if "qwen3_5" not in filename.lower():
+            text = _normalize_transformers_v5_pin(text)
         text = text.replace("</a></a>", "</a>")
         text = _RE_DOUBLE_EXCL.sub("!", text)
         text = text.replace("ee notice", "we notice")
@@ -2259,6 +2279,13 @@ def update_notebook_sections(
                             else:
                                 installation = installation_qwen3_vl_content
                                 
+                        # Qwen3.5 INSTALLATION (must come after Qwen3VL to override for qwen3_5)
+                        if is_path_contains_any(notebook_path.lower(), ["qwen3_5"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_qwen3_5_kaggle_content
+                            else:
+                                installation = installation_qwen3_5_content
+
                         # Nemotron Nano 3 INSTALLATION also Granite has mamba
                         if is_path_contains_any(notebook_path.lower(), ["nemotron-3-nano","nemotron-nano-3", "granite4"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -2295,7 +2322,8 @@ def update_notebook_sections(
                             new_install_text = "".join(installation)
                         else:
                             new_install_text = installation
-                        new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
+                        if not is_path_contains_any(notebook_path.lower(), ["qwen3_5"]):
+                            new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
                         _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
 
                         notebook_content["cells"][i + 1]["source"] = new_install_text
@@ -3252,7 +3280,8 @@ def _apply_global_fixes(nb_path):
         with open(nb_path, "r", encoding="utf-8", newline="") as f:
             raw = f.read()
         new_raw = raw
-        new_raw = _normalize_transformers_v5_pin(new_raw)
+        if "qwen3_5" not in nb_path.lower():
+            new_raw = _normalize_transformers_v5_pin(new_raw)
         new_raw = _RE_GATED_GLOBAL.sub(
             "# HF Token for gated models",
             new_raw,
