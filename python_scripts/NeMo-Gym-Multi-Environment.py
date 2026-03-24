@@ -185,12 +185,12 @@ _if_resources_only = os.path.join(
 if not os.path.exists(_if_resources_only):
     with open(_if_resources_only, "w") as _f:
         _f.write(
-            "instruction_following:\\n"
-            "  resources_servers:\\n"
-            "    instruction_following:\\n"
-            "      entrypoint: app.py\\n"
-            "      domain: instruction_following\\n"
-            "      verified: false\\n"
+            "instruction_following:\n"
+            "  resources_servers:\n"
+            "    instruction_following:\n"
+            "      entrypoint: app.py\n"
+            "      domain: instruction_following\n"
+            "      verified: false\n"
         )
 # Start NeMo Gym servers if not already running
 try:
