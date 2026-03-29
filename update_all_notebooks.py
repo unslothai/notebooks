@@ -41,7 +41,7 @@ try:
 except Exception:
     _tqdm = None
 
-new_announcement = """Introducing **Unsloth Studio** — a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio)
+new_announcement = """Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
 
 <table><tr>
 <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
@@ -2052,6 +2052,36 @@ def extract_version(model_name):
         return (0, 0)
 
 
+def _update_news_only(notebook_path, new_announcement):
+    """Update ONLY the '### News' section in a notebook, leaving everything else untouched."""
+    try:
+        with open(notebook_path, "r", encoding="utf-8", newline="") as f:
+            notebook_content = json.load(f)
+    except Exception:
+        return False
+
+    _cache_notebook_format(notebook_path)
+    updated = False
+
+    for i, cell in enumerate(notebook_content["cells"]):
+        if cell["cell_type"] != "markdown":
+            continue
+        source_str = "".join(cell["source"]).strip()
+        if source_str == "### News":
+            if (
+                i + 1 < len(notebook_content["cells"])
+                and notebook_content["cells"][i + 1]["cell_type"] == "markdown"
+            ):
+                announcement = new_announcement.strip()
+                notebook_content["cells"][i + 1]["source"] = _source_lines(announcement)
+                updated = True
+            break
+
+    if updated:
+        _write_notebook(notebook_path, notebook_content)
+    return updated
+
+
 def update_notebook_sections(
     notebook_path,
     general_announcement,
@@ -3438,6 +3468,11 @@ if __name__ == "__main__":
         help="If true, it will not convert the notebooks to scripts",
     )
     parser.add_argument(
+        "--news_only",
+        action="store_true",
+        help="Only update the News section in all notebooks. Skips installation, README, spelling, and all other updates.",
+    )
+    parser.add_argument(
         "--workers",
         type=int,
         default=0,
@@ -3487,6 +3522,18 @@ if __name__ == "__main__":
                 if file not in DONT_UPDATE_EXCEPTIONS:
                     print(file)
         exit(0)
+
+    if args.news_only:
+        notebook_files = glob(os.path.join("nb", "*.ipynb"))
+        print(f"[--news_only] Found {len(notebook_files)} notebooks")
+        count = 0
+        for nb_path in notebook_files:
+            if _update_news_only(nb_path, new_announcement):
+                count += 1
+        print(f"[--news_only] Updated news in {count} notebooks")
+        _summarize_git_diff()
+        exit(0)
+
     # Cache format of existing notebooks before they are replaced by templates.
     # This preserves the original indent / trailing-newline of files already in nb/.
     for _nb_path in glob(os.path.join("nb", "*.ipynb")):
