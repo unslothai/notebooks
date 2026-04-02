@@ -3623,6 +3623,23 @@ if __name__ == "__main__":
     for nb_path in _progress_iter(all_nb_paths, total=len(all_nb_paths), desc="Restore outputs"):
         _restore_original_outputs(nb_path)
 
+    # Fix HTML-like tags in outputs that GitHub's renderer would hide.
+    # Must run AFTER _restore_original_outputs (processes restored outputs).
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+    from fix_html_tags import fix_outputs as _fix_html_outputs
+    from fix_html_tags import fix_comments as _fix_html_comments
+
+    for nb_path in _progress_iter(all_nb_paths, total=len(all_nb_paths), desc="Fix HTML tags"):
+        try:
+            with open(nb_path, "r", encoding="utf-8", newline="") as f:
+                nb_data = json.load(f)
+            output_fixes = _fix_html_outputs(nb_data)
+            comment_fixes = _fix_html_comments(nb_data)
+            if output_fixes + comment_fixes > 0:
+                _write_notebook(nb_path, nb_data)
+        except Exception:
+            pass
+
     if not args.disable_convert_to_script:
         convert_folder(
             "nb",
