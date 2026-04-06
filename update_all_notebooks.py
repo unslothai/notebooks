@@ -728,11 +728,25 @@ _RE_DUP_DOCS_GLOBAL = re.compile(
 _RE_TRANSFORMERS_V5_PIN = re.compile(
     r"(?<![A-Za-z0-9_.-])transformers\s*==\s*5(?:\.\d+){0,2}(?![A-Za-z0-9_.-])"
 )
+_RE_TRANSFORMERS_V5_PIN_CAPTURE = re.compile(
+    r"(?<![A-Za-z0-9_.-])transformers\s*==\s*(5(?:\.\d+){0,2})(?![A-Za-z0-9_.-])"
+)
 
+_TARGET_TRANSFORMERS_V5 = "5.3.0"
+
+def _parse_version_tuple(v):
+    """Parse '5.3.0' into (5, 3, 0) for comparison."""
+    return tuple(int(x) for x in v.split("."))
 
 def _normalize_transformers_v5_pin(text):
-    """Normalize transformers 5.x pins to transformers==5.3.0."""
-    return _RE_TRANSFORMERS_V5_PIN.sub("transformers==5.3.0", text)
+    """Normalize transformers 5.x pins to the target version, but never downgrade."""
+    target = _parse_version_tuple(_TARGET_TRANSFORMERS_V5)
+    def _replace(m):
+        existing = m.group(1)
+        if _parse_version_tuple(existing) > target:
+            return m.group(0)  # keep the higher version
+        return f"transformers=={_TARGET_TRANSFORMERS_V5}"
+    return _RE_TRANSFORMERS_V5_PIN_CAPTURE.sub(_replace, text)
 
 
 _ALL_NB_FIXES = {
@@ -1896,10 +1910,14 @@ def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
         )
 
 def _preserve_transformers_v5_pin(old_cell_text, new_cell_text):
-    """Force transformers==5.3.0 only when the previous install cell pinned transformers==5.*."""
-    if not _RE_TRANSFORMERS_EQ_PIN_5.search(old_cell_text):
+    """Preserve transformers 5.x pin from the old cell, never downgrading the version."""
+    old_match = _RE_TRANSFORMERS_V5_PIN_CAPTURE.search(old_cell_text)
+    if not old_match:
         return new_cell_text
-    return _RE_TRANSFORMERS_EQ_PIN.sub(r"\g<1>5.3.0", new_cell_text)
+    old_ver = _parse_version_tuple(old_match.group(1))
+    target = _parse_version_tuple(_TARGET_TRANSFORMERS_V5)
+    pin_ver = old_match.group(1) if old_ver > target else _TARGET_TRANSFORMERS_V5
+    return _RE_TRANSFORMERS_EQ_PIN.sub(rf"\g<1>{pin_ver}", new_cell_text)
 
 
 badge_section = '<a href="{link_colab}" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>'
