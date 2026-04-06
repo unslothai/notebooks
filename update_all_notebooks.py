@@ -72,7 +72,8 @@ To install Unsloth on your local device, follow [our guide](https://unsloth.ai/d
 You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)"""
 
 general_announcement_content_a100 = general_announcement_content.replace("on a **free** Tesla T4 Google Colab instance!", "on your A100 Google Colab Pro instance!")
-general_announcement_content_fp8 = general_announcement_content.replace("on a **free** Tesla T4 Google Colab instance!", "on your L4 Google Colab Pro instance!")
+general_announcement_content_l4 = general_announcement_content.replace("on a **free** Tesla T4 Google Colab instance!", "on your L4 Google Colab Pro instance!")
+general_announcement_content_fp8 = general_announcement_content_l4  # backwards compat alias
 
 general_announcement_content_hf_course = general_announcement_content.split(announcement_separation)
 general_announcement_content_hf_course = general_announcement_content_hf_course[0] + announcement_separation + '<a href="https://huggingface.co/learn/nlp-course/en/chapter12/6?fw=pt"><img src="https://github.com/unslothai/notebooks/raw/main/assets/hf%20course.png" width="165"></a>' + general_announcement_content_hf_course[1]
@@ -2109,15 +2110,29 @@ def update_notebook_sections(
                     news_markdown_index = i
                     break
 
-        if f"{hf_course_name}-" in notebook_path: 
+        # Select announcement based on notebook type and GPU
+        gpu_type = notebook_content.get("metadata", {}).get("colab", {}).get("gpuType", "T4")
+        if f"{hf_course_name}-" in notebook_path:
             full_model_name = os.path.basename(notebook_path).replace(".ipynb", "")
             full_model_name = full_model_name.split("-")
             full_model_name = " ".join(full_model_name[1:]).replace("_", " ")
             general_announcement = general_announcement_content_hf_course.format(full_model_name=full_model_name)
         elif "Meta" in notebook_path:
             general_announcement = general_announcement_content_meta
+        elif gpu_type == "A100":
+            general_announcement = general_announcement_content_a100
+        elif gpu_type == "L4":
+            general_announcement = general_announcement_content_l4
         elif "A100" in notebook_path:
             general_announcement = general_announcement_content_a100
+
+        # Fix GPU text in category-specific templates (HF Course, Meta) that default to T4
+        if gpu_type == "A100":
+            general_announcement = general_announcement.replace(
+                "on a **free** Tesla T4 Google Colab instance!", "on your A100 Google Colab Pro instance!")
+        elif gpu_type == "L4":
+            general_announcement = general_announcement.replace(
+                "on a **free** Tesla T4 Google Colab instance!", "on your L4 Google Colab Pro instance!")
 
         # Update the general announcement section
         if first_markdown_index != -1:
@@ -2433,8 +2448,8 @@ def update_notebook_sections(
         if "colab" not in notebook_content["metadata"]:
             notebook_content["metadata"]["colab"] = {"provenance": [], "gpuType" : "T4", "include_colab_link": True}
             updated = True
-        # Override gpuType for A100 notebooks
-        if "A100" in notebook_path:
+        # Override gpuType for A100 notebooks (filename-based fallback)
+        if "A100" in notebook_path and notebook_content["metadata"]["colab"].get("gpuType", "T4") == "T4":
             notebook_content["metadata"]["colab"]["gpuType"] = "A100"
             updated = True
         if "kernelspec" not in notebook_content["metadata"]:
