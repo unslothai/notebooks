@@ -14,13 +14,16 @@
 
 # ### News
 
+# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# 
+# <table><tr>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
+# </tr></table>
+# 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
-# You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
-# 
 # Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
-# 
-# 3x faster LLM training with 30% less VRAM and 500K context. [3x faster](https://unsloth.ai/docs/new/3x-faster-training-packing) • [500K Context](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
@@ -31,22 +34,8 @@
 # # In[1]:
 # 
 # 
-# %%capture
-# import os, importlib.util
-# !pip install --upgrade -qqq uv
-# if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
-#     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
-#     except: _numpy = "numpy"; _pil = "pillow"
-#     !uv pip install -qqq \
-#         "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \
-#         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
-#         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
-# elif importlib.util.find_spec("unsloth") is None:
-#     !uv pip install -qqq unsloth
-# !uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo
-# !uv pip install transformers==5.2.0
-# # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
-# !uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
+# get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    !uv pip install -qqq \\\n        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n!uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo\n!uv pip install transformers==5.2.0\n# causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!\n!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0\n')
+# 
 # 
 # # ### Unsloth
 
@@ -80,6 +69,7 @@ model, tokenizer = FastVisionModel.from_pretrained(
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for long context
 )
 
+
 # We now add LoRA adapters for parameter efficient finetuning - this allows us to only efficiently train 1% of all parameters.
 # 
 # **[NEW]** We also support finetuning ONLY the vision part of the model, or ONLY the language part. Or you can select both! You can also select to finetune the attention or the MLP layers!
@@ -104,6 +94,7 @@ model = FastVisionModel.get_peft_model(
     # target_modules = "all-linear", # Optional now! Can specify a list if needed
 )
 
+
 # <a name="Data"></a>
 # ### Data Prep
 # We'll be using a sampled dataset of handwritten maths formulas. The goal is to convert these images into a computer readable form - ie in LaTeX form, so we can render it. This can be very useful for complex formulas.
@@ -116,6 +107,7 @@ model = FastVisionModel.get_peft_model(
 from datasets import load_dataset
 dataset = load_dataset("unsloth/LaTeX_OCR", split = "train")
 
+
 # Let's take an overview look at the dataset. We shall see what the 3rd image is, and what caption it had.
 
 # In[5]:
@@ -123,15 +115,18 @@ dataset = load_dataset("unsloth/LaTeX_OCR", split = "train")
 
 dataset
 
+
 # In[6]:
 
 
 dataset[2]["image"]
 
+
 # In[7]:
 
 
 dataset[2]["text"]
+
 
 # We can also render the LaTeX in the browser directly!
 
@@ -142,6 +137,7 @@ from IPython.display import display, Math, Latex
 
 latex = dataset[2]["text"]
 display(Math(latex))
+
 
 # To format the dataset, all vision finetuning tasks should be formatted as follows:
 # 
@@ -176,6 +172,7 @@ def convert_to_conversation(sample):
     return { "messages" : conversation }
 pass
 
+
 # Let's convert the dataset into the "correct" format for finetuning:
 
 # In[10]:
@@ -183,12 +180,14 @@ pass
 
 converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 
+
 # We look at how the conversations are structured for the first example:
 
 # In[11]:
 
 
 converted_dataset[0]
+
 
 # Let's first see before we do any finetuning what the model outputs for the first example!
 
@@ -218,6 +217,7 @@ from transformers import TextStreamer
 text_streamer = TextStreamer(tokenizer, skip_prompt = True)
 _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
                    use_cache = True, temperature = 1.5, min_p = 0.1)
+
 
 # <a name="Train"></a>
 # ### Train the model
@@ -261,6 +261,7 @@ trainer = SFTTrainer(
     ),
 )
 
+
 # In[14]:
 
 
@@ -271,10 +272,12 @@ max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
 print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
+
 # In[15]:
 
 
 trainer_stats = trainer.train()
+
 
 # In[16]:
 
@@ -292,6 +295,7 @@ print(f"Peak reserved memory = {used_memory} GB.")
 print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
 print(f"Peak reserved memory % of max memory = {used_percentage} %.")
 print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
+
 
 # <a name="Inference"></a>
 # ### Inference
@@ -326,6 +330,7 @@ text_streamer = TextStreamer(tokenizer, skip_prompt = True)
 _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
                    use_cache = True, temperature = 1.5, min_p = 0.1)
 
+
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
 # To save the final model as LoRA adapters, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
@@ -339,6 +344,7 @@ model.save_pretrained("qwen_lora")  # Local saving
 tokenizer.save_pretrained("qwen_lora")
 # model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 # tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
@@ -375,6 +381,7 @@ text_streamer = TextStreamer(tokenizer, skip_prompt = True)
 _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
                    use_cache = True, temperature = 1.5, min_p = 0.1)
 
+
 # ### Saving to float16 for VLLM
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
@@ -389,6 +396,7 @@ if False: model.save_pretrained_merged("unsloth_finetune", tokenizer,)
 
 # To export and save to your Hugging Face account
 if False: model.push_to_hub_merged("YOUR_USERNAME/unsloth_finetune", tokenizer, token = "YOUR_HF_TOKEN")
+
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
@@ -425,6 +433,7 @@ if False:
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN",
     )
+
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 

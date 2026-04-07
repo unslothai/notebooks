@@ -14,13 +14,16 @@
 
 # ### News
 
+# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# 
+# <table><tr>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
+# </tr></table>
+# 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
-# You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
-# 
 # Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
-# 
-# 3x faster LLM training with 30% less VRAM and 500K context. [3x faster](https://unsloth.ai/docs/new/3x-faster-training-packing) • [500K Context](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
@@ -100,8 +103,8 @@ model = FastLanguageModel.get_peft_model(
 # In[4]:
 
 
-reasoning_start = "<start_working_out>" # Acts as <think>
-reasoning_end   = "<end_working_out>"   # Acts as </think>
+reasoning_start = "<start_working_out>" # Acts as think-open tag
+reasoning_end   = "<end_working_out>"   # Acts as think-close tag
 solution_start  = "<SOLUTION>"
 solution_end    = "</SOLUTION>"
 
@@ -189,7 +192,7 @@ def format_dataset(x):
     expected_answer = x["expected_answer"]
     problem = x["problem"]
 
-    # Remove generated <think> and </think>
+    # Remove generated think tags
     thoughts = x["generated_solution"]
     thoughts = thoughts.replace("<think>", "").replace("</think>", "")
 
@@ -428,7 +431,7 @@ def match_format_approximately(completions, **kwargs):
         # Count how many keywords are seen - we penalize if too many!
         # If we see 1, then plus some points!
 
-        # No need to reward <start_working_out> since we always prepend it!
+        # No need to reward the opening tag since we always prepend it!
         # score += 0.5 if response.count(reasoning_start) == 1 else -1.0
         score += 0.5 if response.count(reasoning_end)   == 1 else -1.0
         score += 0.5 if response.count(solution_start)  == 1 else -1.0

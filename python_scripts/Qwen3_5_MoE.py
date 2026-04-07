@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
+# To run this, press "*Runtime*" and press "*Run all*" on your A100 Google Colab Pro instance!
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
@@ -14,13 +14,16 @@
 
 # ### News
 
+# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# 
+# <table><tr>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
+# </tr></table>
+# 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
-# You can now train embedding models 1.8-3.3x faster with 20% less VRAM. [Blog](https://unsloth.ai/docs/new/embedding-finetuning)
-# 
 # Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
-# 
-# 3x faster LLM training with 30% less VRAM and 500K context. [3x faster](https://unsloth.ai/docs/new/3x-faster-training-packing) • [500K Context](https://unsloth.ai/docs/new/500k-context-length-fine-tuning)
 # 
 # New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
 # 
@@ -31,30 +34,14 @@
 # # In[ ]:
 # 
 # 
-# %%capture
-# import os, importlib.util
-# !pip install --upgrade -qqq uv
-# if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
-#     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
-#     except: _numpy = "numpy"; _pil = "pillow"
-#     !uv pip install -qqq \
-#         "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \
-#         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
-#         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
-# elif importlib.util.find_spec("unsloth") is None:
-#     !uv pip install -qqq unsloth
-# !uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo
-# !uv pip install transformers==5.2.0
-# # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
-# !uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
+# get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    !uv pip install -qqq \\\n        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n!uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo\n!uv pip install transformers==5.2.0\n# causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!\n!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0\n')
+# 
 # 
 # # In[ ]:
 # 
 # 
-# %%capture
-# ! pip uninstall unsloth unsloth_zoo -y
-# ! pip install git+https://github.com/unslothai/unsloth-zoo.git --no-deps
-# ! pip install git+https://github.com/unslothai/unsloth.git --no-deps
+# get_ipython().run_cell_magic('capture', '', '! pip uninstall unsloth unsloth_zoo -y\n! pip install git+https://github.com/unslothai/unsloth-zoo.git --no-deps\n! pip install git+https://github.com/unslothai/unsloth.git --no-deps\n')
+# 
 # 
 # # In[ ]:
 # 
@@ -70,6 +57,7 @@
 # # `!uv pip install --no-build-isolation flash-attn flash-linear-attention causal_conv1d==1.6.`
 # # You can even try playing around with the below env var for faster performance but make sure you have enough VRAM to try autotuning.
 # os.environ['UNSLOTH_MOE_DISABLE_AUTOTUNE'] = '1'
+# 
 # 
 # # ### Unsloth
 
@@ -90,6 +78,7 @@ model, processor = FastLanguageModel.from_pretrained(
 )
 tokenizer = processor.tokenizer # To tokenize text
 
+
 # In[7]:
 
 
@@ -106,6 +95,7 @@ model = FastLanguageModel.get_peft_model(
     bias = "none",
 )
 
+
 # <a name="Data"></a>
 # ### Data Prep
 # We now use the `Qwen 3.5` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy. 
@@ -115,6 +105,7 @@ model = FastLanguageModel.get_peft_model(
 
 from datasets import load_dataset
 dataset = load_dataset("unsloth/OpenMathReasoning-mini", split = "cot")
+
 
 # We now convert the reasoning dataset into conversational format:
 
@@ -134,6 +125,7 @@ def generate_conversation(examples):
 
 dataset = dataset.map(generate_conversation, batched = True)
 
+
 # We now have to apply the chat template for `Qwen 3.5` onto the conversations, and save it to `text`.
 
 # In[ ]:
@@ -146,12 +138,14 @@ def formatting_prompts_func(examples):
 
 dataset = dataset.map(formatting_prompts_func, batched = True)
 
+
 # Let's see how the chat template did!
 
 # In[ ]:
 
 
 dataset[100]['text']
+
 
 # <a name="Train"></a>
 # ### Train the model
@@ -182,10 +176,12 @@ trainer = SFTTrainer(
     ),
 )
 
+
 # In[ ]:
 
 
 dataset[100]['text']
+
 
 # <a name="Train"></a>
 # ### Train the model
@@ -216,6 +212,7 @@ trainer = SFTTrainer(
     ),
 )
 
+
 # We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
 
 # In[ ]:
@@ -228,12 +225,14 @@ trainer = train_on_responses_only(
     response_part = "<|im_start|>assistant\n<think>",
 )
 
+
 # Let's verify masking the instruction part is done! Let's print the 100th row again.
 
 # In[ ]:
 
 
 tokenizer.decode(trainer.train_dataset[100]["input_ids"])
+
 
 # Now let's print the masked out example - you should see only the answer is present:
 
@@ -242,11 +241,13 @@ tokenizer.decode(trainer.train_dataset[100]["input_ids"])
 
 tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
 
+
 # In[ ]:
 
 
 # Compilation can take 2-3 minutes of time, so please be patient :)
 trainer.train()
+
 
 # Let's check if the model has learnt to follow the custom format:
 
@@ -270,6 +271,7 @@ _ = model.generate(
     streamer = TextStreamer(tokenizer, skip_prompt = True),
 )
 
+
 # Yes it did follow the formatting! Great! Let's remove some items before the GRPO step
 
 # In[19]:
@@ -279,6 +281,7 @@ del dataset
 torch.cuda.empty_cache()
 import gc
 gc.collect()
+
 
 # <a name="Save"></a>
 # ### Saving to float16 for VLLM
@@ -303,6 +306,7 @@ if False:
 if False:
     model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
     tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
@@ -339,6 +343,7 @@ if False:
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN",
     )
+
 
 # Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
 # 

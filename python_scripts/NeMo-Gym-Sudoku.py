@@ -137,6 +137,11 @@ if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
         ["bash", "-c", "source .venv/bin/activate && uv pip install reasoning-gym"],
         cwd = GYM_DIR, check = True,
     )
+# Ensure matplotlib is installed (required by reasoning-gym via cellpylib)
+subprocess.run(
+    ["bash", "-c", "source .venv/bin/activate && uv pip install matplotlib"],
+    cwd = GYM_DIR, check = True, stdout = subprocess.DEVNULL,
+)
 # Step 3: Create dataset
 _sudoku_ds = os.path.join(
     GYM_DIR, "resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl"

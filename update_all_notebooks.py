@@ -453,11 +453,28 @@ gemma3n_extra_content = """\
 
 !pip install torchcodec
 import torch; torch._dynamo.config.recompile_limit = 64;"""
-installation_gemma3n_content = installation_content 
+installation_gemma3n_content = installation_content
 installation_gemma3n_content += gemma3n_extra_content
 
 installation_gemma3n_kaggle_content = installation_kaggle_content
 installation_gemma3n_kaggle_content += gemma3n_extra_content
+
+# Gemma 4 needs transformers==5.5.0 (with --no-deps), torchcodec, and
+# torch._dynamo recompile_limit. Do NOT go through update_or_append_pip_install
+# here because Gemma 4 must not get the default transformers==4.56.2 pin or
+# the trl==0.22.2 --no-deps downgrade.
+installation_gemma4_content = """%%capture
+import os, re
+if "COLAB_" not in "".join(os.environ.keys()):
+    !pip install unsloth  # Do this in local & cloud setups
+else:
+    import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
+    __XFORMERS_INSTALL__
+    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+!pip install --no-deps transformers==5.5.0
+!pip install torchcodec
+import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 
 gemma3n_extra_content = """\
 
@@ -711,6 +728,7 @@ _RE_VLLM_UPPER = re.compile(r'\bVLLM\b(?!_)')
 _RE_GATED_COMMENT = re.compile(r"# use one if using gated models.*")
 _RE_GEMMA3N = re.compile(r"gemma[-_]?3n")
 _RE_GEMMA3 = re.compile(r"gemma[-_]?3")
+_RE_GEMMA4 = re.compile(r"gemma[-_]?4")
 _RE_STOP_BRACKET = re.compile(r"[\(\[\{]")
 _RE_MULTI_UNDERSCORE = re.compile(r"__+")
 _RE_ALPHA_ONLY = re.compile(r"[A-Za-z]+")
@@ -1434,6 +1452,8 @@ def _get_base_name_from_filename(filename):
         return "gemma_3n"
     if _RE_GEMMA3.match(lower):
         return "gemma_3"
+    if _RE_GEMMA4.match(lower):
+        return "gemma_4"
 
     stop_match = _RE_STOP_BRACKET.search(name)
     trimmed = name[:stop_match.start()] if stop_match else name
@@ -2324,6 +2344,11 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma3n_content
 
+                        # Gemma4 INSTALLATION: preserve the custom
+                        # transformers==5.5.0 --no-deps + torchcodec block.
+                        if is_path_contains_any(notebook_path.lower(), ["gemma4"]):
+                            installation = installation_gemma4_content
+
                         # ERNIE VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["ernie_4_5_vl"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -2345,8 +2370,12 @@ def update_notebook_sections(
                             else:
                                 installation = installation_qwen3_vl_content
                                 
-                        # Qwen3.5 INSTALLATION (must come after Qwen3VL to override for qwen3_5)
-                        if is_path_contains_any(notebook_path.lower(), ["qwen3_5"]):
+                        # Qwen3.5 INSTALLATION (must come after Qwen3VL to override for qwen3_5).
+                        # Match both "qwen3_5" and "qwen_3_5" so that the inconsistently-named
+                        # Qwen_3_5_27B_A100(80GB).ipynb also hits this branch instead of falling
+                        # through to the default installation_content (which would clobber the
+                        # custom torch 2.8.0 / flash-linear-attention / causal_conv1d block).
+                        if is_path_contains_any(notebook_path.lower(), ["qwen3_5", "qwen_3_5"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_qwen3_5_kaggle_content
                             else:

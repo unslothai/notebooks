@@ -104,7 +104,6 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # 6. Start both resources servers in the background
 # 
 # Google Colab is auto-detected and the `uv_pip_set_python=true` flag is added when needed.
-# 
 
 # In[ ]:
 
@@ -144,6 +143,11 @@ if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
         ["bash", "-c", "source .venv/bin/activate && uv pip install reasoning-gym"],
         cwd = GYM_DIR, check = True,
     )
+# Ensure matplotlib is installed (required by reasoning-gym via cellpylib)
+subprocess.run(
+    ["bash", "-c", "source .venv/bin/activate && uv pip install matplotlib"],
+    cwd = GYM_DIR, check = True, stdout = subprocess.DEVNULL,
+)
 # Step 3: Create sudoku dataset
 sudoku_path = os.path.join(
     GYM_DIR, "resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl"
