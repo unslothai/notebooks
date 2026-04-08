@@ -29,12 +29,20 @@ import shutil
 import stat
 import subprocess
 import sys
+import csv
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from glob import glob
 from nbconvert import PythonExporter
 import nbformat
 from spellchecker import SpellChecker
+
+try:
+    from huggingface_hub import HfApi
+    from huggingface_hub.errors import RepositoryNotFoundError
+except Exception:
+    HfApi = None
+    RepositoryNotFoundError = Exception
 
 try:
     from tqdm.auto import tqdm as _tqdm
@@ -2135,6 +2143,318 @@ def extract_version(model_name):
         return (0, 0)
 
 
+# ============================================================================
+# Model reference extraction + created_at cache (for README sorting)
+# ============================================================================
+#
+# The README row order within each section is computed from the creation
+# timestamp of the Hugging Face models referenced by each notebook. To avoid
+# hitting the Hub on every run we maintain an append-only CSV at
+#   scripts/model_created_at.csv
+# which maps <org>/<repo> to its created_at timestamp. Entries that cannot be
+# resolved (datasets, 404s, placeholders that escaped the blocklist) are
+# cached with status=not_found so we do not re-query them.
+
+# <org>/<repo> where both pieces look like HF repo IDs. Anchored by one of:
+# start-of-string, whitespace, quote, open-paren, open-bracket, open-brace,
+# comma, colon, equals. Ends at a similar boundary.
+_HF_MODEL_REF_RE = re.compile(
+    r"""(?P<before>^|['"\s\(\[\{,:=])
+        (?P<org>[A-Za-z][A-Za-z0-9._-]{0,95})
+        /
+        (?P<repo>[A-Za-z0-9][A-Za-z0-9._-]{0,95})
+        (?=['"\s\)\]\},:]|$)
+    """,
+    re.VERBOSE,
+)
+
+# Matches the primary model assignment: model_name = "org/repo" (or single-quoted).
+# This is the model the notebook actually loads. Many notebooks also list
+# alternative models in a `gemma4_models = [...]` style block; those show up
+# in the generic ref set but are not what the notebook trains on, so we
+# prefer assignments for sorting.
+_HF_MODEL_NAME_ASSIGN_RE = re.compile(
+    r"""model_name\s*=\s*(?P<quote>['"])
+        (?P<org>[A-Za-z][A-Za-z0-9._-]{0,95})
+        /
+        (?P<repo>[A-Za-z0-9][A-Za-z0-9._-]{0,95})
+        (?P=quote)
+    """,
+    re.VERBOSE,
+)
+
+# Matches a positional repo passed as the first arg of .from_pretrained(...).
+# Example: FastVisionModel.from_pretrained("unsloth/gemma-4-E4B-it", ...)
+# This is used when the notebook author omits the model_name= keyword.
+_HF_FROM_PRETRAINED_POSITIONAL_RE = re.compile(
+    r"""\.from_pretrained\s*\(\s*(?P<quote>['"])
+        (?P<org>[A-Za-z][A-Za-z0-9._-]{0,95})
+        /
+        (?P<repo>[A-Za-z0-9][A-Za-z0-9._-]{0,95})
+        (?P=quote)
+    """,
+    re.VERBOSE,
+)
+
+# Strings that look like <org>/<repo> in the notebook source but are never
+# real Hugging Face repos. These get filtered at extraction time so we do
+# not pollute the cache with thousands of useless rows.
+_HF_MODEL_REF_PLACEHOLDER_ORGS = {
+    # Placeholders users are supposed to edit before running
+    "HF_USERNAME", "HF_ACCOUNT", "YOUR_USERNAME", "your_name",
+    "hf", "HuggingFaceOrganization", "HuggingFaceUser",
+    # Python variable names that happen to collide
+    "repo_id", "prompt",
+    # Local save paths used in post-training snippets
+    "grpo_lora", "grpo_saved_lora",
+    # Comment fragments
+    "TrackIO",   # "# Use TrackIO/WandB etc"
+    "data",      # file path fragments
+    "python",    # e.g. "python/triton_kernels"
+    "Colab",
+    "pros",
+}
+
+# Cache file relative to the repo root.
+_MODEL_CREATED_CACHE_PATH = os.path.join("scripts", "model_created_at.csv")
+
+
+def extract_hf_model_refs_from_notebook(notebook_path):
+    """Scan a notebook's code cells for <org>/<repo> Hugging Face model refs.
+
+    Returns (all_refs, assigned_refs):
+        all_refs      : set of every "org/repo" string found in the code cells.
+        assigned_refs : ordered list (deduped, insertion order) of the values
+                        assigned to `model_name = "..."`. These are the models
+                        the notebook actually loads and should take precedence
+                        in the sort key.
+
+    Placeholders (HF_USERNAME, etc.), URL path fragments, and anything that
+    looks like a local file path are filtered out. Returns (set(), []) on
+    I/O or parse errors.
+    """
+    try:
+        with open(notebook_path, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return set(), []
+
+    refs = set()
+    assigned = []  # preserve order, first assignment wins ties
+    seen_assigned = set()
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        src_list = cell.get("source", [])
+        if isinstance(src_list, str):
+            src = src_list
+        else:
+            src = "".join(src_list)
+
+        # Pull out the primary model loads first: model_name="..." assignments
+        # and positional first-arg .from_pretrained("...") calls. These are
+        # what the notebook actually loads. We still add them to the generic
+        # refs set below.
+        for primary_re in (_HF_MODEL_NAME_ASSIGN_RE, _HF_FROM_PRETRAINED_POSITIONAL_RE):
+            for m in primary_re.finditer(src):
+                org = m.group("org")
+                repo = m.group("repo")
+                if "." in org or org in _HF_MODEL_REF_PLACEHOLDER_ORGS:
+                    continue
+                ref = f"{org}/{repo}"
+                if ref not in seen_assigned:
+                    assigned.append(ref)
+                    seen_assigned.add(ref)
+
+        for m in _HF_MODEL_REF_RE.finditer(src):
+            org = m.group("org")
+            repo = m.group("repo")
+            # Skip URLs (match preceded by "://")
+            start = m.start("org")
+            if start >= 3 and src[start - 3:start] == "://":
+                continue
+            # Orgs containing a dot are always domain-ish, never HF orgs
+            if "." in org:
+                continue
+            if org in _HF_MODEL_REF_PLACEHOLDER_ORGS:
+                continue
+            refs.add(f"{org}/{repo}")
+    return refs, assigned
+
+
+def _load_model_created_cache(cache_path=_MODEL_CREATED_CACHE_PATH):
+    """Load the model_created_at CSV into a dict keyed by model_repo.
+
+    Each value is a dict with keys:
+        created_at : str (ISO 8601 UTC) or ""
+        fetched_at : str (ISO 8601 UTC)
+        status     : "ok" | "not_found" | "error"
+
+    Returns an empty dict if the file is missing or unreadable.
+    """
+    cache = {}
+    if not os.path.exists(cache_path):
+        return cache
+    try:
+        with open(cache_path, "r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                repo = (row.get("model_repo") or "").strip()
+                if not repo:
+                    continue
+                cache[repo] = {
+                    "created_at": (row.get("created_at") or "").strip(),
+                    "fetched_at": (row.get("fetched_at") or "").strip(),
+                    "status": (row.get("status") or "").strip() or "ok",
+                }
+    except Exception as e:
+        print(f"  [WARN] Could not parse {cache_path}: {e}")
+    return cache
+
+
+def _write_model_created_cache(cache, cache_path=_MODEL_CREATED_CACHE_PATH):
+    """Write the cache dict out as CSV, sorted alphabetically for stable diffs."""
+    os.makedirs(os.path.dirname(cache_path) or ".", exist_ok=True)
+    with open(cache_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["model_repo", "created_at", "fetched_at", "status"])
+        for repo in sorted(cache.keys()):
+            entry = cache[repo]
+            writer.writerow([
+                repo,
+                entry.get("created_at", ""),
+                entry.get("fetched_at", ""),
+                entry.get("status", ""),
+            ])
+
+
+def _fetch_model_created_at(repo):
+    """Query HF Hub for model created_at. Returns (iso_str, status).
+
+    status in {"ok", "not_found", "error"}.
+
+    Uses HF_TOKEN from the environment when present so that gated/private
+    repos resolve instead of bouncing as 404s.
+    """
+    if HfApi is None:
+        return ("", "error")
+    try:
+        token = os.environ.get("HF_TOKEN") or None
+        api = HfApi(token=token)
+        info = api.model_info(repo, timeout=15, token=token)
+    except RepositoryNotFoundError:
+        return ("", "not_found")
+    except Exception:
+        return ("", "error")
+    created_at = getattr(info, "created_at", None)
+    if created_at is None:
+        return ("", "error")
+    # Normalize to ISO 8601 UTC with Z suffix
+    if hasattr(created_at, "astimezone"):
+        try:
+            created_at = created_at.astimezone(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+        except Exception:
+            created_at = str(created_at)
+    else:
+        created_at = str(created_at)
+    return (created_at, "ok")
+
+
+def refresh_model_created_cache(notebook_paths, cache_path=_MODEL_CREATED_CACHE_PATH):
+    """Scan notebooks, populate/refresh the cache, and return (cache, refs_by_nb, assigned_by_nb).
+
+    refs_by_nb     : dict[notebook_path, set[model_repo]]
+    assigned_by_nb : dict[notebook_path, list[model_repo]]  # model_name="..." hits
+    cache          : dict[model_repo, {"created_at", "fetched_at", "status"}]
+
+    Only repos missing from the cache or previously in "error" state are
+    queried against the Hub. "not_found" entries are treated as sticky:
+    they were 404s once, they will be 404s again, and we do not re-query.
+    """
+    cache = _load_model_created_cache(cache_path)
+
+    refs_by_nb = {}
+    assigned_by_nb = {}
+    all_refs = set()
+    for path in notebook_paths:
+        refs, assigned = extract_hf_model_refs_from_notebook(path)
+        refs_by_nb[path] = refs
+        assigned_by_nb[path] = assigned
+        all_refs.update(refs)
+
+    # Decide which repos we still need to fetch
+    to_fetch = sorted(
+        repo for repo in all_refs
+        if repo not in cache or cache[repo].get("status") == "error"
+    )
+
+    if to_fetch:
+        print(f"  Fetching created_at for {len(to_fetch)} repo(s) from HF Hub...")
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ok = not_found = errors = 0
+        for i, repo in enumerate(to_fetch, 1):
+            created_at, status = _fetch_model_created_at(repo)
+            cache[repo] = {
+                "created_at": created_at,
+                "fetched_at": now_iso,
+                "status": status,
+            }
+            if status == "ok":
+                ok += 1
+            elif status == "not_found":
+                not_found += 1
+            else:
+                errors += 1
+            if i % 25 == 0 or i == len(to_fetch):
+                print(
+                    f"    {i}/{len(to_fetch)} "
+                    f"(ok={ok} not_found={not_found} errors={errors})"
+                )
+        _write_model_created_cache(cache, cache_path)
+    else:
+        print("  Model created_at cache is up to date; no HF Hub queries needed.")
+
+    return cache, refs_by_nb, assigned_by_nb
+
+
+def notebook_created_at_key(notebook_path, refs_by_nb, cache, assigned_by_nb=None):
+    """Return the sort key for one notebook: (iso_created_at, count_ok).
+
+    Preference order:
+      1. If the notebook has one or more `model_name = "org/repo"` assignments
+         that resolved to status=ok, use the MAX of THOSE timestamps. These
+         are the models the notebook actually loads.
+      2. Otherwise, fall back to the MAX of every HF ref discovered in the
+         notebook (menu lists, comments, inference-only references).
+
+    count_ok is the number of ok-status assigned refs (preference 1) or
+    overall refs (preference 2), used as a minor tiebreaker. Notebooks with
+    no resolvable refs return ("", 0) which sorts below every real timestamp
+    in a descending sort.
+    """
+    def _ok_timestamps(repos):
+        out = []
+        for repo in repos:
+            entry = cache.get(repo)
+            if entry and entry.get("status") == "ok" and entry.get("created_at"):
+                out.append(entry["created_at"])
+        return out
+
+    if assigned_by_nb:
+        assigned = assigned_by_nb.get(notebook_path, [])
+        assigned_ts = _ok_timestamps(assigned)
+        if assigned_ts:
+            return (max(assigned_ts), len(assigned_ts))
+
+    refs = refs_by_nb.get(notebook_path, set())
+    ok_timestamps = _ok_timestamps(refs)
+    if not ok_timestamps:
+        return ("", 0)
+    return (max(ok_timestamps), len(ok_timestamps))
+
+
 def _update_news_only(notebook_path, new_announcement):
     """Update ONLY the '### News' section in a notebook, leaving everything else untouched."""
     try:
@@ -2938,6 +3258,14 @@ def update_readme(
     paths = glob(os.path.join(notebooks_dir, "*.ipynb"))
     paths = [x.replace("\\", "/") for x in paths]
 
+    # Scan notebooks for HF model refs and refresh the model_created_at cache
+    # so we can sort rows by the most recently created referenced model.
+    try:
+        model_created_cache, refs_by_nb, assigned_by_nb = refresh_model_created_cache(paths)
+    except Exception as e:
+        print(f"  [WARN] Could not refresh model created_at cache: {e}")
+        model_created_cache, refs_by_nb, assigned_by_nb = {}, {}, {}
+
     # Priority sections appear first in the README, in this order
     priority_sections = [
         "GRPO & Reinforcement Learning",
@@ -3069,16 +3397,21 @@ def update_readme(
             image_alt = "Open In Colab"
         link = f'<a href="{link_url}" target="_blank" rel="noopener noreferrer"><img src="{image_src}" alt="{image_alt}"></a>'
 
+        created_at_key = notebook_created_at_key(
+            path, refs_by_nb, model_created_cache, assigned_by_nb=assigned_by_nb
+        )
+
         notebook_data.append(
             {
                 "model": model_name,
                 "type": model_type,
                 "link": link,
                 "sections": sections_for_notebook,
-                "path": path, 
-                "architecture" : architecture, 
-                "size" : size, 
+                "path": path,
+                "architecture" : architecture,
+                "size" : size,
                 "requires_a100": requires_a100,
+                "created_at_key": created_at_key,
             }
         )
 
@@ -3100,18 +3433,41 @@ def update_readme(
         model_prefix = "(A100) " if data.get('requires_a100', False) else ""
         row = f"| **{model_prefix}{data['model']}** {data['size']} | {data['type']} | {data['link']} |\n"
         platform = "Kaggle" if "kaggle" in data['link'].lower() else "Colab"
+        # Each row carries the precomputed model-created-at key so that
+        # section-level sorting can use it as the primary sort key.
+        row_entry = {
+            "row": row,
+            "created_at_key": data.get("created_at_key", ("", 0)),
+        }
         for section_name in data["sections"]:
-            sections[section_name][platform]["rows"].append(row)
+            sections[section_name][platform]["rows"].append(row_entry)
+
+    def _section_row_sort_key(entry):
+        # Primary: most recently created referenced model (ISO8601 sorts
+        # lexicographically). Notebooks with no resolvable model get ""
+        # which sorts below every real timestamp in a descending sort.
+        # Secondary: the version-from-name fallback so Gemma 4 > Gemma 3, etc.
+        # Tertiary: the row string itself for stable ordering.
+        created_at, count_ok = entry["created_at_key"]
+        return (created_at, count_ok, extract_version_from_row(entry["row"]), entry["row"])
 
     for section in sections:
         try:
-            sections[section]["Colab"]["rows"].sort(key=lambda x: (extract_version_from_row(x), x), reverse=True)
+            sections[section]["Colab"]["rows"].sort(key=_section_row_sort_key, reverse=True)
         except Exception as e:
-            print(f"Warning: Could not sort Colab rows for section '{section}' by version: {e}")
+            print(f"Warning: Could not sort Colab rows for section '{section}': {e}")
         try:
-            sections[section]["Kaggle"]["rows"].sort(key=lambda x: (extract_version_from_row(x), x), reverse=True)
+            sections[section]["Kaggle"]["rows"].sort(key=_section_row_sort_key, reverse=True)
         except Exception as e:
-            print(f"Warning: Could not sort Kaggle rows for section '{section}' by version: {e}")
+            print(f"Warning: Could not sort Kaggle rows for section '{section}': {e}")
+
+    # Flatten row entries back into raw strings for the rendering step below.
+    for section in sections:
+        for platform in ("Colab", "Kaggle"):
+            sections[section][platform]["rows"] = [
+                e["row"] if isinstance(e, dict) else e
+                for e in sections[section][platform]["rows"]
+            ]
 
     try:
         with open(readme_path, "r", encoding="utf-8", newline="") as f:
