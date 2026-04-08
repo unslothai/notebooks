@@ -851,9 +851,10 @@ ARCHITECTURE_MAPPING = {
     # gpt oss
     "gpt oss": "GPT-OSS",
 
-    # Linear Attention
-    "falcon": "Linear Attention",
-    "liquid": "Linear Attention",
+    # Hybrid Attention (SSM / linear-attention hybrids, Mamba-style models)
+    "falcon": "Hybrid Attention",
+    "liquid": "Hybrid Attention",
+    "lfm": "Hybrid Attention",
 
     # Deepseek
     "deepseek": "Deepseek",

@@ -201,11 +201,15 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Granite4.0** **(3B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Granite4.0.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Granite4.0** **(350M)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Granite4.0_350M.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
-### Linear Attention Notebooks
+### Hybrid Attention Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **LFM2.5** **(1.2B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_(1.2B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **LFM2.5 VL** **(1.6B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_VL_(1.6B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Liquid LFM2** **(1.2B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Liquid_LFM2_(1.2B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Liquid LFM2**  | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Liquid_LFM2-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **LFM2.5** **(1.2B)** | Text Completion | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_(1.2B)-Text_Completion.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **LFM2.5** **(1.2B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_(1.2B)-Translation.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Falcon H1** **(0.5B)** | Alpaca | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Falcon_H1_(0.5B)-Alpaca.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Falcon H1**  | Alpaca | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Falcon_H1-Alpaca.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
@@ -308,10 +312,6 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | --- | --- | --- |
 | **CodeForces cot Finetune<br>for Reasoning on CodeForces**  | Reasoning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Synthetic Data Hackathon**  | Synthetic Data | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Synthetic_Data_Hackathon.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **LFM2.5** **(1.2B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_(1.2B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **LFM2.5 VL** **(1.6B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_VL_(1.6B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **LFM2.5** **(1.2B)** | Text Completion | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_(1.2B)-Text_Completion.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **LFM2.5** **(1.2B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/LFM2.5_(1.2B)-Translation.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Unsloth**  | Studio | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
 # 📒 Kaggle Notebooks
@@ -437,7 +437,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Granite4.0** **(3B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Granite4.0.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Granite4.0** **(350M)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Granite4.0_350M.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
-### Linear Attention Notebooks
+### Hybrid Attention Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **Liquid LFM2** **(1.2B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Liquid_LFM2_(1.2B)-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
