@@ -2291,11 +2291,12 @@ def _load_model_created_cache(cache_path=_MODEL_CREATED_CACHE_PATH):
         created_at : str (ISO 8601 UTC) or ""
         downloads  : int (0 if missing/unknown)
         likes      : int (0 if missing/unknown)
+        base_model : str (single upstream repo) or ""
         fetched_at : str (ISO 8601 UTC)
         status     : "ok" | "not_found" | "error"
 
-    Older CSV files written before downloads/likes were added are still
-    supported: missing columns default to 0.
+    Older CSV files without one or more of these columns are still supported:
+    missing numeric columns default to 0 and missing string columns to "".
 
     Returns an empty dict if the file is missing or unreadable.
     """
@@ -2318,6 +2319,7 @@ def _load_model_created_cache(cache_path=_MODEL_CREATED_CACHE_PATH):
                     "created_at": (row.get("created_at") or "").strip(),
                     "downloads": _to_int(row.get("downloads")),
                     "likes": _to_int(row.get("likes")),
+                    "base_model": (row.get("base_model") or "").strip(),
                     "fetched_at": (row.get("fetched_at") or "").strip(),
                     "status": (row.get("status") or "").strip() or "ok",
                 }
@@ -2332,7 +2334,8 @@ def _write_model_created_cache(cache, cache_path=_MODEL_CREATED_CACHE_PATH):
     with open(cache_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
-            "model_repo", "created_at", "downloads", "likes", "fetched_at", "status",
+            "model_repo", "created_at", "downloads", "likes",
+            "base_model", "fetched_at", "status",
         ])
         for repo in sorted(cache.keys()):
             entry = cache[repo]
@@ -2341,30 +2344,64 @@ def _write_model_created_cache(cache, cache_path=_MODEL_CREATED_CACHE_PATH):
                 entry.get("created_at", ""),
                 entry.get("downloads", 0),
                 entry.get("likes", 0),
+                entry.get("base_model", ""),
                 entry.get("fetched_at", ""),
                 entry.get("status", ""),
             ])
 
 
-def _fetch_model_info(repo):
-    """Query HF Hub for model popularity. Returns (created_at, downloads, likes, status).
+def _extract_base_model(info):
+    """Pull a single upstream repo from model_info card_data.base_model.
 
-    status in {"ok", "not_found", "error"}. On non-ok, the numeric fields
-    are 0 and created_at is "".
+    The HF card field can be:
+      * a string ("Qwen/Qwen2.5-VL-7B-Instruct")
+      * a list of strings (["Qwen/Qwen2.5-VL-7B-Instruct"])
+      * missing entirely
+    We return the first valid <org>/<repo> we find, or "" if none.
+    """
+    cd = getattr(info, "card_data", None)
+    if cd is None:
+        return ""
+    base = getattr(cd, "base_model", None)
+    if base is None and isinstance(cd, dict):
+        base = cd.get("base_model")
+    if not base:
+        return ""
+    if isinstance(base, str):
+        candidates = [base]
+    elif isinstance(base, (list, tuple)):
+        candidates = [b for b in base if isinstance(b, str)]
+    else:
+        return ""
+    for c in candidates:
+        c = c.strip()
+        if "/" in c and c.count("/") == 1:
+            org, repo = c.split("/", 1)
+            if org and repo and "." not in org:
+                return c
+    return ""
+
+
+def _fetch_model_info(repo):
+    """Query HF Hub for model popularity.
+
+    Returns (created_at, downloads, likes, base_model, status). status in
+    {"ok", "not_found", "error"}. On non-ok, numeric fields are 0 and
+    string fields are "".
 
     Uses HF_TOKEN from the environment when present so that gated/private
     repos resolve instead of bouncing as 404s.
     """
     if HfApi is None:
-        return ("", 0, 0, "error")
+        return ("", 0, 0, "", "error")
     try:
         token = os.environ.get("HF_TOKEN") or None
         api = HfApi(token=token)
         info = api.model_info(repo, timeout=15, token=token)
     except RepositoryNotFoundError:
-        return ("", 0, 0, "not_found")
+        return ("", 0, 0, "", "not_found")
     except Exception:
-        return ("", 0, 0, "error")
+        return ("", 0, 0, "", "error")
 
     created_at = getattr(info, "created_at", None)
     if created_at is None:
@@ -2387,7 +2424,8 @@ def _fetch_model_info(repo):
 
     downloads = _safe_int(getattr(info, "downloads", 0))
     likes = _safe_int(getattr(info, "likes", 0))
-    return (created_at_str, downloads, likes, "ok")
+    base_model = _extract_base_model(info)
+    return (created_at_str, downloads, likes, base_model, "ok")
 
 
 # How long an "ok" row is allowed to stay in the cache before its
@@ -2462,21 +2500,27 @@ def refresh_model_created_cache(notebook_paths, cache_path=_MODEL_CREATED_CACHE_
         # status == "not_found": skip
         # status == "ok" and fresh: skip
 
-    if to_fetch:
-        print(f"  Fetching popularity for {len(to_fetch)} repo(s) from HF Hub...")
+    def _do_fetch_pass(repos, label):
+        if not repos:
+            return
+        print(f"  Fetching popularity for {len(repos)} {label} repo(s) from HF Hub...")
         now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         ok = not_found = errors = 0
-        for i, repo in enumerate(to_fetch, 1):
-            created_at, downloads, likes, status = _fetch_model_info(repo)
-            # Preserve the existing created_at if the new fetch lost it but we
-            # had one before (defensive: created_at is immutable on the Hub).
+        for i, repo in enumerate(repos, 1):
+            created_at, downloads, likes, base_model, status = _fetch_model_info(repo)
+            # Preserve the existing created_at/base_model if the new fetch
+            # lost them but we had them before (defensive: card_data can
+            # disappear or fail to parse on individual fetches).
             prev = cache.get(repo) or {}
             if not created_at and prev.get("created_at"):
                 created_at = prev["created_at"]
+            if not base_model and prev.get("base_model"):
+                base_model = prev["base_model"]
             cache[repo] = {
                 "created_at": created_at,
                 "downloads": downloads,
                 "likes": likes,
+                "base_model": base_model,
                 "fetched_at": now_iso,
                 "status": status,
             }
@@ -2486,14 +2530,37 @@ def refresh_model_created_cache(notebook_paths, cache_path=_MODEL_CREATED_CACHE_
                 not_found += 1
             else:
                 errors += 1
-            if i % 25 == 0 or i == len(to_fetch):
+            if i % 25 == 0 or i == len(repos):
                 print(
-                    f"    {i}/{len(to_fetch)} "
+                    f"    {i}/{len(repos)} "
                     f"(ok={ok} not_found={not_found} errors={errors})"
                 )
-        _write_model_created_cache(cache, cache_path)
+
+    if to_fetch:
+        _do_fetch_pass(to_fetch, "notebook-referenced")
     else:
-        print("  Model popularity cache is up to date; no HF Hub queries needed.")
+        print("  Notebook-referenced popularity cache is up to date.")
+
+    # Second pass: any base_model upstream we discovered that isn't already
+    # in the cache. This pulls in upstream repos like Qwen/Qwen2.5-VL-7B-Instruct
+    # that the notebooks themselves never reference but that drive the real
+    # popularity of the model family.
+    base_to_fetch = []
+    seen_base = set()
+    for repo, entry in cache.items():
+        if entry.get("status") != "ok":
+            continue
+        bm = (entry.get("base_model") or "").strip()
+        if not bm or bm in seen_base or bm in cache:
+            continue
+        seen_base.add(bm)
+        base_to_fetch.append(bm)
+    base_to_fetch.sort()
+    if base_to_fetch:
+        _do_fetch_pass(base_to_fetch, "upstream base_model")
+
+    if to_fetch or base_to_fetch:
+        _write_model_created_cache(cache, cache_path)
 
     return cache, refs_by_nb, assigned_by_nb
 
@@ -2505,10 +2572,10 @@ def refresh_model_created_cache(notebook_paths, cache_path=_MODEL_CREATED_CACHE_
 _LIKE_WEIGHT = 1000
 
 
-def _popularity_score(entry):
-    """Combined popularity score for one cache entry: downloads + likes*1000.
+def _entry_self_score(entry):
+    """Plain popularity score for one cache entry: downloads + likes*1000.
 
-    Returns 0 for missing/non-ok entries.
+    Returns 0 for missing/non-ok entries. Does NOT follow base_model.
     """
     if not entry or entry.get("status") != "ok":
         return 0
@@ -2517,19 +2584,47 @@ def _popularity_score(entry):
     return downloads + likes * _LIKE_WEIGHT
 
 
+def _popularity_score(entry, cache=None, _seen=None):
+    """Popularity score for a cache entry, following base_model upstream.
+
+    If the entry has a base_model that resolves to an ok cache row, the
+    returned score is the MAX of (this entry, the upstream entry's score).
+    This way notebooks that load `unsloth/X-bnb-4bit` inherit the popularity
+    of the canonical upstream `Qwen/X` (or whatever the base_model is).
+
+    Cycles are guarded by _seen.
+    """
+    if not entry or entry.get("status") != "ok":
+        return 0
+    score = _entry_self_score(entry)
+    if cache is None:
+        return score
+    bm = (entry.get("base_model") or "").strip()
+    if not bm:
+        return score
+    if _seen is None:
+        _seen = set()
+    if bm in _seen:
+        return score
+    _seen.add(bm)
+    upstream = cache.get(bm)
+    if upstream is None:
+        return score
+    return max(score, _popularity_score(upstream, cache, _seen))
+
+
 def notebook_created_at_key(notebook_path, refs_by_nb, cache, assigned_by_nb=None):
     """Return the sort key for one notebook: (popularity_score, count_ok).
 
-    The name is kept for back-compat but the key is now driven by HF Hub
-    popularity (downloads + likes*1000), not creation time.
+    The name is kept for back-compat but the key is driven by HF Hub
+    popularity (downloads + likes*1000), with base_model upstream lookup.
 
     Preference order for *which* model the score comes from:
       1. If the notebook has one or more `model_name = "org/repo"` (or
          positional `from_pretrained("...")`) loads that resolved to ok,
-         take the MAX score across THOSE. These are the models the notebook
-         actually loads.
+         take the MAX score across THOSE (each follows its base_model).
       2. Otherwise, fall back to the MAX score across every HF ref
-         discovered in the notebook (menu lists, comments, etc.).
+         discovered in the notebook.
 
     count_ok is the number of resolved repos in the chosen pool, used as a
     minor tiebreaker. Notebooks with no resolvable refs return (0, 0).
@@ -2539,7 +2634,7 @@ def notebook_created_at_key(notebook_path, refs_by_nb, cache, assigned_by_nb=Non
         for repo in repos:
             entry = cache.get(repo)
             if entry and entry.get("status") == "ok":
-                out.append(_popularity_score(entry))
+                out.append(_popularity_score(entry, cache))
         return out
 
     if assigned_by_nb:
