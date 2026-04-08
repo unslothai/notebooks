@@ -953,6 +953,18 @@ README_SKIP_NOTEBOOKS = [
     "Meta_Synthetic_Data_Llama3_2_(3B).ipynb"
 ]
 
+# Per-notebook overrides for the Model column in README.md tables. Keyed by
+# the on-disk basename (with .ipynb). The value is the literal Markdown text
+# rendered between the surrounding ** ** bold markers, so HTML tags such as
+# <br> can be embedded for multi-line cells. Only set this for notebooks
+# whose computed model name is too long to fit on a single README row.
+README_MODEL_NAME_OVERRIDES = {
+    "CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb":
+        "CodeForces cot Finetune<br>for Reasoning on CodeForces",
+    "Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb":
+        "CodeForces cot Finetune<br>for Reasoning on CodeForces",
+}
+
 
 FIRST_MAPPING_NAME = {
     "gpt-oss-(20B)-Fine-tuning.ipynb" : "gpt_oss_(20B)-Fine-tuning.ipynb",
@@ -2990,8 +3002,14 @@ def update_readme(
             print(f"Error processing {notebook_name}: {e}")
             info = {'name': notebook_name.replace('.ipynb',''), 'size': None, 'type': 'Error', 'architecture': None, 'requires_a100': False} # Fallback
 
-        model_name = info['name'] if info and info['name'] else notebook_name.replace('.ipynb','') 
-        model_type = info['type'] if info and info['type'] else "" 
+        model_name = info['name'] if info and info['name'] else notebook_name.replace('.ipynb','')
+        # Apply per-notebook display-name override (keyed by on-disk basename)
+        # so notebooks with very long auto-derived names can wrap onto multiple
+        # lines in the rendered Markdown table.
+        on_disk_basename = os.path.basename(path)
+        if on_disk_basename in README_MODEL_NAME_OVERRIDES:
+            model_name = README_MODEL_NAME_OVERRIDES[on_disk_basename]
+        model_type = info['type'] if info and info['type'] else ""
         architecture = info['architecture'] if info else None
         size = info['size'] 
         size = size.replace(r"_", " ") if size else None 

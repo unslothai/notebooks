@@ -306,7 +306,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Synthetic Data Hackathon**  | Synthetic Data | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Synthetic_Data_Hackathon.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **NeMo Gym Sudoku**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/NeMo-Gym-Sudoku.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **NeMo Gym Multi Environment**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/NeMo-Gym-Multi-Environment.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
-| **CodeForces cot Finetune for Reasoning on CodeForces**  | Reasoning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **CodeForces cot Finetune<br>for Reasoning on CodeForces**  | Reasoning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
 # 📒 Kaggle Notebooks
 <details>
@@ -513,7 +513,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **Unsloth**  | Studio | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Unsloth_Studio.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **CodeForces cot Finetune for Reasoning on CodeForces**  | Reasoning | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **CodeForces cot Finetune<br>for Reasoning on CodeForces**  | Reasoning | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 </details>
 
