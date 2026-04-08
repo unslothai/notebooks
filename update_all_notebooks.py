@@ -3661,6 +3661,7 @@ def update_readme(
     # Priority sections appear first in the README, in this order
     priority_sections = [
         "GRPO & Reinforcement Learning",
+        "Tool Calling",
         "Text-to-Speech (TTS)",
         "Vision (Multimodal)",
         "Embedding",
@@ -3827,12 +3828,25 @@ def update_readme(
             or "-cpt" in basename_lower
             or "_cpt" in basename_lower
         )
+        # Force-route tool-calling notebooks to the dedicated Tool Calling
+        # section. All FunctionGemma notebooks belong here regardless of
+        # their filename subtype (Multi-Turn-Tool-Calling, LMStudio,
+        # Mobile-Actions, etc.) since FunctionGemma is purpose-built for
+        # function calling. Other notebooks match on type or filename.
+        is_tool_calling = (
+            "tool calling" in model_type.lower()
+            or "functiongemma" in basename_lower
+            or "tool_calling" in basename_lower
+            or "tool-calling" in basename_lower
+        )
         # Use the precomputed is_in_grpo_section flag instead of checking
         # model_type here -- by this point the RL classifier may have
         # already renamed model_type to "GSM8K Math", "Wordle", etc. which
         # would no longer start with "GRPO".
         if is_in_grpo_section or is_forced_grpo:
             section_name = 'GRPO & Reinforcement Learning'
+        elif is_tool_calling:
+            section_name = 'Tool Calling'
         elif is_text_completion:
             section_name = _TEXT_COMPLETION_SECTION
         elif architecture and architecture in list_models:
