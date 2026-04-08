@@ -2230,6 +2230,49 @@ _FAST_INFERENCE_TRUE_RE = re.compile(
 )
 
 
+# TRL trainer class names that identify an RL / preference-optimization
+# training run. Ordered from most to least "RL-like" so detect_trainer_class
+# can pick the most indicative one when a notebook imports several.
+_TRAINER_CLASS_RE = re.compile(
+    r"\b(GRPOTrainer|DPOTrainer|ORPOTrainer|KTOTrainer|RewardTrainer|PPOTrainer)\b"
+)
+_TRAINER_CLASS_PRIORITY = [
+    "GRPOTrainer",
+    "DPOTrainer",
+    "ORPOTrainer",
+    "KTOTrainer",
+    "RewardTrainer",
+    "PPOTrainer",
+]
+
+
+def detect_trainer_class(notebook_path):
+    """Return the TRL trainer class the notebook trains with, or None.
+
+    Scans every code cell for one of the known trainer class names. If
+    multiple classes appear (e.g. an SFT warm-up before GRPO), returns
+    the highest-priority one from _TRAINER_CLASS_PRIORITY so the final
+    RL phase wins. Returns None on I/O errors or when no class matches.
+    """
+    try:
+        with open(notebook_path, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    found = set()
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        src_list = cell.get("source", [])
+        src = src_list if isinstance(src_list, str) else "".join(src_list)
+        for m in _TRAINER_CLASS_RE.finditer(src):
+            found.add(m.group(1))
+    for cls in _TRAINER_CLASS_PRIORITY:
+        if cls in found:
+            return cls
+    return None
+
+
 def notebook_uses_fast_inference(notebook_path):
     """Return True if any code cell contains `fast_inference = True`.
 
@@ -3714,18 +3757,38 @@ def update_readme(
         # The "GRPO" prefix is redundant with the section header, so we
         # drop it entirely when a task is detected.
         basename_lower_for_rl = os.path.basename(path).lower()
-        # GRPO / RL notebooks: identified by model_type OR filename. Catching
-        # "grpo" in the filename picks up notebooks whose classifier-assigned
-        # type is "Vision GRPO", "FP8 GRPO", etc. (GRPO as a suffix), which
-        # model_type.startswith("GRPO") would miss.
+        # Detect the TRL trainer class the notebook trains with. This is
+        # the authoritative signal for RL-style training (GRPO / DPO /
+        # ORPO / KTO / Reward / PPO). Notebooks that import one of these
+        # classes land in the GRPO & Reinforcement Learning section, and
+        # a "(GRPO RL)" suffix is added to the Type when a GRPO notebook
+        # is rendered in a non-GRPO cross-cutting section.
+        trainer_class = detect_trainer_class(path)
+        is_grpo_trainer = trainer_class == "GRPOTrainer"
+        is_dpo_trainer = trainer_class == "DPOTrainer"
+        is_orpo_trainer = trainer_class == "ORPOTrainer"
+        # GRPO / RL notebooks: identified by trainer class, model_type OR
+        # filename. The trainer-class check catches notebooks whose type
+        # the filename classifier assigned as "Vision GRPO" / "FP8 GRPO"
+        # (GRPO as a suffix) or even as "DPO" / "ORPO".
         is_in_grpo_section = (
-            model_type.startswith("GRPO")
+            is_grpo_trainer
+            or is_dpo_trainer
+            or is_orpo_trainer
+            or model_type.startswith("GRPO")
             or "grpo" in basename_lower_for_rl
             or "nemo-gym" in basename_lower_for_rl
             or "nemo_gym" in basename_lower_for_rl
             or "reinforcement_learning" in basename_lower_for_rl
         )
-        if is_in_grpo_section:
+        if is_dpo_trainer:
+            # Pure DPO preference optimization. Route to GRPO section and
+            # force the Type to "DPO" regardless of what the classifier
+            # inferred from the filename.
+            model_type = "DPO"
+        elif is_orpo_trainer:
+            model_type = "ORPO"
+        elif is_in_grpo_section:
             task = detect_rl_task(path)
             if task:
                 model_type = task
@@ -3733,8 +3796,10 @@ def update_readme(
                 model_type = "GRPO"
         # Notebooks that enable Unsloth's fast_inference flag are using
         # vLLM under the hood. Surface that in the Type column so readers
-        # can tell at a glance which variants ship vLLM.
-        if is_in_grpo_section and notebook_uses_fast_inference(path):
+        # can tell at a glance which variants ship vLLM. We only append
+        # the suffix for GRPO-class training so DPO / ORPO rows stay
+        # clean.
+        if is_grpo_trainer and notebook_uses_fast_inference(path):
             model_type = (model_type or "GRPO") + " + vLLM"
         architecture = info['architecture'] if info else None
         size = info['size']
@@ -3821,6 +3886,7 @@ def update_readme(
                 "size" : size,
                 "requires_a100": requires_a100,
                 "created_at_key": created_at_key,
+                "is_grpo_trainer": is_grpo_trainer,
             }
         )
 
@@ -3838,28 +3904,43 @@ def update_readme(
 
     notebook_data.sort(key=get_sort_key)
 
+    _grpo_section_name = "GRPO & Reinforcement Learning"
     for data in notebook_data:
         model_prefix = "(A100) " if data.get('requires_a100', False) else ""
-        row = f"| **{model_prefix}{data['model']}** {data['size']} | {data['type']} | {data['link']} |\n"
         platform = "Kaggle" if "kaggle" in data['link'].lower() else "Colab"
         raw_type = data.get("type") or ""
         # Strip the " + vLLM" suffix to get the base task type for grouping.
         # Both "GSM8K Math" and "GSM8K Math + vLLM" should group together
         # when we interleave the GRPO section by task type below.
         task_type = raw_type.replace(" + vLLM", "").strip() or "Other"
-        # Each row carries the precomputed popularity key so that
-        # section-level sorting can use it as the primary sort key.
-        row_entry = {
-            "row": row,
-            "popularity_key": data.get("created_at_key", (0, 0)),
-            # Boolean flag -- GRPO + vLLM rows sort to the top of any
-            # section they appear in, regardless of raw popularity.
-            "has_vllm": "vLLM" in raw_type,
-            # Base task type (no " + vLLM" suffix) for the GRPO section
-            # round-robin interleave. Used only by _interleave_by_task.
-            "task_type": task_type,
-        }
+        is_grpo_trainer_row = data.get("is_grpo_trainer", False)
         for section_name in data["sections"]:
+            # Cross-section suffix: a GRPOTrainer notebook appearing in a
+            # non-GRPO cross-cutting section (e.g. Vision (Multimodal))
+            # gets "(GRPO RL)" appended so readers can tell it is an RL
+            # notebook and not an SFT Vision notebook that happened to
+            # share the same model family.
+            display_type = raw_type
+            if is_grpo_trainer_row and section_name != _grpo_section_name:
+                if display_type:
+                    display_type = f"{display_type} (GRPO RL)"
+                else:
+                    display_type = "(GRPO RL)"
+            row = (
+                f"| **{model_prefix}{data['model']}** {data['size']} | "
+                f"{display_type} | {data['link']} |\n"
+            )
+            row_entry = {
+                "row": row,
+                "popularity_key": data.get("created_at_key", (0, 0)),
+                # Boolean flag -- GRPO + vLLM rows sort to the top of any
+                # section they appear in, regardless of raw popularity.
+                "has_vllm": "vLLM" in raw_type,
+                # Base task type (no " + vLLM" suffix) for the GRPO
+                # section round-robin interleave. Used only by
+                # _interleave_by_task.
+                "task_type": task_type,
+            }
             sections[section_name][platform]["rows"].append(row_entry)
 
     def _section_row_sort_key(entry):
