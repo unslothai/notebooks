@@ -2440,20 +2440,8 @@ def _ok_row_is_stale(entry, ttl_days=_MODEL_CACHE_OK_TTL_DAYS):
     Rows that are missing fetched_at or have an unparseable timestamp are
     considered stale so they get refreshed on the next run.
     """
-    fetched_at_str = (entry.get("fetched_at") or "").strip()
-    if not fetched_at_str:
-        return True
-    try:
-        # Accept both "...Z" and "+00:00" suffixes.
-        if fetched_at_str.endswith("Z"):
-            fetched_at = datetime.strptime(
-                fetched_at_str, "%Y-%m-%dT%H:%M:%SZ"
-            ).replace(tzinfo=timezone.utc)
-        else:
-            fetched_at = datetime.fromisoformat(fetched_at_str)
-            if fetched_at.tzinfo is None:
-                fetched_at = fetched_at.replace(tzinfo=timezone.utc)
-    except Exception:
+    fetched_at = _parse_iso8601_utc(entry.get("fetched_at"))
+    if fetched_at is None:
         return True
     age = datetime.now(timezone.utc) - fetched_at
     return age.total_seconds() > ttl_days * 86400
@@ -2571,9 +2559,61 @@ def refresh_model_created_cache(notebook_paths, cache_path=_MODEL_CREATED_CACHE_
 # the ordering.
 _LIKE_WEIGHT = 1000
 
+# Freshness boost to counteract the cold-start problem: a brand-new model
+# has 0 downloads but should still appear high in the README for its first
+# few weeks so readers can find it. The boost is added on top of the raw
+# downloads+likes score, linearly decaying from _NEW_MODEL_BOOST_MAGNITUDE
+# at day 0 to 0 at day _NEW_MODEL_BOOST_WINDOW_DAYS. The magnitude is sized
+# to comfortably exceed the most popular Vision/Llama upstream scores
+# (~5-6M) so a day-0 release can land at the top of cross-cutting
+# sections like Vision (Multimodal).
+_NEW_MODEL_BOOST_WINDOW_DAYS = 30
+_NEW_MODEL_BOOST_MAGNITUDE = 15_000_000
+
+
+def _parse_iso8601_utc(s):
+    """Parse a stored ISO8601 string back into an aware UTC datetime.
+
+    Returns None on anything unparseable. Accepts both "...Z" and
+    "+00:00" suffixes (matching the two formats the cache can hold).
+    """
+    s = (s or "").strip()
+    if not s:
+        return None
+    try:
+        if s.endswith("Z"):
+            return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=timezone.utc
+            )
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
+def _freshness_boost(entry):
+    """Decaying score boost for a recently-created model.
+
+    Returns 0 outside the boost window or when created_at is missing. The
+    boost scales linearly from _NEW_MODEL_BOOST_MAGNITUDE at age 0 to 0
+    at age _NEW_MODEL_BOOST_WINDOW_DAYS days.
+    """
+    if not entry:
+        return 0
+    dt = _parse_iso8601_utc(entry.get("created_at"))
+    if dt is None:
+        return 0
+    age_days = (datetime.now(timezone.utc) - dt).total_seconds() / 86400.0
+    if age_days < 0 or age_days >= _NEW_MODEL_BOOST_WINDOW_DAYS:
+        return 0
+    decay = 1.0 - (age_days / _NEW_MODEL_BOOST_WINDOW_DAYS)
+    return int(_NEW_MODEL_BOOST_MAGNITUDE * decay)
+
 
 def _entry_self_score(entry):
-    """Plain popularity score for one cache entry: downloads + likes*1000.
+    """Popularity score for one cache entry: downloads + likes*1000 + freshness boost.
 
     Returns 0 for missing/non-ok entries. Does NOT follow base_model.
     """
@@ -2581,7 +2621,7 @@ def _entry_self_score(entry):
         return 0
     downloads = entry.get("downloads", 0) or 0
     likes = entry.get("likes", 0) or 0
-    return downloads + likes * _LIKE_WEIGHT
+    return downloads + likes * _LIKE_WEIGHT + _freshness_boost(entry)
 
 
 def _popularity_score(entry, cache=None, _seen=None):
