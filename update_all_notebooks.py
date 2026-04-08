@@ -974,6 +974,15 @@ FIRST_MAPPING_NAME = {
     # Gemma
     "Gemma3_(4B).ipynb" : "Gemma3_(4B)-Conversational.ipynb",
     "Gemma3_(270M).ipynb" : "Gemma3_(270M)-Conversational.ipynb",
+    # Gemma 4 Text notebooks: the on-disk filenames use the "-Text" suffix
+    # which is not a known type, so the README row generator would render
+    # them with an empty Type column. Map them to "-Conversational" so the
+    # type extractor picks "Conversational" (matching how Gemma 3 Text
+    # notebooks are labelled).
+    "Gemma4_(E2B)-Text.ipynb" : "Gemma4_(E2B)-Conversational.ipynb",
+    "Gemma4_(E4B)-Text.ipynb" : "Gemma4_(E4B)-Conversational.ipynb",
+    "Gemma4_(31B)-Text.ipynb" : "Gemma4_(31B)-Conversational.ipynb",
+    "Gemma4_(26B_A4B)-Text.ipynb" : "Gemma4_(26B_A4B)-Conversational.ipynb",
 
     # Granite
     "Granite4.0_350M.ipynb" : "Granite4.0_(350M)-Conversational.ipynb",
@@ -2070,16 +2079,34 @@ def extract_version_from_row(row):
         return (0, 0)
 
 def extract_version(model_name):
-    """Extracts the version number for sorting.
+    """Extracts the architecture version number for sorting.
 
     Handles cases like:
         - Phi 3 Medium
         - Phi 3.5 Mini
         - Phi 4
+        - Gemma4 (E4B)        -> 4 (size E4B is ignored)
+        - (A100) Gemma3 (27B) -> 3 (A100 prefix and 27B size are ignored)
+        - Llama3.1 (8B)       -> (3, 1)
     Returns a tuple of (major version, minor version) for proper sorting.
-    Returns (0, 0) if no version is found.
+    Returns (0, 0) if no version is found in the architecture name.
+
+    The size suffix (e.g. "**(7B)**", "**(E4B)**") and the "(A100)" prefix
+    are stripped before searching for the version digit, otherwise the
+    parameter count or "100" from "A100" would be picked up as the version.
     """
-    match = re.search(r"(\d+(\.\d+)?)", model_name)
+    name = model_name
+    # Strip a trailing parenthesised size suffix wrapped in markdown bold,
+    # e.g. "**Gemma4** **(E4B)**" -> "**Gemma4** "
+    name = re.sub(r"\*\*\([^)]*\)\*\*\s*$", "", name).strip()
+    # Strip a trailing parenthesised size suffix without bold,
+    # e.g. "Gemma4 (E4B)" -> "Gemma4"
+    name = re.sub(r"\([^)]*\)\s*$", "", name).strip()
+    # Strip an "(A100)" or "(A100) " prefix anywhere
+    name = re.sub(r"\(A100\)\s*", "", name).strip()
+    # Strip markdown bold markers
+    name = name.replace("**", "").strip()
+    match = re.search(r"(\d+(\.\d+)?)", name)
     if match:
         version_str = match.group(1)
         if "." in version_str:
