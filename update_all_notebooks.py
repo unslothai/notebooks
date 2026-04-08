@@ -3980,38 +3980,43 @@ def update_readme(
             entry["row"],
         )
 
-    def _interleave_by_task(entries):
-        """Round-robin a list of row entries so adjacent rows show different
-        task types.
+    def _unique_types_first(entries):
+        """Order rows so every distinct task type appears at the top first,
+        then duplicates fall in behind, both phases sorted by popularity.
 
-        Preserves the vLLM-at-top invariant by partitioning the list into a
-        vLLM bucket and a non-vLLM bucket, interleaving each bucket
-        independently, then concatenating them.
+        Concretely: sort the incoming list by popularity globally (with
+        vLLM as a tiebreaker so Llama3.1 GSM8K + vLLM beats Gemma3 GSM8K
+        when GSM8K's representative is picked). Then walk the sorted list
+        once -- the first time we see a given task_type, that row becomes
+        the representative of its type; every later row with the same
+        type is a duplicate. Concatenate all representatives (in
+        popularity order) followed by all duplicates (also in popularity
+        order).
 
-        Within each bucket: group entries by task_type, keeping each group
-        in its incoming (popularity-sorted) order. Order the groups by the
-        popularity of their best row so the most-popular task appears
-        first. Then walk the groups round-robin, popping one row from each
-        non-empty group per pass, until all groups are empty.
+        The result: rows 1..N of the section show N distinct task types,
+        ordered by the best row in each type, and rows N+1.. are the
+        leftover duplicates in popularity order.
         """
-        from collections import OrderedDict
+        def _rank(entry):
+            # Tuple used in descending sort. Popularity first, has_vllm
+            # as a minor tiebreaker so vLLM rows outrank non-vLLM rows
+            # with the same popularity. popularity_key is already a
+            # (score, count_ok) tuple from the upstream sort.
+            pop_score, pop_count = entry.get("popularity_key", (0, 0))
+            return (pop_score, pop_count, 1 if entry.get("has_vllm") else 0)
 
-        def _interleave_bucket(bucket):
-            if not bucket:
-                return []
-            groups = OrderedDict()
-            for e in bucket:  # bucket is already sorted by popularity desc
-                groups.setdefault(e.get("task_type") or "Other", []).append(e)
-            out = []
-            while any(groups.values()):
-                for task, queue in list(groups.items()):
-                    if queue:
-                        out.append(queue.pop(0))
-            return out
-
-        vllm = [e for e in entries if e.get("has_vllm")]
-        non_vllm = [e for e in entries if not e.get("has_vllm")]
-        return _interleave_bucket(vllm) + _interleave_bucket(non_vllm)
+        sorted_entries = sorted(entries, key=_rank, reverse=True)
+        seen_types = set()
+        representatives = []
+        duplicates = []
+        for e in sorted_entries:
+            task = e.get("task_type") or "Other"
+            if task in seen_types:
+                duplicates.append(e)
+            else:
+                seen_types.add(task)
+                representatives.append(e)
+        return representatives + duplicates
 
     for section in sections:
         try:
@@ -4023,14 +4028,16 @@ def update_readme(
         except Exception as e:
             print(f"Warning: Could not sort Kaggle rows for section '{section}': {e}")
 
-    # Re-order the GRPO section by interleaving task types so adjacent rows
-    # show different tasks (GSM8K Math -> 2048 Game -> Sudoku -> ...). This
-    # only applies to "GRPO & Reinforcement Learning"; every other section
-    # stays in pure popularity order.
+    # Re-order the GRPO section so every distinct task type appears once
+    # at the top (each row of phase 1 is a different type, sorted by the
+    # popularity of the best row in that type), then duplicates come after
+    # (also sorted by popularity). This only applies to "GRPO &
+    # Reinforcement Learning"; every other section stays in pure
+    # popularity order.
     _grpo_section = "GRPO & Reinforcement Learning"
     if _grpo_section in sections:
         for platform in ("Colab", "Kaggle"):
-            sections[_grpo_section][platform]["rows"] = _interleave_by_task(
+            sections[_grpo_section][platform]["rows"] = _unique_types_first(
                 sections[_grpo_section][platform]["rows"]
             )
 
