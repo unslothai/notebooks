@@ -2222,6 +2222,66 @@ _HF_MODEL_REF_PLACEHOLDER_ORGS = {
 _MODEL_CREATED_CACHE_PATH = os.path.join("scripts", "model_created_at.csv")
 
 
+# Matches `fast_inference = True` (any whitespace around =, any case). This
+# is Unsloth's flag for enabling vLLM during GRPO training, so GRPO notebooks
+# that set it get rendered with a "GRPO + vLLM" type in the README.
+_FAST_INFERENCE_TRUE_RE = re.compile(
+    r"\bfast_inference\s*=\s*True\b"
+)
+
+
+def notebook_uses_fast_inference(notebook_path):
+    """Return True if any code cell contains `fast_inference = True`.
+
+    Returns False on I/O or parse errors.
+    """
+    try:
+        with open(notebook_path, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return False
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        src_list = cell.get("source", [])
+        src = src_list if isinstance(src_list, str) else "".join(src_list)
+        if _FAST_INFERENCE_TRUE_RE.search(src):
+            return True
+    return False
+
+
+def detect_grpo_variant(notebook_path):
+    """Inspect a GRPO notebook's markdown headers to classify what it trains.
+
+    Returns one of:
+      "auto_kernels" : headers mention making faster kernels with RL
+                       (gpt-oss matmul kernel generation notebooks)
+      "2048_game"    : headers mention the 2048 game
+      None           : no recognizable sub-variant
+    """
+    try:
+        with open(notebook_path, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    has_kernels = False
+    has_2048 = False
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") != "markdown":
+            continue
+        src_list = cell.get("source", [])
+        src = (src_list if isinstance(src_list, str) else "".join(src_list)).lower()
+        if "faster kernels" in src or "optimized matrix multiplication" in src:
+            has_kernels = True
+        if "2048 game" in src or "play 2048" in src:
+            has_2048 = True
+    if has_kernels:
+        return "auto_kernels"
+    if has_2048:
+        return "2048_game"
+    return None
+
+
 def extract_hf_model_refs_from_notebook(notebook_path):
     """Scan a notebook's code cells for <org>/<repo> Hugging Face model refs.
 
@@ -3593,9 +3653,26 @@ def update_readme(
         if on_disk_basename in README_MODEL_NAME_OVERRIDES:
             model_name = README_MODEL_NAME_OVERRIDES[on_disk_basename]
         model_type = info['type'] if info and info['type'] else ""
+        # GRPO notebooks have several sub-variants that the filename-based
+        # classifier cannot distinguish:
+        #   * gpt-oss auto-kernel generation (Make faster kernels with RL)
+        #   * 2048 game RL environment (Play 2048)
+        # Detect those via markdown header scan and override the Type so
+        # readers can tell them apart in the README.
+        if model_type.startswith("GRPO"):
+            variant = detect_grpo_variant(path)
+            if variant == "auto_kernels":
+                model_type = "GRPO Auto Kernels"
+            elif variant == "2048_game":
+                model_type = "GRPO 2048 Game"
+        # GRPO notebooks that enable Unsloth's fast_inference flag are
+        # using vLLM under the hood. Surface that in the Type column so
+        # readers can tell at a glance which GRPO variants ship vLLM.
+        if model_type.startswith("GRPO") and notebook_uses_fast_inference(path):
+            model_type = model_type + " + vLLM"
         architecture = info['architecture'] if info else None
-        size = info['size'] 
-        size = size.replace(r"_", " ") if size else None 
+        size = info['size']
+        size = size.replace(r"_", " ") if size else None
         size = f"**({size})**" if size else ""
 
         requires_a100 = info.get('requires_a100', False)
@@ -3619,7 +3696,7 @@ def update_readme(
             or "-cpt" in basename_lower
             or "_cpt" in basename_lower
         )
-        if model_type == 'GRPO' or is_forced_grpo:
+        if model_type.startswith('GRPO') or is_forced_grpo:
             section_name = 'GRPO & Reinforcement Learning'
         elif is_text_completion:
             section_name = _TEXT_COMPLETION_SECTION
@@ -3700,21 +3777,33 @@ def update_readme(
         row_entry = {
             "row": row,
             "popularity_key": data.get("created_at_key", (0, 0)),
+            # Boolean flag -- GRPO + vLLM rows sort to the top of any
+            # section they appear in, regardless of raw popularity.
+            "has_vllm": "vLLM" in (data.get("type") or ""),
         }
         for section_name in data["sections"]:
             sections[section_name][platform]["rows"].append(row_entry)
 
     def _section_row_sort_key(entry):
-        # Primary: HF Hub popularity score (downloads + likes*1000) of the
+        # Top bucket: rows whose Type column mentions vLLM (e.g. "GRPO + vLLM")
+        # always sort above non-vLLM rows in the same section. This puts the
+        # vLLM-enabled GRPO notebooks at the top of the GRPO section.
+        # Secondary: HF Hub popularity score (downloads + likes*1000) of the
         # model the notebook actually loads. Notebooks with no resolvable
         # model get 0 which sorts below every real score in a descending
         # sort.
-        # Secondary: count of ok-status refs that contributed to the score.
-        # Tertiary: the version-from-name fallback so Gemma 4 > Gemma 3
-        # when popularity ties (e.g. brand-new releases with 0 downloads).
-        # Quaternary: the row string itself for stable ordering.
+        # Tertiary: count of ok-status refs that contributed to the score.
+        # Quaternary: version-from-name fallback so Gemma 4 > Gemma 3 when
+        # popularity ties (e.g. brand-new releases with 0 downloads).
+        # Quinary: the row string itself for stable ordering.
         popularity, count_ok = entry["popularity_key"]
-        return (popularity, count_ok, extract_version_from_row(entry["row"]), entry["row"])
+        return (
+            1 if entry.get("has_vllm") else 0,
+            popularity,
+            count_ok,
+            extract_version_from_row(entry["row"]),
+            entry["row"],
+        )
 
     for section in sections:
         try:
