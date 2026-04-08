@@ -3842,6 +3842,11 @@ def update_readme(
         model_prefix = "(A100) " if data.get('requires_a100', False) else ""
         row = f"| **{model_prefix}{data['model']}** {data['size']} | {data['type']} | {data['link']} |\n"
         platform = "Kaggle" if "kaggle" in data['link'].lower() else "Colab"
+        raw_type = data.get("type") or ""
+        # Strip the " + vLLM" suffix to get the base task type for grouping.
+        # Both "GSM8K Math" and "GSM8K Math + vLLM" should group together
+        # when we interleave the GRPO section by task type below.
+        task_type = raw_type.replace(" + vLLM", "").strip() or "Other"
         # Each row carries the precomputed popularity key so that
         # section-level sorting can use it as the primary sort key.
         row_entry = {
@@ -3849,7 +3854,10 @@ def update_readme(
             "popularity_key": data.get("created_at_key", (0, 0)),
             # Boolean flag -- GRPO + vLLM rows sort to the top of any
             # section they appear in, regardless of raw popularity.
-            "has_vllm": "vLLM" in (data.get("type") or ""),
+            "has_vllm": "vLLM" in raw_type,
+            # Base task type (no " + vLLM" suffix) for the GRPO section
+            # round-robin interleave. Used only by _interleave_by_task.
+            "task_type": task_type,
         }
         for section_name in data["sections"]:
             sections[section_name][platform]["rows"].append(row_entry)
@@ -3875,6 +3883,39 @@ def update_readme(
             entry["row"],
         )
 
+    def _interleave_by_task(entries):
+        """Round-robin a list of row entries so adjacent rows show different
+        task types.
+
+        Preserves the vLLM-at-top invariant by partitioning the list into a
+        vLLM bucket and a non-vLLM bucket, interleaving each bucket
+        independently, then concatenating them.
+
+        Within each bucket: group entries by task_type, keeping each group
+        in its incoming (popularity-sorted) order. Order the groups by the
+        popularity of their best row so the most-popular task appears
+        first. Then walk the groups round-robin, popping one row from each
+        non-empty group per pass, until all groups are empty.
+        """
+        from collections import OrderedDict
+
+        def _interleave_bucket(bucket):
+            if not bucket:
+                return []
+            groups = OrderedDict()
+            for e in bucket:  # bucket is already sorted by popularity desc
+                groups.setdefault(e.get("task_type") or "Other", []).append(e)
+            out = []
+            while any(groups.values()):
+                for task, queue in list(groups.items()):
+                    if queue:
+                        out.append(queue.pop(0))
+            return out
+
+        vllm = [e for e in entries if e.get("has_vllm")]
+        non_vllm = [e for e in entries if not e.get("has_vllm")]
+        return _interleave_bucket(vllm) + _interleave_bucket(non_vllm)
+
     for section in sections:
         try:
             sections[section]["Colab"]["rows"].sort(key=_section_row_sort_key, reverse=True)
@@ -3884,6 +3925,17 @@ def update_readme(
             sections[section]["Kaggle"]["rows"].sort(key=_section_row_sort_key, reverse=True)
         except Exception as e:
             print(f"Warning: Could not sort Kaggle rows for section '{section}': {e}")
+
+    # Re-order the GRPO section by interleaving task types so adjacent rows
+    # show different tasks (GSM8K Math -> 2048 Game -> Sudoku -> ...). This
+    # only applies to "GRPO & Reinforcement Learning"; every other section
+    # stays in pure popularity order.
+    _grpo_section = "GRPO & Reinforcement Learning"
+    if _grpo_section in sections:
+        for platform in ("Colab", "Kaggle"):
+            sections[_grpo_section][platform]["rows"] = _interleave_by_task(
+                sections[_grpo_section][platform]["rows"]
+            )
 
     # Flatten row entries back into raw strings for the rendering step below.
     for section in sections:
