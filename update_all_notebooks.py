@@ -2431,7 +2431,7 @@ def _fetch_model_info(repo):
 # How long an "ok" row is allowed to stay in the cache before its
 # downloads/likes are refreshed against the Hub. created_at is immutable so
 # this only matters for the popularity counters.
-_MODEL_CACHE_OK_TTL_DAYS = 7
+_MODEL_CACHE_OK_TTL_DAYS = 14
 
 
 def _ok_row_is_stale(entry, ttl_days=_MODEL_CACHE_OK_TTL_DAYS):
