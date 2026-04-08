@@ -155,7 +155,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **(DGX Spark) gpt oss** **(20B)** | GRPO 2048 | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **(A100) gpt oss** **(120B)** | Fine Tuning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(120B)_A100-Fine-tuning.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
-### Gemma Notebooks
+### Gemma 4 Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **Gemma4** **(E4B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma4_(E4B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -168,6 +168,10 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Gemma4** **(31B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma4_(31B)-Text.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Gemma4** **(26B A4B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma4_(26B_A4B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Gemma4** **(26B A4B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma4_(26B_A4B)-Text.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+
+### Gemma Notebooks
+| Model | Type | Notebook Link |
+| --- | --- | --- |
 | **Gemma3N** **(4B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3N_(4B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Gemma3N** **(4B)** | Multimodal | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3N_(4B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Gemma3N** **(4B)** | Audio | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3N_(4B)-Audio.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
