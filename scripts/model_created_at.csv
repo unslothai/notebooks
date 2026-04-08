@@ -2,6 +2,7 @@ model_repo,created_at,downloads,likes,base_model,fetched_at,status
 AI4Math/MathVista,,0,0,,2026-04-08T08:58:06Z,not_found
 AudioProcessor/DacInterface,,0,0,,2026-04-08T08:58:06Z,not_found
 Fallback/augmentation,,0,0,,2026-04-08T08:58:06Z,not_found
+Flag/unflag,,0,0,,2026-04-08T11:44:51Z,not_found
 FreedomIntelligence/alpaca-gpt4-korean,,0,0,,2026-04-08T08:58:06Z,not_found
 HKUST-Audio/xcodec2,2025-01-07T06:07:24Z,30236,98,,2026-04-08T08:58:06Z,ok
 HuggingFaceH4/Multilingual-Thinking,,0,0,,2026-04-08T08:58:06Z,not_found
@@ -73,6 +74,7 @@ Qwen/Qwen3.5-35B-A3B,2026-02-24T09:39:25Z,3344183,1342,Qwen/Qwen3.5-35B-A3B-Base
 Qwen/Qwen3.5-35B-A3B-Base,2026-02-24T09:42:42Z,47934,125,,2026-04-08T09:26:16Z,ok
 Qwen/Qwen3.5-4B,2026-02-27T14:45:03Z,2782021,440,Qwen/Qwen3.5-4B-Base,2026-04-08T08:58:28Z,ok
 Qwen/Qwen3.5-4B-Base,2026-02-27T13:20:09Z,88832,56,,2026-04-08T09:26:16Z,ok
+Random/uncertain,,0,0,,2026-04-08T11:44:51Z,not_found
 SparkAudio/Spark-TTS-0.5B,2025-02-27T05:01:46Z,789,730,,2026-04-08T08:58:28Z,ok
 Thytu/ChessInstruct,,0,0,,2026-04-08T08:58:06Z,not_found
 Whisper/AudioProcessor,,0,0,,2026-04-08T08:58:06Z,not_found
@@ -90,6 +92,7 @@ deepseek-ai/DeepSeek-OCR,2025-10-17T06:22:05Z,2170590,3202,,2026-04-08T08:58:28Z
 deepseek-ai/DeepSeek-OCR-2,2026-01-27T02:56:54Z,1250376,895,,2026-04-08T08:58:28Z,ok
 deepseek-ai/DeepSeek-R1-0528-Qwen3-8B,2025-05-29T11:07:47Z,180553,1045,,2026-04-08T08:58:28Z,ok
 electroglyph/technical,,0,0,,2026-04-08T08:58:06Z,not_found
+failed/completed,,0,0,,2026-04-08T11:44:51Z,not_found
 gemma_output/model.pte,,0,0,,2026-04-08T08:58:06Z,not_found
 google/functiongemma-270m-it,2025-10-08T17:33:31Z,31603,960,,2026-04-08T08:58:28Z,ok
 google/gemma-2-2b,2024-07-16T08:07:29Z,475407,636,,2026-04-08T08:58:28Z,ok
@@ -178,6 +181,7 @@ mistralai/Pixtral-12B-Base-2409,2024-10-17T12:04:42Z,12,108,,2026-04-08T08:58:28
 mistralai/mistral-7b-instruct-v0.2,2023-12-11T13:18:44Z,2437425,3108,,2026-04-08T08:58:28Z,ok
 mlabonne/FineTome-100k,,0,0,,2026-04-08T08:58:06Z,not_found
 module/package,,0,0,,2026-04-08T08:58:06Z,not_found
+numpy/random,,0,0,,2026-04-08T11:44:51Z,not_found
 nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16,2025-12-04T03:37:11Z,1257272,704,,2026-04-08T08:58:28Z,ok
 nvidia/Nemotron-RL-instruction_following,,0,0,,2026-04-08T08:58:06Z,not_found
 open-r1/DAPO-Math-17k-Processed,,0,0,,2026-04-08T08:58:06Z,not_found
@@ -198,6 +202,9 @@ testing/validation,,0,0,,2026-04-08T08:58:06Z,not_found
 tiiuae/Falcon-H1-0.5B-Base,2025-05-01T05:08:29Z,37559,16,,2026-04-08T08:58:28Z,ok
 tiiuae/Falcon-H1-0.5B-Instruct,2025-05-01T15:43:03Z,1750,34,tiiuae/Falcon-H1-0.5B-Base,2026-04-08T08:58:06Z,ok
 tomaarsen/miriad-4.4M-split,,0,0,,2026-04-08T08:58:06Z,not_found
+total_moves/NUM_EVAL_GAMES,,0,0,,2026-04-08T11:44:51Z,not_found
+train/eval,,0,0,,2026-04-08T11:44:51Z,not_found
+uncertain/random,,0,0,,2026-04-08T11:44:51Z,not_found
 unsloth/DeepSeek-OCR,2025-10-27T10:38:28Z,1823,39,deepseek-ai/DeepSeek-OCR,2026-04-08T08:58:06Z,ok
 unsloth/DeepSeek-OCR-2,2026-01-27T04:28:48Z,277371,32,deepseek-ai/DeepSeek-OCR-2,2026-04-08T08:58:06Z,ok
 unsloth/DeepSeek-R1-0528-Qwen3-8B,2025-05-29T13:58:27Z,1711,18,deepseek-ai/DeepSeek-R1-0528-Qwen3-8B,2026-04-08T08:58:06Z,ok
@@ -422,4 +429,5 @@ vision/audio,,0,0,,2026-04-08T08:58:06Z,not_found
 wikimedia/wikipedia,,0,0,,2026-04-08T08:58:06Z,not_found
 win/lose,,0,0,,2026-04-08T08:58:06Z,not_found
 yahma/alpaca-cleaned,,0,0,,2026-04-08T08:58:06Z,not_found
+your-username/minesweeper-gpt-oss,,0,0,,2026-04-08T11:44:51Z,not_found
 zai-org/GLM-4.7-Flash,2026-01-19T06:28:10Z,924935,1656,,2026-04-08T08:58:28Z,ok

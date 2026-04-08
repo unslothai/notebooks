@@ -2360,6 +2360,8 @@ def detect_rl_task(notebook_path):
         or "2048" in basename_lower
     ):
         return "2048 Game"
+    if "minesweeper" in md_joined or "minesweeper" in basename_lower:
+        return "Minesweeper Game"
     if "sudoku" in md_joined or "sudoku" in basename_lower:
         return "Sudoku"
     return None
