@@ -3594,7 +3594,14 @@ def update_readme(
 
         # Primary section (architecture-based)
         section_name = "Other"
-        if model_type == 'GRPO':
+        # Force-route notebooks whose filename signals a GRPO / RL environment
+        # even though the classifier did not tag them with model_type='GRPO'.
+        # Examples: NeMo-Gym-Sudoku.ipynb, NeMo-Gym-Multi-Environment.ipynb.
+        basename_lower = os.path.basename(path).lower()
+        is_forced_grpo = any(
+            kw in basename_lower for kw in ["nemo-gym", "nemo_gym"]
+        )
+        if model_type == 'GRPO' or is_forced_grpo:
             section_name = 'GRPO & Reinforcement Learning'
         elif architecture and architecture in list_models:
             section_name = architecture

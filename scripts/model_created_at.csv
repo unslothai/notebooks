@@ -94,6 +94,7 @@ gemma_output/model.pte,,0,0,,2026-04-08T08:58:06Z,not_found
 google/functiongemma-270m-it,2025-10-08T17:33:31Z,31603,960,,2026-04-08T08:58:28Z,ok
 google/gemma-2-2b,2024-07-16T08:07:29Z,475407,636,,2026-04-08T08:58:28Z,ok
 google/gemma-2-9b,2024-06-24T08:10:30Z,68791,695,,2026-04-08T08:58:28Z,ok
+google/gemma-3-12b,,0,0,,2026-04-08T10:17:42Z,not_found
 google/gemma-3-12b-it,2025-03-01T19:11:34Z,2603868,703,google/gemma-3-12b-pt,2026-04-08T08:58:28Z,ok
 google/gemma-3-12b-pt,2025-03-01T19:11:17Z,21277,89,google/gemma-3-12b,2026-04-08T09:26:16Z,ok
 google/gemma-3-1b-it,2025-03-10T12:09:00Z,1063807,906,google/gemma-3-1b-pt,2026-04-08T08:58:28Z,ok
@@ -169,6 +170,7 @@ mistralai/Mistral-7B-Instruct-v0.2,2023-12-11T13:18:44Z,2437425,3108,,2026-04-08
 mistralai/Mistral-7B-Instruct-v0.3,2024-05-22T09:57:04Z,2313251,2500,mistralai/Mistral-7B-v0.3,2026-04-08T08:58:28Z,ok
 mistralai/Mistral-7B-v0.1,2023-09-20T13:03:50Z,656082,4064,,2026-04-08T08:58:28Z,ok
 mistralai/Mistral-7B-v0.3,2024-05-22T09:56:38Z,299325,572,,2026-04-08T08:58:28Z,ok
+mistralai/Mistral-Small-3.1-24B-Base-2503,2025-03-16T23:31:11Z,9111,271,,2026-04-08T10:17:42Z,ok
 mistralai/Mistral-Small-3.2-24B-Instruct-2506,2025-06-19T17:41:13Z,767976,577,mistralai/Mistral-Small-3.1-24B-Base-2503,2026-04-08T09:26:16Z,ok
 mistralai/Mistral-Small-Instruct-2409,2024-09-17T13:05:37Z,12392,394,,2026-04-08T08:58:28Z,ok
 mistralai/Pixtral-12B-2409,2024-09-11T18:11:16Z,16958,683,mistralai/Pixtral-12B-Base-2409,2026-04-08T08:58:28Z,ok
