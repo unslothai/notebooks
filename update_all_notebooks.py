@@ -3531,6 +3531,13 @@ def update_readme(
         if cross_section not in list_models:
             list_models.append(cross_section)
 
+    # "Text Completion / Continued Pretraining" collects notebooks whose
+    # primary purpose is base-model continued pretraining or raw text
+    # completion, sitting just before "Other" at the end of the README.
+    _TEXT_COMPLETION_SECTION = "Text Completion / Continued Pretraining"
+    if _TEXT_COMPLETION_SECTION not in list_models:
+        list_models.append(_TEXT_COMPLETION_SECTION)
+
     list_models.append('Other')
 
     sections = {}
@@ -3602,8 +3609,20 @@ def update_readme(
         is_forced_grpo = any(
             kw in basename_lower for kw in ["nemo-gym", "nemo_gym"]
         )
+        # Force-route text completion / continued pretraining notebooks so
+        # they land in the dedicated section instead of the architecture one.
+        # We key off the classified type and the filename because some
+        # notebooks have type="" in the cache but a clear filename.
+        is_text_completion = (
+            model_type in ("Text Completion", "CPT")
+            or "text_completion" in basename_lower
+            or "-cpt" in basename_lower
+            or "_cpt" in basename_lower
+        )
         if model_type == 'GRPO' or is_forced_grpo:
             section_name = 'GRPO & Reinforcement Learning'
+        elif is_text_completion:
+            section_name = _TEXT_COMPLETION_SECTION
         elif architecture and architecture in list_models:
             section_name = architecture
 
