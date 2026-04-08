@@ -2250,36 +2250,89 @@ def notebook_uses_fast_inference(notebook_path):
     return False
 
 
-def detect_grpo_variant(notebook_path):
-    """Inspect a GRPO notebook's markdown headers to classify what it trains.
+def detect_rl_task(notebook_path):
+    """Inspect an RL/GRPO notebook and classify the task it trains on.
 
-    Returns one of:
-      "auto_kernels" : headers mention making faster kernels with RL
-                       (gpt-oss matmul kernel generation notebooks)
-      "2048_game"    : headers mention the 2048 game
-      None           : no recognizable sub-variant
+    Returns a short human-readable task label, or None if no task could
+    be inferred. Detection uses two passes:
+
+    1. Datasets referenced by `load_dataset("...")` calls in code cells.
+       This catches the generic math GRPO notebooks (GSM8K, DAPO,
+       MathVista) that share the same boilerplate markdown structure.
+    2. Markdown headers and filename keywords for environment-specific
+       notebooks (2048, Wordle, Sudoku, Multi Environment, kernels).
+
+    Dataset detection runs first so a Vision GRPO notebook that happens
+    to mention "sudoku" in a comment still gets the "Vision Math" label.
     """
     try:
         with open(notebook_path, "r", encoding="utf-8") as f:
             nb = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
-    has_kernels = False
-    has_2048 = False
+
+    datasets = set()
+    markdown_text = []
     for cell in nb.get("cells", []):
-        if cell.get("cell_type") != "markdown":
-            continue
+        ctype = cell.get("cell_type")
         src_list = cell.get("source", [])
-        src = (src_list if isinstance(src_list, str) else "".join(src_list)).lower()
-        if "faster kernels" in src or "optimized matrix multiplication" in src:
-            has_kernels = True
-        if "2048 game" in src or "play 2048" in src:
-            has_2048 = True
-    if has_kernels:
-        return "auto_kernels"
-    if has_2048:
-        return "2048_game"
+        src = src_list if isinstance(src_list, str) else "".join(src_list)
+        if ctype == "code":
+            for m in _LOAD_DATASET_RE.finditer(src):
+                datasets.add(m.group("repo").strip())
+        elif ctype == "markdown":
+            markdown_text.append(src.lower())
+
+    # --- Dataset-based classification (most reliable) --------------------
+    # Any MathVista reference marks this as a Vision Math RL notebook.
+    if any("mathvista" in d.lower() for d in datasets):
+        return "Vision Math"
+    # DAPO math / OpenMathReasoning (Unsloth's newer GRPO reasoning recipe)
+    if any("dapo" in d.lower() or "openmathreasoning" in d.lower() for d in datasets):
+        return "DAPO Math"
+    # Classic GSM8K math-word-problem GRPO notebooks
+    if any("gsm8k" in d.lower() for d in datasets):
+        return "GSM8K Math"
+
+    # --- Markdown / filename based classification ------------------------
+    md_joined = "\n".join(markdown_text)
+    basename_lower = os.path.basename(notebook_path).lower()
+
+    if "wordle" in md_joined or "wordle" in basename_lower:
+        return "Wordle"
+    if (
+        "multi-environment" in md_joined
+        or "multi environment" in md_joined
+        or "multi-environment" in basename_lower
+    ):
+        return "Multi Environment"
+    if (
+        "faster kernels" in md_joined
+        or "optimized matrix multiplication" in md_joined
+    ):
+        return "Auto Kernel Creation"
+    if (
+        "2048 game" in md_joined
+        or "play 2048" in md_joined
+        or "2048" in basename_lower
+    ):
+        return "2048 Game"
+    if "sudoku" in md_joined or "sudoku" in basename_lower:
+        return "Sudoku"
     return None
+
+
+# Matches `load_dataset("...")` and `load_dataset('...')` with a single
+# positional repo id. Used by detect_rl_task to pull the training dataset
+# out of each notebook's code cells.
+_LOAD_DATASET_RE = re.compile(
+    r"""load_dataset\s*\(\s*
+        (?P<quote>['"])
+        (?P<repo>[^'"]+)
+        (?P=quote)
+    """,
+    re.VERBOSE,
+)
 
 
 def extract_hf_model_refs_from_notebook(notebook_path):
@@ -3653,23 +3706,36 @@ def update_readme(
         if on_disk_basename in README_MODEL_NAME_OVERRIDES:
             model_name = README_MODEL_NAME_OVERRIDES[on_disk_basename]
         model_type = info['type'] if info and info['type'] else ""
-        # GRPO notebooks have several sub-variants that the filename-based
-        # classifier cannot distinguish:
-        #   * gpt-oss auto-kernel generation (Make faster kernels with RL)
-        #   * 2048 game RL environment (Play 2048)
-        # Detect those via markdown header scan and override the Type so
-        # readers can tell them apart in the README.
-        if model_type.startswith("GRPO"):
-            variant = detect_grpo_variant(path)
-            if variant == "auto_kernels":
-                model_type = "GRPO Auto Kernels"
-            elif variant == "2048_game":
-                model_type = "GRPO 2048 Game"
-        # GRPO notebooks that enable Unsloth's fast_inference flag are
-        # using vLLM under the hood. Surface that in the Type column so
-        # readers can tell at a glance which GRPO variants ship vLLM.
-        if model_type.startswith("GRPO") and notebook_uses_fast_inference(path):
-            model_type = model_type + " + vLLM"
+        # Classify RL/GRPO notebooks by the task they actually train on
+        # (GSM8K Math, DAPO Math, Vision Math, Wordle, Sudoku, 2048 Game,
+        # Auto Kernel Creation, Multi Environment, ...). This is driven by
+        # the dataset name or markdown headers, not the filename, and
+        # overrides the generic "GRPO" label from the filename classifier.
+        # The "GRPO" prefix is redundant with the section header, so we
+        # drop it entirely when a task is detected.
+        basename_lower_for_rl = os.path.basename(path).lower()
+        # GRPO / RL notebooks: identified by model_type OR filename. Catching
+        # "grpo" in the filename picks up notebooks whose classifier-assigned
+        # type is "Vision GRPO", "FP8 GRPO", etc. (GRPO as a suffix), which
+        # model_type.startswith("GRPO") would miss.
+        is_in_grpo_section = (
+            model_type.startswith("GRPO")
+            or "grpo" in basename_lower_for_rl
+            or "nemo-gym" in basename_lower_for_rl
+            or "nemo_gym" in basename_lower_for_rl
+            or "reinforcement_learning" in basename_lower_for_rl
+        )
+        if is_in_grpo_section:
+            task = detect_rl_task(path)
+            if task:
+                model_type = task
+            elif not model_type:
+                model_type = "GRPO"
+        # Notebooks that enable Unsloth's fast_inference flag are using
+        # vLLM under the hood. Surface that in the Type column so readers
+        # can tell at a glance which variants ship vLLM.
+        if is_in_grpo_section and notebook_uses_fast_inference(path):
+            model_type = (model_type or "GRPO") + " + vLLM"
         architecture = info['architecture'] if info else None
         size = info['size']
         size = size.replace(r"_", " ") if size else None
@@ -3696,7 +3762,11 @@ def update_readme(
             or "-cpt" in basename_lower
             or "_cpt" in basename_lower
         )
-        if model_type.startswith('GRPO') or is_forced_grpo:
+        # Use the precomputed is_in_grpo_section flag instead of checking
+        # model_type here -- by this point the RL classifier may have
+        # already renamed model_type to "GSM8K Math", "Wordle", etc. which
+        # would no longer start with "GRPO".
+        if is_in_grpo_section or is_forced_grpo:
             section_name = 'GRPO & Reinforcement Learning'
         elif is_text_completion:
             section_name = _TEXT_COMPLETION_SECTION
