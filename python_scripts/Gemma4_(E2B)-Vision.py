@@ -247,6 +247,58 @@ result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128
 # 
 # We use our new `UnslothVisionDataCollator` which will help in our vision finetuning setup.
 
+# #### Optional: Image token budget
+# 
+# Gemma 4 supports a configurable image token budget. This controls how many
+# visual tokens are used to represent each image.
+# 
+# Lower values are faster and useful for simple visual tasks. Higher values keep
+# more image detail, which can help for OCR, document parsing, handwriting, or
+# small text.
+# 
+# The default is usually `280`. Since this notebook is doing LaTeX OCR, we can
+# optionally increase it before creating the data collator and trainer.
+# 
+# See [here](https://ai.google.dev/gemma/docs/core/model_card_4#5_variable_image_resolution) for more details.
+
+# In[ ]:
+
+
+from unsloth.trainer import UnslothVisionDataCollator
+
+# For Gemma 4, this is the repeated image token used after processing.
+IMAGE_TOKEN_ID = 258880
+
+print(processor.tokenizer.decode([IMAGE_TOKEN_ID]))
+
+collator = UnslothVisionDataCollator(model, processor)
+out = collator(converted_dataset[:3])
+
+image_token_counts = (out["input_ids"] == IMAGE_TOKEN_ID).sum(dim = 1)
+
+print("Default image token budget:", processor.image_processor.max_soft_tokens)
+print("Image tokens per sample:", image_token_counts.tolist())
+print("Batch input_ids shape:", out["input_ids"].shape)
+
+
+# In[ ]:
+
+
+# Supported values: 70, 140, 280, 560, 1120
+# Try 280 first. Use 560 or 1120 for OCR / document parsing / small text.
+IMAGE_TOKEN_BUDGET = 1120
+
+processor.image_processor.max_soft_tokens = IMAGE_TOKEN_BUDGET
+
+collator = UnslothVisionDataCollator(model, processor)
+out = collator(converted_dataset[:3])
+
+image_token_counts = (out["input_ids"] == IMAGE_TOKEN_ID).sum(dim = 1)
+
+print("Image tokens per sample:", image_token_counts.tolist())
+print("Batch input_ids shape:", out["input_ids"].shape)
+
+
 # In[ ]:
 
 
