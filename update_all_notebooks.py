@@ -3660,8 +3660,11 @@ def update_readme(
         print(f"  [WARN] Could not refresh model created_at cache: {e}")
         model_created_cache, refs_by_nb, assigned_by_nb = {}, {}, {}
 
-    # Priority sections appear first in the README, in this order
+    # Priority sections appear first in the README, in this order.
+    # "Gemma 4" leads the auto-generated region so the section renders
+    # directly below the hand-written Main Notebooks table.
     priority_sections = [
+        "Gemma 4",
         "GRPO & Reinforcement Learning",
         "Tool Calling",
         "Text-to-Speech (TTS)",
@@ -3677,13 +3680,6 @@ def update_readme(
     for arch in unique_architectures:
         if arch not in list_models:
             list_models.append(arch)
-
-    # Place "Gemma 4" immediately before "Gemma" so the newer family appears
-    # above its predecessor instead of after it (default alphabetical sort
-    # would order "Gemma" before "Gemma 4" because "Gemma" is a prefix).
-    if "Gemma 4" in list_models and "Gemma" in list_models:
-        list_models.remove("Gemma 4")
-        list_models.insert(list_models.index("Gemma"), "Gemma 4")
 
     # Cross-cutting sections (notebooks can appear in multiple sections)
     for cross_section in ["Vision (Multimodal)", "Embedding", "OCR"]:
@@ -3873,6 +3869,13 @@ def update_readme(
         if any(kw in name_lower for kw in ["embedding", "minilm", "bge", "modernbert", "bert_classification"]):
             if "Embedding" not in sections_for_notebook:
                 sections_for_notebook.append("Embedding")
+
+        # Cross-cutting: list every Gemma 4 notebook in the Gemma 4 section,
+        # even when the primary section picked is GRPO & Reinforcement
+        # Learning (or another priority section). This keeps the Gemma 4
+        # architecture section as a single index of everything Gemma 4.
+        if architecture == "Gemma 4" and "Gemma 4" not in sections_for_notebook:
+            sections_for_notebook.append("Gemma 4")
 
         link_base = base_url_kaggle if is_kaggle else base_url_colab
         link_url = f"{link_base}{path}"
