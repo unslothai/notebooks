@@ -4112,19 +4112,32 @@ def update_readme(
             "</summary>\n\n"
         )
 
-        # Static "Specific use-case Notebooks" section (Colab only, before "Other")
+        # Static "Specific use-case Notebooks" section (Colab only, before "Other").
+        # Links use HTML anchors with target="_blank" rel="noopener noreferrer"
+        # so clicks open in a new tab, matching every other section.
+        _colab_badge_img = (
+            '<img src="https://colab.research.google.com/assets/colab-badge.svg" '
+            'alt="Open In Colab">'
+        )
+
+        def _colab_anchor(url):
+            return (
+                f'<a href="{url}" target="_blank" rel="noopener noreferrer">'
+                f'{_colab_badge_img}</a>'
+            )
+
         specific_usecase_section = (
             "### Specific use-case Notebooks\n"
             "| Usecase | Model | Notebook Link |\n"
             "| --- | --- | --- |\n"
-            '| Text Classification | Llama 3.1 (8B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/timothelaborie/text_classification_scripts/blob/main/unsloth_classification.ipynb) |\n'
-            '| Tool Calling | Qwen2.5-Coder (1.5B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |\n'
-            '| Multiple Datasets | | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1njCCbE1YVal9xC83hjdo2hiGItpY_D6t?usp=sharing) |\n'
-            '| KTO | Qwen2.5-Instruct (1.5B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1MRgGtLWuZX4ypSfGguFgC-IblTvO2ivM?usp=sharing) |\n'
-            '| Inference Chat UI | LLaMa 3.2 Vision | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb) |\n'
-            '| Conversational | LLaMa 3.2 (1B and 3B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb) |\n'
-            '| ChatML | Mistral (7B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/15F1xyn8497_dUbxZP4zWmPZ3PJx1Oymv?usp=sharing) |\n'
-            '| Text Completion | Mistral (7B) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_(7B)-Text_Completion.ipynb) |\n'
+            f'| Text Classification | Llama 3.1 (8B) | {_colab_anchor("https://colab.research.google.com/github/timothelaborie/text_classification_scripts/blob/main/unsloth_classification.ipynb")} |\n'
+            f'| Tool Calling | Qwen2.5-Coder (1.5B) | {_colab_anchor("https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb")} |\n'
+            f'| Multiple Datasets | | {_colab_anchor("https://colab.research.google.com/drive/1njCCbE1YVal9xC83hjdo2hiGItpY_D6t?usp=sharing")} |\n'
+            f'| KTO | Qwen2.5-Instruct (1.5B) | {_colab_anchor("https://colab.research.google.com/drive/1MRgGtLWuZX4ypSfGguFgC-IblTvO2ivM?usp=sharing")} |\n'
+            f'| Inference Chat UI | LLaMa 3.2 Vision | {_colab_anchor("https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb")} |\n'
+            f'| Conversational | LLaMa 3.2 (1B and 3B) | {_colab_anchor("https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B_and_3B)-Conversational.ipynb")} |\n'
+            f'| ChatML | Mistral (7B) | {_colab_anchor("https://colab.research.google.com/drive/15F1xyn8497_dUbxZP4zWmPZ3PJx1Oymv?usp=sharing")} |\n'
+            f'| Text Completion | Mistral (7B) | {_colab_anchor("https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_(7B)-Text_Completion.ipynb")} |\n'
             "\n"
         )
 
