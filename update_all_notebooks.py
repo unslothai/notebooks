@@ -3959,29 +3959,52 @@ def update_readme(
                 # section round-robin interleave. Used only by
                 # _interleave_by_task.
                 "task_type": task_type,
+                # Tracks whether this is a GRPO / RL notebook, so the
+                # architecture-section sorter can float RL rows to the
+                # top of sections like "Gemma 4".
+                "is_grpo_trainer_row": is_grpo_trainer_row,
             }
             sections[section_name][platform]["rows"].append(row_entry)
 
-    def _section_row_sort_key(entry):
-        # Top bucket: rows whose Type column mentions vLLM (e.g. "GRPO + vLLM")
-        # always sort above non-vLLM rows in the same section. This puts the
-        # vLLM-enabled GRPO notebooks at the top of the GRPO section.
-        # Secondary: HF Hub popularity score (downloads + likes*1000) of the
-        # model the notebook actually loads. Notebooks with no resolvable
-        # model get 0 which sorts below every real score in a descending
-        # sort.
-        # Tertiary: count of ok-status refs that contributed to the score.
-        # Quaternary: version-from-name fallback so Gemma 4 > Gemma 3 when
-        # popularity ties (e.g. brand-new releases with 0 downloads).
-        # Quinary: the row string itself for stable ordering.
-        popularity, count_ok = entry["popularity_key"]
-        return (
-            1 if entry.get("has_vllm") else 0,
-            popularity,
-            count_ok,
-            extract_version_from_row(entry["row"]),
-            entry["row"],
-        )
+    def _make_section_row_sort_key(section_name):
+        # Factory so the sort key can depend on which section it is
+        # ordering. For the "Gemma 4" architecture section we float
+        # cross-listed GRPO / RL rows to the top so readers scanning the
+        # Gemma 4 index see the RL options first; every other section
+        # keeps the previous ordering.
+        float_grpo_rl_to_top = section_name == "Gemma 4"
+
+        def _key(entry):
+            # Top bucket (only in sections where float_grpo_rl_to_top is
+            # enabled): rows whose Type mentions GRPO RL sort above
+            # everything else.
+            grpo_rl_top = 0
+            if float_grpo_rl_to_top and entry.get("is_grpo_trainer_row"):
+                grpo_rl_top = 1
+            # Next bucket: rows whose Type column mentions vLLM
+            # (e.g. "GRPO + vLLM") always sort above non-vLLM rows in
+            # the same section. This puts the vLLM-enabled GRPO
+            # notebooks at the top of the GRPO section.
+            # Then: HF Hub popularity score (downloads + likes*1000) of
+            # the model the notebook actually loads. Notebooks with no
+            # resolvable model get 0 which sorts below every real score
+            # in a descending sort.
+            # Then: count of ok-status refs that contributed to the
+            # score. Version-from-name fallback so Gemma 4 > Gemma 3
+            # when popularity ties (e.g. brand-new releases with 0
+            # downloads). Finally the row string itself for stable
+            # ordering.
+            popularity, count_ok = entry["popularity_key"]
+            return (
+                grpo_rl_top,
+                1 if entry.get("has_vllm") else 0,
+                popularity,
+                count_ok,
+                extract_version_from_row(entry["row"]),
+                entry["row"],
+            )
+
+        return _key
 
     def _unique_types_first(entries):
         """Order rows so every distinct task type appears at the top first,
@@ -4022,12 +4045,13 @@ def update_readme(
         return representatives + duplicates
 
     for section in sections:
+        section_sort_key = _make_section_row_sort_key(section)
         try:
-            sections[section]["Colab"]["rows"].sort(key=_section_row_sort_key, reverse=True)
+            sections[section]["Colab"]["rows"].sort(key=section_sort_key, reverse=True)
         except Exception as e:
             print(f"Warning: Could not sort Colab rows for section '{section}': {e}")
         try:
-            sections[section]["Kaggle"]["rows"].sort(key=_section_row_sort_key, reverse=True)
+            sections[section]["Kaggle"]["rows"].sort(key=section_sort_key, reverse=True)
         except Exception as e:
             print(f"Warning: Could not sort Kaggle rows for section '{section}': {e}")
 
