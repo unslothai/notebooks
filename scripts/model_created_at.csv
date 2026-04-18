@@ -1,6 +1,7 @@
 model_repo,created_at,downloads,likes,base_model,fetched_at,status
 AI4Math/MathVista,,0,0,,2026-04-08T08:58:06Z,not_found
 AudioProcessor/DacInterface,,0,0,,2026-04-08T08:58:06Z,not_found
+Dao-AILab/causal-conv1d,,0,0,,2026-04-18T00:43:34Z,not_found
 Fallback/augmentation,,0,0,,2026-04-08T08:58:06Z,not_found
 Flag/unflag,,0,0,,2026-04-08T11:44:51Z,not_found
 FreedomIntelligence/alpaca-gpt4-korean,,0,0,,2026-04-08T08:58:06Z,not_found
@@ -74,6 +75,7 @@ Qwen/Qwen3.5-35B-A3B,2026-02-24T09:39:25Z,3344183,1342,Qwen/Qwen3.5-35B-A3B-Base
 Qwen/Qwen3.5-35B-A3B-Base,2026-02-24T09:42:42Z,47934,125,,2026-04-08T09:26:16Z,ok
 Qwen/Qwen3.5-4B,2026-02-27T14:45:03Z,2782021,440,Qwen/Qwen3.5-4B-Base,2026-04-08T08:58:28Z,ok
 Qwen/Qwen3.5-4B-Base,2026-02-27T13:20:09Z,88832,56,,2026-04-08T09:26:16Z,ok
+Qwen/Qwen3.6-35B-A3B,2026-04-15T05:59:19Z,21180,726,,2026-04-18T00:43:34Z,ok
 Random/uncertain,,0,0,,2026-04-08T11:44:51Z,not_found
 SparkAudio/Spark-TTS-0.5B,2025-02-27T05:01:46Z,789,730,,2026-04-08T08:58:28Z,ok
 Thytu/ChessInstruct,,0,0,,2026-04-08T08:58:06Z,not_found
@@ -93,6 +95,7 @@ deepseek-ai/DeepSeek-OCR-2,2026-01-27T02:56:54Z,1250376,895,,2026-04-08T08:58:28
 deepseek-ai/DeepSeek-R1-0528-Qwen3-8B,2025-05-29T11:07:47Z,180553,1045,,2026-04-08T08:58:28Z,ok
 electroglyph/technical,,0,0,,2026-04-08T08:58:06Z,not_found
 failed/completed,,0,0,,2026-04-08T11:44:51Z,not_found
+fla-org/flash-linear-attention,,0,0,,2026-04-18T00:43:34Z,not_found
 gemma_output/model.pte,,0,0,,2026-04-08T08:58:06Z,not_found
 google/functiongemma-270m-it,2025-10-08T17:33:31Z,31603,960,,2026-04-08T08:58:28Z,ok
 google/gemma-2-2b,2024-07-16T08:07:29Z,475407,636,,2026-04-08T08:58:28Z,ok
@@ -338,6 +341,7 @@ unsloth/Qwen3.5-27B,2026-02-24T14:54:41Z,41024,13,Qwen/Qwen3.5-27B,2026-04-08T08
 unsloth/Qwen3.5-2B,2026-02-28T14:04:19Z,148821,10,Qwen/Qwen3.5-2B,2026-04-08T08:58:06Z,ok
 unsloth/Qwen3.5-35B-A3B,2026-02-24T14:53:39Z,29549,13,Qwen/Qwen3.5-35B-A3B,2026-04-08T08:58:06Z,ok
 unsloth/Qwen3.5-4B,2026-03-01T14:38:47Z,188060,17,Qwen/Qwen3.5-4B,2026-04-08T08:58:06Z,ok
+unsloth/Qwen3.6-35B-A3B,2026-04-16T04:31:13Z,683,7,Qwen/Qwen3.6-35B-A3B,2026-04-18T00:43:34Z,ok
 unsloth/Radiology_mini,,0,0,,2026-04-08T08:58:06Z,not_found
 unsloth/Spark-TTS-0.5B,2025-05-15T16:47:20Z,334,13,SparkAudio/Spark-TTS-0.5B,2026-04-08T08:58:06Z,ok
 unsloth/Support-Bot-Recommendation,,0,0,,2026-04-08T08:58:06Z,not_found
