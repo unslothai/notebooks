@@ -302,13 +302,14 @@ print("Batch input_ids shape:", out["input_ids"].shape)
 # In[ ]:
 
 
+from unsloth.trainer import UnslothVisionDataCollator
 from trl import SFTTrainer, SFTConfig
 
 trainer = SFTTrainer(
     model = model,
     train_dataset = converted_dataset,
     processing_class = processor.tokenizer,
-    data_collator = collator,
+    data_collator = UnslothVisionDataCollator(model, processor),
     args = SFTConfig(
         per_device_train_batch_size = 1,
         gradient_accumulation_steps = 4,
