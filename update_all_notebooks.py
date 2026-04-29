@@ -169,6 +169,7 @@ else:
     __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip uninstall -y torchao
 """.replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 installation_content = update_or_append_pip_install(
     installation_content,
@@ -480,6 +481,7 @@ else:
     __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip uninstall -y torchao
 !pip install --no-deps transformers==5.5.0
 !pip install torchcodec
 import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
@@ -517,7 +519,9 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo
 !uv pip install transformers==5.2.0
 # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
-!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0"""
+!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
+# sentence-transformers is optional here, but its torchcodec import is broken on Colab.
+!pip uninstall -y torchao sentence-transformers torchcodec"""
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
