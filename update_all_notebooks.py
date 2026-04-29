@@ -529,8 +529,6 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
         "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
-    # torch 2.8 needs torchcodec 0.7; Colab preinstalls 0.10 against torch 2.10
-    # which ABI-mismatches once we downgrade torch and breaks transformers import.
     !uv pip install -qqq --no-deps "torchcodec==0.7.0"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
@@ -575,8 +573,6 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
         "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
-    # torch 2.7 needs torchcodec 0.6; Colab preinstalls 0.10 against torch 2.10
-    # which ABI-mismatches once we downgrade torch and breaks transformers import.
     !uv pip install -qqq --no-deps "torchcodec==0.6.0"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
