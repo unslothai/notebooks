@@ -350,7 +350,7 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
         git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo
+!uv pip install --upgrade --no-deps transformers==4.56.2 "tokenizers>=0.22.0,<=0.23.0" trl==0.22.2 unsloth unsloth_zoo
 """ + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 # installation_gpt_oss_content = update_or_append_pip_install(
@@ -532,7 +532,7 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
     !uv pip install -qqq --no-deps "torchcodec==0.7.0"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo
+!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==0.22.2 unsloth unsloth_zoo
 !uv pip install transformers==5.2.0
 # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
 !uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
@@ -573,10 +573,10 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
         "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
-    !uv pip install -qqq --no-deps "torchcodec==0.6.0"
+    !uv pip install -qqq --no-deps "torchcodec==0.5"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo
+!uv pip install --upgrade --no-deps transformers==4.56.2 "tokenizers>=0.22.0,<=0.23.0" trl==0.22.2 unsloth unsloth_zoo
 
 # Mamba is supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes!
 !uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2
