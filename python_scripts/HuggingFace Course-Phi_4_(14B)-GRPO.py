@@ -57,6 +57,7 @@
 #     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 #     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
 #     get_ipython().system('uv pip install -qqq {_triton}')
+#     get_ipython().system('uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"')
 # get_ipython().system('uv pip install transformers==4.56.2')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
 # 

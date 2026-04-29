@@ -36,7 +36,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n!pip install --upgrade -qqq uv\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install!\n    !pip install unsloth vllm synthetic-data-kit==0.0.3\nelse:\n    try: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\n    except: _numpy = "numpy"; _pil = "pillow"\n    try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\n    except: is_t4 = False\n    _vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.15.1\', \'triton\')\n    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n    !uv pip install -qqq {_triton}\n    !uv pip install synthetic-data-kit==0.0.3\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n!pip install --upgrade -qqq uv\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install!\n    !pip install unsloth vllm synthetic-data-kit==0.0.3\nelse:\n    try: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\n    except: _numpy = "numpy"; _pil = "pillow"\n    try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\n    except: is_t4 = False\n    _vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.15.1\', \'triton\')\n    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n    !uv pip install -qqq {_triton}\n    !uv pip install synthetic-data-kit==0.0.3\n    !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # In[ ]:
@@ -57,6 +57,7 @@
 #     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 #     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
 #     get_ipython().system('uv pip install -qqq {_triton}')
+#     get_ipython().system('uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"')
 # get_ipython().system('uv pip install transformers==4.56.2')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
 # 
