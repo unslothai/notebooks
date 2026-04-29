@@ -27,7 +27,7 @@
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', '# Installs Unsloth, Xformers (Flash Attention) and all other packages!\n!pip install unsloth\n# Get latest Unsloth\n!pip uninstall unsloth -y\n')
+get_ipython().run_cell_magic('capture', '', '# Installs Unsloth, Xformers (Flash Attention) and all other packages!\n!pip install unsloth\n# Get latest Unsloth\n!pip uninstall unsloth -y\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n')
 
 
 # In[ ]:
