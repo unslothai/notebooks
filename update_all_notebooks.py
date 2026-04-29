@@ -529,6 +529,9 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
         "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
+    # torch 2.8 needs torchcodec 0.7; Colab preinstalls 0.10 against torch 2.10
+    # which ABI-mismatches once we downgrade torch and breaks transformers import.
+    !uv pip install -qqq --no-deps "torchcodec==0.7.0"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo
@@ -565,13 +568,16 @@ installation_ernie_4_5_vl_kaggle_content += """\n!pip install decord"""
 installation_nemotron_nano_content = """%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
-if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):    
+if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
         "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
+    # torch 2.7 needs torchcodec 0.6; Colab preinstalls 0.10 against torch 2.10
+    # which ABI-mismatches once we downgrade torch and breaks transformers import.
+    !uv pip install -qqq --no-deps "torchcodec==0.6.0"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo
