@@ -517,7 +517,9 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install --upgrade --no-deps tokenizers trl==0.22.2 unsloth unsloth_zoo
 !uv pip install transformers==5.2.0
 # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
-!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0"""
+!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
+# sentence-transformers is optional here, but its torchcodec import is broken on Colab.
+!pip uninstall -y sentence-transformers torchcodec"""
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
