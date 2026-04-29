@@ -36,6 +36,7 @@
 
 
 get_ipython().system('pip install unsloth unsloth_zoo omegaconf')
+get_ipython().system('pip uninstall -y torchao')
 
 # If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:
 # !source /home/ubuntu/.venv/bin/activate
