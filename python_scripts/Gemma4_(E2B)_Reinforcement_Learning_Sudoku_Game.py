@@ -32,7 +32,7 @@ get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip ins
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', '!pip install --no-deps --upgrade timm # For Gemma 4 vision/audio\n')
+get_ipython().run_cell_magic('capture', '', '!pip install --no-deps --upgrade timm # For Gemma 4 vision/audio\n!pip uninstall -y torchao\n')
 
 
 # ### Unsloth

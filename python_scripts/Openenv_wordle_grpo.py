@@ -35,7 +35,7 @@ get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip ins
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel --prefer-binary\n!pip install "openenv-core[core]>=0.2.1"\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./envs\')  # Add OpenEnv envs for textarena_env module\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().absolute())\n')
+get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel --prefer-binary\n!pip install "openenv-core[core]>=0.2.1"\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./envs\')  # Add OpenEnv envs for textarena_env module\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().absolute())\n!pip uninstall -y torchao\n')
 
 
 # We'll load Qwen3-4B and set some parameters:

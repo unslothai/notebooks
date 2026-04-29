@@ -189,6 +189,7 @@ import os
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
 !pip install unsloth
 !pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets==4.3.0"
+!pip uninstall -y torchao
 """
 
 installation_kaggle_content = update_or_append_pip_install(
@@ -225,7 +226,8 @@ else:
     except: is_t4 = False
     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
-    !uv pip install -qqq {_triton}"""
+    !uv pip install -qqq {_triton}
+    !pip uninstall -y torchao"""
 
 installation_extra_grpo_content = update_or_append_pip_install(
     installation_extra_grpo_content,
@@ -250,6 +252,7 @@ except: is_t4 = False
 _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
 !uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"
+!pip uninstall -y torchao
 """
 
 installation_grpo_kaggle_content = update_or_append_pip_install(
@@ -278,7 +281,8 @@ else:
     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
-    !uv pip install synthetic-data-kit==0.0.3"""
+    !uv pip install synthetic-data-kit==0.0.3
+    !pip uninstall -y torchao"""
 
 installation_synthetic_data_content = update_or_append_pip_install(
     installation_synthetic_data_content,
@@ -302,7 +306,8 @@ _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1',
 !uv pip install -qqq --upgrade unsloth {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers
 !uv pip install -qqq {_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"
-!uv pip install synthetic-data-kit==0.0.3"""
+!uv pip install synthetic-data-kit==0.0.3
+!pip uninstall -y torchao"""
 installation_grpo_synthetic_data_content = update_or_append_pip_install(
     installation_grpo_synthetic_data_content,
     "transformers",
@@ -339,7 +344,8 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
         git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo"""
+!uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo
+!pip uninstall -y torchao"""
 
 # installation_gpt_oss_content = update_or_append_pip_install(
 #     installation_gpt_oss_content,
@@ -563,7 +569,8 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install --upgrade --no-deps transformers==4.56.2 tokenizers trl==0.22.2 unsloth unsloth_zoo
 
 # Mamba is supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes!
-!uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2"""
+!uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2
+!pip uninstall -y torchao"""
 
 installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
 

@@ -57,6 +57,7 @@
 #     get_ipython().system('uv pip install -qqq {get_triton}')
 # get_ipython().system('uv pip install transformers==4.55.4')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
+# get_ipython().system('pip uninstall -y torchao')
 # 
 # 
 # # ### Unsloth

@@ -52,6 +52,7 @@ get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip ins
 #     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 #     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
 #     !uv pip install -qqq {_triton}
+#     !pip uninstall -y torchao
 # !uv pip install transformers==4.56.2
 # !uv pip install --no-deps trl==0.22.2
 

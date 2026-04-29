@@ -40,7 +40,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', '!pip install --no-deps git+https://github.com/huggingface/transformers.git # Need main branch for Liquid LFM2 models\n!pip install --no-deps causal-conv1d==1.5.0.post8 # Install Mamba kernels\n')
+# get_ipython().run_cell_magic('capture', '', '!pip install --no-deps git+https://github.com/huggingface/transformers.git # Need main branch for Liquid LFM2 models\n!pip install --no-deps causal-conv1d==1.5.0.post8 # Install Mamba kernels\n!pip uninstall -y torchao\n')
 # 
 # 
 # # ### Unsloth
