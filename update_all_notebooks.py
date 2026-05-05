@@ -510,7 +510,7 @@ else:
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
     !pip install --no-deps --upgrade "torchao>=0.16.0"
-!pip install --no-deps transformers==5.5.0
+!pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"
 !pip install torchcodec
 import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 
