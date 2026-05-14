@@ -3,10 +3,11 @@
 
 # Notebook drift detector workflow. Two job tiers:
 #
-#   1. notebook-lint (HARD GATE, every PR, ~30s, no torch installed)
+#   1. notebook-lint (HARD GATE, every PR, ~2-3 min, no torch installed)
 #      tests/test_notebook_json_validity.py
 #      tests/test_notebook_pin_consistency.py
 #      tests/test_notebook_amd_install_parity.py
+#      tests/test_python_scripts_regen_parity.py  (live nbconvert)
 #
 #   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
 #      tests/test_notebook_api_drift.py against three (transformers, trl)
@@ -86,6 +87,16 @@ jobs:
       - name: tests/test_notebook_amd_install_parity.py
         run: |
           python -m pytest tests/test_notebook_amd_install_parity.py -q --tb=short
+
+      - name: tests/test_python_scripts_regen_parity.py
+        # Runs the generator's convert_notebook_to_script (nbconvert
+        # PythonExporter) live on each nb/*.ipynb, asserts byte-equal
+        # to the committed python_scripts/<name>.py mirror, and
+        # ast.parses every mirror as a complete module. Catches the
+        # "edited .ipynb without regenerating .py" failure mode the
+        # per-cell static parse cannot see. ~2 min sequential.
+        run: |
+          python -m pytest tests/test_python_scripts_regen_parity.py -q --tb=short
 
   api-drift:
     # The flagship matrix: assert every classmethod / kwarg the
