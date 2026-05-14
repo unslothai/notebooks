@@ -1,0 +1,228 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright 2026-present the Unsloth AI Inc. team. All rights reserved.
+
+# Pure-Python supply-chain audit for unslothai/notebooks. Mirrors
+# unslothai/unsloth-zoo's security-audit.yml verbatim (the surface is
+# identical: a single pyproject.toml + scripts/ + tests/security/).
+# Jobs: advisory-audit (pip-audit + trufflehog), pip-scan-packages
+# (transitive closure pattern scan), workflow-trigger-lint,
+# tests-security (HARD GATE).
+
+name: Security audit
+
+on:
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+      - 'scripts/scan_packages.py'
+      - 'scripts/lint_workflow_triggers.py'
+      - 'tests/security/**'
+      - '.github/workflows/security-audit.yml'
+  push:
+    branches: [main]
+  schedule:
+    - cron: '13 4 * * *'   # 04:13 UTC daily, off the cron rush
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Advisory-DB audit: pip-audit + trufflehog. Non-blocking while baseline settles.
+  advisory-audit:
+    name: advisory audit (pip + secrets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner (egress block)
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450  # v2.19.1
+        with:
+          egress-policy: block
+          disable-sudo: true
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0   # trufflehog needs full history for diff scans
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+
+      - name: Build filtered requirements set
+        # Reads pyproject.toml deps + extras into a flat requirements file.
+        # git+ specs are skipped (advisory-DB can't resolve them).
+        run: |
+          mkdir -p audit-reqs
+          python <<'PY' > audit-reqs/zoo-deps.txt
+          import tomllib
+          with open("pyproject.toml", "rb") as f:
+              d = tomllib.load(f)
+          core = d["project"]["dependencies"]
+          all_extras = []
+          for extra_name, specs in d["project"].get("optional-dependencies", {}).items():
+              # Skip self-referential extras like "huggingface = ['unsloth_zoo[core]']".
+              all_extras += [s for s in specs if "unsloth_zoo" not in s]
+          print("# Auto-generated from pyproject.toml by security-audit.yml.")
+          for spec in core + all_extras:
+              if "git+" in spec:
+                  print(f"# [security-audit] skipped git+ spec: {spec}")
+                  continue
+              print(spec)
+          PY
+
+      - name: pip-audit (advisory DB lookup)
+        continue-on-error: true
+        run: pip-audit --requirement audit-reqs/zoo-deps.txt --disable-pip --strict || true
+
+      - name: Trufflehog secret scan
+        continue-on-error: true
+        uses: trufflesecurity/trufflehog@17456f8c7d042d8c82c9a8ca9e937231f9f42e26  # v3.95.2
+        with:
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+  # pip-scan-packages: downloads every PyPI archive in zoo's transitive closure and
+  # pattern-scans (catches the malicious-upload class that precedes CVE publication).
+  pip-scan-packages:
+    name: pip scan-packages (zoo transitive closure)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Harden runner (egress block)
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450  # v2.19.1
+        with:
+          egress-policy: block
+          disable-sudo: true
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install scan_packages.py runtime deps
+        # requests + packaging for PyPI's JSON API. Scanned packages are
+        # downloaded raw and inspected, never `pip install`-ed.
+        run: python -m pip install --upgrade pip requests packaging
+
+      - name: Build filtered requirements set
+        run: |
+          mkdir -p audit-reqs
+          python <<'PY' > audit-reqs/zoo-deps.txt
+          import tomllib
+          with open("pyproject.toml", "rb") as f:
+              d = tomllib.load(f)
+          core = d["project"]["dependencies"]
+          all_extras = []
+          for extra_name, specs in d["project"].get("optional-dependencies", {}).items():
+              all_extras += [s for s in specs if "unsloth_zoo" not in s]
+          print("# Auto-generated from pyproject.toml by security-audit.yml.")
+          for spec in core + all_extras:
+              if "git+" in spec:
+                  print(f"# [security-audit] skipped git+ spec: {spec}")
+                  continue
+              print(spec)
+          PY
+
+      - name: scan-packages (with deps)
+        continue-on-error: true
+        # --with-deps makes scan transitive. Archives are downloaded and
+        # pattern-scanned WITHOUT installing -- malicious wheels cannot execute.
+        run: python3 scripts/scan_packages.py --requirements audit-reqs/zoo-deps.txt --with-deps
+
+  # workflow-trigger-lint: refuses pull_request_target with PR-head checkout,
+  # restricted workflow_run without justification, and cache-key collisions.
+  workflow-trigger-lint:
+    name: workflow-trigger lint (pull_request_target / cache-poisoning)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner (egress block)
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450  # v2.19.1
+        with:
+          egress-policy: block
+          disable-sudo: true
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: pip install pyyaml==6.0.2
+
+      - name: Run workflow-trigger lint
+        run: python3 scripts/lint_workflow_triggers.py
+
+  # HARD GATE: regression tests for scanner + lint scripts. Drift in IOC tables
+  # or scanner exit semantics fails this PR at review time.
+  tests-security:
+    name: pytest tests/security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner (egress block)
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450  # v2.19.1
+        with:
+          egress-policy: block
+          disable-sudo: true
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest + PyYAML
+        # PyYAML needed by scripts/lint_workflow_triggers.py, exercised via subprocess
+        # by tests/security/test_lint_workflow_triggers.py. (See unsloth PR #5397: without
+        # pyyaml the lint script exits 2.)
+        run: pip install pytest==9.0.3 pyyaml==6.0.2
+
+      - name: Run security regression tests
+        run: python3 -m pytest tests/security -v

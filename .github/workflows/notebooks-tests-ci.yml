@@ -1,0 +1,212 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright 2026-present the Unsloth AI Inc. team. All rights reserved.
+
+# Notebook drift detector workflow. Two job tiers:
+#
+#   1. notebook-lint (HARD GATE, every PR, ~30s, no torch installed)
+#      tests/test_notebook_json_validity.py
+#      tests/test_notebook_pin_consistency.py
+#      tests/test_notebook_amd_install_parity.py
+#
+#   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
+#      tests/test_notebook_api_drift.py against three (transformers, trl)
+#      combos: HF=4.57.6 + TRL<1, HF=default + TRL=default, HF=latest +
+#      TRL=latest.
+#
+# Mirrors the policy on unslothai/unsloth-zoo PR #637 and
+# unslothai/unsloth PR #5414: drift detector failures fire pytest.fail
+# with "DRIFT DETECTED: ..." -- never pytest.skip -- so a real upstream
+# regression goes red BEFORE a notebook user on Colab hits the crash.
+
+name: Notebooks Tests
+
+on:
+  pull_request:
+    paths:
+      - 'original_template/**'
+      - 'nb/**'
+      - 'kaggle/**'
+      - 'python_scripts/**'
+      - 'update_all_notebooks.py'
+      - 'replace_text.py'
+      - 'update_max_seq_length.py'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/notebooks-tests-ci.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  notebook-lint:
+    name: notebook static checks (HARD GATE)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner (audit)
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450  # v2.19.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install pytest + generator deps (no torch / no model)
+        run: |
+          set -euxo pipefail
+          python -m pip install --upgrade pip
+          # Three minimal-cost dependencies. nbformat + nbconvert +
+          # pyspellchecker + tqdm + huggingface_hub are what
+          # update_all_notebooks.py imports at module top; the AMD
+          # parity tests need the module to load.
+          pip install pytest pyyaml nbformat nbconvert pyspellchecker tqdm huggingface_hub
+
+      - name: tests/test_notebook_json_validity.py
+        run: |
+          python -m pytest tests/test_notebook_json_validity.py -q --tb=short
+
+      - name: tests/test_notebook_pin_consistency.py
+        run: |
+          python -m pytest tests/test_notebook_pin_consistency.py -q --tb=short
+
+      - name: tests/test_notebook_amd_install_parity.py
+        run: |
+          python -m pytest tests/test_notebook_amd_install_parity.py -q --tb=short
+
+  api-drift:
+    # The flagship matrix: assert every classmethod / kwarg the
+    # notebooks invoke on unsloth / unsloth_zoo / trl / transformers /
+    # peft / datasets still exists, against three (HF, TRL) combos.
+    # See tests/test_notebook_api_drift.py for the per-symbol detail.
+    strategy:
+      fail-fast: false
+      matrix:
+        combo:
+          - id: t4576-trl0latest
+            label: "HF=4.57.6 + TRL<1"
+            transformers_spec: "transformers==4.57.6"
+            trl_spec: "trl>=0.18.2,<1.0.0"
+            continue_on_error: false
+          - id: pyproject
+            label: "HF=default + TRL=default"
+            transformers_spec: "__from_pin_constants__"
+            trl_spec: "__from_pin_constants__"
+            continue_on_error: false
+          - id: tlatest5-trl1latest
+            label: "HF=latest + TRL=latest"
+            transformers_spec: "transformers>=5,<6"
+            trl_spec: "trl>=1,<2"
+            continue_on_error: true
+    name: "api drift (${{ matrix.combo.label }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: ${{ matrix.combo.continue_on_error }}
+    env:
+      MATRIX_TRANSFORMERS_SPEC: ${{ matrix.combo.transformers_spec }}
+      MATRIX_TRL_SPEC: ${{ matrix.combo.trl_spec }}
+      PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+      UNSLOTH_COMPILE_DISABLE: '1'
+      UNSLOTH_IS_PRESENT: '1'
+    steps:
+      - name: Harden runner (audit)
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450  # v2.19.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Resolve matrix specs (handle __from_pin_constants__ sentinel)
+        # The pyproject cell uses a sentinel; resolve the canonical pin
+        # from update_all_notebooks.py:107-117 via the shared inventory
+        # helper. Keeps the matrix and the test gate using ONE source of
+        # truth for the canonical pin set.
+        run: |
+          set -euxo pipefail
+          python <<'PY' >> "$GITHUB_ENV"
+          import os, sys
+          sys.path.insert(0, "scripts")
+          import notebook_inventory as ni
+          pins = ni.read_pin_constants()
+          spec_t = os.environ["MATRIX_TRANSFORMERS_SPEC"]
+          spec_r = os.environ["MATRIX_TRL_SPEC"]
+          if spec_t == "__from_pin_constants__":
+              spec_t = f"transformers=={pins.get('transformers', '4.56.2')}"
+          if spec_r == "__from_pin_constants__":
+              spec_r = f"trl=={pins.get('trl', '0.22.2')}"
+          print(f"RESOLVED_TRANSFORMERS_SPEC={spec_t}")
+          print(f"RESOLVED_TRL_SPEC={spec_r}")
+          PY
+          grep RESOLVED_ "$GITHUB_ENV" || true
+
+      - name: Install CPU torch + unsloth + unsloth_zoo from main
+        # Same shape used by unslothai/unsloth-zoo's Core matrix:
+        # CPU-only torch from the official index, transformers + trl
+        # from the matrix cell, then unsloth + unsloth_zoo at
+        # git+main --no-deps so we get the just-merged import_fixes.
+        run: |
+          set -euxo pipefail
+          python -m pip install --upgrade pip
+          pip install pytest pyyaml \
+            protobuf sentencepiece triton \
+            'peft>=0.18,<0.20' 'accelerate>=0.34,<2' \
+            'numpy<3' 'datasets>=3,<5' \
+            nbformat nbconvert pyspellchecker tqdm huggingface_hub
+          pip install --index-url https://download.pytorch.org/whl/cpu \
+            'torch>=2.4,<2.11' 'torchvision<0.26'
+          pip install "$RESOLVED_TRANSFORMERS_SPEC"
+          pip install "$RESOLVED_TRL_SPEC"
+          pip install 'bitsandbytes>=0.45'
+          pip install --no-deps \
+            "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git@main" \
+            "unsloth @ git+https://github.com/unslothai/unsloth.git@main"
+          echo "::group::Installed versions"
+          pip show transformers trl torch peft datasets unsloth unsloth-zoo 2>/dev/null | grep -E '^(Name|Version):'
+          echo "::endgroup::"
+
+      - name: tests/test_notebook_api_drift.py
+        run: |
+          python -m pytest tests/test_notebook_api_drift.py -v --tb=short
+
+  security-tests:
+    name: tests/security (HARD GATE)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner (audit)
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450  # v2.19.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - run: pip install pytest pyyaml
+
+      - run: python -m pytest tests/security -v --tb=short
