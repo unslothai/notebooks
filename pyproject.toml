@@ -9,3 +9,7 @@ dependencies = [
     "ipywidgets>=8.1.7",
     "nbconvert>=7.16.6",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
