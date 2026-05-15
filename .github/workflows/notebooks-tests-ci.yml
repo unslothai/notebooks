@@ -70,11 +70,17 @@ jobs:
         run: |
           set -euxo pipefail
           python -m pip install --upgrade pip
-          # Three minimal-cost dependencies. nbformat + nbconvert +
-          # pyspellchecker + tqdm + huggingface_hub are what
-          # update_all_notebooks.py imports at module top; the AMD
-          # parity tests need the module to load.
-          pip install pytest pyyaml nbformat nbconvert pyspellchecker tqdm huggingface_hub
+          # nbformat + nbconvert + pyspellchecker + tqdm + huggingface_hub
+          # are what update_all_notebooks.py imports at module top; the
+          # AMD parity + regen-parity tests need the module to load.
+          # ipython is required by nbconvert's PythonExporter to
+          # translate cell magics (%%bash, %%capture) into
+          # ``get_ipython().run_cell_magic(...)`` calls. Without it
+          # nbconvert silently falls back to commenting out the raw
+          # magic syntax and the regen-parity diff fires false-positive
+          # on every notebook that uses a cell magic.
+          pip install pytest pyyaml nbformat nbconvert ipython \
+            pyspellchecker tqdm huggingface_hub
 
       - name: tests/test_notebook_json_validity.py
         run: |
@@ -182,7 +188,7 @@ jobs:
             protobuf sentencepiece triton \
             'peft>=0.18,<0.20' 'accelerate>=0.34,<2' \
             'numpy<3' 'datasets>=3,<5' \
-            nbformat nbconvert pyspellchecker tqdm huggingface_hub
+            nbformat nbconvert ipython pyspellchecker tqdm huggingface_hub
           pip install --index-url https://download.pytorch.org/whl/cpu \
             'torch>=2.4,<2.11' 'torchvision<0.26'
           pip install "$RESOLVED_TRANSFORMERS_SPEC"
