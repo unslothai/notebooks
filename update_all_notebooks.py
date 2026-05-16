@@ -4075,9 +4075,12 @@ def update_notebook_sections(
                             ):
                                 source_install_texts.append(installation_extra_grpo_content)
                             if is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
+                                # AMD path: only the FLA + causal_conv1d kernels
+                                # are propagated. tilelang has no ROCm wheel
+                                # (and apache-tvm-ffi is CUDA-only), so they
+                                # stay filtered out via _AMD_INSTALL_PACKAGE_IGNORE.
                                 source_install_texts.append(
-                                    "!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0\n"
-                                    "!uv pip install \"apache-tvm-ffi==0.1.9\" \"tilelang==0.1.8\""
+                                    "!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0"
                                 )
                             installation, amd_extras_cell_text = _compose_amd_installation(
                                 notebook_path, source_install_texts
