@@ -5187,20 +5187,60 @@ def update_readme(
 
         # Dedicated AMD section at the very end. AMD-prefixed notebooks
         # target ROCm and do not run in Colab; we link straight to GitHub.
-        # Sorted by HF Hub popularity (descending) so the top 6 are the
-        # most-used models; the rest fold into a Kaggle-style collapsible.
+        # Top-of-section mirrors the hand-written "Main Notebooks" table
+        # (the AMD-* counterpart of each Main row, in Main order, capped
+        # at 6); the rest folds into a Kaggle-style collapsible.
         amd_entries = [d for d in notebook_data if d.get("is_amd")]
-        amd_entries.sort(
-            key=lambda d: (
-                d.get("created_at_key", (0, 0)),
-                d.get("architecture") or "",
-                d.get("model") or "",
-                d.get("path") or "",
-            ),
-            reverse=True,
-        )
         amd_section = ""
         if amd_entries:
+            import urllib.parse as _urlparse
+
+            # Parse the hand-written Main Notebooks block out of README to
+            # discover which non-AMD notebook filenames appear there, in
+            # order. We then pick the AMD-prefixed sibling of each.
+            _main_match = re.search(
+                r"^### Main Notebooks\b(.*?)(?=^### |^# |^<!--|\Z)",
+                readme_content,
+                re.MULTILINE | re.DOTALL,
+            )
+            main_filenames_ordered = []
+            if _main_match:
+                for _u in re.finditer(
+                    r"/blob/main/nb/([^)\s\"']+\.ipynb)",
+                    _main_match.group(1),
+                ):
+                    fn = _urlparse.unquote(_u.group(1))
+                    if fn not in main_filenames_ordered:
+                        main_filenames_ordered.append(fn)
+
+            # Index AMD entries by their non-AMD-prefixed basename.
+            amd_by_base = {}
+            for d in amd_entries:
+                base = os.path.basename(d["path"])
+                if base.startswith("AMD-"):
+                    amd_by_base[base[len("AMD-"):]] = d
+
+            _AMD_POPULAR_COUNT = 6
+            popular_amd = []
+            for fn in main_filenames_ordered:
+                d = amd_by_base.get(fn)
+                if d is not None and d not in popular_amd:
+                    popular_amd.append(d)
+                if len(popular_amd) >= _AMD_POPULAR_COUNT:
+                    break
+
+            popular_paths = {d["path"] for d in popular_amd}
+            rest_amd = [d for d in amd_entries if d["path"] not in popular_paths]
+            rest_amd.sort(
+                key=lambda d: (
+                    d.get("created_at_key", (0, 0)),
+                    d.get("architecture") or "",
+                    d.get("model") or "",
+                    d.get("path") or "",
+                ),
+                reverse=True,
+            )
+
             github_blob_base = "https://github.com/unslothai/notebooks/blob/main/"
             amd_table_header = (
                 "| Model | Type | Notebook |\n"
@@ -5220,19 +5260,16 @@ def update_readme(
                 model_cell = f"**{display_model}** {size}".rstrip()
                 return f"| {model_cell} | {d.get('type','')} | [GitHub]({gh_url}) |\n"
 
-            _AMD_POPULAR_COUNT = 6
-            popular_amd = amd_entries[:_AMD_POPULAR_COUNT]
-            rest_amd = amd_entries[_AMD_POPULAR_COUNT:]
-
             amd_section = (
                 "# 🐧 AMD Notebooks\n"
                 "These notebooks target AMD ROCm GPUs and are not available in Colab. "
                 "View / download them directly from GitHub:\n\n"
             )
-            amd_section += amd_table_header
-            for d in popular_amd:
-                amd_section += _render_amd_row(d)
-            amd_section += "\n"
+            if popular_amd:
+                amd_section += amd_table_header
+                for d in popular_amd:
+                    amd_section += _render_amd_row(d)
+                amd_section += "\n"
 
             if rest_amd:
                 amd_section += (

@@ -553,12 +553,12 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 
 | Model | Type | Notebook |
 | --- | --- | --- |
-| **Qwen3** **(0 6B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(0_6B)-Phone_Deployment.ipynb) |
-| **Qwen3** **(0.6B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch.ipynb) |
-| **Llama3.1** **(8B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-Inference.ipynb) |
-| **Llama3.1** **(8B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb) |
-| **NeMo Gym Sudoku** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-NeMo-Gym-Sudoku.ipynb) |
-| **NeMo Gym Multi Environment** | Multi Environment | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-NeMo-Gym-Multi-Environment.ipynb) |
+| **Unsloth** | Studio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Unsloth_Studio.ipynb) |
+| **Gemma4** **(E2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Vision.ipynb) |
+| **Qwen3 5** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision.ipynb) |
+| **Qwen3 5** **(2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(2B)_Vision.ipynb) |
+| **gpt oss** **(20B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)-Fine-tuning.ipynb) |
+| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)-GRPO.ipynb) |
 
 <details>
   <summary>
@@ -567,6 +567,12 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 
 | Model | Type | Notebook |
 | --- | --- | --- |
+| **Qwen3** **(0 6B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(0_6B)-Phone_Deployment.ipynb) |
+| **Qwen3** **(0.6B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch.ipynb) |
+| **Llama3.1** **(8B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-Inference.ipynb) |
+| **Llama3.1** **(8B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb) |
+| **NeMo Gym Sudoku** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-NeMo-Gym-Sudoku.ipynb) |
+| **NeMo Gym Multi Environment** | Multi Environment | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-NeMo-Gym-Multi-Environment.ipynb) |
 | **Whisper** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Whisper.ipynb) |
 | **gpt oss** **(20B)** | Minesweeper Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.ipynb) |
 | **gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb) |
@@ -574,8 +580,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb) |
 | **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_GRPO_BF16.ipynb) |
 | **gpt oss** **(20B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_500K_Context_Fine_tuning.ipynb) |
-| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)-GRPO.ipynb) |
-| **gpt oss** **(20B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)-Fine-tuning.ipynb) |
 | **OpenEnv gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb) |
 | **OpenEnv gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb) |
 | **GPT OSS MXFP4** **(20B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GPT_OSS_MXFP4_(20B)-Inference.ipynb) |
@@ -617,7 +621,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **Qwen3** **(32B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(32B)_A100-Reasoning-Conversational.ipynb) |
 | **Llama3.1** **(8B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-Alpaca.ipynb) |
 | **Qwen3 5** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision_GRPO.ipynb) |
-| **Qwen3 5** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision.ipynb) |
 | **Qwen3** **(14B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B).ipynb) |
 | **Qwen3** **(14B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B)-Reasoning-Conversational.ipynb) |
 | **CodeForces cot Finetune for Reasoning on CodeForces** | Reasoning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
@@ -643,7 +646,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **Gemma4** **(E4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Text.ipynb) |
 | **Gemma4** **(E4B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Audio.ipynb) |
 | **Llama3.2** **(11B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb) |
-| **Qwen3 5** **(2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(2B)_Vision.ipynb) |
 | **Phi 3.5 Mini** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_3.5_Mini-Conversational.ipynb) |
 | **Gemma4** **(26B A4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(26B_A4B)-Vision.ipynb) |
 | **Gemma4** **(26B A4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(26B_A4B)-Text.ipynb) |
@@ -666,7 +668,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **Gemma4** **(E2B)** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.ipynb) |
 | **Gemma4** **(E2B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_Reinforcement_Learning_2048_Game.ipynb) |
 | **Gemma4** **(E2B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_GRPO.ipynb) |
-| **Gemma4** **(E2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Vision.ipynb) |
 | **Gemma4** **(E2B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Text.ipynb) |
 | **Gemma4** **(E2B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Audio.ipynb) |
 | **Qwen3 6 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_6_MoE.ipynb) |
@@ -708,7 +709,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **BGE M3** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-BGE_M3.ipynb) |
 | **TinyQwen3 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-TinyQwen3_MoE.ipynb) |
 | **All MiniLM L6 v2** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-All_MiniLM_L6_v2.ipynb) |
-| **Unsloth** | Studio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Unsloth_Studio.ipynb) |
 
 </details>
 
