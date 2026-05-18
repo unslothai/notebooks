@@ -4924,6 +4924,11 @@ def update_readme(
             path, refs_by_nb, model_created_cache, assigned_by_nb=assigned_by_nb
         )
 
+        # AMD-prefixed notebooks target ROCm and do not run in Colab. They
+        # are routed to a dedicated "AMD Notebooks" section at the very end
+        # of the README with bare GitHub links (no Colab badge).
+        is_amd_notebook = os.path.basename(path).startswith("AMD-")
+
         notebook_data.append(
             {
                 "model": model_name,
@@ -4936,6 +4941,7 @@ def update_readme(
                 "requires_a100": requires_a100,
                 "created_at_key": created_at_key,
                 "is_grpo_trainer": is_grpo_trainer,
+                "is_amd": is_amd_notebook,
             }
         )
 
@@ -4955,6 +4961,10 @@ def update_readme(
 
     _grpo_section_name = "GRPO & Reinforcement Learning"
     for data in notebook_data:
+        # AMD notebooks are rendered in their own section at the end, not
+        # in any per-architecture / cross-cutting table.
+        if data.get("is_amd"):
+            continue
         model_prefix = "(A100) " if data.get('requires_a100', False) else ""
         platform = "Kaggle" if "kaggle" in data['link'].lower() else "Colab"
         raw_type = data.get("type") or ""
@@ -5175,15 +5185,44 @@ def update_readme(
 
         kaggle_updated_notebooks_links += "</details>\n\n"
 
-        now = datetime.now() 
+        # Dedicated AMD section at the very end. AMD-prefixed notebooks
+        # target ROCm and do not run in Colab; we link straight to GitHub.
+        amd_entries = [d for d in notebook_data if d.get("is_amd")]
+        amd_entries.sort(key=lambda d: (d.get("architecture") or "", d.get("model") or "", d.get("path") or ""))
+        amd_section = ""
+        if amd_entries:
+            github_blob_base = "https://github.com/unslothai/notebooks/blob/main/"
+            amd_section = (
+                "# 🐧 AMD Notebooks\n"
+                "These notebooks target AMD ROCm GPUs and are not available in Colab. "
+                "View / download them directly from GitHub:\n\n"
+                "| Model | Type | Notebook |\n"
+                "| --- | --- | --- |\n"
+            )
+            for d in amd_entries:
+                gh_url = (github_blob_base + d["path"]).replace(" ", "%20")
+                display_model = d.get("model") or os.path.basename(d["path"]).replace(".ipynb", "")
+                # Strip any leading "AMD" / "AMD-" / "AMD " from the model name --
+                # the section header already says AMD, so the prefix is noise.
+                for _prefix in ("AMD-", "AMD "):
+                    if display_model.startswith(_prefix):
+                        display_model = display_model[len(_prefix):]
+                        break
+                size = d.get("size") or ""
+                model_cell = f"**{display_model}** {size}".rstrip()
+                amd_section += f"| {model_cell} | {d.get('type','')} | [GitHub]({gh_url}) |\n"
+            amd_section += "\n"
+
+        now = datetime.now()
         timestamp = f"\n"
 
         updated_readme_content = (
             content_before
             + colab_updated_notebooks_links
-            + kaggle_updated_notebooks_links 
+            + kaggle_updated_notebooks_links
+            + amd_section
             + timestamp
-            + content_after 
+            + content_after
         )
 
         if end_marker_alt and end_index != -1:
@@ -5199,10 +5238,11 @@ def update_readme(
                   else:
                       content_after = "" 
 
-             updated_readme_content = ( 
+             updated_readme_content = (
                 content_before
                 + colab_updated_notebooks_links
-                + kaggle_updated_notebooks_links 
+                + kaggle_updated_notebooks_links
+                + amd_section
                 + timestamp
                 + content_after
              )
