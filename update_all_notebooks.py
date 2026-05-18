@@ -603,11 +603,17 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install transformers==5.2.0
 # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
 !uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
-# FLA's TileLang backend on Hopper+ gives an extra ~26% on Qwen3.5 GDN
+# FLA's TileLang backend on Ampere+ gives an extra ~26% on Qwen3.5 GDN
 # layers vs the Triton path. Pin apache-tvm-ffi==0.1.9: tilelang's
 # >=0.1.2 lets pip pull 0.1.10/0.1.11 which crash Triton with "CUDA:
-# misaligned address" on sm_100.
-!uv pip install "apache-tvm-ffi==0.1.9" "tilelang==0.1.8"
+# misaligned address" on sm_100. Skip on Turing (sm_75 / T4): tilelang
+# 0.1.8 has no Turing kernels; FLA's Triton path handles it once we set
+# FLA_TILELANG=0 so the dispatcher does not try the unbuilt backend.
+import torch, os
+if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
+    !uv pip install --no-deps "apache-tvm-ffi==0.1.9" "tilelang==0.1.8"
+else:
+    os.environ["FLA_TILELANG"] = "0"
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
