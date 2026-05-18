@@ -603,6 +603,11 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install transformers==5.2.0
 # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
 !uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
+import torch
+if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
+    !uv pip install --no-deps "apache-tvm-ffi==0.1.9" "tilelang==0.1.8"
+else:
+    os.environ["FLA_TILELANG"] = "0"
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
@@ -2330,6 +2335,9 @@ _AMD_INSTALL_PACKAGE_IGNORE = frozenset({
     # variant_extras and source-extracted groups never re-install with a
     # conflicting (or unpinned) version.
     "tokenizers",
+    # NVIDIA/Hopper TileLang backend deps; do not auto-propagate into ROCm
+    # AMD notebooks. AMD users get a separate ROCm install path or skip.
+    "apache_tvm_ffi", "apache-tvm-ffi", "tilelang", "torch_c_dlpack_ext",
 })
 
 _AMD_VARIABLE_PACKAGE_FALLBACKS = {
@@ -4014,12 +4022,14 @@ def update_notebook_sections(
                             else:
                                 installation = installation_qwen3_vl_content
                                 
-                        # Qwen3.5 INSTALLATION (must come after Qwen3VL to override for qwen3_5).
-                        # Match both "qwen3_5" and "qwen_3_5" so that the inconsistently-named
-                        # Qwen_3_5_27B_A100(80GB).ipynb also hits this branch instead of falling
-                        # through to the default installation_content (which would clobber the
-                        # custom torch 2.8.0 / flash-linear-attention / causal_conv1d block).
-                        if is_path_contains_any(notebook_path.lower(), ["qwen3_5", "qwen_3_5"]):
+                        # Qwen3.5 / Qwen3.6 INSTALLATION (must come after Qwen3VL).
+                        # Match the inconsistently-named variants too. Qwen3.6 also
+                        # needs flash-linear-attention + causal_conv1d + tilelang so
+                        # we route both families through the same install block.
+                        if is_path_contains_any(
+                            notebook_path.lower(),
+                            ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6"],
+                        ):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_qwen3_5_kaggle_content
                             else:
@@ -4065,6 +4075,10 @@ def update_notebook_sections(
                             ):
                                 source_install_texts.append(installation_extra_grpo_content)
                             if is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
+                                # AMD path: only the FLA + causal_conv1d kernels
+                                # are propagated. tilelang has no ROCm wheel
+                                # (and apache-tvm-ffi is CUDA-only), so they
+                                # stay filtered out via _AMD_INSTALL_PACKAGE_IGNORE.
                                 source_install_texts.append(
                                     "!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0"
                                 )
