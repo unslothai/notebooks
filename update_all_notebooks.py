@@ -5187,31 +5187,63 @@ def update_readme(
 
         # Dedicated AMD section at the very end. AMD-prefixed notebooks
         # target ROCm and do not run in Colab; we link straight to GitHub.
+        # Sorted by HF Hub popularity (descending) so the top 6 are the
+        # most-used models; the rest fold into a Kaggle-style collapsible.
         amd_entries = [d for d in notebook_data if d.get("is_amd")]
-        amd_entries.sort(key=lambda d: (d.get("architecture") or "", d.get("model") or "", d.get("path") or ""))
+        amd_entries.sort(
+            key=lambda d: (
+                d.get("created_at_key", (0, 0)),
+                d.get("architecture") or "",
+                d.get("model") or "",
+                d.get("path") or "",
+            ),
+            reverse=True,
+        )
         amd_section = ""
         if amd_entries:
             github_blob_base = "https://github.com/unslothai/notebooks/blob/main/"
-            amd_section = (
-                "# 🐧 AMD Notebooks\n"
-                "These notebooks target AMD ROCm GPUs and are not available in Colab. "
-                "View / download them directly from GitHub:\n\n"
+            amd_table_header = (
                 "| Model | Type | Notebook |\n"
                 "| --- | --- | --- |\n"
             )
-            for d in amd_entries:
+
+            def _render_amd_row(d):
                 gh_url = (github_blob_base + d["path"]).replace(" ", "%20")
                 display_model = d.get("model") or os.path.basename(d["path"]).replace(".ipynb", "")
-                # Strip any leading "AMD" / "AMD-" / "AMD " from the model name --
-                # the section header already says AMD, so the prefix is noise.
+                # Strip any leading "AMD" / "AMD-" / "AMD " -- the section
+                # header already labels these as AMD, so the prefix is noise.
                 for _prefix in ("AMD-", "AMD "):
                     if display_model.startswith(_prefix):
                         display_model = display_model[len(_prefix):]
                         break
                 size = d.get("size") or ""
                 model_cell = f"**{display_model}** {size}".rstrip()
-                amd_section += f"| {model_cell} | {d.get('type','')} | [GitHub]({gh_url}) |\n"
+                return f"| {model_cell} | {d.get('type','')} | [GitHub]({gh_url}) |\n"
+
+            _AMD_POPULAR_COUNT = 6
+            popular_amd = amd_entries[:_AMD_POPULAR_COUNT]
+            rest_amd = amd_entries[_AMD_POPULAR_COUNT:]
+
+            amd_section = (
+                "# 🐧 AMD Notebooks\n"
+                "These notebooks target AMD ROCm GPUs and are not available in Colab. "
+                "View / download them directly from GitHub:\n\n"
+            )
+            amd_section += amd_table_header
+            for d in popular_amd:
+                amd_section += _render_amd_row(d)
             amd_section += "\n"
+
+            if rest_amd:
+                amd_section += (
+                    "<details>\n  <summary>\n"
+                    "    Click for all our AMD ROCm notebooks:\n  "
+                    "</summary>\n\n"
+                )
+                amd_section += amd_table_header
+                for d in rest_amd:
+                    amd_section += _render_amd_row(d)
+                amd_section += "\n</details>\n\n"
 
         now = datetime.now()
         timestamp = f"\n"

@@ -553,154 +553,164 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 
 | Model | Type | Notebook |
 | --- | --- | --- |
-| **CodeForces cot Finetune for Reasoning on CodeForces** | Reasoning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
-| **NeMo Gym Multi Environment** | Multi Environment | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-NeMo-Gym-Multi-Environment.ipynb) |
-| **NeMo Gym Sudoku** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-NeMo-Gym-Sudoku.ipynb) |
-| **Openenv wordle** | Wordle + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Openenv_wordle_grpo.ipynb) |
-| **Synthetic Data Hackathon** | Synthetic Data | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Synthetic_Data_Hackathon.ipynb) |
-| **Unsloth** | Studio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Unsloth_Studio.ipynb) |
-| **ModernBert** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-ModernBert.ipynb) |
-| **bert** | Classification | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-bert_classification.ipynb) |
-| **DeepSeek R1 0528 Qwen3** **(8B)** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb) |
-| **Deepseek OCR** **(3B)** | Eval | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Deepseek_OCR_(3B)-Eval.ipynb) |
-| **Deepseek OCR** **(3B)** | Evaluation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Deepseek_OCR_(3B)-Evaluation.ipynb) |
-| **Deepseek OCR** **(3B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Deepseek_OCR_(3B).ipynb) |
-| **Deepseek OCR 2** **(3B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Deepseek_OCR_2_(3B).ipynb) |
-| **ERNIE 4 5 21B A3B PT** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-ERNIE_4_5_21B_A3B_PT-Conversational.ipynb) |
-| **ERNIE 4 5 VL 28B A3B PT** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb) |
-| **All MiniLM L6 v2** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-All_MiniLM_L6_v2.ipynb) |
-| **BGE M3** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-BGE_M3.ipynb) |
-| **GLM Flash(80GB)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GLM_Flash_A100(80GB).ipynb) |
-| **GPT OSS BNB** **(20B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GPT_OSS_BNB_(20B)-Inference.ipynb) |
-| **GPT OSS MXFP4** **(20B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GPT_OSS_MXFP4_(20B)-Inference.ipynb) |
-| **OpenEnv gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb) |
-| **OpenEnv gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb) |
-| **gpt oss** **(120B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(120B)_A100-Fine-tuning.ipynb) |
-| **gpt oss** **(20B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)-Fine-tuning.ipynb) |
-| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)-GRPO.ipynb) |
-| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)_A100-GRPO.ipynb) |
-| **gpt oss** **(20B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_500K_Context_Fine_tuning.ipynb) |
-| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_GRPO_BF16.ipynb) |
-| **gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb) |
-| **gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb) |
-| **gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb) |
-| **gpt oss** **(20B)** | Minesweeper Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.ipynb) |
-| **CodeGemma** **(7B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeGemma_(7B)-Conversational.ipynb) |
-| **EmbeddingGemma** **(300M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-EmbeddingGemma_(300M).ipynb) |
-| **FunctionGemma** **(270M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-LMStudio.ipynb) |
-| **FunctionGemma** **(270M)** | Mobile Actions | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-Mobile-Actions.ipynb) |
-| **FunctionGemma** **(270M)** | Tool Calling | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-Multi-Turn-Tool-Calling.ipynb) |
-| **FunctionGemma** **(270M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M).ipynb) |
-| **Gemma2** **(2B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma2_(2B)-Alpaca.ipynb) |
-| **Gemma2** **(9B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma2_(9B)-Alpaca.ipynb) |
-| **Gemma3** **(1B)** | GSM8K Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(1B)-GRPO.ipynb) |
-| **Gemma3** **(270M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(270M).ipynb) |
-| **Gemma3** **(270M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(270M)_Phone_Deployment.ipynb) |
-| **Gemma3** **(27B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(27B)_A100-Conversational.ipynb) |
-| **Gemma3** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B)-Vision-GRPO.ipynb) |
-| **Gemma3** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B)-Vision.ipynb) |
-| **Gemma3** **(4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B).ipynb) |
-| **Gemma3N** **(2B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(2B)-Inference.ipynb) |
-| **Gemma3N** **(4B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Audio.ipynb) |
-| **Gemma3N** **(4B)** | Multimodal | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Conversational.ipynb) |
-| **Gemma3N** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Vision.ipynb) |
-| **Gemma4** **(26B A4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(26B_A4B)-Text.ipynb) |
-| **Gemma4** **(26B A4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(26B_A4B)-Vision.ipynb) |
-| **Gemma4** **(31B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(31B)-Text.ipynb) |
-| **Gemma4** **(31B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(31B)-Vision.ipynb) |
-| **Gemma4** **(E2B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Audio.ipynb) |
-| **Gemma4** **(E2B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Text.ipynb) |
-| **Gemma4** **(E2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Vision.ipynb) |
-| **Gemma4** **(E2B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_GRPO.ipynb) |
-| **Gemma4** **(E2B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_Reinforcement_Learning_2048_Game.ipynb) |
-| **Gemma4** **(E2B)** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.ipynb) |
-| **Gemma4** **(E4B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Audio.ipynb) |
-| **Gemma4** **(E4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Text.ipynb) |
-| **Gemma4** **(E4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Vision.ipynb) |
-| **Granite4.0** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Granite4.0.ipynb) |
-| **Granite4.0 350M** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Granite4.0_350M.ipynb) |
-| **Falcon H1** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Falcon_H1-Alpaca.ipynb) |
-| **Falcon H1** **(0.5B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Falcon_H1_(0.5B)-Alpaca.ipynb) |
-| **LFM2.5** **(1.2B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Conversational.ipynb) |
-| **LFM2.5** **(1.2B)** | DAPO Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-GRPO.ipynb) |
-| **LFM2.5** **(1.2B)** | Text Completion | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Text_Completion.ipynb) |
-| **LFM2.5** **(1.2B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Translation.ipynb) |
-| **LFM2.5 VL** **(1.6B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_VL_(1.6B)-Vision.ipynb) |
-| **Liquid LFM2** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Liquid_LFM2-Conversational.ipynb) |
-| **Liquid LFM2** **(1.2B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Liquid_LFM2_(1.2B)-Conversational.ipynb) |
-| **Llama** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama_FP8_GRPO.ipynb) |
-| **Llama3** **(8B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Alpaca.ipynb) |
-| **Llama3** **(8B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Conversational.ipynb) |
-| **Llama3** **(8B)** | ORPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-ORPO.ipynb) |
-| **Llama3** **(8B)** | Ollama | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Ollama.ipynb) |
-| **Llama3.1** **(8B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-Alpaca.ipynb) |
-| **Llama3.1** **(8B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb) |
-| **Llama3.1** **(8B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-Inference.ipynb) |
-| **Llama3.2** **(11B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb) |
-| **Llama3.2** **(1B)** | RAFT | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(1B)-RAFT.ipynb) |
-| **Llama3.2** **(1B and 3B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(1B_and_3B)-Conversational.ipynb) |
-| **Llama3.3** **(70B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.3_(70B)_A100-Conversational.ipynb) |
-| **Meta Synthetic Data Llama3 2** **(3B)** | GRPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Meta_Synthetic_Data_Llama3_2_(3B).ipynb) |
-| **Meta Synthetic Data Llama3.1** **(8B)** | GRPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Meta-Synthetic-Data-Llama3.1_(8B).ipynb) |
-| **TinyLlama** **(1.1B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-TinyLlama_(1.1B)-Alpaca.ipynb) |
-| **Magistral** **(24B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Magistral_(24B)-Reasoning-Conversational.ipynb) |
-| **Ministral 3** **(3B)** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb) |
-| **Ministral 3 VL** **(3B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Ministral_3_VL_(3B)_Vision.ipynb) |
-| **Mistral** **(7B)** | Text Completion | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_(7B)-Text_Completion.ipynb) |
-| **Mistral Nemo** **(12B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_Nemo_(12B)-Alpaca.ipynb) |
-| **Mistral Small** **(22B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_Small_(22B)-Alpaca.ipynb) |
-| **Mistral v0.3** **(7B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-Alpaca.ipynb) |
-| **Mistral v0.3** **(7B)** | CPT | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-CPT.ipynb) |
-| **Mistral v0.3** **(7B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-Conversational.ipynb) |
-| **Mistral v0.3** **(7B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-GRPO.ipynb) |
-| **Pixtral** **(12B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Pixtral_(12B)-Vision.ipynb) |
-| **Zephyr** **(7B)** | DPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Zephyr_(7B)-DPO.ipynb) |
-| **Nemotron 3 Nano 30B A3B** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Nemotron-3-Nano-30B-A3B_A100.ipynb) |
-| **Nemotron Nano 3 30B A3B** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Nemotron-Nano-3-30B-A3B_A100.ipynb) |
-| **Paddle OCR** **(1B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Paddle_OCR_(1B)_Vision.ipynb) |
-| **Phi 3 Medium** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_3_Medium-Conversational.ipynb) |
-| **Phi 3.5 Mini** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_3.5_Mini-Conversational.ipynb) |
-| **Phi 4** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_4-Conversational.ipynb) |
-| **Phi 4** **(14B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_4_(14B)-GRPO.ipynb) |
-| **Qwen 3 5 27B(80GB)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen_3_5_27B_A100(80GB).ipynb) |
-| **Qwen2** **(7B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2_(7B)-Alpaca.ipynb) |
-| **Qwen2 5 7B VL** | Vision Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2_5_7B_VL_GRPO.ipynb) |
-| **Qwen2 VL** **(7B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2_VL_(7B)-Vision.ipynb) |
-| **Qwen2.5** **(3B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_(3B)-GRPO.ipynb) |
-| **Qwen2.5** **(7B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_(7B)-Alpaca.ipynb) |
-| **Qwen2.5 Coder** **(1.5B)** | Tool Calling | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |
-| **Qwen2.5 Coder** **(14B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_Coder_(14B)-Conversational.ipynb) |
-| **Qwen2.5 VL** **(7B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_VL_(7B)-Vision.ipynb) |
-| **Qwen3** **(0.6B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch.ipynb) |
 | **Qwen3** **(0 6B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(0_6B)-Phone_Deployment.ipynb) |
-| **Qwen3** **(14B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B)-Alpaca.ipynb) |
-| **Qwen3** **(14B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B)-Reasoning-Conversational.ipynb) |
-| **Qwen3** **(14B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B).ipynb) |
-| **Qwen3** **(32B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(32B)_A100-Reasoning-Conversational.ipynb) |
-| **Qwen3** **(4B)** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)-GRPO.ipynb) |
-| **Qwen3** **(4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)-Instruct.ipynb) |
-| **Qwen3** **(4B)** | Thinking | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)-Thinking.ipynb) |
-| **Qwen3** **(4B)** | QAT | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)_Instruct-QAT.ipynb) |
-| **Qwen3 5** **(0 8B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(0_8B)_Vision.ipynb) |
-| **Qwen3 5** **(2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(2B)_Vision.ipynb) |
-| **Qwen3 5** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision.ipynb) |
-| **Qwen3 5** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision_GRPO.ipynb) |
-| **Qwen3 5 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_MoE.ipynb) |
-| **Qwen3 6 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_6_MoE.ipynb) |
-| **Qwen3 8B** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_8B_FP8_GRPO.ipynb) |
-| **Qwen3 Embedding** **(0 6B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_Embedding_(0_6B).ipynb) |
-| **Qwen3 Embedding** **(4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_Embedding_(4B).ipynb) |
-| **Qwen3 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_MoE.ipynb) |
-| **Qwen3 VL** **(8B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_VL_(8B)-Vision-GRPO.ipynb) |
-| **Qwen3 VL** **(8B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_VL_(8B)-Vision.ipynb) |
-| **TinyQwen3 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-TinyQwen3_MoE.ipynb) |
+| **Qwen3** **(0.6B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch.ipynb) |
+| **Llama3.1** **(8B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-Inference.ipynb) |
+| **Llama3.1** **(8B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb) |
+| **NeMo Gym Sudoku** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-NeMo-Gym-Sudoku.ipynb) |
+| **NeMo Gym Multi Environment** | Multi Environment | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-NeMo-Gym-Multi-Environment.ipynb) |
+
+<details>
+  <summary>
+    Click for all our AMD ROCm notebooks:
+  </summary>
+
+| Model | Type | Notebook |
+| --- | --- | --- |
 | **Whisper** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Whisper.ipynb) |
-| **Llasa TTS** **(1B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llasa_TTS_(1B).ipynb) |
-| **Llasa TTS** **(3B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llasa_TTS_(3B).ipynb) |
-| **Orpheus** **(3B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Orpheus_(3B)-TTS.ipynb) |
-| **Oute TTS** **(1B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Oute_TTS_(1B).ipynb) |
-| **Sesame CSM** **(1B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Sesame_CSM_(1B)-TTS.ipynb) |
+| **gpt oss** **(20B)** | Minesweeper Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.ipynb) |
+| **gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.ipynb) |
+| **gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb) |
+| **gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb) |
+| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_GRPO_BF16.ipynb) |
+| **gpt oss** **(20B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_500K_Context_Fine_tuning.ipynb) |
+| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)-GRPO.ipynb) |
+| **gpt oss** **(20B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)-Fine-tuning.ipynb) |
+| **OpenEnv gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb) |
+| **OpenEnv gpt oss** **(20B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb) |
+| **GPT OSS MXFP4** **(20B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GPT_OSS_MXFP4_(20B)-Inference.ipynb) |
+| **GPT OSS BNB** **(20B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GPT_OSS_BNB_(20B)-Inference.ipynb) |
 | **Spark TTS** **(0 5B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Spark_TTS_(0_5B).ipynb) |
+| **Qwen3 8B** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_8B_FP8_GRPO.ipynb) |
+| **Llama3** **(8B)** | Ollama | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Ollama.ipynb) |
+| **Llama3** **(8B)** | ORPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-ORPO.ipynb) |
+| **Llama3** **(8B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Alpaca.ipynb) |
+| **Openenv wordle** | Wordle + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Openenv_wordle_grpo.ipynb) |
+| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)_A100-GRPO.ipynb) |
+| **gpt oss** **(120B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(120B)_A100-Fine-tuning.ipynb) |
+| **Qwen2.5** **(3B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_(3B)-GRPO.ipynb) |
+| **ModernBert** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-ModernBert.ipynb) |
+| **Qwen3** **(4B)** | QAT | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)_Instruct-QAT.ipynb) |
+| **Qwen3** **(4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)-Instruct.ipynb) |
+| **Qwen2.5 VL** **(7B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_VL_(7B)-Vision.ipynb) |
+| **Qwen2 5 7B VL** | Vision Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2_5_7B_VL_GRPO.ipynb) |
+| **Llasa TTS** **(1B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llasa_TTS_(1B).ipynb) |
+| **Llama3.2** **(1B)** | RAFT | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(1B)-RAFT.ipynb) |
+| **Llama** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama_FP8_GRPO.ipynb) |
+| **Deepseek OCR** **(3B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Deepseek_OCR_(3B).ipynb) |
+| **Deepseek OCR** **(3B)** | Evaluation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Deepseek_OCR_(3B)-Evaluation.ipynb) |
+| **Deepseek OCR** **(3B)** | Eval | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Deepseek_OCR_(3B)-Eval.ipynb) |
+| **Paddle OCR** **(1B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Paddle_OCR_(1B)_Vision.ipynb) |
+| **ERNIE 4 5 VL 28B A3B PT** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-ERNIE_4_5_VL_28B_A3B_PT_Vision.ipynb) |
+| **Deepseek OCR 2** **(3B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Deepseek_OCR_2_(3B).ipynb) |
+| **Qwen3 VL** **(8B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_VL_(8B)-Vision.ipynb) |
+| **Qwen3 VL** **(8B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_VL_(8B)-Vision-GRPO.ipynb) |
+| **Mistral v0.3** **(7B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-GRPO.ipynb) |
+| **Mistral v0.3** **(7B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-Conversational.ipynb) |
+| **Qwen3 5 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_MoE.ipynb) |
+| **Orpheus** **(3B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Orpheus_(3B)-TTS.ipynb) |
+| **Llasa TTS** **(3B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llasa_TTS_(3B).ipynb) |
+| **Meta Synthetic Data Llama3.1** **(8B)** | GRPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Meta-Synthetic-Data-Llama3.1_(8B).ipynb) |
+| **Meta Synthetic Data Llama3 2** **(3B)** | GRPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Meta_Synthetic_Data_Llama3_2_(3B).ipynb) |
+| **Llama3.2** **(1B and 3B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(1B_and_3B)-Conversational.ipynb) |
+| **Qwen 3 5 27B(80GB)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen_3_5_27B_A100(80GB).ipynb) |
+| **Qwen3** **(32B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(32B)_A100-Reasoning-Conversational.ipynb) |
+| **Llama3.1** **(8B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-Alpaca.ipynb) |
+| **Qwen3 5** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision_GRPO.ipynb) |
+| **Qwen3 5** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision.ipynb) |
+| **Qwen3** **(14B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B).ipynb) |
+| **Qwen3** **(14B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B)-Reasoning-Conversational.ipynb) |
+| **CodeForces cot Finetune for Reasoning on CodeForces** | Reasoning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
+| **Llama3.3** **(70B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.3_(70B)_A100-Conversational.ipynb) |
+| **Synthetic Data Hackathon** | Synthetic Data | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Synthetic_Data_Hackathon.ipynb) |
+| **Gemma3** **(4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B).ipynb) |
+| **Gemma3** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B)-Vision-GRPO.ipynb) |
+| **Phi 4** **(14B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_4_(14B)-GRPO.ipynb) |
+| **Phi 4** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_4-Conversational.ipynb) |
+| **Gemma3** **(27B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(27B)_A100-Conversational.ipynb) |
+| **Qwen3 5** **(0 8B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(0_8B)_Vision.ipynb) |
+| **GLM Flash(80GB)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GLM_Flash_A100(80GB).ipynb) |
+| **Sesame CSM** **(1B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Sesame_CSM_(1B)-TTS.ipynb) |
+| **Gemma4** **(31B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(31B)-Vision.ipynb) |
+| **Gemma4** **(31B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(31B)-Text.ipynb) |
+| **Qwen2 VL** **(7B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2_VL_(7B)-Vision.ipynb) |
+| **Qwen3** **(4B)** | Thinking | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)-Thinking.ipynb) |
+| **Qwen3 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_MoE.ipynb) |
+| **Gemma3** **(1B)** | GSM8K Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(1B)-GRPO.ipynb) |
+| **Nemotron Nano 3 30B A3B** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Nemotron-Nano-3-30B-A3B_A100.ipynb) |
+| **Nemotron 3 Nano 30B A3B** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Nemotron-3-Nano-30B-A3B_A100.ipynb) |
+| **Gemma4** **(E4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Vision.ipynb) |
+| **Gemma4** **(E4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Text.ipynb) |
+| **Gemma4** **(E4B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Audio.ipynb) |
+| **Llama3.2** **(11B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb) |
+| **Qwen3 5** **(2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(2B)_Vision.ipynb) |
+| **Phi 3.5 Mini** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_3.5_Mini-Conversational.ipynb) |
+| **Gemma4** **(26B A4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(26B_A4B)-Vision.ipynb) |
+| **Gemma4** **(26B A4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(26B_A4B)-Text.ipynb) |
+| **Magistral** **(24B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Magistral_(24B)-Reasoning-Conversational.ipynb) |
+| **Qwen2.5** **(7B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_(7B)-Alpaca.ipynb) |
+| **DeepSeek R1 0528 Qwen3** **(8B)** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb) |
+| **Qwen2.5 Coder** **(1.5B)** | Tool Calling | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb) |
+| **Gemma3** **(270M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(270M)_Phone_Deployment.ipynb) |
+| **Gemma3** **(270M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(270M).ipynb) |
+| **Qwen2.5 Coder** **(14B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_Coder_(14B)-Conversational.ipynb) |
+| **FunctionGemma** **(270M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M).ipynb) |
+| **FunctionGemma** **(270M)** | Tool Calling | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-Multi-Turn-Tool-Calling.ipynb) |
+| **FunctionGemma** **(270M)** | Mobile Actions | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-Mobile-Actions.ipynb) |
+| **FunctionGemma** **(270M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-LMStudio.ipynb) |
+| **Gemma3N** **(4B)** | Multimodal | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Conversational.ipynb) |
+| **Gemma3N** **(4B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Audio.ipynb) |
+| **Gemma3N** **(2B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(2B)-Inference.ipynb) |
+| **LFM2.5** **(1.2B)** | DAPO Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-GRPO.ipynb) |
+| **LFM2.5** **(1.2B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Conversational.ipynb) |
+| **Gemma4** **(E2B)** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.ipynb) |
+| **Gemma4** **(E2B)** | 2048 Game | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_Reinforcement_Learning_2048_Game.ipynb) |
+| **Gemma4** **(E2B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)_GRPO.ipynb) |
+| **Gemma4** **(E2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Vision.ipynb) |
+| **Gemma4** **(E2B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Text.ipynb) |
+| **Gemma4** **(E2B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Audio.ipynb) |
+| **Qwen3 6 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_6_MoE.ipynb) |
+| **Qwen3 Embedding** **(4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_Embedding_(4B).ipynb) |
+| **Qwen3** **(4B)** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)-GRPO.ipynb) |
+| **Pixtral** **(12B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Pixtral_(12B)-Vision.ipynb) |
+| **Qwen3 Embedding** **(0 6B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_Embedding_(0_6B).ipynb) |
+| **Mistral Small** **(22B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_Small_(22B)-Alpaca.ipynb) |
+| **Liquid LFM2** **(1.2B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Liquid_LFM2_(1.2B)-Conversational.ipynb) |
+| **Liquid LFM2** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Liquid_LFM2-Conversational.ipynb) |
+| **LFM2.5 VL** **(1.6B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_VL_(1.6B)-Vision.ipynb) |
+| **Ministral 3 VL** **(3B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Ministral_3_VL_(3B)_Vision.ipynb) |
+| **Ministral 3** **(3B)** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb) |
+| **Gemma3** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B)-Vision.ipynb) |
+| **Oute TTS** **(1B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Oute_TTS_(1B).ipynb) |
+| **Llama3** **(8B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Conversational.ipynb) |
+| **ERNIE 4 5 21B A3B PT** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-ERNIE_4_5_21B_A3B_PT-Conversational.ipynb) |
+| **Granite4.0** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Granite4.0.ipynb) |
+| **Qwen3** **(14B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B)-Alpaca.ipynb) |
+| **LFM2.5** **(1.2B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Translation.ipynb) |
+| **LFM2.5** **(1.2B)** | Text Completion | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Text_Completion.ipynb) |
+| **Gemma3N** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Vision.ipynb) |
+| **Granite4.0 350M** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Granite4.0_350M.ipynb) |
+| **TinyLlama** **(1.1B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-TinyLlama_(1.1B)-Alpaca.ipynb) |
+| **Falcon H1** **(0.5B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Falcon_H1_(0.5B)-Alpaca.ipynb) |
+| **Falcon H1** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Falcon_H1-Alpaca.ipynb) |
+| **Phi 3 Medium** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_3_Medium-Conversational.ipynb) |
+| **EmbeddingGemma** **(300M)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-EmbeddingGemma_(300M).ipynb) |
+| **Gemma2** **(9B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma2_(9B)-Alpaca.ipynb) |
+| **Gemma2** **(2B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma2_(2B)-Alpaca.ipynb) |
+| **Mistral v0.3** **(7B)** | CPT | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-CPT.ipynb) |
+| **Mistral v0.3** **(7B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-Alpaca.ipynb) |
+| **Mistral** **(7B)** | Text Completion | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_(7B)-Text_Completion.ipynb) |
+| **Qwen2** **(7B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2_(7B)-Alpaca.ipynb) |
+| **Zephyr** **(7B)** | DPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Zephyr_(7B)-DPO.ipynb) |
+| **bert** | Classification | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-bert_classification.ipynb) |
+| **Mistral Nemo** **(12B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_Nemo_(12B)-Alpaca.ipynb) |
+| **CodeGemma** **(7B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeGemma_(7B)-Conversational.ipynb) |
+| **BGE M3** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-BGE_M3.ipynb) |
+| **TinyQwen3 MoE** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-TinyQwen3_MoE.ipynb) |
+| **All MiniLM L6 v2** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-All_MiniLM_L6_v2.ipynb) |
+| **Unsloth** | Studio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Unsloth_Studio.ipynb) |
+
+</details>
 
 
 <!-- End of Notebook Links -->
