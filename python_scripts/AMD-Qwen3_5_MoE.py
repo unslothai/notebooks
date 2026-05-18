@@ -41,6 +41,7 @@
 # 
 # 
 # import os
+# os.environ["FLA_TILELANG"] = "0"
 # os.environ['UNSLOTH_MOE_DISABLE_AUTOTUNE'] = '1'
 # get_ipython().system('uv pip install --system -qqq --no-deps "torchcodec==0.7.0"')
 # get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')

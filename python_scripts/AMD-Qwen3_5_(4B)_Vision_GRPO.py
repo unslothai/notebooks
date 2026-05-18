@@ -42,6 +42,7 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 
+os.environ["FLA_TILELANG"] = "0"
 get_ipython().system('uv pip install --system -qqq --no-deps "torchcodec==0.7.0"')
 get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 get_ipython().system('uv pip install --system -qqq "transformers==5.2.0" vllm')

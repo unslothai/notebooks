@@ -34,35 +34,27 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.3.0\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    !uv pip install -qqq \\\n        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\n    !uv pip install -qqq --no-deps "torchcodec==0.7.0"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==0.22.2 unsloth unsloth_zoo\n!uv pip install transformers==5.3.0\n# causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!\n!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0\nimport torch\nif torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:\n    !uv pip install --no-deps "apache-tvm-ffi==0.1.9" "tilelang==0.1.8"\nelse:\n    os.environ["FLA_TILELANG"] = "0"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
 # 
 # 
 # # ### Install flash-linear-attention and causal-conv-1d
 # 
-# # In[ ]:
+# # In[2]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import json, platform, sys, urllib.request\nimport torch\n\ndef github_release_asset(repo, tag, predicate):\n    api = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"\n    with urllib.request.urlopen(api) as response:\n        release = json.load(response)\n    for asset in release.get("assets", []):\n        if predicate(asset["name"]):\n            return asset["browser_download_url"]\n    return None\n\npy_tag = f"cp{sys.version_info.major}{sys.version_info.minor}"\ntorch_tag = ".".join(torch.__version__.split("+")[0].split(".")[:2])\ncuda_major = (torch.version.cuda or "").split(".")[0]\nif not cuda_major:\n    raise RuntimeError("CUDA-enabled PyTorch is required for this notebook.")\n\ncuda_tag = f"cu{cuda_major}"\ncxx11abi = "TRUE" if torch.compiled_with_cxx11_abi() else "FALSE"\nmachine = platform.machine().lower()\nplatform_tag = "linux_x86_64" if machine in ("x86_64", "amd64") else "linux_aarch64"\n\ncausal_conv1d_url = github_release_asset(\n    "Dao-AILab/causal-conv1d",\n    "v1.6.1.post4",\n    lambda name: name.endswith(f"{py_tag}-{py_tag}-{platform_tag}.whl") and f"+{cuda_tag}torch{torch_tag}" in name and f"cxx11abi{cxx11abi}" in name,\n)\nif causal_conv1d_url is None:\n    raise RuntimeError(f"No matching causal-conv1d wheel found for torch {torch.__version__}, CUDA {torch.version.cuda}, Python {py_tag}, ABI {cxx11abi}.")\n\nflash_linear_attention_url = github_release_asset(\n    "fla-org/flash-linear-attention",\n    "v0.4.2",\n    lambda name: name.endswith(f"{py_tag}-{py_tag}-{platform_tag}.whl"),\n) or "https://github.com/fla-org/flash-linear-attention/archive/refs/tags/v0.4.2.tar.gz"\n\n!uv pip install -qqq --no-deps "$causal_conv1d_url" "$flash_linear_attention_url"\n\n# # sentence-transformers is optional here, but its torchcodec import is broken on Colab.\n!pip uninstall -y sentence-transformers torchcodec\n')
-# 
-# 
-# # In[5]:
-# 
-# 
-# import os
-# # Keep autotuning off to reduce startup time and memory spikes on Colab.
-# os.environ['UNSLOTH_MOE_DISABLE_AUTOTUNE'] = '1'
+# get_ipython().run_cell_magic('capture', '', 'import json, platform, sys, torch\nfrom urllib.request import urlopen\n\npy   = f"cp{sys.version_info.major}{sys.version_info.minor}"\ntv   = ".".join(torch.__version__.split("+")[0].split(".")[:2])\nassert (cu := (torch.version.cuda or "").split(".")[0]), "CUDA-enabled PyTorch required."\nabi  = "TRUE" if torch.compiled_with_cxx11_abi() else "FALSE"\nplat = "linux_x86_64" if platform.machine().lower() in ("x86_64", "amd64") else "linux_aarch64"\nwhl  = f"{py}-{py}-{plat}.whl"\n\ndef find(repo, tag, match):\n    api = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"\n    return next((a["browser_download_url"] for a in json.load(urlopen(api))["assets"] if match(a["name"])), None)\n\ncc1d = find("Dao-AILab/causal-conv1d", "v1.6.1.post4",\n            lambda n: n.endswith(whl) and f"+cu{cu}torch{tv}" in n and f"cxx11abi{abi}" in n)\nassert cc1d, f"No causal-conv1d wheel for torch {torch.__version__}/cu{cu}/{py}/abi{abi}"\nfla = find("fla-org/flash-linear-attention", "v0.4.2", lambda n: n.endswith(whl)) \\\n      or "https://github.com/fla-org/flash-linear-attention/archive/refs/tags/v0.4.2.tar.gz"\n\n!uv pip install -qqq --no-deps "$cc1d" "$fla"\n!pip uninstall -y sentence-transformers torchcodec  # torchcodec import broken on Colab\n')
 # 
 # 
 # # ### Unsloth
 
-# In[ ]:
+# In[3]:
 
 
 from unsloth import FastLanguageModel
 import torch
 
 max_seq_length = 2048 # Can increase for longer reasoning traces
-lora_rank = 16 # Larger rank = smarter, but slower
+lora_rank = 8 # Larger rank = smarter, but slower
 
 model, processor = FastLanguageModel.from_pretrained(
     "unsloth/Qwen3.6-35B-A3B", # This is a very big model, might take a while for downloading
@@ -73,7 +65,7 @@ model, processor = FastLanguageModel.from_pretrained(
 tokenizer = processor.tokenizer # To tokenize text
 
 
-# In[ ]:
+# In[4]:
 
 
 model = FastLanguageModel.get_peft_model(
@@ -94,7 +86,7 @@ model = FastLanguageModel.get_peft_model(
 # ### Data Prep
 # We now use the `Qwen 3.5` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy.
 
-# In[10]:
+# In[5]:
 
 
 from datasets import load_dataset
@@ -103,7 +95,7 @@ dataset = load_dataset("unsloth/OpenMathReasoning-mini", split = "cot")
 
 # We now convert the reasoning dataset into conversational format:
 
-# In[11]:
+# In[6]:
 
 
 def generate_conversation(examples):
@@ -122,7 +114,7 @@ dataset = dataset.map(generate_conversation, batched = True)
 
 # We now have to apply the chat template for `Qwen 3.5` onto the conversations, and save it to `text`.
 
-# In[12]:
+# In[7]:
 
 
 def formatting_prompts_func(examples):
@@ -135,7 +127,7 @@ dataset = dataset.map(formatting_prompts_func, batched = True)
 
 # Let's see how the chat template did!
 
-# In[13]:
+# In[8]:
 
 
 dataset[100]['text']
@@ -145,43 +137,7 @@ dataset[100]['text']
 # ### Train the model
 # Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 
-# In[14]:
-
-
-from trl import SFTTrainer, SFTConfig
-trainer = SFTTrainer(
-    model = model,
-    tokenizer = tokenizer,
-    train_dataset = dataset,
-    args = SFTConfig(
-        dataset_text_field = "text",
-        per_device_train_batch_size = 1,
-        gradient_accumulation_steps = 1, # Use GA to mimic batch size!
-        warmup_steps = 5,
-        # num_train_epochs = 1, # Set this for 1 full training run.
-        max_steps = 50,
-        learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
-        logging_steps = 5,
-        optim = "adamw_8bit",
-        weight_decay = 0.001,
-        lr_scheduler_type = "linear",
-        seed = 3407,
-        report_to = "none", # Use TrackIO/WandB etc
-    ),
-)
-
-
-# In[15]:
-
-
-dataset[100]['text']
-
-
-# <a name="Train"></a>
-# ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
-
-# In[16]:
+# In[9]:
 
 
 from trl import SFTTrainer, SFTConfig
@@ -209,7 +165,7 @@ trainer = SFTTrainer(
 
 # We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
 
-# In[17]:
+# In[10]:
 
 
 from unsloth.chat_templates import train_on_responses_only
@@ -222,7 +178,7 @@ trainer = train_on_responses_only(
 
 # Let's verify masking the instruction part is done! Let's print the 100th row again.
 
-# In[18]:
+# In[11]:
 
 
 tokenizer.decode(trainer.train_dataset[100]["input_ids"])
@@ -230,13 +186,13 @@ tokenizer.decode(trainer.train_dataset[100]["input_ids"])
 
 # Now let's print the masked out example - you should see only the answer is present:
 
-# In[19]:
+# In[12]:
 
 
 tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
 
 
-# In[20]:
+# In[13]:
 
 
 # Compilation can take 2-3 minutes of time, so please be patient :)
@@ -245,7 +201,7 @@ trainer.train()
 
 # Let's check if the model has learnt to follow the custom format:
 
-# In[21]:
+# In[14]:
 
 
 messages = [
@@ -266,9 +222,7 @@ _ = model.generate(
 )
 
 
-# Yes it did follow the formatting! Great! Let's remove some items before the GRPO step
-
-# In[22]:
+# In[15]:
 
 
 del dataset
@@ -282,7 +236,7 @@ gc.collect()
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
-# In[23]:
+# In[16]:
 
 
 # Merge to 16bit
@@ -312,7 +266,7 @@ if False:
 # 
 # [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 
-# In[24]:
+# In[17]:
 
 
 # Save to 8bit Q8_0

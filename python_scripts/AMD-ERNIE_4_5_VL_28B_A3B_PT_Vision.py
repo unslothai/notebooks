@@ -437,7 +437,7 @@ class ErnieSFTTrainer(SFTTrainer):
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 30 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
+# Now let's train our model. We do 30 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!
 # 
 # We use our new `ErnieVisionDataCollator` which will help in our vision finetuning setup.
 

@@ -41,9 +41,11 @@
 # 
 # 
 # import os
+# os.environ["FLA_TILELANG"] = "0"
 # os.environ['UNSLOTH_MOE_DISABLE_AUTOTUNE'] = '1'
+# get_ipython().system('uv pip install --system -qqq --no-deps "torchcodec==0.7.0" accelerate peft')
+# get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 # get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==5.3.0"')
-# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # get_ipython().system('uv pip install --system -qqq --no-build-isolation flash-linear-attention "causal_conv1d==1.6.0"')
 # 
 # 
