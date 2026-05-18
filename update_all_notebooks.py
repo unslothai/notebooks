@@ -603,7 +603,7 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install transformers==5.2.0
 # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
 !uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
-import torch, os
+import torch
 if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
     !uv pip install --no-deps "apache-tvm-ffi==0.1.9" "tilelang==0.1.8"
 else:
