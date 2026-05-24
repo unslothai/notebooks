@@ -327,7 +327,7 @@ max_prompt_length = 287 + 1 # + 1 just in case!
 from trl import GRPOConfig, GRPOTrainer
 training_args = GRPOConfig(
     learning_rate = 5e-6,
-    weight_decay = 0.1,
+    weight_decay = 0.001,
     warmup_ratio = 0.1,
     lr_scheduler_type = "cosine",
     optim = "adamw_torch_fused",
