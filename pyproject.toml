@@ -10,6 +10,32 @@ dependencies = [
     "nbconvert>=7.16.6",
 ]
 
+[project.optional-dependencies]
+# Generator / dev tooling — install with: pip install -e ".[generator]"
+#   marimo is used by scripts/molab_generate.py (marimo.App / @app.cell
+#     emission) and by CI to run `marimo check` in
+#     test_molab_marimo_validity.py and `marimo convert` in
+#     test_molab_generation_parity.py.
+#   ruff is invoked by scripts/molab_generate.py as a final `ruff format`
+#     pass — marimo's IR conversion ast-unparses cells whose top-level
+#     names it had to rename for the single-definition rule, which
+#     collapses multi-line calls onto one long line; ruff re-wraps them
+#     readably.  Pinned so regeneration is byte-stable across CI runs.
+generator = [
+    "marimo>=0.23,<0.24",
+    "ruff>=0.15,<0.16",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+# Explicit setuptools package discovery. Without this, the flat layout (with
+# top-level molab/, scripts/, tests/ directories) makes setuptools try to
+# auto-discover them all as packages, which fails the `pip install -e .` and
+# `pip install -e ".[generator]"` invocations. This project ships no
+# importable Python package -- generator helpers live as flat modules under
+# scripts/ and are imported via sys.path.insert at runtime by the tests.
+[tool.setuptools]
+packages = []
+py-modules = []

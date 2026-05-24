@@ -1,0 +1,628 @@
+# /// script
+# requires-python = ">=3.10,<3.14"
+# dependencies = [
+#     "accelerate",
+#     "bitsandbytes>=0.43.0",
+#     "datasets==4.3.0",
+#     "hf_transfer",
+#     "huggingface_hub>=0.34.0",
+#     "llama-index",
+#     "llama-index-packs-raft-dataset",
+#     "marimo",
+#     "peft",
+#     "protobuf",
+#     "sentencepiece",
+#     "torchao>=0.16.0",
+#     "transformers>=4.56.0",
+#     "triton>=3.2.0",
+#     "trl==0.22.2",
+#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
+#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+# ]
+#
+# [tool.uv]
+# no-build-package = [
+#     "bitsandbytes",
+#     "triton",
+#     "vllm",
+#     "xformers",
+# ]
+# ///
+
+import marimo
+
+__generated_with = "0.23.8"
+app = marimo.App()
+
+
+@app.cell
+def _():
+    import marimo as mo
+
+    return (mo,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    To run this, press the **Run** button beside each cell!
+    <div class="align-center">
+    <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+    <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
+    <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+    </div>
+
+    To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+
+    You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### News
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://github.com/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+
+    <table><tr>
+    <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
+    <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
+    </tr></table>
+
+    Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
+
+    Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
+
+    New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+
+    Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
+    """)
+    return
+
+
+@app.cell
+def _():
+    # packages added via marimo's package management: llama-index llama-index-packs-raft-dataset !pip install -qU llama-index llama-index-packs-raft-dataset
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Unsloth
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Retrieval Augmented Finetuning (RAFT) Cookbook Recipe!
+    This cookbook aims to show how to use Unsloth to use retrieval augmented finetuning (RAFT). Supervised finetuning is like a closed-book examination where we encode knowledge from the training dataset into the LLM during finetuning, and then test it on unseen examples in the "exam".
+
+    RAFT differs from this in that it is an open-book exam format of finetuning! We allow the LLM to see not just the question and answer (in chain-of-thought format), but also the contexts. The hope is that the LLM will be able to acquire the domain knowledge, but also an improved ability to synthesize answers from context.
+
+    > Reference: [RAFT: Adapting Language Model to Domain Specific RAG](https://arxiv.org/abs/2403.10131)
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Code Setup
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    First, let's setting up the OPENAI API KEY so that we can use the OpenAI LLMs.
+    """)
+    return
+
+
+@app.cell
+def _():
+    import os
+
+    os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Next, we'll set up LlamaIndex. This involves configuring the language model (LLM) and embedding model that LlamaIndex will use. We'll be using OpenAI's `gpt-4o` as our LLM and `text-embedding-ada-002` as our embedding model.
+    """)
+    return
+
+
+@app.cell
+def _():
+    from llama_index.core import (
+        Settings,
+        SimpleDirectoryReader,
+    )
+    from llama_index.llms.openai import OpenAI
+    from llama_index.embeddings.openai import OpenAIEmbedding
+
+    Settings.llm = OpenAI(model="gpt-4o")
+    Settings.embed_model = OpenAIEmbedding(model="text-embedding-ada-002")
+    return Settings, SimpleDirectoryReader
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Ingest documents
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    We'll use the following code to download a research paper and then load it using `SimpleDirectoryReader`. This will be the data we use for our retrieval augmented finetuning.
+    """)
+    return
+
+
+@app.cell
+def _(SimpleDirectoryReader):
+    import subprocess
+
+    #! mkdir  -p ../data
+    subprocess.call(["mkdir", "-p", "../data"])
+    #! wget "https://arxiv.org/pdf/2405.00247.pdf" -O "../data/non_traditional_credentials.pdf"
+    subprocess.call(
+        [
+            "wget",
+            "https://arxiv.org/pdf/2405.00247.pdf",
+            "-O",
+            "../data/non_traditional_credentials.pdf",
+        ]
+    )
+
+    docs = SimpleDirectoryReader("../data/").load_data(show_progress=True)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Retrieval Augmented Finetuning
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Getting the RAFT dataset
+    LlamaIndex has very kindly adapted the source code of the RAFT repository and made it even easier to generate your own RAFT dataset. Just point it to your filepath.t
+    > Reference: [RAFTDatasetPack](https://github.com/run-llama/llama_index/blob/main/llama-index-packs/llama-index-packs-raft-dataset/examples/raft_dataset.ipynb)
+    """)
+    return
+
+
+@app.cell
+def _(Settings):
+    from llama_index.packs.raft_dataset import RAFTDatasetPack
+
+    raft_dataset = RAFTDatasetPack(
+        file_path="../data/non_traditional_credentials.pdf",
+        llm=Settings.llm,
+        embed_model=Settings.embed_model,
+    )
+    return (raft_dataset,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    This cell takes quite long to run! Go have a coffee ☕
+    > It took 19 minutes for the cell to finish running
+    """)
+    return
+
+
+@app.cell
+def _(raft_dataset):
+    dataset = raft_dataset.run()
+    return (dataset,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Let's have a look!
+    """)
+    return
+
+
+@app.cell
+def _(dataset):
+    import pandas as pd
+
+    df = pd.DataFrame(dataset)
+    df.head()
+    return df, pd
+
+
+@app.cell
+def _(df):
+    from IPython.display import display, Markdown
+
+    display(Markdown(df.iloc[0]["instruction"]))
+    return Markdown, display
+
+
+@app.cell
+def _(Markdown, df, display):
+    display(Markdown(df.iloc[0]["oracle_context"]))
+    return
+
+
+@app.cell
+def _(dataset):
+    # Save as .jsonl format
+    dataset.to_json("raft_train.jsonl")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Training the LLM
+    Our dataset is a HuggingFace `Dataset` object, so we can leverage the abstraction's advantage to do a train-test split
+    """)
+    return
+
+
+@app.cell
+def _(dataset):
+    splits = dataset.train_test_split(test_size=0.1)
+    train_ds = splits["train"]
+    eval_ds = splits["test"]
+    return eval_ds, train_ds
+
+
+@app.cell
+def _(eval_ds, train_ds):
+    train_ds, eval_ds
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Now let's get the model!
+    """)
+    return
+
+
+@app.cell
+def _():
+    from unsloth import FastLanguageModel
+    import torch
+
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name="unsloth/Llama-3.2-1B-Instruct",
+        max_seq_length=2048,  # Choose any for long context!
+        load_in_4bit=True,  # 4 bit quantization to reduce memory
+        load_in_8bit=False,
+        full_finetuning=False,
+    )
+    return FastLanguageModel, model, tokenizer, torch
+
+
+@app.cell
+def _(FastLanguageModel, model):
+    model_1 = FastLanguageModel.get_peft_model(
+        model,
+        r=16,  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+        lora_alpha=16,
+        lora_dropout=0,  # Supports any, but = 0 is optimized
+        bias="none",  # Supports any, but = "none" is optimized
+        use_gradient_checkpointing="unsloth",  # True or "unsloth" for very long context
+        random_state=2025,
+        use_rslora=False,  # We support rank stabilized LoRA
+        loftq_config=None,  # And LoftQ
+    )
+    return (model_1,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Formatting the prompts
+    We need to put everything together into a single 'text' field for the LLM to be trained on. According to the [RAFT paper](https://arxiv.org/abs/2403.10131), we add the context along with the question and chain-of-thought answer in a bid to help our LLM learn how to use the context to answer the question. Let's do that!
+    """)
+    return
+
+
+@app.cell
+def _(eval_ds, tokenizer, train_ds):
+    def formatting_prompts_func(examples):
+        """Define a formatter that injects the retrieved context:"""
+        texts = []
+        for qn, ctx, oracle, instr, ans in zip(
+            examples["question"],
+            examples["context"],
+            examples["oracle_context"],
+            examples["instruction"],
+            examples["cot_answer"],
+        ):
+            prompt = f"### Question:\n{qn}\n\n### Context:\n{ctx}\n\n### (Oracle Passages):\n{oracle}\n\n### Instruction:\n{instr}\n\n### Answer:\n"
+            texts.append(prompt + ans + tokenizer.eos_token)
+        return {"text": texts}
+
+    train_ds_1 = train_ds.map(formatting_prompts_func, batched=True)
+    # then:
+    eval_ds_1 = eval_ds.map(
+        formatting_prompts_func, batched=True
+    )
+    return eval_ds_1, train_ds_1
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Let's take a look at what we just did!
+    """)
+    return
+
+
+@app.cell
+def _(Markdown, display, pd, train_ds_1):
+    display(Markdown(pd.DataFrame(train_ds_1).head()["text"].iloc[0]))
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### And now we finally get to training!
+    """)
+    return
+
+
+@app.cell
+def _(eval_ds_1, model_1, tokenizer, train_ds_1):
+    from trl import SFTTrainer
+    from transformers import TrainingArguments
+
+    training_args = TrainingArguments(
+        output_dir="llama32_1bn_raft_v2",  # This will also be used as your huggingfacehub model id name
+        report_to="wandb",  # Leave this to be blank if you don't want to use wandb
+        run_name="RAFT_SFT_Take7",
+        eval_steps=5,
+        eval_strategy="steps",
+        per_device_train_batch_size=1,  # small batches if quantized
+        per_device_eval_batch_size=1,
+        gradient_accumulation_steps=8,
+        learning_rate=2e-05,
+        num_train_epochs=5,
+        save_strategy="no",
+        gradient_checkpointing=True,
+        logging_strategy="steps",
+        logging_steps=5,
+        seed=42,
+        optim="adamw_torch",
+        lr_scheduler_type="cosine",
+    )
+    trainer = SFTTrainer(
+        model=model_1,
+        tokenizer=tokenizer,
+        train_dataset=train_ds_1,
+        eval_dataset=eval_ds_1,
+        args=training_args,
+        dataset_text_field="text",
+    )
+    return (trainer,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Current memory statistics
+    """)
+    return
+
+
+@app.cell
+def _(torch):
+    gpu_stats = torch.cuda.get_device_properties(0)
+    start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+    max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+    print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
+    print(f"{start_gpu_memory} GB of memory reserved.")
+    return max_memory, start_gpu_memory
+
+
+@app.cell
+def _(trainer):
+    trainer_stats = trainer.train()
+    return (trainer_stats,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Used memory statistics
+    """)
+    return
+
+
+@app.cell
+def _(max_memory, start_gpu_memory, torch, trainer_stats):
+    used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+    used_memory_for_lora = round(used_memory - start_gpu_memory, 3)
+    used_percentage = round(used_memory / max_memory * 100, 3)
+    lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
+    print(f"{trainer_stats.metrics['train_runtime']} seconds used for training.")
+    print(
+        f"{round(trainer_stats.metrics['train_runtime'] / 60, 2)} minutes used for training."
+    )
+    print(f"Peak reserved memory = {used_memory} GB.")
+    print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
+    print(f"Peak reserved memory % of max memory = {used_percentage} %.")
+    print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    <a name="Save"></a>
+    ### Saving to float16 for VLLM
+
+    We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+    """)
+    return
+
+
+@app.cell
+def _(model_1, tokenizer):
+    # Merge to 16bit
+    if False:
+        model_1.save_pretrained_merged(
+            "llama_finetune_16bit", tokenizer, save_method="merged_16bit"
+        )
+    if False:
+        # Merge to 4bit
+        model_1.push_to_hub_merged(
+            "HF_USERNAME/llama_finetune_16bit",
+            tokenizer,
+            save_method="merged_16bit",
+            token="YOUR_HF_TOKEN",
+        )
+    if False:
+        model_1.save_pretrained_merged(
+            "llama_finetune_4bit", tokenizer, save_method="merged_4bit"
+        )
+    # Just LoRA adapters
+    if False:
+        model_1.push_to_hub_merged(
+            "HF_USERNAME/llama_finetune_4bit",
+            tokenizer,
+            save_method="merged_4bit",
+            token="YOUR_HF_TOKEN",
+        )
+    if False:
+        model_1.save_pretrained("llama_lora")
+        tokenizer.save_pretrained("llama_lora")
+    if False:
+        model_1.push_to_hub("HF_USERNAME/llama_lora", token="YOUR_HF_TOKEN")
+        tokenizer.push_to_hub("HF_USERNAME/llama_lora", token="YOUR_HF_TOKEN")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### GGUF / llama.cpp Conversion
+    To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
+
+    Some supported quant methods (full list on our [docs page](https://unsloth.ai/docs/basics/inference-and-deployment/saving-to-gguf)):
+    * `q8_0` - Fast conversion. High resource use, but generally acceptable.
+    * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
+    * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
+
+    [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://github.com/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
+    """)
+    return
+
+
+@app.cell
+def _(model_1, tokenizer):
+    # Save to 8bit Q8_0
+    if False:
+        # Remember to go to https://huggingface.co/settings/tokens for a token!
+        # And change hf to your username!
+        model_1.save_pretrained_gguf("llama_finetune", tokenizer)
+    if False:
+        # Save to 16bit GGUF
+        model_1.push_to_hub_gguf(
+            "HF_USERNAME/llama_finetune", tokenizer, token="YOUR_HF_TOKEN"
+        )
+    if False:
+        model_1.save_pretrained_gguf(
+            "llama_finetune", tokenizer, quantization_method="f16"
+        )
+    # Save to q4_k_m GGUF
+    if False:
+        model_1.push_to_hub_gguf(
+            "HF_USERNAME/llama_finetune",
+            tokenizer,
+            quantization_method="f16",
+            token="YOUR_HF_TOKEN",
+        )
+    if False:
+        # Save to multiple GGUF options - much faster if you want multiple!
+        model_1.save_pretrained_gguf(
+            "llama_finetune", tokenizer, quantization_method="q4_k_m"
+        )
+    if False:
+        model_1.push_to_hub_gguf(
+            "HF_USERNAME/llama_finetune",
+            tokenizer,
+            quantization_method="q4_k_m",
+            token="YOUR_HF_TOKEN",
+        )  # Change hf to your username!
+    if False:
+        model_1.push_to_hub_gguf(
+            "HF_USERNAME/llama_finetune",
+            tokenizer,
+            quantization_method=["q4_k_m", "q8_0", "q5_k_m"],
+            token="YOUR_HF_TOKEN",
+        )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
+
+    Some other resources:
+    1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+    2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+    3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+    4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+    5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
+
+    <div class="align-center">
+      <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+      <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
+      <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+
+      Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
+
+      <b>This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)</b>
+    </div>
+    """)
+    return
+
+
+if __name__ == "__main__":
+    app.run()
