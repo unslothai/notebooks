@@ -98,45 +98,141 @@ model = FastLanguageModel.get_peft_model(
 # <a name="Data"></a>
 # ### Data Prep  
 # 
-# We will use `ylacombe/jenny-tts-6h` (Jenny TTS, ~6 h single-speaker English; commercial use, redistribution, and TTS training are permitted by the upstream Dioco licence at https://github.com/dioco-group/jenny-tts-dataset, with attribution "Jenny (Dioco)" required if you ship a user-facing voice interface). Fallback is `keithito/lj_speech`, the public-domain LJSpeech corpus (Linda Johnson via LibriVox). Ensure that your dataset follows the required format: **text, audio** for single-speaker models or **source, text, audio** for multi-speaker models. The original `MrDragonFox/Elise` was DMCA-disabled on 2026-04-24, and re-uploads of the same audio under other usernames (e.g. `BarryFutureman/elise_v2`, `mrfakename/Elise`) carry the same legal risk because the claim is over the underlying voice recordings. Neither Jenny nor LJSpeech includes `<laughs>` / `<sighs>` / `<giggles>` non-verbal cue tokens, so this fine-tune teaches voice timbre only; Orpheus's pretrained cue tokens remain in the vocabulary and still work at inference.
+# We default to `vysakh25/laion-nonverbal-filtered` (single voice `shimmer`, GPT-4o TTS clips relicensed CC-BY-4.0 by LAION, ~24 kHz, three emotion buckets sampled by default). Each clip carries `parentheticals` like "Light Laugh, a gentle sound that barely breaks the silence" that the loader maps onto Orpheus's pretrained `<laughs>` / `<sighs>` / `<giggles>` etc. tokens before training, so the fine-tune reinforces the cue tokens as well as the voice timbre. Public-domain `keithito/lj_speech` (Linda Johnson via LibriVox) is the cue-less safety net. The original `MrDragonFox/Elise` and every byte-identical mirror (`BarryFutureman/elise_v2`, `mrfakename/Elise`, etc.) were DMCA-disabled on 2026-04-24 (Moon Silk Audios); re-uploads under different usernames carry the same legal risk regardless of the licence tag. Set the `ORPHEUS_DATASET` env var to override with any HF dataset that exposes `audio` and `text` columns.
 
 # In[ ]:
 
 
-from datasets import load_dataset
+import io
+import json
+import os
+import re
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+from datasets import Audio, Dataset, load_dataset
+from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
 
-# `MrDragonFox/Elise` and `Jinsaryko/Elise` were DMCA-disabled on the
-# HF Hub on 2026-04-24 by the original voice talent (Moon Silk Audios).
-# The takedown covers the underlying audio recordings, so re-uploads
-# of the same audio under different usernames (e.g. `BarryFutureman/
-# elise_v2`, `mrfakename/Elise`) carry the same risk regardless of the
-# licence string the re-uploader sets. We default to Jenny TTS (Dioco
-# licence, commercial OK, attribution required), with public-domain
-# LJSpeech as the pure-PD fallback. Override with the ORPHEUS_DATASET
-# env var to point at any HF dataset that exposes audio + text columns.
-import os
-_user = os.environ.get("ORPHEUS_DATASET")
-DATASET_CANDIDATES = [_user] if _user else [
-    "ylacombe/jenny-tts-6h",  # primary: Jenny (Dioco) - commercial OK, attribute "Jenny (Dioco)"
-    "keithito/lj_speech",     # fallback: Linda Johnson via LibriVox - public domain
+# `MrDragonFox/Elise` and `Jinsaryko/Elise` were DMCA-disabled by Moon
+# Silk Audios on 2026-04-24. Byte-identical re-uploads under any other
+# username carry the same risk regardless of the licence string set
+# by the re-uploader. We default to LAION's `shimmer` voice slices of
+# `vysakh25/laion-nonverbal-filtered` (CC-BY-4.0, GPT-4o TTS clips
+# Whisper-filtered so the non-verbal cues are actually performed in
+# the audio, not just typed). The transcripts have parentheticals
+# stripped, so we map them back to Orpheus's pretrained `<laughs>` /
+# `<sighs>` / etc. tokens before training. Override with the
+# `ORPHEUS_DATASET` env var to point at any HF dataset that exposes
+# `audio` and `text` columns.
+
+# Three shimmer emotion buckets spanning calm -> playful -> charged.
+# Add or remove buckets to broaden / narrow the emotional range.
+_LAION_REPO = "vysakh25/laion-nonverbal-filtered"
+_LAION_SHARDS = [
+    "parquets/english_shimmer_intense_contentment_relaxation_peacefulness_calmness_satisfaction_and_serenity.parquet",
+    "parquets/english_shimmer_intense_teasing_bantering_and_playful_mocking.parquet",
+    "parquets/english_shimmer_intense_happiness_excitement_joy_exhilaration_delight_jubilation_and_bliss.parquet",
 ]
+
+# Map LAION parenthetical description keywords -> Orpheus cue tokens.
+# Longest keyword wins via the explicit `break` after first match.
+_CUE_KEYWORDS = (
+    ("chortle",  "<laughs>"),
+    ("chuckle",  "<laughs>"),
+    ("giggle",   "<giggles>"),
+    ("snicker",  "<giggles>"),
+    ("snigger",  "<giggles>"),
+    ("laugh",    "<laughs>"),
+    ("sigh",     "<sighs>"),
+    ("gasp",     "<gasps>"),
+    ("moan",     "<moans>"),
+    ("groan",    "<groans>"),
+    ("whisper",  "<whispers>"),
+    ("yawn",     "<yawns>"),
+    ("sniff",    "<sniffles>"),
+    ("sniffle",  "<sniffles>"),
+    ("cough",    "<coughs>"),
+    ("scream",   "<screams>"),
+    ("cry",      "<cries>"),
+    ("sob",      "<cries>"),
+)
+
+def _parentheticals_to_cues(pars_field):
+    if pars_field is None:
+        return []
+    if isinstance(pars_field, str):
+        try:
+            pars = json.loads(pars_field)
+        except Exception:
+            return []
+    else:
+        try:
+            pars = list(pars_field)
+        except Exception:
+            return []
+    out, seen = [], set()
+    for desc in pars:
+        d = str(desc).lower()
+        for kw, tok in _CUE_KEYWORDS:
+            if kw in d:
+                if tok not in seen:
+                    out.append(tok)
+                    seen.add(tok)
+                break
+    return out
+
+def _row_to_orpheus(example):
+    """Re-inject Orpheus cue tokens into `text_clean` and decode `audio_bytes`."""
+    import soundfile as sf
+    text = (example.get("text_clean") or example.get("text_original") or "").strip()
+    cues = _parentheticals_to_cues(example.get("parentheticals"))
+    if cues:
+        text = (" ".join(cues) + " " + text).strip()
+    raw = example.get("audio_bytes")
+    if isinstance(raw, dict) and "bytes" in raw:
+        raw = raw["bytes"]
+    audio = None
+    if raw:
+        try:
+            arr, sr = sf.read(io.BytesIO(raw), dtype = "float32", always_2d = False)
+            if hasattr(arr, "ndim") and arr.ndim > 1:
+                arr = arr.mean(axis = -1)
+            audio = {"array": arr, "sampling_rate": int(sr)}
+        except Exception as _e:
+            audio = None
+    return {"text": text, "audio": audio}
+
+def _load_laion_shimmer():
+    locals_ = []
+    for shard in _LAION_SHARDS:
+        locals_.append(hf_hub_download(_LAION_REPO, shard, repo_type = "dataset"))
+    tables = [pq.read_table(p) for p in locals_]
+    table = pa.concat_tables(tables, promote_options = "default") if len(tables) > 1 else tables[0]
+    ds = Dataset(table)
+    ds = ds.map(_row_to_orpheus, remove_columns = ds.column_names)
+    ds = ds.cast_column("audio", Audio())
+    return ds
+
+def _load_via_hf(name):
+    ds = load_dataset(name, split = "train")
+    cols = ds.column_names
+    if "text" not in cols:
+        for _alt in ("transcription", "normalized_text", "sentence"):
+            if _alt in cols:
+                ds = ds.rename_column(_alt, "text")
+                break
+    return ds
+
+_user = os.environ.get("ORPHEUS_DATASET")
+DATASET_CANDIDATES = [_user] if _user else ["__laion_shimmer__", "keithito/lj_speech"]
 
 dataset = None
 last_err = None
 for _name in DATASET_CANDIDATES:
     try:
-        dataset = load_dataset(_name, split = "train")
-        # Normalise the text column so the rest of the notebook keeps
-        # using `dataset[i]["text"]`. Jenny uses `transcription`,
-        # LJSpeech uses `text`, Common Voice / others use `sentence`.
-        _cols = dataset.column_names
-        if "text" not in _cols:
-            for _alt in ("transcription", "normalized_text", "sentence"):
-                if _alt in _cols:
-                    dataset = dataset.rename_column(_alt, "text")
-                    break
-        print(f"Loaded dataset: {_name}")
+        dataset = _load_laion_shimmer() if _name == "__laion_shimmer__" else _load_via_hf(_name)
+        print(f"Loaded dataset: {_name} ({len(dataset)} rows)")
         break
     except (FileNotFoundError, HfHubHTTPError, ValueError) as e:
         last_err = e
@@ -148,7 +244,7 @@ if dataset is None:
         "dataset that exposes `audio` and `text` columns (any sample "
         "rate; the notebook resamples to 24 kHz for SNAC). Avoid Elise "
         "mirrors: the original `MrDragonFox/Elise` and `Jinsaryko/Elise` "
-        "were DMCA-disabled on 2026-04-24."
+        "were DMCA-disabled by Moon Silk Audios on 2026-04-24."
     ) from last_err
 
 
