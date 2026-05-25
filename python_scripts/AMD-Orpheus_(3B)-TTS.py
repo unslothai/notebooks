@@ -1,20 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-# Converted from: nb/AMD-Orpheus_(3B)-TTS.ipynb
-
-import subprocess
-import os
-import sys
-import re
-
-# Capture original packages before any installs
-_original_packages = subprocess.run(
-    [sys.executable, '-m', 'pip', 'freeze'],
-    capture_output=True, text=True
-).stdout
-
-# Working directory (replaces Colab's /content/)
-_WORKING_DIR = os.getcwd()
 
 # To run this, press "*Run*" and press "*Run All*" on **AMD Dev Cloud**!
 # <div class="align-center">
@@ -44,36 +29,29 @@ _WORKING_DIR = os.getcwd()
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 
-# ### Installation
-
-%%bash
-python -m pip install -qU uv --root-user-action=ignore
-
-ROCM_TAG="$({ command -v amd-smi >/dev/null 2>&1 && amd-smi version 2>/dev/null | awk -F'ROCm version: ' 'NF>1{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}'; } || { [ -r /opt/rocm/.info/version ] && awk -F. '{print "rocm"$1"."$2; exit}' /opt/rocm/.info/version; } || { command -v hipconfig >/dev/null 2>&1 && hipconfig --version 2>/dev/null | awk -F': *' '/HIP version/{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}'; } || { command -v dpkg-query >/dev/null 2>&1 && ver="$(dpkg-query -W -f='${Version}\n' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F'[.-]' '{print "rocm"$1"."$2; exit}' <<<"$ver"; } || { command -v rpm >/dev/null 2>&1 && ver="$(rpm -q --qf '%{VERSION}\n' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F'[.-]' '{print "rocm"$1"."$2; exit}' <<<"$ver"; })"
-[ -n "$ROCM_TAG" ] || { echo "Could not detect ROCm. Install ROCm first or set ROCM_TAG manually."; exit 1; }
-case "$ROCM_TAG" in
-  rocm6.[0-4]|rocm7.[02]) T="$ROCM_TAG" ;;
-  rocm6.*) T="rocm6.4" ;;
-  *) T="rocm7.1" ;;
-esac
-pip install bitsandbytes
-PYTORCH_INDEX_URL="https://download.pytorch.org/whl/${T}"
-uv pip install --system -U --force-reinstall \
-    torch torchvision torchaudio triton-rocm \
-    --index-url "$PYTORCH_INDEX_URL"
-uv pip install --system cut-cross-entropy torchao --no-deps
-uv pip install --system -U --no-deps "unsloth[amd]" "unsloth_zoo[amd]"
-uv pip install --system --no-deps -r "$(python -c 'import pathlib,site;print(next(p for r in [*site.getsitepackages(),site.getusersitepackages()] if (p:=pathlib.Path(r,"studio/backend/requirements/no-torch-runtime.txt")).exists()))')" torchao
-uv pip install --system --no-deps -U "tokenizers>=0.22.0,<=0.23.0"
-
-subprocess.run('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" snac torchcodec', shell=True)
-subprocess.run('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"', shell=True)
-
-# ### Unsloth
+# # ### Installation
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-user-action=ignore\n\nROCM_TAG="$({ command -v amd-smi >/dev/null 2>&1 && amd-smi version 2>/dev/null | awk -F\'ROCm version: \' \'NF>1{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { [ -r /opt/rocm/.info/version ] && awk -F. \'{print "rocm"$1"."$2; exit}\' /opt/rocm/.info/version; } || { command -v hipconfig >/dev/null 2>&1 && hipconfig --version 2>/dev/null | awk -F\': *\' \'/HIP version/{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { command -v dpkg-query >/dev/null 2>&1 && ver="$(dpkg-query -W -f=\'${Version}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; } || { command -v rpm >/dev/null 2>&1 && ver="$(rpm -q --qf \'%{VERSION}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; })"\n[ -n "$ROCM_TAG" ] || { echo "Could not detect ROCm. Install ROCm first or set ROCM_TAG manually."; exit 1; }\ncase "$ROCM_TAG" in\n  rocm6.[0-4]|rocm7.[02]) T="$ROCM_TAG" ;;\n  rocm6.*) T="rocm6.4" ;;\n  *) T="rocm7.1" ;;\nesac\npip install bitsandbytes\nPYTORCH_INDEX_URL="https://download.pytorch.org/whl/${T}"\nuv pip install --system -U --force-reinstall \\\n    torch torchvision torchaudio triton-rocm \\\n    --index-url "$PYTORCH_INDEX_URL"\nuv pip install --system cut-cross-entropy torchao --no-deps\nuv pip install --system -U --no-deps "unsloth[amd]" "unsloth_zoo[amd]"\nuv pip install --system --no-deps -r "$(python -c \'import pathlib,site;print(next(p for r in [*site.getsitepackages(),site.getusersitepackages()] if (p:=pathlib.Path(r,"studio/backend/requirements/no-torch-runtime.txt")).exists()))\')" torchao\nuv pip install --system --no-deps -U "tokenizers>=0.22.0,<=0.23.0"\n')
+# 
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" snac torchcodec')
+# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
+# 
+# 
+# # ### Unsloth
 # 
 # `FastModel` supports loading nearly any model now! This includes Vision and Text models!
 # 
 # Thank you to [Etherl](https://huggingface.co/Etherll) for creating this notebook!
+
+# In[ ]:
+
 
 from unsloth import FastLanguageModel
 import torch
@@ -102,7 +80,11 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     # token = "YOUR_HF_TOKEN", # HF Token for gated models
 )
 
+
 # We now add LoRA adapters so we only need to update 1 to 10% of all parameters!
+
+# In[ ]:
+
 
 model = FastLanguageModel.get_peft_model(
     model,
@@ -119,10 +101,16 @@ model = FastLanguageModel.get_peft_model(
     loftq_config = None, # And LoftQ
 )
 
+
 # <a name="Data"></a>
 # ### Data Prep  
 # 
-# We default to `vysakh25/laion-nonverbal-filtered` (single voice `shimmer`, GPT-4o TTS clips relicensed CC-BY-4.0 by LAION, ~24 kHz, three emotion buckets sampled by default). Each clip carries `parentheticals` like "Light Laugh, a gentle sound that barely breaks the silence" that the loader maps onto Orpheus's pretrained `<laughs>` / `<sighs>` / `<giggles>` etc. tokens before training, so the fine-tune reinforces the cue tokens as well as the voice timbre. Public-domain `keithito/lj_speech` (Linda Johnson via LibriVox) is the cue-less safety net. The original `MrDragonFox/Elise` and every byte-identical mirror (`BarryFutureman/elise_v2`, `mrfakename/Elise`, etc.) were DMCA-disabled on 2026-04-24 (Moon Silk Audios); re-uploads under different usernames carry the same legal risk regardless of the licence tag. Set the `ORPHEUS_DATASET` env var to override with any HF dataset that exposes `audio` and `text` columns. Note on licensing: the LAION default is GPT-4o TTS audio re-licensed CC-BY-4.0 by LAION; OpenAI's Terms of Use forbid using GPT-4o output to develop competing models, so commercial uses should switch to LJSpeech (public domain) or your own recordings. Both fallbacks are wired into the loader below.
+# We default to `vysakh25/laion-nonverbal-filtered` (single voice `shimmer`, GPT-4o TTS clips re-licensed CC-BY-4.0 by LAION, ~24 kHz, three emotion buckets sampled by default). Each clip carries `parentheticals` like "Light Laugh, a gentle sound that barely breaks the silence" that the loader maps onto Orpheus's pretrained `<laughs>` / `<sighs>` / `<giggles>` etc. tokens, and inserts the cue token at the position in the sentence where the audio performs the cue (preserving acoustic alignment). Public-domain `keithito/lj_speech` (Linda Johnson via LibriVox) is the cue-less safety net. The original `MrDragonFox/Elise` and all known mirrors (`Jinsaryko/Elise`, `BarryFutureman/elise_v2`, `mrfakename/Elise`, etc.) were DMCA-disabled on 2026-04-24 (Moon Silk Audios); re-uploads under different usernames carry the same legal risk regardless of the licence tag the uploader sets. Set the `ORPHEUS_DATASET` env var to override with any HF dataset that exposes `audio` and `text` columns.
+# 
+# **Licensing notes.** The LAION default is GPT-4o TTS audio re-licensed CC-BY-4.0 by LAION. (a) OpenAI's Terms of Use restrict using OpenAI service Output to develop AI models that compete with OpenAI's own services; whether a fine-tune of Orpheus on LAION shimmer triggers that clause depends on your end use, and you should review the terms yourself. For unrestricted commercial use, switch to LJSpeech (public domain) or your own recordings. (b) CC-BY-4.0 requires attribution: if you redistribute checkpoints fine-tuned on this data, credit LAION (`vysakh25/laion-nonverbal-filtered`) in the model card.
+
+# In[ ]:
+
 
 import io
 import json
@@ -336,6 +324,10 @@ if dataset is None:
         "were DMCA-disabled by Moon Silk Audios on 2026-04-24."
     ) from last_err
 
+
+# In[ ]:
+
+
 #@title Tokenization Function
 
 import locale
@@ -474,11 +466,15 @@ columns_to_remove = [col for col in dataset.column_names if col not in columns_t
 
 dataset = dataset.remove_columns(columns_to_remove)
 
+
 # <a name="Train"></a>
 # ### Train the model
 # Now let's use Hugging Face `Trainer`! More docs here: [Transformers docs](https://huggingface.co/docs/transformers/main_classes/trainer). We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 # 
 # **Note:** Using a per_device_train_batch_size >1 may lead to errors if multi-GPU setup to avoid issues, ensure CUDA_VISIBLE_DEVICES is set to a single GPU (e.g., CUDA_VISIBLE_DEVICES=0).
+
+# In[ ]:
+
 
 from transformers import TrainingArguments,Trainer,DataCollatorForSeq2Seq
 trainer = Trainer(
@@ -501,6 +497,10 @@ trainer = Trainer(
     ),
 )
 
+
+# In[ ]:
+
+
 # @title Show current memory stats
 gpu_stats = torch.cuda.get_device_properties(0)
 start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
@@ -508,7 +508,15 @@ max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
 print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
+
+# In[ ]:
+
+
 trainer_stats = trainer.train()
+
+
+# In[ ]:
+
 
 # @title Show final memory and time stats
 used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
@@ -524,15 +532,23 @@ print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
 print(f"Peak reserved memory % of max memory = {used_percentage} %.")
 print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
 
+
 # <a name="Inference"></a>
 # ### Inference
 # Let's run the model! You can change the prompts
+
+# In[ ]:
+
 
 prompts = [
     "Hey there my name is Elise, <giggles> and I'm a speech generation model that can sound like a person.",
 ]
 
 chosen_voice = None # None for single-speaker
+
+
+# In[ ]:
+
 
 #@title Run Inference
 
@@ -649,20 +665,28 @@ else:
 # Clean up to save RAM
 del my_samples,samples
 
+
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
 # To save the final model as LoRA adapters, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
 
+# In[ ]:
+
+
 model.save_pretrained("orpheus_lora")  # Local saving
 tokenizer.save_pretrained("orpheus_lora")
 # model.push_to_hub("your_name/orpheus_lora", token = "YOUR_HF_TOKEN") # Online saving
 # tokenizer.push_to_hub("your_name/orpheus_lora", token = "YOUR_HF_TOKEN") # Online saving
 
+
 # ### Saving to float16
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+
+# In[ ]:
+
 
 # Merge to 16bit
 if False: model.save_pretrained_merged("orpheus_finetune_16bit", tokenizer, save_method = "merged_16bit",)
@@ -679,6 +703,7 @@ if False:
 if False:
     model.push_to_hub("HF_USERNAME/orpheus_lora", token = "YOUR_HF_TOKEN")
     tokenizer.push_to_hub("HF_USERNAME/orpheus_lora", token = "YOUR_HF_TOKEN")
+
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
@@ -698,10 +723,3 @@ if False:
 # 
 #   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
 # </div>
-
-
-# Restore original packages (install one by one, skip failures)
-for _pkg in _original_packages.strip().split('\n'):
-    if _pkg:
-        subprocess.run([sys.executable, '-m', 'pip', 'install', _pkg, '-q'],
-                       stderr=subprocess.DEVNULL)
