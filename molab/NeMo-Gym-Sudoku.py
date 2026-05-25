@@ -70,13 +70,12 @@ def _(mo):
 
 @app.cell
 def _():
-    # packages added via marimo's package management: unsloth unsloth_zoo omegaconf !pip install unsloth unsloth_zoo omegaconf
 
     # If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:
     # !source /home/ubuntu/.venv/bin/activate
     # !python -m ensurepip --upgrade
     # !python -m pip install -U pip
-    # !python -m pip install -U unsloth
+    # !python -m pip install -U "unsloth @ git+https://github.com/unslothai/unsloth"
     return
 
 

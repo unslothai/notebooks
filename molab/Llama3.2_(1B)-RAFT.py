@@ -87,12 +87,6 @@ def _(mo):
     return
 
 
-@app.cell
-def _():
-    # packages added via marimo's package management: llama-index llama-index-packs-raft-dataset !pip install -qU llama-index llama-index-packs-raft-dataset
-    return
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""

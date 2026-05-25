@@ -99,8 +99,7 @@ def _(mo):
 @app.cell
 def _():
     # For faster training, we can use Mamba's CUDA function instead
-    # packages added via marimo's package management: causal-conv1d==1.5.0.post8 !pip install --no-deps causal-conv1d==1.5.0.post8
-    # packages added via marimo's package management: mamba-ssm==2.2.4 !pip install --no-build-isolation mamba-ssm==2.2.4
+
     return
 
 

@@ -88,9 +88,7 @@ def _(mo):
 
 @app.cell
 def _():
-    # packages added via marimo's package management: git+https://github.com/huggingface/transformers.git !pip install --no-deps git+https://github.com/huggingface/transformers.git
     # Need main branch for Liquid LFM2 models
-    # packages added via marimo's package management: causal-conv1d==1.5.0.post8 !pip install --no-deps causal-conv1d==1.5.0.post8
     # Install Mamba kernels
     return
 

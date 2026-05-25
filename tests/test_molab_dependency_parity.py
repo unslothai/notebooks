@@ -300,8 +300,8 @@ def test_molab_forces_unsloth_git_for_phone_notebooks() -> None:
     assert "unsloth @ git+https://github.com/unslothai/unsloth" in deps
     assert "unsloth>=2026.5.7" not in deps
     assert "transformers==4.57.3" in deps
-    assert "trl==0.24.0" in deps
-    assert "trl==0.25.1" not in deps
+    assert "trl==0.25.1" in deps
+    assert "trl==0.24.0" not in deps
 
 
 def test_molab_git_overlay_avoids_excluded_transformers_release() -> None:
@@ -318,8 +318,8 @@ def test_molab_git_overlay_avoids_excluded_transformers_release() -> None:
     assert "unsloth>=2026.5.7" not in deps
     assert "transformers==4.57.3" in deps
     assert "transformers==4.57.0" not in deps
-    assert "trl==0.24.0" in deps
-    assert "trl==0.26.2" not in deps
+    assert "trl==0.26.2" in deps
+    assert "trl==0.24.0" not in deps
 
 
 def test_molab_strips_unsloth_base_extra_from_direct_reference() -> None:
@@ -333,6 +333,7 @@ def test_molab_strips_unsloth_base_extra_from_direct_reference() -> None:
     deps = set(plan.dependencies)
 
     assert "unsloth @ git+https://github.com/unslothai/unsloth" in deps
+    assert "trl==0.29.1" in deps
     assert (
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
         not in deps

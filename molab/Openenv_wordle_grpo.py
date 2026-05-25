@@ -14,7 +14,7 @@
 #     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
-#     "trl==0.24.0",
+#     "trl==0.29.1",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 #     "uvicorn",
@@ -101,8 +101,6 @@ def _(mo):
 def _():
     import subprocess
 
-    # packages added via marimo's package management: fastapi uvicorn requests open_spiel !pip install -qqq fastapi uvicorn requests open_spiel --prefer-binary
-    # packages added via marimo's package management: openenv-core[core]>=0.2.1 !pip install "openenv-core[core]>=0.2.1"
     #! git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1
     subprocess.call(
         "git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1",

@@ -101,9 +101,6 @@ def _(mo):
 def _():
     import subprocess
 
-    # packages added via marimo's package management: fastapi uvicorn requests open_spiel !pip install -qqq fastapi uvicorn requests open_spiel
-    # packages added via marimo's package management: fastapi uvicorn requests !pip install fastapi uvicorn requests
-    # packages added via marimo's package management: open_spiel !pip install open_spiel --prefer-binary
     #! git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1
     subprocess.call(
         "git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1",

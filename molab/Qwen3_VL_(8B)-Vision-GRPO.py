@@ -14,7 +14,7 @@
 #     "torchao>=0.16.0",
 #     "transformers==4.57.3",
 #     "triton>=3.2.0",
-#     "trl==0.24.0",
+#     "trl==0.26.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #

@@ -79,7 +79,6 @@ def _(mo):
 
 @app.cell
 def _():
-    # packages added via marimo's package management: timm !pip install --no-deps --upgrade timm
     # For Gemma 4 vision/audio
     return
 

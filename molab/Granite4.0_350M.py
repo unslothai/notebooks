@@ -88,8 +88,7 @@ def _(mo):
 @app.cell
 def _():
     # These are mamba kernels and we must have these for faster training
-    # packages added via marimo's package management: mamba_ssm==2.2.5 !pip install --no-build-isolation mamba_ssm==2.2.5
-    # packages added via marimo's package management: causal_conv1d==1.5.2 !pip install --no-build-isolation causal_conv1d==1.5.2
+
     return
 
 

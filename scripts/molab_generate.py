@@ -246,6 +246,10 @@ _COLAB_PROSE_REWRITES: list[tuple[str, str]] = [
     (r"\bColab\b", "molab"),
 ]
 
+_MOLAB_UNSLOTH_DIRECT_REFERENCE = (
+    "unsloth @ git+https://github.com/unslothai/unsloth"
+)
+
 
 def _replace_colab_mentions(code: str) -> str:
     """Substitute Colab-isms for molab equivalents in a cell.
@@ -258,6 +262,18 @@ def _replace_colab_mentions(code: str) -> str:
     """
     out: list[str] = []
     for line in code.splitlines(keepends=True):
+        line = line.replace(
+            "python -m pip install -U unsloth",
+            f'python -m pip install -U "{_MOLAB_UNSLOTH_DIRECT_REFERENCE}"',
+        )
+        line = line.replace(
+            "pip install -U unsloth",
+            f'pip install -U "{_MOLAB_UNSLOTH_DIRECT_REFERENCE}"',
+        )
+        line = line.replace(
+            "pip install unsloth",
+            f'pip install "{_MOLAB_UNSLOTH_DIRECT_REFERENCE}"',
+        )
         for pattern, replacement in _COLAB_URL_REWRITES:
             line = re.sub(pattern, replacement, line)
         for pattern, replacement in _COLAB_BADGE_TEXT_REWRITES:
@@ -269,6 +285,17 @@ def _replace_colab_mentions(code: str) -> str:
             line = re.sub(pattern, replacement, line)
         out.append(line)
     return "".join(out)
+
+
+_MARIMO_PACKAGE_MANAGEMENT_COMMENT_RE = re.compile(
+    r"^\s*# packages added via marimo's package management:.*(?:\r?\n)?",
+    flags=re.MULTILINE,
+)
+
+
+def _strip_marimo_package_management_comments(code: str) -> str:
+    """Drop marimo's generated package-management comments from cells."""
+    return _MARIMO_PACKAGE_MANAGEMENT_COMMENT_RE.sub("", code)
 
 
 # Shell metacharacters that, when passed as a separate argv element to
@@ -861,6 +888,9 @@ def _post_pass(ir, plan):
         code = _fix_env_assignments(code)
         code = _fix_shell_subprocess(code)
         code = _ensure_subprocess_import(code)
+        code = _strip_marimo_package_management_comments(code)
+        if not code.strip():
+            continue
         add(code, hide=hide)
 
     return codes, names, configs

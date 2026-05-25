@@ -494,8 +494,7 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
         chosen[key] = latest_spec
 
     # Keep known Molab resolver safety pins even though Unsloth itself now
-    # comes from GitHub.  The source notebooks use --no-deps in places where
-    # Molab's PEP 723 environment resolves the full dependency graph.
+    # comes from GitHub.
     if "unsloth" in chosen:
         transformers_spec = chosen.get("transformers")
         excluded_transformers = {
@@ -510,17 +509,6 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                 reason="replaced: this transformers release is known to break "
                        "Molab's Unsloth dependency resolution; use the nearest "
                        "compatible 4.57.x pin",
-            ))
-
-        trl_spec = chosen.get("trl")
-        trl_pin = re.match(r"^trl==(\d+)\.(\d+)\.(\d+)$", trl_spec or "")
-        if trl_pin and tuple(map(int, trl_pin.groups())) > (0, 24, 0):
-            chosen["trl"] = "trl==0.24.0"
-            plan.dropped.append(DroppedItem(
-                text=trl_spec,
-                reason="replaced: source Colab uses --no-deps, but Molab's "
-                       "PEP 723 environment resolves the full graph; keep "
-                       "trl on the known-compatible <=0.24.0 line",
             ))
 
     # Drop any explicit ``unsloth_zoo`` line from the source notebook's

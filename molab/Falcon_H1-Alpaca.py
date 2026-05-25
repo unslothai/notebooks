@@ -70,41 +70,10 @@ def _():
     import subprocess
 
     # Installs Unsloth, Xformers (Flash Attention) and all other packages!
-    # packages added via marimo's package management: unsloth !pip install unsloth
     # Get latest Unsloth
     #! pip uninstall unsloth -y
     subprocess.call(["pip", "uninstall", "unsloth", "-y"])
-    # packages added via marimo's package management: torchao>=0.16.0 !pip install --no-deps --upgrade "torchao>=0.16.0"
-    return
 
-
-@app.cell
-def _():
-    # packages added via marimo's package management: unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git@main !pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git@main"
-    return
-
-
-@app.cell
-def _():
-    # packages added via marimo's package management: git+https://github.com/huggingface/transformers.git !pip install --force-reinstall git+https://github.com/huggingface/transformers.git
-    return
-
-
-@app.cell
-def _():
-    # packages added via marimo's package management: git+https://github.com/Dao-AILab/causal-conv1d.git@main !pip install --no-build-isolation git+https://github.com/Dao-AILab/causal-conv1d.git@main
-    return
-
-
-@app.cell
-def _():
-    # packages added via marimo's package management: git+https://github.com/state-spaces/mamba.git@main !pip install --no-build-isolation git+https://github.com/state-spaces/mamba.git@main
-    return
-
-
-@app.cell
-def _():
-    # packages added via marimo's package management: git+https://github.com/unslothai/unsloth-zoo.git !pip install git+https://github.com/unslothai/unsloth-zoo.git
     return
 
 

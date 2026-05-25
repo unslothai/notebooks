@@ -89,7 +89,6 @@ def _(mo):
 
 @app.cell
 def _():
-    # packages added via marimo's package management: timm !pip install --no-deps --upgrade timm
     # Only for Gemma 3N
     return
 
