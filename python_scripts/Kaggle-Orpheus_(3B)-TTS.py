@@ -98,7 +98,7 @@ model = FastLanguageModel.get_peft_model(
 # <a name="Data"></a>
 # ### Data Prep  
 # 
-# We default to `vysakh25/laion-nonverbal-filtered` (single voice `shimmer`, GPT-4o TTS clips relicensed CC-BY-4.0 by LAION, ~24 kHz, three emotion buckets sampled by default). Each clip carries `parentheticals` like "Light Laugh, a gentle sound that barely breaks the silence" that the loader maps onto Orpheus's pretrained `<laughs>` / `<sighs>` / `<giggles>` etc. tokens before training, so the fine-tune reinforces the cue tokens as well as the voice timbre. Public-domain `keithito/lj_speech` (Linda Johnson via LibriVox) is the cue-less safety net. The original `MrDragonFox/Elise` and every byte-identical mirror (`BarryFutureman/elise_v2`, `mrfakename/Elise`, etc.) were DMCA-disabled on 2026-04-24 (Moon Silk Audios); re-uploads under different usernames carry the same legal risk regardless of the licence tag. Set the `ORPHEUS_DATASET` env var to override with any HF dataset that exposes `audio` and `text` columns.
+# We default to `vysakh25/laion-nonverbal-filtered` (single voice `shimmer`, GPT-4o TTS clips relicensed CC-BY-4.0 by LAION, ~24 kHz, three emotion buckets sampled by default). Each clip carries `parentheticals` like "Light Laugh, a gentle sound that barely breaks the silence" that the loader maps onto Orpheus's pretrained `<laughs>` / `<sighs>` / `<giggles>` etc. tokens before training, so the fine-tune reinforces the cue tokens as well as the voice timbre. Public-domain `keithito/lj_speech` (Linda Johnson via LibriVox) is the cue-less safety net. The original `MrDragonFox/Elise` and every byte-identical mirror (`BarryFutureman/elise_v2`, `mrfakename/Elise`, etc.) were DMCA-disabled on 2026-04-24 (Moon Silk Audios); re-uploads under different usernames carry the same legal risk regardless of the licence tag. Set the `ORPHEUS_DATASET` env var to override with any HF dataset that exposes `audio` and `text` columns. Note on licensing: the LAION default is GPT-4o TTS audio re-licensed CC-BY-4.0 by LAION; OpenAI's Terms of Use forbid using GPT-4o output to develop competing models, so commercial uses should switch to LJSpeech (public domain) or your own recordings. Both fallbacks are wired into the loader below.
 
 # In[ ]:
 
@@ -136,15 +136,24 @@ _LAION_SHARDS = [
 ]
 
 # Map LAION parenthetical description keywords -> Orpheus cue tokens.
-# Longest keyword wins via the explicit `break` after first match.
+# Word-boundary regex matching (vs `kw in desc`) so "hum" does not match
+# "human" and "breath" matches "breath" and "breathes". Ordering matters
+# only for tie-breaking; the first matching keyword wins per parenthetical.
 _CUE_KEYWORDS = (
     ("chortle",  "<laughs>"),
     ("chuckle",  "<laughs>"),
     ("giggle",   "<giggles>"),
     ("snicker",  "<giggles>"),
     ("snigger",  "<giggles>"),
+    ("titter",   "<giggles>"),
+    ("guffaw",   "<laughs>"),
+    ("snort",    "<laughs>"),
+    ("squeal",   "<laughs>"),
     ("laugh",    "<laughs>"),
     ("sigh",     "<sighs>"),
+    ("exhale",   "<sighs>"),
+    ("hum",      "<sighs>"),
+    ("breath",   "<sighs>"),
     ("gasp",     "<gasps>"),
     ("moan",     "<moans>"),
     ("groan",    "<groans>"),
@@ -156,6 +165,13 @@ _CUE_KEYWORDS = (
     ("scream",   "<screams>"),
     ("cry",      "<cries>"),
     ("sob",      "<cries>"),
+)
+
+# Pre-compiled word-boundary patterns. `\b` plus `\w*` so plurals
+# ("laughs"), gerunds ("laughing"), and past tense ("breathed") all hit.
+_CUE_PATTERNS = tuple(
+    (re.compile(rf"\b{re.escape(kw)}\w*", re.IGNORECASE), tok)
+    for kw, tok in _CUE_KEYWORDS
 )
 
 def _parentheticals_to_cues(pars_field):
@@ -173,19 +189,32 @@ def _parentheticals_to_cues(pars_field):
             return []
     out, seen = [], set()
     for desc in pars:
-        d = str(desc).lower()
-        for kw, tok in _CUE_KEYWORDS:
-            if kw in d:
+        d = str(desc)
+        for pat, tok in _CUE_PATTERNS:
+            if pat.search(d):
                 if tok not in seen:
                     out.append(tok)
                     seen.add(tok)
                 break
     return out
 
+# Strip parentheticals from text. Used on the text_original fallback path
+# so we never train the model to read parenthetical stage directions aloud.
+_PAREN_RE = re.compile(r"\([^)]*\)")
+def _strip_parentheticals(txt):
+    return _PAREN_RE.sub("", txt).strip() if txt else txt
+
 def _row_to_orpheus(example):
     """Re-inject Orpheus cue tokens into `text_clean` and decode `audio_bytes`."""
     import soundfile as sf
-    text = (example.get("text_clean") or example.get("text_original") or "").strip()
+    # Prefer text_clean (parentheticals already stripped by LAION). Only
+    # fall back to text_original when text_clean is null/empty, and strip
+    # parentheticals from that fallback so the model never trains on
+    # "(Light Laugh, a gentle sound that barely breaks the silence)" as
+    # literal text.
+    text = (example.get("text_clean") or "").strip()
+    if not text:
+        text = _strip_parentheticals(example.get("text_original") or "").strip()
     cues = _parentheticals_to_cues(example.get("parentheticals"))
     if cues:
         text = (" ".join(cues) + " " + text).strip()
@@ -464,7 +493,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 
 
 prompts = [
-    "Hey there my name is Jenny, <giggles> and I'm a speech generation model that can sound like a person.",
+    "Hey there my name is Shimmer, <giggles> and I'm a speech generation model that can sound like a person.",
 ]
 
 chosen_voice = None # None for single-speaker
