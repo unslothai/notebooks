@@ -104,7 +104,38 @@ model = FastLanguageModel.get_peft_model(
 
 
 from datasets import load_dataset
-dataset = load_dataset("MrDragonFox/Elise", split = "train")
+from huggingface_hub.utils import HfHubHTTPError
+
+# `MrDragonFox/Elise` was DMCA-disabled on the HF Hub (2026-04-24).
+# `BarryFutureman/elise_v2` is a public MIT-licensed mirror with the
+# same {audio, text} schema. Override with the ORPHEUS_DATASET env var
+# to point at any HF dataset that exposes `audio` and `text` columns.
+import os
+_user = os.environ.get("ORPHEUS_DATASET")
+DATASET_CANDIDATES = [_user] if _user else [
+    "BarryFutureman/elise_v2",  # primary (public, MIT, 1195 rows)
+    "MrDragonFox/Elise",        # legacy name; kept in case it is restored
+]
+
+dataset = None
+last_err = None
+for _name in DATASET_CANDIDATES:
+    try:
+        dataset = load_dataset(_name, split = "train")
+        print(f"Loaded dataset: {_name}")
+        break
+    except (FileNotFoundError, HfHubHTTPError, ValueError) as e:
+        last_err = e
+        print(f"Could not load {_name}: {type(e).__name__}: {e}")
+
+if dataset is None:
+    raise RuntimeError(
+        "Could not load any Elise-compatible dataset. The original "
+        "`MrDragonFox/Elise` was disabled on the Hugging Face Hub "
+        "(DMCA, 2026-04-24). Set ORPHEUS_DATASET to any HF dataset "
+        "that exposes `audio` and `text` columns (any sample rate; "
+        "the notebook resamples to 24 kHz for SNAC)."
+    ) from last_err
 
 
 # In[ ]:
