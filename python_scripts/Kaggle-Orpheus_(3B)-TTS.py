@@ -136,56 +136,73 @@ _LAION_SHARDS = [
 ]
 
 # Map LAION parenthetical description keywords -> Orpheus cue tokens.
-# Word-boundary regex matching (vs `kw in desc`) so "hum" does not match
-# "human" and "breath" matches "breath" and "breathes". Ordering matters
-# only for tie-breaking; the first matching keyword wins per parenthetical.
-_CUE_KEYWORDS = (
-    ("chortle",  "<laughs>"),
-    ("chuckle",  "<laughs>"),
-    ("cackle",   "<laughs>"),
-    ("giggle",   "<giggles>"),
-    ("snicker",  "<giggles>"),
-    ("snigger",  "<giggles>"),
-    ("titter",   "<giggles>"),
-    ("guffaw",   "<laughs>"),
-    ("snort",    "<laughs>"),
-    ("squeal",   "<laughs>"),
-    ("laugh",    "<laughs>"),
-    ("sigh",     "<sighs>"),
-    ("exhale",   "<sighs>"),
-    ("hum",      "<sighs>"),
-    ("breath",   "<sighs>"),
-    ("gasp",     "<gasps>"),
-    ("moan",     "<moans>"),
-    ("groan",    "<groans>"),
-    ("whisper",  "<whispers>"),
-    ("yawn",     "<yawns>"),
-    ("sniff",    "<sniffles>"),
-    ("sniffle",  "<sniffles>"),
-    ("cough",    "<coughs>"),
-    ("scream",   "<screams>"),
-    ("cry",      "<cries>"),
-    ("sob",      "<cries>"),
+_CUE_FORMS = (
+    # <gasps>: specific intake of breath, MUST come before generic
+    # <sighs> entries so "quiet gasp, a restrained intake of breath"
+    # picks <gasps>, not <sighs>.
+    (("gasp", "gasps", "gasped", "gasping"),
+     "<gasps>"),
+    # <whispers>: specific quiet voice; precedes <sighs>.
+    (("whisper", "whispers", "whispered", "whispering"),
+     "<whispers>"),
+    (("scream", "screams", "screamed", "screaming"),
+     "<screams>"),
+    (("cough", "coughs", "coughed", "coughing"),
+     "<coughs>"),
+    (("sniff", "sniffs", "sniffed", "sniffing",
+      "sniffle", "sniffles", "sniffled", "sniffling"),
+     "<sniffles>"),
+    (("yawn", "yawns", "yawned", "yawning"),
+     "<yawns>"),
+    (("groan", "groans", "groaned", "groaning"),
+     "<groans>"),
+    (("moan", "moans", "moaned", "moaning"),
+     "<moans>"),
+    (("cry", "cries", "cried", "crying",
+      "sob", "sobs", "sobbed", "sobbing"),
+     "<cries>"),
+    # <laughs>: full laughter forms incl. noun "laughter" and the
+    # drop-e past/gerund of cackle, chuckle etc.
+    (("laugh", "laughs", "laughed", "laughing", "laughter",
+      "chuckle", "chuckles", "chuckled", "chuckling",
+      "cackle", "cackles", "cackled", "cackling",
+      "chortle", "chortles", "chortled", "chortling",
+      "guffaw", "guffaws", "guffawed", "guffawing",
+      "snort", "snorts", "snorted", "snorting",
+      "squeal", "squeals", "squealed", "squealing"),
+     "<laughs>"),
+    (("giggle", "giggles", "giggled", "giggling",
+      "snicker", "snickers", "snickered", "snickering",
+      "snigger", "sniggers", "sniggered", "sniggering",
+      "titter", "titters", "tittered", "tittering"),
+     "<giggles>"),
+    # <sighs>: generic exhale / hum. LAST so specific cues win.
+    # Includes consonant-doubled "humming" / "hummed" inflections
+    # explicitly; a suffix-list regex misses them.
+    (("sigh", "sighs", "sighed", "sighing",
+      "exhale", "exhales", "exhaled", "exhaling",
+      "breath", "breaths", "breathe", "breathes", "breathed", "breathing",
+      "hum", "hums", "hummed", "humming", "hummer"),
+     "<sighs>"),
 )
-
-# Constrained-suffix patterns: `\bkw(s|es|ed|ing|er|ers|ly)?\b`. The
-# previous `\b{kw}\w*` form silently matched "human" from "hum",
-# "cryptic" from "cry", "sober" from "sob". Limiting to a fixed
-# verb/noun-suffix list keeps the desired plurals/gerunds
-# ("laughs", "laughing", "breathed") while rejecting unrelated
-# words that just happen to share a prefix.
-_CUE_PATTERNS = tuple(
-    (
-        re.compile(
-            rf"\b{re.escape(kw)}(?:s|es|ed|ing|er|ers|ly)?\b",
-            re.IGNORECASE,
-        ),
-        tok,
-    )
-    for kw, tok in _CUE_KEYWORDS
+_CUE_FORM_TO_TOKEN = {f.lower(): t for forms, t in _CUE_FORMS for f in forms}
+# Explicit \b(form1|form2|...)\b alternation. No \w* expansion, no
+# suffix-list expansion: previous round caught either false positives
+# (sober -> sob+er, human -> hum+an, cryptic -> cry+ptic) or false
+# negatives (laughter / humming / cackled silently skipped). Listing
+# inflected forms verbatim avoids both.
+_CUE_PATTERN = re.compile(
+    r"\b(" + "|".join(re.escape(f) for f in _CUE_FORM_TO_TOKEN) + r")\b",
+    re.IGNORECASE,
 )
 
 def _parentheticals_to_cues(pars_field):
+    """Map LAION natural-language descriptions onto Orpheus cue tokens.
+
+    Earliest-position match wins, so specific cues like <gasps> override
+    generic ones like <sighs> when both keyword stems appear in the
+    same description. Returns a de-duplicated list preserving order.
+    """
     if pars_field is None:
         return []
     if isinstance(pars_field, str):
@@ -201,34 +218,45 @@ def _parentheticals_to_cues(pars_field):
     out, seen = [], set()
     for desc in pars:
         d = str(desc)
-        for pat, tok in _CUE_PATTERNS:
-            if pat.search(d):
-                if tok not in seen:
-                    out.append(tok)
-                    seen.add(tok)
-                break
+        m = _CUE_PATTERN.search(d)
+        if m:
+            tok = _CUE_FORM_TO_TOKEN[m.group(1).lower()]
+            if tok not in seen:
+                out.append(tok)
+                seen.add(tok)
     return out
 
-# Strip parentheticals from text. Used on the text_original fallback path
-# so we never train the model to read parenthetical stage directions aloud.
+# Strip parentheticals (fallback path) and inline-replace them with cue
+# tokens at their original position (primary path). Inline replacement
+# preserves temporal alignment between the cue token and the SNAC codes
+# of the corresponding clip moment, instead of jamming every cue at the
+# start of the transcript.
 _PAREN_RE = re.compile(r"\([^)]*\)")
 def _strip_parentheticals(txt):
     return _PAREN_RE.sub("", txt).strip() if txt else txt
 
+def _inline_parens_to_cues(txt):
+    if not txt:
+        return txt
+    def _sub(m):
+        cues = _parentheticals_to_cues([m.group(0).strip("()")])
+        return " " + " ".join(cues) + " " if cues else " "
+    return _PAREN_RE.sub(_sub, txt).strip()
+
 def _row_to_orpheus(example):
-    """Re-inject Orpheus cue tokens into `text_clean` and decode `audio_bytes`."""
+    """Re-inject Orpheus cue tokens INLINE into the transcript and decode `audio_bytes`."""
     import soundfile as sf
-    # Prefer text_clean (parentheticals already stripped by LAION). Only
-    # fall back to text_original when text_clean is null/empty, and strip
-    # parentheticals from that fallback so the model never trains on
-    # "(Light Laugh, a gentle sound that barely breaks the silence)" as
-    # literal text.
-    text = (example.get("text_clean") or "").strip()
-    if not text:
-        text = _strip_parentheticals(example.get("text_original") or "").strip()
-    cues = _parentheticals_to_cues(example.get("parentheticals"))
-    if cues:
-        text = (" ".join(cues) + " " + text).strip()
+    # Prefer `text_original` so cue tokens land at the position where
+    # the audio actually performs the cue. Fall back to `text_clean`
+    # (cues prepended) when text_original is empty.
+    text_original = (example.get("text_original") or "").strip()
+    if text_original:
+        text = _inline_parens_to_cues(text_original)
+    else:
+        text = (example.get("text_clean") or "").strip()
+        cues = _parentheticals_to_cues(example.get("parentheticals"))
+        if cues:
+            text = (" ".join(cues) + " " + text).strip()
     raw = example.get("audio_bytes")
     if isinstance(raw, dict) and "bytes" in raw:
         raw = raw["bytes"]
@@ -274,7 +302,7 @@ for _name in DATASET_CANDIDATES:
         dataset = _load_laion_shimmer() if _name == "__laion_shimmer__" else _load_via_hf(_name)
         print(f"Loaded dataset: {_name} ({len(dataset)} rows)")
         break
-    except (FileNotFoundError, HfHubHTTPError, ValueError) as e:
+    except (FileNotFoundError, HfHubHTTPError, ValueError, OSError, ConnectionError) as e:
         last_err = e
         print(f"Could not load {_name}: {type(e).__name__}: {e}")
 
