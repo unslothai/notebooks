@@ -280,6 +280,42 @@ _SHELL_METACHARS: frozenset[str] = frozenset(
 )
 
 
+_RE_SUBPROCESS_USE = re.compile(r"\bsubprocess\.\w+\(")
+_RE_SUBPROCESS_IMPORT = re.compile(
+    r"^\s*(?:import\s+subprocess\b|from\s+subprocess\b)",
+    flags=re.MULTILINE,
+)
+
+
+def _ensure_subprocess_import(code: str) -> str:
+    """Prepend ``import subprocess`` when a cell uses it before importing it.
+
+    marimo's conversion of bang-shell magics emits ``subprocess.call([...])``
+    inline where the magic appeared.  If the source notebook's
+    ``import subprocess`` lived AFTER the magics (a common Colab pattern —
+    the install cell sets up imports last for sys.path / Path tweaks),
+    the converted cell calls ``subprocess`` before importing it and
+    raises ``NameError: name 'subprocess' is not defined`` at runtime.
+
+    Detect cells whose FIRST ``subprocess.<x>(`` use precedes their first
+    ``import subprocess`` (or where no import is present at all because
+    marimo dropped it during conversion).  In those cases, prepend an
+    explicit ``import subprocess`` so the call resolves.  Idempotent: a
+    cell that already imports subprocess before first use is left alone.
+    """
+    use_match = _RE_SUBPROCESS_USE.search(code)
+    if use_match is None:
+        return code
+    import_match = _RE_SUBPROCESS_IMPORT.search(code)
+    if import_match is not None and import_match.start() < use_match.start():
+        # Already imported before first use; nothing to do.
+        return code
+    # The cell body in marimo's serialised form has no surrounding ``def``
+    # (the @app.cell decoration is added at emit time), so we just prepend
+    # to the code string itself.
+    return "import subprocess\n" + code
+
+
 def _fix_shell_subprocess(code: str) -> str:
     """Convert broken ``subprocess.X([..., "|", ...])`` calls to ``shell=True``.
 
@@ -461,6 +497,174 @@ def _reinline_kwarg_comments(code: str, comments: dict[str, str]) -> str:
     return result
 
 
+def _strip_capture_magic(code: str) -> str:
+    """Remove a leading ``%%capture`` cell magic from a code cell.
+
+    marimo's IR converter bails out of ANY cell that starts with a
+    cell-magic it doesn't recognise (``%%capture``, ``%%bash``,
+    ``%%writefile`` etc.) — it emits the entire cell as a commented-out
+    "magic command not supported in marimo" block, which the molab
+    post-pass then drops as empty.  That loses every Python statement
+    after the bang-shell magics — for example the
+    ``working_directory = str(Path.cwd().parent.absolute() / "OpenEnv")``
+    line that downstream cells depend on in the OpenEnv RL notebooks.
+
+    Stripping ``%%capture`` lets marimo convert the cell normally:
+    ``!pip install`` lines become commented (deps go to PEP 723),
+    ``!git clone <url>`` becomes ``subprocess.call(["git", "clone", ...])``,
+    ``%cd <dir>`` becomes ``os.chdir(<dir>)``, and trailing Python
+    statements survive.  Any shell metachars left in the resulting
+    ``subprocess.call([...])`` argv (``>``, ``|``, etc.) are fixed up
+    by :func:`_fix_shell_subprocess` in the post-pass.
+
+    ``%%capture`` itself is purely an output-suppression hint that has
+    no marimo equivalent (marimo manages cell output natively), so
+    dropping it is semantics-preserving.
+    """
+    lines = code.splitlines(keepends=True)
+    if not lines:
+        return code
+    if re.match(r"^\s*%%capture\b", lines[0]):
+        # Drop the magic line and any blank line that immediately follows.
+        i = 1
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        return "".join(lines[i:])
+    return code
+
+
+class _GlobalAssignRewriter(ast.NodeTransformer):
+    """Rewrite in-function assignments to globally-declared names so the
+    LHS uses ``globals()['X'] = ...`` instead of ``X = ...``.
+
+    See :func:`_rewrite_function_globals` for the full rationale.
+    """
+
+    def __init__(self) -> None:
+        self.stack: list[set[str]] = []
+        self.changed = False
+
+    @staticmethod
+    def _subscript_for(name: str) -> ast.Subscript:
+        return ast.Subscript(
+            value=ast.Call(
+                func=ast.Name(id="globals", ctx=ast.Load()),
+                args=[],
+                keywords=[],
+            ),
+            slice=ast.Constant(value=name),
+            ctx=ast.Store(),
+        )
+
+    def _collect_globals(self, body: list[ast.stmt], out: set[str]) -> None:
+        """Walk ``body`` collecting ``global X`` names declared at THIS
+        function's scope (without descending into nested functions)."""
+        for stmt in body:
+            if isinstance(stmt, ast.Global):
+                out.update(stmt.names)
+            elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue  # nested function — owns its own scope
+            else:
+                for child in ast.iter_child_nodes(stmt):
+                    if isinstance(child, ast.stmt):
+                        self._collect_globals([child], out)
+                    elif hasattr(child, "body") and isinstance(getattr(child, "body", None), list):
+                        # Handle If/While/For/Try/With containers whose
+                        # nested ast.stmt children are inside `.body`/etc.
+                        for sub in child.body:
+                            if isinstance(sub, ast.stmt):
+                                self._collect_globals([sub], out)
+
+    def _enter(self, node: ast.AST) -> ast.AST:
+        active: set[str] = set()
+        self._collect_globals(node.body, active)
+        self.stack.append(active)
+        result = self.generic_visit(node)
+        self.stack.pop()
+        return result
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        return self._enter(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AST:
+        return self._enter(node)
+
+    def _rewrite_elt(self, elt: ast.expr, active: set[str]) -> ast.expr:
+        if isinstance(elt, ast.Name) and elt.id in active:
+            self.changed = True
+            return self._subscript_for(elt.id)
+        if isinstance(elt, ast.Tuple):
+            return ast.Tuple(
+                elts=[self._rewrite_elt(e, active) for e in elt.elts],
+                ctx=ast.Store(),
+            )
+        if isinstance(elt, ast.List):
+            return ast.List(
+                elts=[self._rewrite_elt(e, active) for e in elt.elts],
+                ctx=ast.Store(),
+            )
+        return elt
+
+    def visit_Assign(self, node: ast.Assign) -> ast.AST:
+        if self.stack and self.stack[-1]:
+            active = self.stack[-1]
+            node.targets = [self._rewrite_elt(t, active) for t in node.targets]
+        self.generic_visit(node)
+        return node
+
+
+def _rewrite_function_globals(code: str) -> str:
+    """Rewrite ``X, Y = expr`` inside ``def f(): global X, Y; ...`` to
+    ``globals()['X'], globals()['Y'] = expr``.
+
+    Why
+    ---
+    marimo's ``transform_duplicate_definitions`` walks each cell's AST
+    and renames any top-level ``Store`` of a name that's also defined
+    in another cell.  Its ``on_def`` callback (``marimo/_convert/ipynb/
+    to_ir.py:1205-1220``) checks ``block_stack[-1].global_names`` —
+    which, while the visitor is inside a ``FunctionDef``, contains the
+    names declared via ``global X``.  So an in-function ``port = ...``
+    gets misclassified as a module-level redefinition and renamed to
+    ``port_2``, and marimo then propagates ``port_2`` as a phantom cell
+    output.  The downstream cell's ``def _(..., port_2)`` parameter is
+    never satisfied at runtime, producing ``NameError: name 'port_2'
+    is not defined``.
+
+    Affected source: the OpenEnv 2048 GRPO notebooks (and any future
+    notebook that does ``def f(): global X; X = mutate(X)`` to
+    propagate state across cells, a common Jupyter idiom).
+
+    Fix
+    ---
+    Rewriting the assignment target from a ``Name`` (which marimo's
+    deduper recognises) to a ``Subscript`` (``globals()['X']`` — which
+    it doesn't) sidesteps the rename entirely.  Semantics are
+    preserved: ``globals()['X'] = expr`` writes to the module-level
+    ``X`` exactly like ``global X; X = expr`` does.  The original
+    ``global X`` declaration is left in place so right-hand-side reads
+    of ``X`` still resolve at compile time (technically redundant once
+    every LHS uses ``globals()[]``, but harmless and keeps the diff
+    narrow).
+
+    Nested functions are processed independently — each function only
+    knows about its OWN ``global`` declarations.
+
+    Safe to call on any code: returns input unchanged when no in-
+    function ``global X; X = ...`` pattern is present.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    rewriter = _GlobalAssignRewriter()
+    new_tree = rewriter.visit(tree)
+    if not rewriter.changed:
+        return code
+    ast.fix_missing_locations(new_tree)
+    return ast.unparse(new_tree)
+
+
 def _privatise_dead_demo_bindings(code: str) -> str:
     """Underscore-prefix names bound inside a top-level ``if False:`` body.
 
@@ -598,7 +802,9 @@ def _convert_bootstrap(nb_path: Path):
         if cell.get("cell_type") != "code":
             continue
         src = "".join(cell.get("source", []))
-        rewritten = _privatise_dead_demo_bindings(src)
+        rewritten = _strip_capture_magic(src)
+        rewritten = _rewrite_function_globals(rewritten)
+        rewritten = _privatise_dead_demo_bindings(rewritten)
         if rewritten != src:
             cell["source"] = rewritten.splitlines(keepends=True)
 
@@ -654,6 +860,7 @@ def _post_pass(ir, plan):
         code = _strip_google_colab_import(code)
         code = _fix_env_assignments(code)
         code = _fix_shell_subprocess(code)
+        code = _ensure_subprocess_import(code)
         add(code, hide=hide)
 
     return codes, names, configs

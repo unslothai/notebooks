@@ -2,17 +2,16 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
-#     "git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchao>=0.16.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 # ]
 #
@@ -84,6 +83,13 @@ def _(mo):
     return
 
 
+@app.cell
+def _():
+    # packages added via marimo's package management: git+https://github.com/unslothai/unsloth-zoo !uv pip install --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo
+    # packages added via marimo's package management: git+https://github.com/unslothai/unsloth !uv pip install --force-reinstall --no-deps git+https://github.com/unslothai/unsloth
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -145,17 +151,18 @@ def _(mo):
 def _(model, tokenizer):
     from transformers import TextStreamer
 
-    _messages = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages = [
+        {"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."},
+    ]
+    inputs = tokenizer.apply_chat_template(
+        messages,
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
         reasoning_effort="low",  # **NEW!** Set reasoning effort to low, medium or high
     ).to("cuda")
-    _ = model.generate(
-        **_inputs, max_new_tokens=512, streamer=TextStreamer(tokenizer)
-    )  # **NEW!** Set reasoning effort to low, medium or high
+
+    _ = model.generate(**inputs, max_new_tokens=512, streamer=TextStreamer(tokenizer))
     return (TextStreamer,)
 
 
@@ -169,15 +176,17 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model, tokenizer):
-    _messages = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages_1 = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
+    inputs_1 = tokenizer.apply_chat_template(
+        messages_1,
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
         reasoning_effort="medium",  # **NEW!** Set reasoning effort to low, medium or high
     ).to("cuda")
-    _ = model.generate(**_inputs, max_new_tokens=1024, streamer=TextStreamer(tokenizer))
+    _ = model.generate(
+        **inputs_1, max_new_tokens=1024, streamer=TextStreamer(tokenizer)
+    )  # **NEW!** Set reasoning effort to low, medium or high
     return
 
 
@@ -191,15 +200,17 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model, tokenizer):
-    _messages = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages_2 = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
+    inputs_2 = tokenizer.apply_chat_template(
+        messages_2,
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
         reasoning_effort="high",  # **NEW!** Set reasoning effort to low, medium or high
     ).to("cuda")
-    _ = model.generate(**_inputs, max_new_tokens=2048, streamer=TextStreamer(tokenizer))
+    _ = model.generate(
+        **inputs_2, max_new_tokens=2048, streamer=TextStreamer(tokenizer)
+    )  # **NEW!** Set reasoning effort to low, medium or high
     return
 
 

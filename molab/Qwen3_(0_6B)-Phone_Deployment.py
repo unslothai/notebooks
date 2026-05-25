@@ -5,21 +5,20 @@
 #     "bitsandbytes>=0.43.0",
 #     "datasets==4.3.0",
 #     "executorch==1.1.0",
-#     "git+https://github.com/huggingface/optimum-executorch.git@v0.1.0",
 #     "hf_transfer",
 #     "huggingface_hub>=0.34.0",
 #     "marimo",
+#     "optimum-executorch @ git+https://github.com/huggingface/optimum-executorch.git@v0.1.0",
 #     "optimum==1.24.0",
 #     "peft",
 #     "protobuf",
 #     "pytorch-tokenizers",
 #     "sentencepiece",
 #     "torchao==0.15.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.57.3",
 #     "triton>=3.2.0",
-#     "trl==0.25.1",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "trl==0.24.0",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -48,7 +47,7 @@ def _():
 def _():
     import subprocess
 
-    return (subprocess,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -457,10 +456,10 @@ def _(mo):
 
 
 @app.cell
-def _(subprocess):
-    # Convert the weight checkpoint state dict keys to one that ExecuTorch expects
-    #! python -m executorch.examples.models.qwen3.convert_weights "phone_model" pytorch_model_converted.bin
-    subprocess.call(
+def _():
+    import subprocess as _molab_subprocess
+
+    _molab_subprocess.call(
         [
             "python",
             "-m",
@@ -473,10 +472,10 @@ def _(subprocess):
 
 
 @app.cell
-def _(subprocess):
-    # Download model config from ExecuTorch repo
-    #! curl -L -o 0.6B_config.json https://raw.githubusercontent.com/pytorch/executorch/main/examples/models/qwen3/config/0_6b_config.json
-    subprocess.call(
+def _():
+    import subprocess as _molab_subprocess_2
+
+    _molab_subprocess_2.call(
         [
             "curl",
             "-L",
@@ -513,9 +512,10 @@ def _(mo):
 
 
 @app.cell
-def _(subprocess):
-    #! ls -l -h qwen3_0.6B_model.pte
-    subprocess.call(["ls", "-l", "-h", "qwen3_0.6B_model.pte"])
+def _():
+    import subprocess as _molab_subprocess_3
+
+    _molab_subprocess_3.call(["ls", "-l", "-h", "qwen3_0.6B_model.pte"])
     return
 
 

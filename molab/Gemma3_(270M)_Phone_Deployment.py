@@ -5,21 +5,20 @@
 #     "bitsandbytes>=0.43.0",
 #     "datasets==4.3.0",
 #     "executorch==1.1.0",
-#     "git+https://github.com/huggingface/optimum-executorch.git@v0.1.0",
 #     "hf_transfer",
 #     "huggingface_hub>=0.34.0",
 #     "marimo",
+#     "optimum-executorch @ git+https://github.com/huggingface/optimum-executorch.git@v0.1.0",
 #     "optimum==1.24.0",
 #     "peft",
 #     "protobuf",
 #     "pytorch-tokenizers",
 #     "sentencepiece",
 #     "torchao==0.15.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.57.3",
 #     "triton>=3.2.0",
-#     "trl==0.25.1",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "trl==0.24.0",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -48,7 +47,7 @@ def _():
 def _():
     import subprocess
 
-    return (subprocess,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -392,9 +391,10 @@ def _():
 
 
 @app.cell
-def _(subprocess):
-    #! python export_gemma_model.py
-    subprocess.call(["python", "export_gemma_model.py"])
+def _():
+    import subprocess as _molab_subprocess
+
+    _molab_subprocess.call(["python", "export_gemma_model.py"])
     return
 
 
@@ -407,9 +407,10 @@ def _(mo):
 
 
 @app.cell
-def _(subprocess):
-    #! ls -lh gemma_output/model.pte
-    subprocess.call(["ls", "-lh", "gemma_output/model.pte"])
+def _():
+    import subprocess as _molab_subprocess_2
+
+    _molab_subprocess_2.call(["ls", "-lh", "gemma_output/model.pte"])
     return
 
 
@@ -440,9 +441,10 @@ def _():
 
 
 @app.cell
-def _(subprocess):
-    #! python test_executorch.py
-    subprocess.call(["python", "test_executorch.py"])
+def _():
+    import subprocess as _molab_subprocess_3
+
+    _molab_subprocess_3.call(["python", "test_executorch.py"])
     return
 
 

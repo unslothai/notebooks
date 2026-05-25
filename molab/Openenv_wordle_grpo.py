@@ -3,7 +3,6 @@
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
 #     "fastapi",
-#     "git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "open_spiel",
 #     "openenv-core[core]>=0.2.1",
@@ -12,11 +11,11 @@
 #     "torch>=2.8.0",
 #     "torchvision",
 #     "trackio",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
-#     "trl==0.29.1",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
+#     "trl==0.24.0",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 #     "uvicorn",
 # ]
@@ -98,6 +97,29 @@ def _(mo):
     return
 
 
+@app.cell
+def _():
+    import subprocess
+
+    # packages added via marimo's package management: fastapi uvicorn requests open_spiel !pip install -qqq fastapi uvicorn requests open_spiel --prefer-binary
+    # packages added via marimo's package management: openenv-core[core]>=0.2.1 !pip install "openenv-core[core]>=0.2.1"
+    #! git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1
+    subprocess.call(
+        "git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1",
+        shell=True,
+    )
+    import os
+
+    os.chdir("OpenEnv")
+    import subprocess, sys, os
+    from pathlib import Path
+
+    sys.path.insert(0, "./envs")  # Add OpenEnv envs for textarena_env module
+    sys.path.insert(0, "./src")
+    working_directory = str(Path.cwd().absolute())
+    return (os,)
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -110,21 +132,20 @@ def _(mo):
 
 @app.cell
 def _():
-    import os
+    import os as _molab_os
     from unsloth import FastLanguageModel
     import torch
 
     max_seq_length = 4096  # Can increase for longer RL output
     lora_rank = 32  # Larger rank = smarter, but slower
     model, processor = FastLanguageModel.from_pretrained(
-        # model_name = "unsloth/gemma-3-1b-it",
         model_name="unsloth/Qwen3-4B",
         load_in_4bit=False,
         max_seq_length=max_seq_length,  # Can increase for longer RL output
         fast_inference=True,
     )
     tokenizer = getattr(processor, "tokenizer", processor)
-    return FastLanguageModel, lora_rank, model, os, tokenizer, torch
+    return FastLanguageModel, lora_rank, model, tokenizer, torch
 
 
 @app.cell(hide_code=True)
@@ -712,10 +733,10 @@ def _(mo):
 
 @app.cell
 def _():
-    import sys
+    import sys as _molab_sys
 
-    sys.stdout.fileno = lambda: 1
-    sys.stderr.fileno = lambda: 2
+    _molab_sys.stdout.fileno = lambda: 1
+    _molab_sys.stderr.fileno = lambda: 2
     return
 
 

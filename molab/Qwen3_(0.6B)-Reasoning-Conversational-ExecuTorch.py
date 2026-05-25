@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -368,18 +367,22 @@ def _(mo):
 
 @app.cell
 def _(model, tokenizer):
-    _messages = [{"role": "user", "content": "Solve (x + 2)^2 = 0."}]
-    _text = tokenizer.apply_chat_template(
-        _messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
+    messages = [{"role": "user", "content": "Solve (x + 2)^2 = 0."}]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,  # Must add for generation
+        enable_thinking=False,  # Disable thinking
     )
+
     from transformers import TextStreamer
 
     _ = model.generate(
-        **tokenizer(_text, return_tensors="pt").to("cuda"),
+        **tokenizer(text, return_tensors="pt").to("cuda"),
         max_new_tokens=256,  # Increase for longer outputs!
         temperature=0.7,  # For non thinking
         top_p=0.8,
-        top_k=20,
+        top_k=20,  # For non thinking
         streamer=TextStreamer(tokenizer, skip_prompt=True),
     )
     return (TextStreamer,)
@@ -387,12 +390,12 @@ def _(model, tokenizer):
 
 @app.cell
 def _(TextStreamer, model, tokenizer):
-    _messages = [{"role": "user", "content": "Solve (x + 2)^2 = 0."}]
-    _text = tokenizer.apply_chat_template(
-        _messages, tokenize=False, add_generation_prompt=True, enable_thinking=True
+    messages_1 = [{"role": "user", "content": "Solve (x + 2)^2 = 0."}]
+    text_1 = tokenizer.apply_chat_template(
+        messages_1, tokenize=False, add_generation_prompt=True, enable_thinking=True
     )
     _ = model.generate(
-        **tokenizer(_text, return_tensors="pt").to("cuda"),
+        **tokenizer(text_1, return_tensors="pt").to("cuda"),
         max_new_tokens=1024,  # Increase for longer outputs!
         temperature=0.6,  # For non thinking
         top_p=0.95,

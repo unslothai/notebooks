@@ -14,11 +14,10 @@
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torchao>=0.16.0",
 #     "torchcodec",
-#     "transformers>=4.56.0",
+#     "transformers==5.5.0",
 #     "triton>=3.2.0",
 #     "trl",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -89,6 +88,13 @@ def _(mo):
     return
 
 
+@app.cell
+def _():
+    # packages added via marimo's package management: timm !pip install --no-deps --upgrade timm
+    # For Gemma 4 vision/audio
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -141,12 +147,12 @@ def _(mo):
 @app.cell
 def _(model, tokenizer):
     from transformers import TextStreamer
-    # Helper function for inference
 
+    # Helper function for inference
     def do_gemma_4_inference(messages, max_new_tokens=128):
         _ = model.generate(
             **tokenizer.apply_chat_template(
-                _messages,
+                messages,
                 add_generation_prompt=True,  # Must add for generation
                 tokenize=True,
                 return_dict=True,
@@ -158,7 +164,7 @@ def _(model, tokenizer):
             top_p=0.95,
             top_k=64,
             streamer=TextStreamer(tokenizer, skip_prompt=True),
-        )  # Must add for generation
+        )
 
     return TextStreamer, do_gemma_4_inference
 
@@ -176,7 +182,8 @@ def _(mo):
 @app.cell
 def _(do_gemma_4_inference):
     sloth_link = "https://files.worldwildlife.org/wwfcmsprod/images/Sloth_Sitting_iStock_3_12_2014/story_full_width/8l7pbjmj29_iStock_000011145477Large_mini__1_.jpg"
-    _messages = [
+
+    messages = [
         {
             "role": "user",
             "content": [
@@ -186,7 +193,7 @@ def _(do_gemma_4_inference):
         }
     ]
     # You might have to wait 1 minute for Unsloth's auto compiler
-    do_gemma_4_inference(_messages, max_new_tokens=256)
+    do_gemma_4_inference(messages, max_new_tokens=256)
     return
 
 
@@ -200,13 +207,13 @@ def _(mo):
 
 @app.cell
 def _(do_gemma_4_inference):
-    _messages = [
+    messages_1 = [
         {
             "role": "user",
             "content": [{"type": "text", "text": "Write a poem about sloths."}],
         }
     ]
-    do_gemma_4_inference(_messages)
+    do_gemma_4_inference(messages_1)
     return
 
 
@@ -501,7 +508,7 @@ def _(mo):
 @app.cell
 def _(get_chat_template, model_1, tokenizer_1):
     tokenizer_2 = get_chat_template(tokenizer_1, chat_template="gemma-4-thinking")
-    _messages = [
+    messages_2 = [
         {
             "role": "user",
             "content": [
@@ -509,22 +516,24 @@ def _(get_chat_template, model_1, tokenizer_1):
             ],
         }
     ]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages,
+    inputs = tokenizer_2.apply_chat_template(
+        messages_2,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
         return_dict=True,
     ).to("cuda")
     outputs = model_1.generate(
-        **_inputs,
+        **inputs,
         max_new_tokens=64,  # Increase for longer outputs!
         use_cache=True,
         temperature=1.0,
         top_p=0.95,
         top_k=64,
     )
-    tokenizer_2.batch_decode(outputs)
+    tokenizer_2.batch_decode(
+        outputs
+    )
     return (tokenizer_2,)
 
 
@@ -538,18 +547,18 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, tokenizer_2):
-    _messages = [
+    messages_3 = [
         {"role": "user", "content": [{"type": "text", "text": "Why is the sky blue?"}]}
     ]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages,
+    inputs_1 = tokenizer_2.apply_chat_template(
+        messages_3,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
         return_dict=True,
     ).to("cuda")
     _ = model_1.generate(
-        **_inputs,
+        **inputs_1,
         max_new_tokens=64,  # Increase for longer outputs!
         use_cache=True,
         temperature=1.0,
@@ -595,18 +604,18 @@ def _(TextStreamer, model_1, tokenizer_2):
         _model, _tokenizer = _FastModel.from_pretrained(
             model_name="gemma_4_lora", max_seq_length=2048, load_in_4bit=True  # YOUR MODEL YOU USED FOR TRAINING
         )
-    _messages = [
+    messages_4 = [
         {"role": "user", "content": [{"type": "text", "text": "What is Gemma-4?"}]}
     ]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages,
+    inputs_2 = tokenizer_2.apply_chat_template(
+        messages_4,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
         return_dict=True,
     ).to("cuda")
     _ = model_1.generate(
-        **_inputs,
+        **inputs_2,
         max_new_tokens=128,  # Increase for longer outputs!
         temperature=1.0,
         top_p=0.95,

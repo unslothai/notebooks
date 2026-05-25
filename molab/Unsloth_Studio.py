@@ -29,6 +29,7 @@ def _():
 @app.cell
 def _():
     import subprocess
+    import subprocess
     # @title ↙️ Press ▶ to start 🦥 Unsloth Studio Chat for Llama-3.1 8b
 
     # Unsloth Studio

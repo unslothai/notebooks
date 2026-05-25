@@ -2,17 +2,16 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
-#     "git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchao>=0.16.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 # ]
 #
@@ -362,14 +361,15 @@ def _(mo):
 @app.cell
 def _(MinesweeperGame):
     # Create test game
-    _game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=42)
-    print(_game.pretty_print())
-    print(f"State: {_game.state()}")
-    _game.do_action({"type": "reveal", "row": 0, "col": 0})
+    game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=42)
+    print(game.pretty_print())
+    print(f"State: {game.state()}")
+
     # Test action
+    game.do_action({"type": "reveal", "row": 0, "col": 0})
     print("\nAfter revealing (0,0):")
-    print(_game.pretty_print())
-    print(f"State: {_game.state()}")
+    print(game.pretty_print())
+    print(f"State: {game.state()}")
     return
 
 
@@ -414,15 +414,15 @@ def _(MinesweeperGame):
     def format_state_for_llm(game: MinesweeperGame) -> str:
         """Convert game state to JSON prompt for LLM"""
         state = {
-            "board": _game.get_visible_board(),
-            "rows": _game.rows,
-            "cols": _game.cols,
-            "mines": _game.num_mines,
-            "flags_placed": len(_game._flagged),
-            "cells_revealed": len(_game._revealed),
+            "board": game.get_visible_board(),
+            "rows": game.rows,
+            "cols": game.cols,
+            "mines": game.num_mines,
+            "flags_placed": len(game._flagged),
+            "cells_revealed": len(game._revealed),
         }
-        _prompt = f'You are playing Minesweeper. Analyze the game state and output your next move.\n\nGame state:\n{json.dumps(state, indent=2)}\n\nLegend:\n- "." = unrevealed cell\n- "F" = flagged cell (suspected mine)\n- "0"-"8" = number of adjacent mines\n- "*" = revealed mine (game over)\n\nOutput your next action as JSON:\n{{"type": "reveal", "row": <row_index>, "col": <col_index>}}\nor\n{{"type": "flag", "row": <row_index>, "col": <col_index>}}\n\nYour action:'
-        return _prompt
+        prompt = f'You are playing Minesweeper. Analyze the game state and output your next move.\n\nGame state:\n{json.dumps(state, indent=2)}\n\nLegend:\n- "." = unrevealed cell\n- "F" = flagged cell (suspected mine)\n- "0"-"8" = number of adjacent mines\n- "*" = revealed mine (game over)\n\nOutput your next action as JSON:\n{{"type": "reveal", "row": <row_index>, "col": <col_index>}}\nor\n{{"type": "flag", "row": <row_index>, "col": <col_index>}}\n\nYour action:'
+        return prompt
 
     def parse_llm_action(response: str) -> dict:
         """Extract JSON action from LLM response.
@@ -449,10 +449,10 @@ def _(MinesweeperGame):
                 continue
         return best
 
-    _game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=42)
-    _prompt = format_state_for_llm(_game)
+    game_1 = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=42)
+    prompt = format_state_for_llm(game_1)
     # Test formatting
-    print(_prompt[:500] + "...")
+    print(prompt[:500] + "...")
     return format_state_for_llm, json, parse_llm_action
 
 
@@ -470,15 +470,15 @@ def _(mo):
 def _(MinesweeperGame, format_state_for_llm, model_1, tokenizer):
     from transformers import TextStreamer
 
-    _game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=42)
-    _prompt = format_state_for_llm(_game)
+    game_2 = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=42)
+    prompt_1 = format_state_for_llm(game_2)
     text = tokenizer.apply_chat_template(
-        [{"role": "user", "content": _prompt}],
+        [{"role": "user", "content": prompt_1}],
         tokenize=False,
         add_generation_prompt=True,
     )
     print("=== Base Model Response ===")
-    _output = model_1.generate(
+    output = model_1.generate(
         **tokenizer(text, return_tensors="pt").to("cuda"),
         temperature=1.0,
         max_new_tokens=128,
@@ -514,30 +514,32 @@ def _(MinesweeperGame, json, parse_llm_action):
                 if dr == 0 and dc == 0:
                     continue
                 nr, nc = (row + dr, col + dc)
-                if not (0 <= nr < _game.rows and 0 <= nc < _game.cols):
+                if not (0 <= nr < game.rows and 0 <= nc < game.cols):
                     continue
-                if (nr, nc) not in _game._revealed:
+                if (nr, nc) not in game._revealed:
                     continue
-                number = _game._board[nr][nc]
+                number = game._board[nr][nc]
                 if number <= 0:
                     continue
                 flagged_neighbors = 0
-                for dr2 in [-1, 0, 1]:
+                for dr2 in [-1, 0, 1]:  # Count flagged neighbors of the numbered cell
                     for dc2 in [-1, 0, 1]:
                         if dr2 == 0 and dc2 == 0:
                             continue
                         nnr, nnc = (nr + dr2, nc + dc2)
                         if (
-                            0 <= nnr < _game.rows
-                            and 0 <= nnc < _game.cols
-                            and ((nnr, nnc) in _game._flagged)
+                            0 <= nnr < game.rows
+                            and 0 <= nnc < game.cols
+                            and ((nnr, nnc) in game._flagged)
                         ):
                             flagged_neighbors = flagged_neighbors + 1
                 if flagged_neighbors == number:
                     return True
         return False
 
-    def valid_json_reward(completions, **kwargs):
+    def valid_json_reward(
+        completions, **kwargs
+    ):  # All mines accounted for → (row, col) is provably safe
         """Reward valid JSON action format"""
         scores = []
         for completion in completions:
@@ -549,7 +551,7 @@ def _(MinesweeperGame, json, parse_llm_action):
                 scores.append(1.0)
         return scores
 
-    def gameplay_reward(completions, **kwargs):
+    def gameplay_reward(completions, **kwargs):  # Invalid format
         """
         Clean reward function based on defined criteria.  # Valid format
 
@@ -575,81 +577,97 @@ def _(MinesweeperGame, json, parse_llm_action):
             if action is None:
                 scores.append(-10.0)
                 continue
-            if idx < len(seeds) and idx < len(move_histories):
+            if idx < len(seeds) and idx < len(
+                move_histories
+            ):  # Get game state info passed from dataset
                 seed = seeds[idx]
                 move_history_raw = move_histories[idx]
                 if isinstance(move_history_raw, str):
                     move_history = json.loads(move_history_raw)  # backward compat
                 else:
                     move_history = move_history_raw  # backward compat
-                _game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=seed)
-                for prev_action in move_history:
-                    _game.do_action(prev_action)
-                board = _game.get_visible_board()
+                game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=seed)
+                for prev_action in move_history:  # Criterion 9: Invalid JSON
+                    game.do_action(prev_action)
+                board = game.get_visible_board()
                 row, col = (action["row"], action["col"])
                 action_type = action["type"]
-                if not (0 <= row < _game.rows and 0 <= col < _game.cols):
+                if not (
+                    0 <= row < game.rows and 0 <= col < game.cols
+                ):  # Reconstruct EXACT game state
                     scores.append(-15.0)
                     continue
-                is_mine = _game._board[row][col] == -1  # Ground truth (hidden from LLM)
-                is_revealed = (row, col) in _game._revealed
-                is_flagged = (row, col) in _game._flagged
-                if action_type == "flag":
+                is_mine = game._board[row][col] == -1  # Ground truth (hidden from LLM)
+                is_revealed = (row, col) in game._revealed
+                is_flagged = (
+                    (row, col) in game._flagged
+                )
+                if (
+                    action_type == "flag"
+                ):  # to avoid HF Dataset schema inference mangling list-of-dicts.
                     if is_revealed:
                         scores.append(-12.0)
                         continue
-                    if is_flagged:
+                    if is_flagged:  # backward compat
                         scores.append(-8.0)
-                        continue
-                    current_flag_count = len(_game._flagged)
-                    if current_flag_count >= _game.num_mines:
+                        continue  # Reconstruct game to exact state from prompt
+                    current_flag_count = len(game._flagged)
+                    if current_flag_count >= game.num_mines:
                         scores.append(-10.0)
                         continue
                     if is_mine:
                         scores.append(15.0)
                     else:
                         scores.append(-10.0)
-                    continue
+                    continue  # Criterion 7: Out of bounds
                 elif action_type == "reveal":
                     if is_revealed:
                         scores.append(-12.0)
                         continue
-                    if is_flagged:
-                        scores.append(-8.0)
+                    if is_flagged:  # Get ground truth and current state
+                        scores.append(-8.0)  # Ground truth (hidden from LLM)
                         continue
-                    _game.do_action(action)
-                    if _game.state() == "success":
-                        scores.append(100.0)
+                    game.do_action(action)
+                    if game.state() == "success":
+                        scores.append(100.0)  # --- FLAG ACTION ---
                         continue
-                    if _game.state() == "failed":
+                    if (
+                        game.state() == "failed"
+                    ):  # Criterion 6: Can't flag already revealed cells
                         scores.append(-25.0)
                         continue
-                    if _is_logically_safe(_game, row, col):
+                    if _is_logically_safe(game, row, col):
                         scores.append(15.0)
-                    else:
+                    else:  # Criterion 5: Flag already flagged cell
                         scores.append(10.0)
                     continue
                 else:
                     scores.append(-10.0)
-            else:
+            else:  # Criterion 8: Check if exceeding mine count
                 scores.append(0.0)
         return scores
 
     print("Reward function created!")
     print("")
     print("Rewards:")
-    print("  +100: Win game (revealed all safe cells)")
+    print(
+        "  +100: Win game (revealed all safe cells)"
+    )  # Criterion 1 & 2: Check if flagged cell is actually a mine
     print("  +15: Flag actual mine / logically deducible safe reveal")
-    print("  +10: Reveal safe cell (uncertain/random)")
+    print("  +10: Reveal safe cell (uncertain/random)")  # Correct flag!
     print("  +1:  Valid JSON format")
-    print("")
+    print("")  # Wrong flag
     print("Penalties:")
     print("  -25: Reveal mine (game over)")
-    print("  -15: Out of bounds")
+    print("  -15: Out of bounds")  # --- REVEAL ACTION ---
     print("  -12: Reveal already revealed cell")
-    print("  -10: Flag non-mine, exceed mine count, invalid JSON")
+    print(
+        "  -10: Flag non-mine, exceed mine count, invalid JSON"
+    )  # Criterion 6: Reveal already revealed cell
     print("  -8:  Flag already flagged / reveal flagged cell")
-    print("  -5:  Invalid JSON format")
+    print(
+        "  -5:  Invalid JSON format"
+    )
     return gameplay_reward, np, valid_json_reward
 
 
@@ -686,34 +704,34 @@ def _(MinesweeperGame, format_state_for_llm, json, np, random):
             rng_seed: Seed for numpy/random RNG for reproducibility (Issue #10).
         """
         np.random.seed(rng_seed)
-        random.seed(rng_seed)
+        random.seed(rng_seed)  # Seed RNG for reproducibility across runs
         dataset_items = []
         attempts = 0
         max_attempts = num_samples * 3  # Safety limit
         while len(dataset_items) < num_samples and attempts < max_attempts:
             attempts = attempts + 1
-            seed = np.random.randint(100000)
-            _game = MinesweeperGame(
-                rows=rows, cols=cols, num_mines=num_mines, seed=seed
-            )
+            seed = np.random.randint(100000)  # Safety limit
+            game = MinesweeperGame(rows=rows, cols=cols, num_mines=num_mines, seed=seed)
             num_moves = np.random.randint(0, 6)
             move_history = []  # backward compat
             for _ in range(num_moves):
-                board = _game.get_visible_board()
+                board = game.get_visible_board()
                 unrevealed = []
-                for r in range(rows):
+                for r in range(
+                    rows
+                ):  # Make 0-5 random moves (0 = fresh game, 1-5 = mid-game)
                     for c in range(cols):
                         if board[r][c] == ".":
                             unrevealed.append((r, c))
-                if unrevealed and _game.state() == "ongoing":
+                if unrevealed and game.state() == "ongoing":
                     r, c = random.choice(unrevealed)
                     action = {"type": "reveal", "row": r, "col": c}
-                    _game.do_action(action)
+                    game.do_action(action)
                     move_history.append(action)
                 else:
                     break
-            if _game.state() == "ongoing":
-                prompt_text = format_state_for_llm(_game)
+            if game.state() == "ongoing":
+                prompt_text = format_state_for_llm(game)
                 dataset_items.append(
                     {
                         "prompt": [{"role": "user", "content": prompt_text}],
@@ -730,7 +748,7 @@ def _(MinesweeperGame, format_state_for_llm, json, np, random):
     print(f"  Fresh games: {fresh_count} ({fresh_count / len(dataset) * 100:.1f}%)")
     print(
         f"  Mid-game states: {len(dataset) - fresh_count} ({(len(dataset) - fresh_count) / len(dataset) * 100:.1f}%)"
-    )
+    )  # Only add ongoing games (skip failed/completed games)
     print("\nExample training prompt:")
     print(dataset[0]["prompt"][0]["content"][:400] + "...")
     print(
@@ -761,7 +779,7 @@ def _(lora_rank, max_seq_length):
     training_args = GRPOConfig(
         temperature=1.0,
         learning_rate=5e-5,
-        weight_decay=0.01,
+        weight_decay=0.001,
         warmup_ratio=0.1,
         lr_scheduler_type="linear",
         optim="adamw_8bit",
@@ -808,30 +826,30 @@ def _(MinesweeperGame, format_state_for_llm, parse_llm_action):
                 return
             was_training = model.training
             model.eval()
-            wins = 0
+            wins = 0  # Temporarily set model to eval mode
             for i in range(self.num_games):
-                _game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=10000 + i)
+                game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=10000 + i)
                 moves = 0
-                while _game.state() == "ongoing" and moves < 50:
-                    _prompt = format_state_for_llm(_game)
+                while game.state() == "ongoing" and moves < 50:
+                    prompt = format_state_for_llm(game)
                     text = tokenizer.apply_chat_template(
-                        [{"role": "user", "content": _prompt}],
+                        [{"role": "user", "content": prompt}],
                         tokenize=False,
                         add_generation_prompt=True,
                     )
-                    _output = model.generate(
+                    output = model.generate(
                         **tokenizer(text, return_tensors="pt").to(model.device),
                         temperature=0.7,
                         max_new_tokens=128,
                         do_sample=True,
                     )
-                    response = tokenizer.decode(_output[0], skip_special_tokens=True)
+                    response = tokenizer.decode(output[0], skip_special_tokens=True)
                     action = parse_llm_action(response)
                     if action is None:
                         break
-                    _game.do_action(action)
+                    game.do_action(action)
                     moves = moves + 1
-                if _game.state() == "success":
+                if game.state() == "success":
                     wins = wins + 1
             win_rate = wins / self.num_games
             print(
@@ -898,6 +916,7 @@ def _(
     parse_llm_action,
     tokenizer,
 ):
+    # Test on new game
     test_game = MinesweeperGame(rows=6, cols=6, num_mines=5, seed=999)
     test_prompt = format_state_for_llm(test_game)
     test_text = tokenizer.apply_chat_template(
@@ -906,18 +925,19 @@ def _(
         add_generation_prompt=True,
     )
     print("=== Trained Model Response ===")
-    _output = model_1.generate(
+    output_1 = model_1.generate(
         **tokenizer(test_text, return_tensors="pt").to("cuda"),
         temperature=0.7,
         max_new_tokens=128,
         streamer=TextStreamer(tokenizer, skip_prompt=True),
     )
-    response_text = tokenizer.decode(_output[0])
+    response_text = tokenizer.decode(output_1[0])
     action = parse_llm_action(response_text)
     print(f"\nParsed action: {action}")
     if action:
         test_game.do_action(action)
         print(f"\nGame state after action: {test_game.state()}")
+        # Parse and test action
         print(test_game.pretty_print())
     return
 
@@ -944,47 +964,52 @@ def _(
         model, tokenizer, rows=6, cols=6, num_mines=5, seed=None, max_moves=50
     ):
         """Play a complete Minesweeper game with the model"""
-        _game = MinesweeperGame(rows=rows, cols=cols, num_mines=num_mines, seed=seed)
+        game = MinesweeperGame(rows=rows, cols=cols, num_mines=num_mines, seed=seed)
         moves = 0
-        while _game.state() == "ongoing" and moves < max_moves:
-            _prompt = format_state_for_llm(_game)
+        while game.state() == "ongoing" and moves < max_moves:
+            prompt = format_state_for_llm(game)
             text = tokenizer.apply_chat_template(
-                [{"role": "user", "content": _prompt}],
+                [{"role": "user", "content": prompt}],
                 tokenize=False,
                 add_generation_prompt=True,
-            )
-            _output = model.generate(
+            )  # Get current state
+            output = model.generate(
                 **tokenizer(text, return_tensors="pt").to("cuda"),
                 temperature=0.7,
                 max_new_tokens=128,
                 do_sample=True,
             )
-            response = tokenizer.decode(_output[0])
+            response = tokenizer.decode(
+                output[0]
+            )  # Removed reasoning_effort = "low" for train/eval consistency
             action = parse_llm_action(response)
             if action is None:
                 break
-            _game.do_action(action)
+            game.do_action(action)
             moves = moves + 1
-        return (_game, moves)
+        return (game, moves)
 
-    NUM_EVAL_GAMES = 100
+    NUM_EVAL_GAMES = 100  # Generate action
     print(f"Evaluating model on {NUM_EVAL_GAMES} games...\n")
     wins = 0
     total_moves = 0
     for i in range(NUM_EVAL_GAMES):
-        _game, moves = play_full_game(model_1, tokenizer, seed=i)
-        result = _game.state()
+        game_3, moves = play_full_game(model_1, tokenizer, seed=i)
+        result = game_3.state()
         if result == "success":
             wins = wins + 1
         if i < 10 or result == "success":
             tag = "WIN" if result == "success" else "LOSS"
             print(f"Game {i + 1}: {tag} ({result}) after {moves} moves")
-        total_moves = total_moves + moves
+        total_moves = total_moves + moves  # Invalid action
     if NUM_EVAL_GAMES > 10:
         print(f"... (showing first 10 + wins; {NUM_EVAL_GAMES} total)")
     print(f"\nResults:")
     print(f"  Win rate: {wins}/{NUM_EVAL_GAMES} ({wins / NUM_EVAL_GAMES * 100:.1f}%)")
-    print(f"  Average moves: {total_moves / NUM_EVAL_GAMES:.1f}")
+    # Evaluate on 100 games for statistically meaningful win rates
+    print(
+        f"  Average moves: {total_moves / NUM_EVAL_GAMES:.1f}"
+    )  # Only print individual results for first 10 + any wins
     return
 
 

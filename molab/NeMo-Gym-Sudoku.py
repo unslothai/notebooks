@@ -3,8 +3,7 @@
 # dependencies = [
 #     "marimo",
 #     "omegaconf",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]

@@ -2,17 +2,16 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
-#     "git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "timm",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers>=5.5.0",
 #     "triton>=3.2.0",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl>=0.28.0",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 # ]
 #
@@ -75,6 +74,13 @@ def _(mo):
     # Installation
     We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Gemma 4. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster.
     """)
+    return
+
+
+@app.cell
+def _():
+    # packages added via marimo's package management: timm !pip install --no-deps --upgrade timm
+    # For Gemma 4 vision/audio
     return
 
 
@@ -486,11 +492,19 @@ def _(mo):
 def _():
     from unsloth import check_python_modules, create_locked_down_function
 
-    _sample = "\ndef strategy(board, initial):\n    for r in range(9):\n        for c in range(9):\n            if board[r][c] == 0:\n                return (r, c, 1)\n    return (0, 0, 1)\n"
     # Test safe code
-    _ok, _info = check_python_modules(_sample)
-    print("Safe Python code?", _ok)
-    print(_info)
+    sample = """
+    def strategy(board, initial):
+        for r in range(9):
+            for c in range(9):
+                if board[r][c] == 0:
+                    return (r, c, 1)
+        return (0, 0, 1)
+    """
+
+    ok, info = check_python_modules(sample)
+    print("Safe Python code?", ok)
+    print(info)
     return check_python_modules, create_locked_down_function
 
 
@@ -504,10 +518,10 @@ def _(mo):
 
 @app.cell
 def _(check_python_modules):
-    _sample = "\ndef strategy(board, initial):\n    import numpy as np\n    return (0, 0, 1)\n"
-    _ok, _info = check_python_modules(_sample)
-    print("Safe Python code?", _ok)
-    print(_info)
+    sample_1 = "\ndef strategy(board, initial):\n    import numpy as np\n    return (0, 0, 1)\n"
+    ok_1, info_1 = check_python_modules(sample_1)
+    print("Safe Python code?", ok_1)
+    print(info_1)
     return
 
 
@@ -559,7 +573,7 @@ def _(mo):
 
 @app.cell
 def _(model_1, prompt, tokenizer):
-    _text = tokenizer.apply_chat_template(
+    text = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt.strip()}],
         tokenize=False,
         add_generation_prompt=True,
@@ -569,7 +583,7 @@ def _(model_1, prompt, tokenizer):
     print("=" * 50)
     print("BASE MODEL OUTPUT (before RL training):")
     print("=" * 50)
-    inputs = tokenizer(text=_text, add_special_tokens=False, return_tensors="pt").to(
+    inputs = tokenizer(text=text, add_special_tokens=False, return_tensors="pt").to(
         "cuda"
     )
     text_streamer = TextStreamer(tokenizer, skip_prompt=True)
@@ -604,10 +618,10 @@ def _(mo):
 @app.function
 def extract_function(text):
     """Extract Python function from markdown code blocks."""
-    if _text.count("```") >= 2:
-        first = _text.find("```") + 3
-        second = _text.find("```", first)
-        fx = _text[first:second].strip()
+    if text.count("```") >= 2:
+        first = text.find("```") + 3
+        second = text.find("```", first)
+        fx = text[first:second].strip()
         fx = fx.removeprefix("python\n")
         fx = fx[fx.find("def") :]
         if fx.startswith("def strategy(board, initial):"):
@@ -634,18 +648,21 @@ def _(check_python_modules, create_locked_down_function):
             score = 0  # Invalid function
             response = completion[0]["content"]
             function = extract_function(response)
+
             if function is not None:
-                _ok, _info = check_python_modules(function)
-            if function is None or "error" in _info:
+                ok, info = check_python_modules(function)
+
+            if function is None or "error" in info:
                 score = -2.0  # Invalid function
             else:
-                try:  # Invalid function
+                try:
                     new_strategy = create_locked_down_function(function)
-                    score = 1.0  # Invalid function
+                    score = 1.0  # Valid function
                 except:
-                    score = -1.0  # Valid function
+                    score = -1.0  # Function has errors
+
             scores.append(score)
-        return scores  # Function has errors
+        return scores
 
     return (function_works,)
 
@@ -668,12 +685,14 @@ def _(check_python_modules):
         for completion in completions:
             response = completion[0]["content"]
             function = extract_function(response)
+
             if function is not None:
-                _ok, _info = check_python_modules(function)
-                scores.append(1.0 if _ok else -20.0)
-            else:  # Heavy penalty for cheating
-                scores.append(-1.0)
-        return scores  # Failed to create function
+                ok, info = check_python_modules(function)
+                scores.append(1.0 if ok else -20.0)  # Heavy penalty for cheating
+            else:
+                scores.append(-1.0)  # Failed to create function
+
+        return scores
 
     return (no_cheating,)
 
@@ -717,8 +736,8 @@ def _(
                 print("=" * 60)
             PRINTER = PRINTER + 1
             if function is not None:
-                _ok, _info = check_python_modules(function)
-            if function is None or "error" in _info:
+                ok, info = check_python_modules(function)
+            if function is None or "error" in info:
                 scores.append(0)
                 continue
             try:
@@ -749,8 +768,8 @@ def _(
                 scores.append(-1.0)
             except Exception as e:
                 print(f"Exception: {str(e)[:100]}")
-                scores.append(-3.0)
-        return scores
+                scores.append(-3.0)  # Solved the puzzle!
+        return scores  # Reward based on valid moves made before failure  # Each valid move is worth 0.2 points  # Failed immediately with no valid moves
 
     return PRINTER, strategy_succeeds
 
@@ -945,13 +964,13 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, prompt, tokenizer):
-    _text = tokenizer.apply_chat_template(
+    text_1 = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt.strip()}],
         tokenize=False,
         add_generation_prompt=True,
     )
     _ = model_1.generate(
-        **tokenizer(images=None, text=_text, return_tensors="pt").to("cuda"),
+        **tokenizer(images=None, text=text_1, return_tensors="pt").to("cuda"),
         temperature=1.0,
         max_new_tokens=512,
         streamer=TextStreamer(tokenizer, skip_prompt=False),

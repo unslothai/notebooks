@@ -12,11 +12,10 @@
 #     "sentencepiece",
 #     "torchao>=0.16.0",
 #     "torchcodec",
-#     "transformers>=4.56.0",
+#     "transformers==4.52.3",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -159,6 +158,7 @@ def _(mo):
 
 @app.cell
 def _(torch):
+    # @title Dataset Prep functions
     from datasets import load_dataset, Audio, Dataset
     import os
     from transformers import AutoProcessor
@@ -167,6 +167,7 @@ def _(torch):
     raw_ds = load_dataset("MrDragonFox/Elise", split="train")
     speaker_key = "source"
     if "source" not in raw_ds.column_names and "speaker_id" not in raw_ds.column_names:
+        # Getting the speaker id is important for multi-speaker models and speaker consistency
         print(
             'Unsloth: No speaker found, adding default "source" of 0 for all examples'
         )
@@ -178,7 +179,7 @@ def _(torch):
     raw_ds = raw_ds.cast_column("audio", Audio(sampling_rate=target_sampling_rate))
 
     def preprocess_example(example):
-        _conversation = [
+        conversation = [
             {
                 "role": str(example[speaker_key]),
                 "content": [
@@ -189,7 +190,7 @@ def _(torch):
         ]
         try:
             model_inputs = processor_1.apply_chat_template(
-                _conversation,
+                conversation,
                 tokenize=True,
                 return_dict=True,
                 output_labels=True,
@@ -335,35 +336,40 @@ def _(Audio, model_1, processor_1, torch):
     from IPython.display import display
     import soundfile as sf
 
-    _text = (
+    text = (
         "We just finished fine tuning a text to speech model... and it's pretty good!"
     )
-    _speaker_id = 0
-    _inputs = processor_1(f"[{_speaker_id}]{_text}", add_special_tokens=True).to("cuda")
-    _audio_values = model_1.generate(**_inputs, max_new_tokens=125, output_audio=True)
-    _audio = _audio_values[0].to(torch.float32).cpu().numpy()
-    sf.write("example_without_context.wav", _audio, 24000)
-    display(Audio(_audio, rate=24000))
+    speaker_id = 0
+    inputs = processor_1(f"[{speaker_id}]{text}", add_special_tokens=True).to("cuda")
+    audio_values = model_1.generate(**inputs, max_new_tokens=125, output_audio=True)
+    audio = audio_values[0].to(torch.float32).cpu().numpy()
+    sf.write("example_without_context.wav", audio, 24000)
+    display(
+        Audio(audio, rate=24000)
+    )#########################################################
     return display, sf
 
 
 @app.cell
 def _(Audio, display, model_1, processor_1, sf, torch):
-    _text = "Sesame is a super cool TTS model which can be fine tuned with Unsloth."
-    _speaker_id = 0
-    _conversation = [
-        {"role": str(_speaker_id), "content": [{"type": "text", "text": _text}]}
+    text_1 = "Sesame is a super cool TTS model which can be fine tuned with Unsloth."
+    speaker_id_1 = 0
+    conversation = [
+        {"role": str(speaker_id_1), "content": [{"type": "text", "text": text_1}]}
     ]
-    _audio_values = model_1.generate(
+    # Another equivalent way to prepare the inputs
+    audio_values_1 = model_1.generate(
         **processor_1.apply_chat_template(
-            _conversation, tokenize=True, return_dict=True
+            conversation, tokenize=True, return_dict=True
         ).to("cuda"),
         max_new_tokens=125,  # 125 tokens is 10 seconds of audio, for longer speech increase this
         output_audio=True,
     )
-    _audio = _audio_values[0].to(torch.float32).cpu().numpy()
-    sf.write("example_without_context.wav", _audio, 24000)
-    display(Audio(_audio, rate=24000))
+    audio_1 = audio_values_1[0].to(torch.float32).cpu().numpy()
+    sf.write("example_without_context.wav", audio_1, 24000)
+    display(
+        Audio(audio_1, rate=24000)
+    )#########################################################
     return
 
 
@@ -379,29 +385,31 @@ def _(mo):
 
 @app.cell
 def _(Audio, display, model_1, processor_1, raw_ds, sf, torch):
-    _speaker_id = 0
+    speaker_id_2 = 0
     utterance = raw_ds[3]["audio"]["array"]
     utterance_text = raw_ds[3]["text"]
-    _text = "Sesame is a super cool TTS model which can be fine tuned with Unsloth."
-    _conversation = [
+    text_2 = "Sesame is a super cool TTS model which can be fine tuned with Unsloth."
+    conversation_1 = [
         {
-            "role": str(_speaker_id),
+            "role": str(speaker_id_2),
             "content": [
                 {"type": "text", "text": utterance_text},
                 {"type": "audio", "path": utterance},
             ],
         },
-        {"role": str(_speaker_id), "content": [{"type": "text", "text": _text}]},
+        {"role": str(speaker_id_2), "content": [{"type": "text", "text": text_2}]},
     ]
-    _inputs = processor_1.apply_chat_template(
-        _conversation, tokenize=True, return_dict=True
+    inputs_1 = processor_1.apply_chat_template(
+        conversation_1, tokenize=True, return_dict=True
     )
-    _audio_values = model_1.generate(
-        **_inputs.to("cuda"), max_new_tokens=125, output_audio=True
+    audio_values_2 = model_1.generate(
+        **inputs_1.to("cuda"), max_new_tokens=125, output_audio=True
     )
-    _audio = _audio_values[0].to(torch.float32).cpu().numpy()
-    sf.write("example_with_context.wav", _audio, 24000)
-    display(Audio(_audio, rate=24000))
+    audio_2 = audio_values_2[0].to(torch.float32).cpu().numpy()
+    sf.write("example_with_context.wav", audio_2, 24000)
+    display(
+        Audio(audio_2, rate=24000)
+    )#########################################################
     return
 
 

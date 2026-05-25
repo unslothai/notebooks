@@ -12,11 +12,10 @@
 #     "torchao>=0.16.0",
 #     "torchcodec==0.7.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==5.2.0",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 #     "xformers>=0.0.33",
 # ]
@@ -97,6 +96,56 @@ def _(mo):
     return
 
 
+@app.cell
+def _():
+    import subprocess
+    import subprocess
+    import json, platform, sys, torch
+    from urllib.request import urlopen
+
+    py = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    tv = ".".join(torch.__version__.split("+")[0].split(".")[:2])
+    assert (cu := (torch.version.cuda or "").split(".")[0]), (
+        "CUDA-enabled PyTorch required."
+    )
+    abi = "TRUE" if torch.compiled_with_cxx11_abi() else "FALSE"
+    plat = (
+        "linux_x86_64"
+        if platform.machine().lower() in ("x86_64", "amd64")
+        else "linux_aarch64"
+    )
+    whl = f"{py}-{py}-{plat}.whl"
+
+    def find(repo, tag, match):
+        api = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
+        return next(
+            (
+                a["browser_download_url"]
+                for a in json.load(urlopen(api))["assets"]
+                if match(a["name"])
+            ),
+            None,
+        )
+
+    cc1d = find(
+        "Dao-AILab/causal-conv1d",
+        "v1.6.1.post4",
+        lambda n: (
+            n.endswith(whl) and f"+cu{cu}torch{tv}" in n and f"cxx11abi{abi}" in n
+        ),
+    )
+    assert cc1d, (
+        f"No causal-conv1d wheel for torch {torch.__version__}/cu{cu}/{py}/abi{abi}"
+    )
+    fla = (
+        find("fla-org/flash-linear-attention", "v0.4.2", lambda n: n.endswith(whl))
+        or "https://github.com/fla-org/flash-linear-attention/archive/refs/tags/v0.4.2.tar.gz"
+    )
+    subprocess.call(["pip", "uninstall", "-y", "sentence-transformers", "torchcodec"])
+    # torchcodec import broken on molab
+    return (torch,)
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -108,19 +157,18 @@ def _(mo):
 @app.cell
 def _():
     from unsloth import FastLanguageModel
-    import torch
+    import torch as _molab_torch
 
     max_seq_length = 2048  # Can increase for longer reasoning traces
     lora_rank = 8  # Larger rank = smarter, but slower
-
     model, processor = FastLanguageModel.from_pretrained(
-        "unsloth/Qwen3.5-35B-A3B",  # This is a very big model, might take a while for downloading
+        "unsloth/Qwen3.5-35B-A3B",
         max_seq_length=max_seq_length,  # Can increase for longer reasoning traces
         load_in_4bit=False,
         fast_inference=False,  # Not supported for MoE (yet!)
     )
     tokenizer = processor.tokenizer  # To tokenize text
-    return FastLanguageModel, lora_rank, model, tokenizer, torch
+    return FastLanguageModel, lora_rank, model, tokenizer
 
 
 @app.cell

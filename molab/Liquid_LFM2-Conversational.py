@@ -6,7 +6,6 @@
 #     "causal-conv1d==1.5.0.post8",
 #     "cut_cross_entropy",
 #     "datasets>=3.4.1,<4.0.0",
-#     "git+https://github.com/huggingface/transformers.git",
 #     "hf_transfer",
 #     "huggingface_hub>=0.34.0",
 #     "marimo",
@@ -14,10 +13,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
+#     "transformers @ git+https://github.com/huggingface/transformers.git",
 #     "triton>=3.2.0",
 #     "trl",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "xformers>=0.0.33",
 # ]
 #
@@ -86,6 +85,15 @@ def _(mo):
 
     Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
     """)
+    return
+
+
+@app.cell
+def _():
+    # packages added via marimo's package management: git+https://github.com/huggingface/transformers.git !pip install --no-deps git+https://github.com/huggingface/transformers.git
+    # Need main branch for Liquid LFM2 models
+    # packages added via marimo's package management: causal-conv1d==1.5.0.post8 !pip install --no-deps causal-conv1d==1.5.0.post8
+    # Install Mamba kernels
     return
 
 
@@ -387,9 +395,9 @@ def _(mo):
 
 @app.cell
 def _(model_1, tokenizer):
-    _messages = [{"role": "user", "content": "Why is the sky blue?"}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages = [{"role": "user", "content": "Why is the sky blue?"}]
+    inputs = tokenizer.apply_chat_template(
+        messages,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
@@ -398,7 +406,7 @@ def _(model_1, tokenizer):
     from transformers import TextStreamer
 
     _ = model_1.generate(
-        **_inputs,
+        **inputs,
         max_new_tokens=128,  # Increase for longer outputs!
         temperature=0.3,
         min_p=0.15,
@@ -410,16 +418,16 @@ def _(model_1, tokenizer):
 
 @app.cell
 def _(TextStreamer, model_1, tokenizer):
-    _messages = [{"role": "user", "content": "Write a poem about a sloth."}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages_1 = [{"role": "user", "content": "Write a poem about a sloth."}]
+    inputs_1 = tokenizer.apply_chat_template(
+        messages_1,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
         return_dict=True,
     ).to("cuda")
     _ = model_1.generate(
-        **_inputs,
+        **inputs_1,
         max_new_tokens=128,  # Increase for longer outputs!
         temperature=0.3,
         min_p=0.15,
@@ -470,16 +478,16 @@ def _(TextStreamer, dtype, load_in_4bit, max_seq_length, model_1, tokenizer):
             load_in_4bit=load_in_4bit,  # 4 bit quantization to reduce memory
         )
         _FastModel.for_inference(_model)
-    _messages = [{"role": "user", "content": "How do I code up a transformer?"}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages_2 = [{"role": "user", "content": "How do I code up a transformer?"}]
+    inputs_2 = tokenizer.apply_chat_template(
+        messages_2,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
         return_dict=True,
     ).to("cuda")
     _ = model_1.generate(
-        **_inputs,
+        **inputs_2,
         max_new_tokens=128,  # Increase for longer outputs!
         temperature=0.3,
         min_p=0.15,

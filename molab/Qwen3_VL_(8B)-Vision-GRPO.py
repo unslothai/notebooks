@@ -12,11 +12,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.57.3",
 #     "triton>=3.2.0",
-#     "trl==0.26.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "trl==0.24.0",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -214,19 +213,21 @@ def _(mo):
 
 @app.cell
 def _(dataset_1):
+    # Resize to (512, 512)
     def resize_images(example):
-        _image = example["decoded_image"]
-        _image = _image.resize((512, 512))
-        example["decoded_image"] = _image
+        image = example["decoded_image"]
+        image = image.resize((512, 512))
+        example["decoded_image"] = image
         return example
 
     dataset_2 = dataset_1.map(resize_images)
 
+    # Then convert to RGB
     def convert_to_rgb(example):
-        _image = example["decoded_image"]
-        if _image.mode != "RGB":
-            _image = _image.convert("RGB")
-        example["decoded_image"] = _image
+        image = example["decoded_image"]
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        example["decoded_image"] = image
         return example
 
     dataset_2 = dataset_2.map(convert_to_rgb)
@@ -243,28 +244,31 @@ def _(mo):
 
 @app.cell
 def _(dataset_2):
+    # Define the delimiter variables for clarity and easy modification
     REASONING_START = "<REASONING>"
     REASONING_END = "</REASONING>"
     SOLUTION_START = "<SOLUTION>"
     SOLUTION_END = "</SOLUTION>"
 
     def make_conversation(example):
-        text_content = f"{example['question']}. Also first provide your reasoning or working out on how you would go about solving the question between {REASONING_START} and {REASONING_END} and then your final answer between {SOLUTION_START} and (put a single float here) {SOLUTION_END}"
-        _prompt = [
+        text_content = f"{example['question']}. Also first provide your reasoning or working out on how you would go about solving the question between {REASONING_START} and {REASONING_END} and then your final answer between {SOLUTION_START} and (put a single float here) {SOLUTION_END}"  # Define placeholder constants if they are not defined globally
+        prompt = [
             {
                 "role": "user",
                 "content": [{"type": "image"}, {"type": "text", "text": text_content}],
             }
-        ]
+        ]  # The user's text prompt
         return {
-            "prompt": _prompt,
+            "prompt": prompt,
             "image": example["decoded_image"],
             "answer": example["answer"],
         }
 
     train_dataset = dataset_2.map(make_conversation)
     train_dataset = train_dataset.remove_columns("image")
-    train_dataset = train_dataset.rename_column("decoded_image", "image")
+    train_dataset = train_dataset.rename_column(
+        "decoded_image", "image"
+    )
     return (
         REASONING_END,
         REASONING_START,
@@ -383,17 +387,17 @@ def _(mo):
 
 @app.cell
 def _(model_1, tokenizer, train_dataset):
-    _image = train_dataset[100]["image"]
-    _prompt = train_dataset[100]["prompt"]
-    _inputs = tokenizer(
-        _image, _prompt, add_special_tokens=False, return_tensors="pt"
-    ).to("cuda")
+    image = train_dataset[100]["image"]
+    prompt = train_dataset[100]["prompt"]
+    inputs = tokenizer(image, prompt, add_special_tokens=False, return_tensors="pt").to(
+        "cuda"
+    )
     from transformers import TextStreamer
 
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    text_streamer = TextStreamer(tokenizer, skip_prompt=True)
     _ = model_1.generate(
-        **_inputs,
-        streamer=_text_streamer,
+        **inputs,
+        streamer=text_streamer,
         max_new_tokens=1024,
         use_cache=True,
         temperature=1.0,
@@ -500,15 +504,15 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, tokenizer, train_dataset):
-    _image = train_dataset[165]["image"]
-    _prompt = train_dataset[165]["prompt"]
-    _inputs = tokenizer(
-        _image, _prompt, add_special_tokens=False, return_tensors="pt"
+    image_1 = train_dataset[165]["image"]
+    prompt_1 = train_dataset[165]["prompt"]
+    inputs_1 = tokenizer(
+        image_1, prompt_1, add_special_tokens=False, return_tensors="pt"
     ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    text_streamer_1 = TextStreamer(tokenizer, skip_prompt=True)
     _ = model_1.generate(
-        **_inputs,
-        streamer=_text_streamer,
+        **inputs_1,
+        streamer=text_streamer_1,
         max_new_tokens=1024,
         use_cache=True,
         temperature=1.0,

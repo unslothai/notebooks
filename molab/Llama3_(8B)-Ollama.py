@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -577,7 +576,9 @@ def _(mo):
 
 
 @app.cell
-def _(subprocess):
+def _():
+    import subprocess
+
     #! curl -fsSL https://ollama.com/install.sh | sh
     subprocess.call("curl -fsSL https://ollama.com/install.sh | sh", shell=True)
     return
@@ -656,13 +657,13 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess
+    import subprocess as _molab_subprocess
 
-    subprocess.Popen(["ollama", "serve"])
+    _molab_subprocess.Popen(["ollama", "serve"])
     import time
 
-    time.sleep(3)  # Wait for a few seconds for Ollama to load!
-    return (subprocess,)
+    time.sleep(3)
+    return
 
 
 @app.cell(hide_code=True)
@@ -688,9 +689,12 @@ def _(mo):
 
 
 @app.cell
-def _(subprocess):
-    #! ollama create unsloth_model -f ./model/Modelfile
-    subprocess.call(["ollama", "create", "unsloth_model", "-f", "./model/Modelfile"])
+def _():
+    import subprocess as _molab_subprocess_2
+
+    _molab_subprocess_2.call(
+        ["ollama", "create", "unsloth_model", "-f", "./model/Modelfile"]
+    )
     return
 
 

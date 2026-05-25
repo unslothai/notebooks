@@ -16,11 +16,10 @@
 #     "torchao>=0.16.0",
 #     "torchcodec",
 #     "torchtune",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.1",
 #     "triton>=3.2.0",
 #     "trl==0.15.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "vector_quantize_pytorch",
 #     "xcodec2==0.1.5",
 # ]

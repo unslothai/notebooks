@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -154,41 +153,49 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model, tokenizer_1):
-    _messages = [
+    messages = [
         {"from": "human", "value": "Continue the fibonacci sequence: 1, 1, 2, 3, 5, 8,"}
     ]
-    _inputs = tokenizer_1.apply_chat_template(
-        _messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
-    ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer_1)
+    inputs = tokenizer_1.apply_chat_template(
+        messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
+    ).to("cuda")  # EDIT HERE!
+    text_streamer = TextStreamer(tokenizer_1)
     _ = model.generate(
-        input_ids=_inputs, streamer=_text_streamer, max_new_tokens=1024, use_cache=True
+        input_ids=inputs, streamer=text_streamer, max_new_tokens=1024, use_cache=True
     )
     return
 
 
 @app.cell
 def _(TextStreamer, model, tokenizer_1):
-    _messages = [{"from": "human", "value": "Describe the tallest tower in the world."}]
-    _inputs = tokenizer_1.apply_chat_template(
-        _messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
+    messages_1 = [
+        {"from": "human", "value": "Describe the tallest tower in the world."}
+    ]
+    inputs_1 = tokenizer_1.apply_chat_template(
+        messages_1, tokenize=True, add_generation_prompt=True, return_tensors="pt"
     ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer_1)
+    text_streamer_1 = TextStreamer(tokenizer_1)
     _ = model.generate(
-        input_ids=_inputs, streamer=_text_streamer, max_new_tokens=1024, use_cache=True
+        input_ids=inputs_1,
+        streamer=text_streamer_1,
+        max_new_tokens=1024,
+        use_cache=True,
     )
     return
 
 
 @app.cell
 def _(TextStreamer, model, tokenizer_1):
-    _messages = [{"from": "human", "value": "What is Unsloth?"}]
-    _inputs = tokenizer_1.apply_chat_template(
-        _messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
+    messages_2 = [{"from": "human", "value": "What is Unsloth?"}]
+    inputs_2 = tokenizer_1.apply_chat_template(
+        messages_2, tokenize=True, add_generation_prompt=True, return_tensors="pt"
     ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer_1)
+    text_streamer_2 = TextStreamer(tokenizer_1)
     _ = model.generate(
-        input_ids=_inputs, streamer=_text_streamer, max_new_tokens=1024, use_cache=True
+        input_ids=inputs_2,
+        streamer=text_streamer_2,
+        max_new_tokens=1024,
+        use_cache=True,
     )
     return
 

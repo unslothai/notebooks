@@ -27,11 +27,10 @@
 #     "tiktoken",
 #     "torchao>=0.16.0",
 #     "torchcodec",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uroman",
 # ]
 #
@@ -55,6 +54,13 @@ def _():
     import marimo as mo
 
     return (mo,)
+
+
+@app.cell
+def _():
+    import subprocess
+
+    return
 
 
 @app.cell(hide_code=True)
@@ -202,6 +208,7 @@ def _():
 
 @app.cell
 def _(Dataset, dataset, torch):
+    # @title Tokenization Function
     from tqdm import tqdm
     import io
     import tempfile
@@ -213,10 +220,12 @@ def _(Dataset, dataset, torch):
     from outetts.version.v3.audio_processor import AudioProcessor
     from outetts.version.v3.prompt_processor import PromptProcessor
     from outetts.dac.interface import DacInterface
+
+    # V3 Imports
     from outetts.models.config import ModelConfig
     import whisper
     from outetts.utils.preprocessing import text_normalizations
-    import soundfile as sf
+    import soundfile as sf  # Need a dummy config for AudioProcessor
     import numpy as np
 
     class DataCreationV3:
@@ -251,7 +260,7 @@ def _(Dataset, dataset, torch):
                 print(
                     "Missing audio bytes or transcript in create_speaker_representation."
                 )
-                return None
+                return None  # Let AudioProcessor use default DAC path
             try:
                 with tempfile.NamedTemporaryFile(
                     suffix=".wav", delete=True
@@ -264,7 +273,9 @@ def _(Dataset, dataset, torch):
                     normalized_transcript = text_normalizations(transcript)
                     words_with_timings = []
                     if whisper_result and "segments" in whisper_result:
-                        for segment in whisper_result["segments"]:
+                        for segment in whisper_result[
+                            "segments"
+                        ]:  # Renamed and adapted from the previous version
                             if "words" in segment:
                                 for word_info in segment["words"]:
                                     cleaned_word = word_info["word"].strip()
@@ -281,7 +292,9 @@ def _(Dataset, dataset, torch):
                             f"Whisper did not return segments/words for: {transcript[:50]}..."
                         )
                         return None
-                    if not words_with_timings:
+                    if (
+                        not words_with_timings
+                    ):  # Whisper needs a file path, so save bytes to a temporary file
                         print(
                             f"No word timings extracted by Whisper for: {transcript[:50]}..."
                         )
@@ -293,11 +306,11 @@ def _(Dataset, dataset, torch):
                     }
                     v3_speaker = self.audio_processor.create_speaker_from_dict(
                         speaker_data_dict
-                    )
+                    )  # Ensure data is written
                     return v3_speaker
-            except Exception as e:
+            except Exception as e:  # 1. Get word timings using Whisper
                 print(f"Error during speaker creation (Whisper/AudioProcessor): {e}")
-                return None
+                return None  # Use the provided transcript for consistency, but Whisper timings
 
         def process_dataset(self, dataset: Dataset):
             """
@@ -316,7 +329,9 @@ def _(Dataset, dataset, torch):
                 try:
                     transcript = item.get("text")
                     audio_info = item.get("audio")
-                    if not transcript or not isinstance(transcript, str):
+                    if not transcript or not isinstance(
+                        transcript, str
+                    ):  # Indicate failure
                         print(
                             f"Row {i}: Skipping due to missing or invalid 'text' column."
                         )
@@ -330,29 +345,31 @@ def _(Dataset, dataset, torch):
                         audio_info["sampling_rate"],
                         format="WAV",
                         subtype="FLOAT",
-                    )
+                    )  # Prepare data dict for AudioProcessor
                     buffer.seek(0)
                     audio_bytes = buffer.getvalue()
                     speaker = self.create_speaker_representation(
                         audio_bytes, transcript
-                    )
+                    )  # Use the potentially normalized transcript
                     if speaker is None:
                         print(
                             f"Row {i}: Failed to create speaker representation for text: {transcript[:50]}... Skipping."
                         )
                         skipped_count = skipped_count + 1
-                        continue
-                    _prompt = self.prompt_processor.get_training_prompt(speaker)
+                        continue  # 2. Use AudioProcessor to create the speaker representation
+                    prompt = self.prompt_processor.get_training_prompt(speaker)
                     processed_count = processed_count + 1
-                    yield _prompt
+                    yield prompt
                 except KeyboardInterrupt:
                     print("Processing interrupted by user.")
-                    break
+                    break  # Indicate failure
                 except Exception as e:
                     print(
                         f"Row {i}: Unhandled error processing item: {e}", exc_info=True
                     )
-                    skipped_count = skipped_count + 1
+                    skipped_count = (
+                        skipped_count + 1
+                    )  # --- V3 Changes: run method is now a generator ---
                     continue
             print(
                 f"Dataset processing finished. Processed: {processed_count}, Skipped: {skipped_count}"
@@ -368,12 +385,12 @@ def _(Dataset, dataset, torch):
         all_prompts = []
         print("Starting dataset processing...")
         procced_dataset = data_processor.process_dataset(dataset)
-        for _prompt in procced_dataset:
-            if _prompt:
-                all_prompts.append({"text": _prompt})
+        for prompt in procced_dataset:
+            if prompt:
+                all_prompts.append({"text": prompt})
         dataset_1 = Dataset.from_list(all_prompts)
         print("Moving Whisper model to CPU")
-        data_processor.whisper_model.to("cpu")
+        data_processor.whisper_model.to("cpu")  # Iterate directly over the dataset
         torch.cuda.empty_cache()
     return data_processor, dataset_1
 
@@ -470,6 +487,7 @@ def _():
 
 @app.cell
 def _(Audio, FastModel, data_processor, input_text, model_1, tokenizer, torch):
+    # @title Run Inference
     import re
     from typing import Dict, Any
     import torchaudio.transforms as T
@@ -536,31 +554,37 @@ def _(Audio, FastModel, data_processor, input_text, model_1, tokenizer, torch):
                 start_index = max(0, seq_len - self.penalty_last_n)
                 window_indices = input_ids[b, start_index:]  # Shape: (window_len,)
                 if window_indices.numel() == 0:
-                    continue
+                    continue  # Check if penalties should be applied
                 tokens_in_window = set(window_indices.tolist())
                 for token_id in tokens_in_window:
                     if token_id >= vocab_size:
                         continue
                     logit = scores[b, token_id]
                     if logit <= 0:
-                        logit = logit * self.penalty
+                        logit = (
+                            logit * self.penalty
+                        )  # Process each batch item independently
                     else:
-                        logit = logit / self.penalty
+                        logit = logit / self.penalty  # 1. Determine the penalty window
                     scores[b, token_id] = logit
-            return scores
+            return scores  # Shape: (window_len,)
 
     generation_utils.RepetitionPenaltyLogitsProcessor = (
         RepetitionPenaltyLogitsProcessorPatch
     )
-    AutoModelForCausalLM.generate = generation_utils.GenerationMixin.generate
+    AutoModelForCausalLM.generate = (
+        generation_utils.GenerationMixin.generate
+    )  # Skip if window is empty
     if __name__ == "__main__":
         formated_text = "<|text_start|>" + input_text + "<|text_end|>"
-        _prompt = "\n".join(
+        prompt_1 = "\n".join(
             ["<|im_start|>", formated_text, "<|audio_start|><|global_features_start|>"]
-        )
+        )  # 2. Find unique tokens within the window
         with torch.inference_mode():
             with torch.amp.autocast("cuda", dtype=model_1.dtype):
-                model_inputs = tokenizer([_prompt], return_tensors="pt").to("cuda")
+                model_inputs = tokenizer([prompt_1], return_tensors="pt").to(
+                    "cuda"
+                )  # 3. Apply repetition penalty to the scores for this batch item
                 print("Generating token sequence...")
                 generated_ids = model_1.generate(
                     **model_inputs,
@@ -577,7 +601,9 @@ def _(Audio, FastModel, data_processor, input_text, model_1, tokenizer, torch):
         audio = audio.cpu()
         from IPython.display import display
 
-        display(Audio(audio.squeeze(0), rate=24000))
+        display(
+            Audio(audio.squeeze(0), rate=24000)
+        )
     return
 
 

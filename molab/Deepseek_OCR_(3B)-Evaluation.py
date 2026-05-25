@@ -15,11 +15,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -948,14 +947,19 @@ def _(mo):
 @app.cell
 def _(eval_dataset, model_1, tokenizer):
     eval_dataset[0]["image_path"].save("your_image.jpg")
-    _prompt = "<image>\nFree OCR. "
-    _image_file = "your_image.jpg"
-    _output_path = "your/output/dir"
-    _res = model_1.infer(
+    prompt = "<image>\nFree OCR. "
+    image_file = "your_image.jpg"
+    output_path = "your/output/dir"
+    # Tiny: base_size = 512, image_size = 512, crop_mode = False
+    # Small: base_size = 640, image_size = 640, crop_mode = False
+    # Base: base_size = 1024, image_size = 1024, crop_mode = False
+    # Large: base_size = 1280, image_size = 1280, crop_mode = False
+    # Gundam: base_size = 1024, image_size = 640, crop_mode = True
+    res = model_1.infer(
         tokenizer,
-        prompt=_prompt,
-        image_file=_image_file,
-        output_path=_output_path,
+        prompt=prompt,
+        image_file=image_file,
+        output_path=output_path,
         image_size=640,
         base_size=1024,
         crop_mode=True,
@@ -1006,14 +1010,19 @@ def _(AutoModel, model_1, tokenizer):
             use_gradient_checkpointing="unsloth",  # True or "unsloth" for long context
         )
         _FastVisionModel.for_inference(_model)
-    _prompt = "<image>\nFree OCR. "
-    _image_file = "your_image.jpg"
-    _output_path = "your/output/dir"
-    _res = model_1.infer(
+    prompt_1 = "<image>\nFree OCR. "
+    image_file_1 = "your_image.jpg"
+    output_path_1 = "your/output/dir"
+    # Tiny: base_size = 512, image_size = 512, crop_mode = False
+    # Small: base_size = 640, image_size = 640, crop_mode = False
+    # Base: base_size = 1024, image_size = 1024, crop_mode = False
+    # Large: base_size = 1280, image_size = 1280, crop_mode = False
+    # Gundam: base_size = 1024, image_size = 640, crop_mode = True
+    res_1 = model_1.infer(
         tokenizer,
-        prompt=_prompt,
-        image_file=_image_file,
-        output_path=_output_path,
+        prompt=prompt_1,
+        image_file=image_file_1,
+        output_path=output_path_1,
         image_size=640,
         base_size=1024,
         crop_mode=True,

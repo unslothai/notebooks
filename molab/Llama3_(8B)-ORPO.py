@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -312,8 +311,9 @@ def _(mo):
 
 @app.cell
 def _(FastLanguageModel, alpaca_prompt, model_1, tokenizer):
-    FastLanguageModel.for_inference(model_1)
-    _inputs = tokenizer(
+    # alpaca_prompt = Copied from above
+    FastLanguageModel.for_inference(model_1)  # Enable native 2x faster inference
+    inputs = tokenizer(
         [
             alpaca_prompt.format(
                 "Continue the fibonacci sequence.", "1, 1, 2, 3, 5, 8", ""
@@ -321,8 +321,10 @@ def _(FastLanguageModel, alpaca_prompt, model_1, tokenizer):
         ],
         return_tensors="pt",
     ).to("cuda")
-    _outputs = model_1.generate(**_inputs, max_new_tokens=64, use_cache=True)
-    tokenizer.batch_decode(_outputs)
+    outputs = model_1.generate(**inputs, max_new_tokens=64, use_cache=True)
+    tokenizer.batch_decode(
+        outputs
+    )
     return
 
 
@@ -336,8 +338,9 @@ def _(mo):
 
 @app.cell
 def _(FastLanguageModel, alpaca_prompt, model_1, tokenizer):
-    FastLanguageModel.for_inference(model_1)
-    _inputs = tokenizer(
+    # alpaca_prompt = Copied from above
+    FastLanguageModel.for_inference(model_1)  # Enable native 2x faster inference
+    inputs_1 = tokenizer(
         [
             alpaca_prompt.format(
                 "Continue the fibonacci sequence.", "1, 1, 2, 3, 5, 8", ""
@@ -348,7 +351,9 @@ def _(FastLanguageModel, alpaca_prompt, model_1, tokenizer):
     from transformers import TextStreamer
 
     text_streamer = TextStreamer(tokenizer)
-    _ = model_1.generate(**_inputs, streamer=text_streamer, max_new_tokens=128)
+    _ = model_1.generate(
+        **inputs_1, streamer=text_streamer, max_new_tokens=128
+    )
     return
 
 
@@ -391,12 +396,15 @@ def _(alpaca_prompt, dtype, load_in_4bit, max_seq_length, model_1, tokenizer):
             load_in_4bit=load_in_4bit,  # Use 4bit quantization to reduce memory usage. Can be False.
         )
         _FastLanguageModel.for_inference(_model)
-    _inputs = tokenizer(
+    inputs_2 = tokenizer(
         [alpaca_prompt.format("What is a famous tall tower in Paris?", "", "")],
         return_tensors="pt",
     ).to("cuda")
-    _outputs = model_1.generate(**_inputs, max_new_tokens=64, use_cache=True)
-    tokenizer.batch_decode(_outputs)
+    # alpaca_prompt = You MUST copy from above!
+    outputs_1 = model_1.generate(**inputs_2, max_new_tokens=64, use_cache=True)
+    tokenizer.batch_decode(
+        outputs_1
+    )
     return
 
 

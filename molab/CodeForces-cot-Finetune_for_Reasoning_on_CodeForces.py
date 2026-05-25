@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -310,11 +309,11 @@ def _(mo):
 
 @app.cell
 def _(FastLanguageModel, inputs, model_1, tokenizer):
-    FastLanguageModel.for_inference(model_1)
+    FastLanguageModel.for_inference(model_1)  # Enable native 2x faster inference
     from transformers import TextStreamer
 
-    _text_streamer = TextStreamer(tokenizer)
-    _ = model_1.generate(**inputs, streamer=_text_streamer, max_new_tokens=128)
+    text_streamer = TextStreamer(tokenizer)
+    _ = model_1.generate(**inputs, streamer=text_streamer, max_new_tokens=128)
     return (TextStreamer,)
 
 
@@ -369,8 +368,11 @@ def _(
         [alpaca_prompt.format("What is a famous tall tower in Paris?", "", "")],
         return_tensors="pt",
     ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer)
-    _ = model_1.generate(**inputs_1, streamer=_text_streamer, max_new_tokens=128)
+    # alpaca_prompt = You MUST copy from above!
+    text_streamer_1 = TextStreamer(tokenizer)
+    _ = model_1.generate(
+        **inputs_1, streamer=text_streamer_1, max_new_tokens=128
+    )
     return
 
 

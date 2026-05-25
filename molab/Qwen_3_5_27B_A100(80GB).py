@@ -12,11 +12,10 @@
 #     "torchao>=0.16.0",
 #     "torchcodec==0.7.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==5.3.0",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 #     "xformers>=0.0.33",
 # ]

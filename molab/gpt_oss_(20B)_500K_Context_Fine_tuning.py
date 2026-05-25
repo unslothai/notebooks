@@ -2,17 +2,16 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
-#     "git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchao>=0.16.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 # ]
 #
@@ -194,18 +193,17 @@ def _(tokenizer):
         length: int = 0
 
     books = {
+        # "Frankenstein" : Book("https://www.gutenberg.org/ebooks/84.txt.utf-8"),
         "Moby Dick": Book("https://www.gutenberg.org/ebooks/2701.txt.utf-8"),
         "Pride and Prejudice": Book("https://www.gutenberg.org/ebooks/1342.txt.utf-8"),
-    }  # "Frankenstein" : Book("https://www.gutenberg.org/ebooks/84.txt.utf-8"),
-    for _book_name, _book_data in books.items():
-        _book_data.text = requests.get(_book_data.url).text
-        _book_data.input_ids = tokenizer.encode(
-            _book_data.text
-        )  # "The King in Yellow" : Book("https://www.gutenberg.org/ebooks/8492.txt.utf-8"),
-        _book_data.length = len(
-            _book_data.input_ids
-        )  # "Romeo and Juliet" : Book("https://www.gutenberg.org/ebooks/1513.txt.utf-8"),
-        print(f"The book '{_book_name}' has context length = {_book_data.length:,}")
+        # "The King in Yellow" : Book("https://www.gutenberg.org/ebooks/8492.txt.utf-8"),
+        # "Romeo and Juliet" : Book("https://www.gutenberg.org/ebooks/1513.txt.utf-8"),
+    }
+    for book_name, book_data in books.items():
+        book_data.text = requests.get(book_data.url).text
+        book_data.input_ids = tokenizer.encode(book_data.text)
+        book_data.length = len(book_data.input_ids)
+        print(f"The book '{book_name}' has context length = {book_data.length:,}")
     return (books,)
 
 
@@ -229,13 +227,13 @@ def _(books, tokenizer):
     import itertools
 
     messages = []
-    for _book_name, _book_data in books.items():
+    for book_name_1, book_data_1 in books.items():
         messages = messages + [
             {
                 "role": "user",
-                "content": f"Print out the contents for the book: '{_book_name}'",
+                "content": f"Print out the contents for the book: '{book_name_1}'",
             },
-            {"role": "assistant", "content": _book_data.text},
+            {"role": "assistant", "content": book_data_1.text},
         ]
     dataset = Dataset.from_list(
         [

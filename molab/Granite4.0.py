@@ -10,11 +10,10 @@
 #     "torchao>=0.16.0",
 #     "torchcodec==0.5",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 # ]
 #
@@ -261,7 +260,7 @@ def _(dataset, tokenizer):
     def formatting_prompts_func(examples):
         user_texts = examples["snippet"]
         response_texts = examples["recommendation"]
-        _messages = [
+        messages = [
             [
                 {"role": "user", "content": user_text},
                 {"role": "assistant", "content": response_text},
@@ -272,7 +271,7 @@ def _(dataset, tokenizer):
             tokenizer.apply_chat_template(
                 message, tokenize=False, add_generation_prompt=False
             )
-            for message in _messages
+            for message in messages
         ]
         return {"text": texts}
 
@@ -531,10 +530,10 @@ def _():
 
 @app.cell
 def _(FastLanguageModel, model_1, scenario_1, tokenizer):
-    FastLanguageModel.for_inference(model_1)
-    _messages = [{"role": "user", "content": scenario_1}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    FastLanguageModel.for_inference(model_1)  # Enable native 2x faster inference
+    messages = [{"role": "user", "content": scenario_1}]
+    inputs = tokenizer.apply_chat_template(
+        messages,
         tokenize=True,
         add_generation_prompt=True,  # Must add for generation
         padding=True,
@@ -543,10 +542,10 @@ def _(FastLanguageModel, model_1, scenario_1, tokenizer):
     ).to("cuda")
     from transformers import TextStreamer
 
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=False)
+    text_streamer = TextStreamer(tokenizer, skip_prompt=False)
     _ = model_1.generate(
-        **_inputs,
-        streamer=_text_streamer,
+        **inputs,
+        streamer=text_streamer,
         max_new_tokens=512,  # Increase if tokens are getting cut off
         use_cache=True,
         do_sample=True,
@@ -559,20 +558,20 @@ def _(FastLanguageModel, model_1, scenario_1, tokenizer):
 
 @app.cell
 def _(FastLanguageModel, TextStreamer, model_1, scenario_2, tokenizer):
-    FastLanguageModel.for_inference(model_1)
-    _messages = [{"role": "user", "content": scenario_2}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    FastLanguageModel.for_inference(model_1)  # Enable native 2x faster inference
+    messages_1 = [{"role": "user", "content": scenario_2}]
+    inputs_1 = tokenizer.apply_chat_template(
+        messages_1,
         tokenize=True,
         add_generation_prompt=True,  # Must add for generation
         padding=True,
         return_tensors="pt",
         return_dict=True,
     ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=False)
+    text_streamer_1 = TextStreamer(tokenizer, skip_prompt=False)
     _ = model_1.generate(
-        **_inputs,
-        streamer=_text_streamer,
+        **inputs_1,
+        streamer=text_streamer_1,
         max_new_tokens=512,  # Increase if tokens are getting cut off
         use_cache=True,
         do_sample=False,

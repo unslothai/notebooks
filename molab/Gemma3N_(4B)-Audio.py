@@ -13,11 +13,10 @@
 #     "timm",
 #     "torchao>=0.16.0",
 #     "torchcodec",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -88,6 +87,13 @@ def _(mo):
     return
 
 
+@app.cell
+def _():
+    # packages added via marimo's package management: timm !pip install --no-deps --upgrade timm
+    # Only for Gemma 3N
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -142,12 +148,12 @@ def _(mo):
 @app.cell
 def _(model, processor):
     from transformers import TextStreamer
-    # Helper function for inference
 
+    # Helper function for inference
     def do_gemma_3n_inference(messages, max_new_tokens=128):
         _ = model.generate(
             **processor.apply_chat_template(
-                _messages,
+                messages,
                 add_generation_prompt=True,  # Must add for generation
                 tokenize=True,
                 return_dict=True,
@@ -156,7 +162,7 @@ def _(model, processor):
             max_new_tokens=max_new_tokens,  # Increase for longer outputs!
             do_sample=False,
             streamer=TextStreamer(processor, skip_prompt=True),
-        )  # Must add for generation
+        )
 
     return TextStreamer, do_gemma_3n_inference
 
@@ -193,7 +199,7 @@ def _(Audio, test_audio):
 
 @app.cell
 def _(do_gemma_3n_inference, test_audio):
-    _messages = [
+    messages = [
         {
             "role": "system",
             "content": [
@@ -211,7 +217,8 @@ def _(do_gemma_3n_inference, test_audio):
             ],
         },
     ]
-    do_gemma_3n_inference(_messages, max_new_tokens=256)
+
+    do_gemma_3n_inference(messages, max_new_tokens=256)
     return
 
 
@@ -471,7 +478,7 @@ def _(mo):
 
 @app.cell
 def _(do_gemma_3n_inference, test_audio):
-    _messages = [
+    messages_1 = [
         {
             "role": "system",
             "content": [
@@ -489,7 +496,7 @@ def _(do_gemma_3n_inference, test_audio):
             ],
         },
     ]
-    do_gemma_3n_inference(_messages, max_new_tokens=256)
+    do_gemma_3n_inference(messages_1, max_new_tokens=256)
     return
 
 
@@ -536,11 +543,11 @@ def _(TextStreamer, model_1, processor):
         _model, _processor = _FastModel.from_pretrained(
             model_name="gemma_3n_lora", max_seq_length=2048, load_in_4bit=True  # YOUR MODEL YOU USED FOR TRAINING
         )
-    _messages = [
+    messages_2 = [
         {"role": "user", "content": [{"type": "text", "text": "What is Gemma-3N?"}]}
     ]
     inputs = processor.apply_chat_template(
-        _messages,
+        messages_2,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,

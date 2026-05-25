@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -383,9 +382,9 @@ def _(mo):
 
 @app.cell
 def _(model_1, tokenizer):
-    _messages = [{"role": "user", "content": "Why is the sky blue?"}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages = [{"role": "user", "content": "Why is the sky blue?"}]
+    inputs = tokenizer.apply_chat_template(
+        messages,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
@@ -394,7 +393,7 @@ def _(model_1, tokenizer):
     from transformers import TextStreamer
 
     _ = model_1.generate(
-        **_inputs,
+        **inputs,
         max_new_tokens=128,  # Increase for longer outputs!
         temperature=0.1,
         top_k=50,
@@ -407,16 +406,16 @@ def _(model_1, tokenizer):
 
 @app.cell
 def _(TextStreamer, model_1, tokenizer):
-    _messages = [{"role": "user", "content": "Write a poem about a sloth."}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages_1 = [{"role": "user", "content": "Write a poem about a sloth."}]
+    inputs_1 = tokenizer.apply_chat_template(
+        messages_1,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
         return_dict=True,
     ).to("cuda")
     _ = model_1.generate(
-        **_inputs,
+        **inputs_1,
         max_new_tokens=128,  # Increase for longer outputs!
         temperature=0.1,
         top_k=50,
@@ -468,16 +467,16 @@ def _(TextStreamer, dtype, load_in_4bit, max_seq_length, model_1, tokenizer):
             load_in_4bit=load_in_4bit,  # 4 bit quantization to reduce memory
         )
         _FastModel.for_inference(_model)
-    _messages = [{"role": "user", "content": "How do I code up a transformer?"}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages_2 = [{"role": "user", "content": "How do I code up a transformer?"}]
+    inputs_2 = tokenizer.apply_chat_template(
+        messages_2,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
         tokenize=True,
         return_dict=True,
     ).to("cuda")
     _ = model_1.generate(
-        **_inputs,
+        **inputs_2,
         max_new_tokens=128,  # Increase for longer outputs!
         temperature=0.1,
         top_k=50,

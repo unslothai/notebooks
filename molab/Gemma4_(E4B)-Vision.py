@@ -14,11 +14,10 @@
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torchao>=0.16.0",
 #     "torchcodec",
-#     "transformers>=4.56.0",
+#     "transformers==5.5.0",
 #     "triton>=3.2.0",
 #     "trl",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -86,6 +85,13 @@ def _(mo):
 
     Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
     """)
+    return
+
+
+@app.cell
+def _():
+    # packages added via marimo's package management: timm !pip install --no-deps --upgrade timm
+    # For Gemma 4 vision/audio
     return
 
 
@@ -245,14 +251,14 @@ def _(mo):
 
 @app.cell
 def _():
-    _instruction = "Write the LaTeX representation for this image."
+    instruction = "Write the LaTeX representation for this image."
 
     def convert_to_conversation(sample):
         conversation = [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": _instruction},
+                    {"type": "text", "text": instruction},
                     {"type": "image", "image": sample["image"]},
                 ],
             },
@@ -321,24 +327,24 @@ def _(mo):
 
 @app.cell
 def _(dataset, model_1, processor_1):
-    _image = dataset[2]["image"]
-    _instruction = "Write the LaTeX representation for this image."
-    _messages = [
+    image = dataset[2]["image"]
+    instruction_1 = "Write the LaTeX representation for this image."
+    messages = [
         {
             "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": _instruction}],
+            "content": [{"type": "image"}, {"type": "text", "text": instruction_1}],
         }
     ]
-    _input_text = processor_1.apply_chat_template(_messages, add_generation_prompt=True)
-    _inputs = processor_1(
-        _image, _input_text, add_special_tokens=False, return_tensors="pt"
+    input_text = processor_1.apply_chat_template(messages, add_generation_prompt=True)
+    inputs = processor_1(
+        image, input_text, add_special_tokens=False, return_tensors="pt"
     ).to("cuda")
     from transformers import TextStreamer
 
-    _text_streamer = TextStreamer(processor_1, skip_prompt=True)
-    _result = model_1.generate(
-        **_inputs,
-        streamer=_text_streamer,
+    text_streamer = TextStreamer(processor_1, skip_prompt=True)
+    result = model_1.generate(
+        **inputs,
+        streamer=text_streamer,
         max_new_tokens=128,
         use_cache=True,
         temperature=1.0,
@@ -451,22 +457,24 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, dataset, model_1, processor_1):
-    _image = dataset[10]["image"]
-    _instruction = "Write the LaTeX representation for this image."
-    _messages = [
+    image_1 = dataset[10]["image"]
+    instruction_2 = "Write the LaTeX representation for this image."
+    messages_1 = [
         {
             "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": _instruction}],
+            "content": [{"type": "image"}, {"type": "text", "text": instruction_2}],
         }
     ]
-    _input_text = processor_1.apply_chat_template(_messages, add_generation_prompt=True)
-    _inputs = processor_1(
-        _image, _input_text, add_special_tokens=False, return_tensors="pt"
+    input_text_1 = processor_1.apply_chat_template(
+        messages_1, add_generation_prompt=True
+    )
+    inputs_1 = processor_1(
+        image_1, input_text_1, add_special_tokens=False, return_tensors="pt"
     ).to("cuda")
-    _text_streamer = TextStreamer(processor_1, skip_prompt=True)
-    _result = model_1.generate(
-        **_inputs,
-        streamer=_text_streamer,
+    text_streamer_1 = TextStreamer(processor_1, skip_prompt=True)
+    result_1 = model_1.generate(
+        **inputs_1,
+        streamer=text_streamer_1,
         max_new_tokens=128,
         use_cache=True,
         temperature=1.0,
@@ -512,21 +520,23 @@ def _(TextStreamer, dataset, model_1, processor_1):
             model_name="gemma_4_lora", load_in_4bit=True  # YOUR MODEL YOU USED FOR TRAINING
         )
     sample = dataset[1]
-    _image = sample["image"].convert("RGB")
-    _messages = [
+    image_2 = sample["image"].convert("RGB")
+    messages_2 = [
         {
             "role": "user",
             "content": [{"type": "text", "text": sample["text"]}, {"type": "image"}],
         }
     ]
-    _input_text = processor_1.apply_chat_template(_messages, add_generation_prompt=True)
-    _inputs = processor_1(
-        _image, _input_text, add_special_tokens=False, return_tensors="pt"
+    input_text_2 = processor_1.apply_chat_template(
+        messages_2, add_generation_prompt=True
+    )
+    inputs_2 = processor_1(
+        image_2, input_text_2, add_special_tokens=False, return_tensors="pt"
     ).to("cuda")
-    _text_streamer = TextStreamer(processor_1.tokenizer, skip_prompt=True)
+    text_streamer_2 = TextStreamer(processor_1.tokenizer, skip_prompt=True)
     _ = model_1.generate(
-        **_inputs,
-        streamer=_text_streamer,
+        **inputs_2,
+        streamer=text_streamer_2,
         max_new_tokens=128,
         use_cache=True,
         temperature=1.0,

@@ -12,11 +12,10 @@
 #     "sentencepiece",
 #     "torchao>=0.16.0",
 #     "transformers-cfg",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -285,11 +284,11 @@ def _(mo):
 
 @app.cell
 def _(copy, tokenizer_orig, user_query):
-    _messages = []
-    _messages.append(user_query)
+    messages = []
+    messages.append(user_query)
     tokenizer_1 = copy.deepcopy(tokenizer_orig)
     input_ids = tokenizer_1.apply_chat_template(
-        _messages,
+        messages,
         tokenize=True,
         add_generation_prompt=True,
         add_special_tokens=False,
@@ -391,13 +390,13 @@ def _(AutoTokenizer):
 
 @app.cell
 def _(generate_with_grammar, input_ids, model, tokenizer_1):
-    _output = generate_with_grammar(model=model, input_ids=input_ids)
-    _generated_tokens = _output[:, input_ids.shape[1] :]
+    output = generate_with_grammar(model=model, input_ids=input_ids)
+    generated_tokens = output[:, input_ids.shape[1] :]
     decoded_output = tokenizer_1.batch_decode(
-        _generated_tokens, skip_special_tokens=True
+        generated_tokens, skip_special_tokens=True
     )
-    for _i, _message in enumerate(decoded_output):
-        print(f"{_message}")
+    for i, message in enumerate(decoded_output):
+        print(f"{message}")
     return (decoded_output,)
 
 
@@ -413,8 +412,8 @@ def _(mo):
 def _(decoded_output):
     import json
 
-    _content = json.loads(decoded_output[0])
-    arguments = _content[0]["arguments"]
+    content = json.loads(decoded_output[0])
+    arguments = content[0]["arguments"]
     vector_a = arguments["a"]
     vector_b = arguments["b"]
     print(f"args a: {vector_a}, b: {vector_b}")
@@ -462,24 +461,24 @@ def _(arguments, copy, model, result, tokenizer_orig, user_query):
         result = "".join((random.choice(characters) for _ in range(9)))
         return result
 
-    _messages = []
-    _original_prompt = user_query["content"]
-    _prompt_with_context = f"You are a super helpful AI assistant.\nYou are asked to answer a question based on the following context information.\nQuestion:\n{_original_prompt}"
-    _messages.append({"role": "user", "content": _prompt_with_context})
-    _tool_call_id = generate_alphanumeric()
-    _tool_calls = [
+    messages_1 = []
+    original_prompt = user_query["content"]
+    prompt_with_context = f"You are a super helpful AI assistant.\nYou are asked to answer a question based on the following context information.\nQuestion:\n{original_prompt}"
+    messages_1.append({"role": "user", "content": prompt_with_context})
+    tool_call_id = generate_alphanumeric()
+    tool_calls = [
         {
-            "id": _tool_call_id,
+            "id": tool_call_id,
             "type": "function",
             "function": {"name": "get_vector_sum", "arguments": arguments},
         }
     ]
-    _messages.append({"role": "assistant", "tool_calls": _tool_calls})
-    _messages.append({"role": "tool", "name": "get_vector_sum", "content": result})
-    _messages.append({"role": "assistant", "content": "Answer:\n"})
+    messages_1.append({"role": "assistant", "tool_calls": tool_calls})
+    messages_1.append({"role": "tool", "name": "get_vector_sum", "content": result})
+    messages_1.append({"role": "assistant", "content": "Answer:\n"})
     tokenizer_2 = copy.deepcopy(tokenizer_orig)
     tool_prompt = tokenizer_2.apply_chat_template(
-        _messages,
+        messages_1,
         continue_final_message=True,
         add_special_tokens=True,
         return_tensors="pt",
@@ -493,9 +492,9 @@ def _(arguments, copy, model, result, tokenizer_orig, user_query):
 
 @app.cell
 def _(model, tokenizer_2, tool_prompt):
-    _out = model.generate(**tool_prompt, max_new_tokens=128)
-    _generated_text = _out[0, tool_prompt["input_ids"].shape[1] :]
-    print(tokenizer_2.decode(_generated_text, skip_special_tokens=True))
+    out = model.generate(**tool_prompt, max_new_tokens=128)
+    generated_text = out[0, tool_prompt["input_ids"].shape[1] :]
+    print(tokenizer_2.decode(generated_text, skip_special_tokens=True))
     return
 
 
@@ -525,13 +524,13 @@ def _(copy, tokenizer_orig, user_query):
 
 @app.cell
 def _(input_ids_1, model, tokenizer_3):
-    _output = model.generate(input_ids=input_ids_1, max_new_tokens=1024)
-    _generated_tokens = _output[:, input_ids_1.shape[1] :]
+    output_1 = model.generate(input_ids=input_ids_1, max_new_tokens=1024)
+    generated_tokens_1 = output_1[:, input_ids_1.shape[1] :]
     decoded_output_1 = tokenizer_3.batch_decode(
-        _generated_tokens, skip_special_tokens=True
+        generated_tokens_1, skip_special_tokens=True
     )
-    for _i, _message in enumerate(decoded_output_1):
-        print(f"{_message}")
+    for i_1, message_1 in enumerate(decoded_output_1):
+        print(f"{message_1}")
     return
 
 
@@ -661,9 +660,11 @@ def _(copy, get_all_items, get_usd_to_euro_conversion_rate, inventory_check):
     from transformers.utils import chat_template_utils
 
     tools = [get_all_items, inventory_check, get_usd_to_euro_conversion_rate]  # pass the tools
+
     orig_tools = copy.deepcopy(tools)  # save a copy for later
-    for _tool in tools:
-        _ = chat_template_utils.get_json_schema(_tool)  # save a copy for later
+
+    for tool in tools:
+        _ = chat_template_utils.get_json_schema(tool)
     return chat_template_utils, orig_tools, tools
 
 
@@ -677,11 +678,11 @@ def _(mo):
 
 @app.cell
 def _(copy, tokenizer_orig, tools, user_query_1):
-    _messages = []
-    _messages.append(user_query_1)
+    messages_2 = []
+    messages_2.append(user_query_1)
     tokenizer_4 = copy.deepcopy(tokenizer_orig)
     input_ids_2 = tokenizer_4.apply_chat_template(
-        _messages,
+        messages_2,
         tokenize=True,
         add_generation_prompt=True,
         add_special_tokens=False,
@@ -689,26 +690,26 @@ def _(copy, tokenizer_orig, tools, user_query_1):
         tools=tools,  # pass the tools
         return_tensors="pt",
     ).to("cuda")
-    print(tokenizer_4.decode(input_ids_2[0]))
+    print(tokenizer_4.decode(input_ids_2[0]))  # pass the tools
     return input_ids_2, tokenizer_4
 
 
 @app.cell
 def _(generate_with_grammar, input_ids_2, model, tokenizer_4):
-    _output = generate_with_grammar(model=model, input_ids=input_ids_2)
-    _generated_tokens = _output[:, input_ids_2.shape[1] :]
+    output_2 = generate_with_grammar(model=model, input_ids=input_ids_2)
+    generated_tokens_2 = output_2[:, input_ids_2.shape[1] :]
     decoded_output_2 = tokenizer_4.batch_decode(
-        _generated_tokens, skip_special_tokens=True
+        generated_tokens_2, skip_special_tokens=True
     )
-    for _i, _message in enumerate(decoded_output_2):
-        print(f"{_message}")
+    for i_2, message_2 in enumerate(decoded_output_2):
+        print(f"{message_2}")
     return (decoded_output_2,)
 
 
 @app.cell
 def _(decoded_output_2, json):
-    _content = json.loads(decoded_output_2[0])
-    arguments_1 = _content[0]["arguments"]
+    content_1 = json.loads(decoded_output_2[0])
+    arguments_1 = content_1[0]["arguments"]
     item_codes = arguments_1["item_codes"]
     conversion_rate = arguments_1["conversion_rate"]
     print(f"item_codes: {item_codes}, conversion_rate: {conversion_rate}")
@@ -740,26 +741,26 @@ def _(
     tokenizer_orig,
     user_query_1,
 ):
-    _messages = []
-    _original_prompt = user_query_1["content"]
-    _prompt_with_context = f"You are a super helpful AI assistant.\nYou are asked to answer a question based on the following context information.\nQuestion:\n{_original_prompt}"
-    _messages.append({"role": "user", "content": _prompt_with_context})
-    _tool_call_id = generate_alphanumeric()
-    _tool_calls = [
+    messages_3 = []
+    original_prompt_1 = user_query_1["content"]
+    prompt_with_context_1 = f"You are a super helpful AI assistant.\nYou are asked to answer a question based on the following context information.\nQuestion:\n{original_prompt_1}"
+    messages_3.append({"role": "user", "content": prompt_with_context_1})
+    tool_call_id_1 = generate_alphanumeric()
+    tool_calls_1 = [
         {
-            "id": _tool_call_id,
+            "id": tool_call_id_1,
             "type": "function",
             "function": {"name": "inventory_check", "arguments": arguments_1},
         }
     ]
-    _messages.append({"role": "assistant", "tool_calls": _tool_calls})
-    _messages.append(
+    messages_3.append({"role": "assistant", "tool_calls": tool_calls_1})
+    messages_3.append(
         {"role": "tool", "name": "inventory_check", "content": result_total}
     )
-    _messages.append({"role": "assistant", "content": "Answer:\n"})
+    messages_3.append({"role": "assistant", "content": "Answer:\n"})
     tokenizer_5 = copy.deepcopy(tokenizer_orig)
     tool_prompt_1 = tokenizer_5.apply_chat_template(
-        _messages,
+        messages_3,
         continue_final_message=True,
         add_special_tokens=True,
         return_tensors="pt",
@@ -773,9 +774,9 @@ def _(
 
 @app.cell
 def _(model, tokenizer_5, tool_prompt_1):
-    _out = model.generate(**tool_prompt_1, max_new_tokens=128)
-    _generated_text = _out[0, tool_prompt_1["input_ids"].shape[1] :]
-    print(tokenizer_5.decode(_generated_text, skip_special_tokens=True))
+    out_1 = model.generate(**tool_prompt_1, max_new_tokens=128)
+    generated_text_1 = out_1[0, tool_prompt_1["input_ids"].shape[1] :]
+    print(tokenizer_5.decode(generated_text_1, skip_special_tokens=True))
     return
 
 
@@ -833,18 +834,18 @@ def _(mo):
 
 @app.cell
 def _(chat_template_utils, tools_1):
-    for _tool in tools_1:
-        _ = chat_template_utils.get_json_schema(_tool)
+    for tool_1 in tools_1:
+        _ = chat_template_utils.get_json_schema(tool_1)
     return
 
 
 @app.cell
 def _(copy, tokenizer_orig, tools_1, user_query_2):
-    _messages = []
-    _messages.append(user_query_2)
+    messages_4 = []
+    messages_4.append(user_query_2)
     tokenizer_6 = copy.deepcopy(tokenizer_orig)
     input_ids_3 = tokenizer_6.apply_chat_template(
-        _messages,
+        messages_4,
         tokenize=True,
         add_generation_prompt=True,
         add_special_tokens=False,
@@ -858,13 +859,13 @@ def _(copy, tokenizer_orig, tools_1, user_query_2):
 
 @app.cell
 def _(generate_with_grammar, input_ids_3, model, tokenizer_6):
-    _output = generate_with_grammar(model=model, input_ids=input_ids_3)
-    _generated_tokens = _output[:, input_ids_3.shape[1] :]
+    output_3 = generate_with_grammar(model=model, input_ids=input_ids_3)
+    generated_tokens_3 = output_3[:, input_ids_3.shape[1] :]
     decoded_output_3 = tokenizer_6.batch_decode(
-        _generated_tokens, skip_special_tokens=True
+        generated_tokens_3, skip_special_tokens=True
     )
-    for _i, _message in enumerate(decoded_output_3):
-        print(f"{_message}")
+    for i_3, message_3 in enumerate(decoded_output_3):
+        print(f"{message_3}")
     return (decoded_output_3,)
 
 
@@ -878,12 +879,12 @@ def _(mo):
 
 @app.cell
 def _(decoded_output_3, fetch_item_by_name, inventory_check, json):
-    _content = json.loads(decoded_output_3[0])
-    arguments_for_item_name = _content[0]["arguments"]
+    content_2 = json.loads(decoded_output_3[0])
+    arguments_for_item_name = content_2[0]["arguments"]
     item_name = arguments_for_item_name["item_name"]
     item_code = fetch_item_by_name(item_name).item_code
     print(f"item_name: {item_name}, item_code: {item_code}")
-    arguments_for_inventory_check = _content[1]["arguments"]
+    arguments_for_inventory_check = content_2[1]["arguments"]
     conversion_rate_1 = arguments_for_inventory_check["conversion_rate"]
     print(f"conversion_rate: {conversion_rate_1}")
     result_total_1 = inventory_check([item_code], conversion_rate_1)
@@ -913,26 +914,26 @@ def _(
     tokenizer_orig,
     user_query_2,
 ):
-    _messages = []
-    _original_prompt = user_query_2["content"]
-    _prompt_with_context = f"You are a super helpful AI assistant.\nYou are asked to answer a question based on the following context information.\nQuestion:\n{_original_prompt}"
-    _messages.append({"role": "user", "content": _prompt_with_context})
-    _tool_call_id = generate_alphanumeric()
-    _tool_calls = [
+    messages_5 = []
+    original_prompt_2 = user_query_2["content"]
+    prompt_with_context_2 = f"You are a super helpful AI assistant.\nYou are asked to answer a question based on the following context information.\nQuestion:\n{original_prompt_2}"
+    messages_5.append({"role": "user", "content": prompt_with_context_2})
+    tool_call_id_2 = generate_alphanumeric()
+    tool_calls_2 = [
         {
-            "id": _tool_call_id,
+            "id": tool_call_id_2,
             "type": "function",
             "function": {"name": "inventory_check", "arguments": arguments_1},
         }
     ]
-    _messages.append({"role": "assistant", "tool_calls": _tool_calls})
-    _messages.append(
+    messages_5.append({"role": "assistant", "tool_calls": tool_calls_2})
+    messages_5.append(
         {"role": "tool", "name": "inventory_check", "content": result_total_1}
     )
-    _messages.append({"role": "assistant", "content": "Answer:\n"})
+    messages_5.append({"role": "assistant", "content": "Answer:\n"})
     tokenizer_7 = copy.deepcopy(tokenizer_orig)
     tool_prompt_2 = tokenizer_7.apply_chat_template(
-        _messages,
+        messages_5,
         continue_final_message=True,
         add_special_tokens=True,
         return_tensors="pt",
@@ -940,15 +941,15 @@ def _(
         tools=None,  # pass the tools
     )
     tool_prompt_2 = tool_prompt_2.to(model.device)
-    print(tokenizer_7.decode(tool_prompt_2["input_ids"][0]))
+    print(tokenizer_7.decode(tool_prompt_2["input_ids"][0]))  # pass the result total
     return tokenizer_7, tool_prompt_2
 
 
 @app.cell
 def _(model, tokenizer_7, tool_prompt_2):
-    _out = model.generate(**tool_prompt_2, max_new_tokens=128)
-    _generated_text = _out[0, tool_prompt_2["input_ids"].shape[1] :]
-    print(tokenizer_7.decode(_generated_text, skip_special_tokens=True))
+    out_2 = model.generate(**tool_prompt_2, max_new_tokens=128)
+    generated_text_2 = out_2[0, tool_prompt_2["input_ids"].shape[1] :]
+    print(tokenizer_7.decode(generated_text_2, skip_special_tokens=True))
     return
 
 

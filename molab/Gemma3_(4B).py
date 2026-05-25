@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -400,7 +399,7 @@ def _(mo):
 @app.cell
 def _(get_chat_template, model_1, tokenizer_1):
     tokenizer_2 = get_chat_template(tokenizer_1, chat_template="gemma-3")
-    _messages = [
+    messages = [
         {
             "role": "user",
             "content": [
@@ -408,17 +407,19 @@ def _(get_chat_template, model_1, tokenizer_1):
             ],
         }
     ]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages,
+    inputs = tokenizer_2.apply_chat_template(
+        messages,
         add_generation_prompt=True,  # Must add for generation
         tokenize=True,
         return_tensors="pt",
         return_dict=True,
     )
     outputs = model_1.generate(
-        **_inputs.to("cuda"), max_new_tokens=64, temperature=1.0, top_p=0.95, top_k=64
+        **inputs.to("cuda"), max_new_tokens=64, temperature=1.0, top_p=0.95, top_k=64
     )
-    tokenizer_2.batch_decode(outputs)
+    tokenizer_2.batch_decode(
+        outputs
+    )
     return (tokenizer_2,)
 
 
@@ -432,11 +433,11 @@ def _(mo):
 
 @app.cell
 def _(model_1, tokenizer_2):
-    _messages = [
+    messages_1 = [
         {"role": "user", "content": [{"type": "text", "text": "Why is the sky blue?"}]}
     ]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages,
+    inputs_1 = tokenizer_2.apply_chat_template(
+        messages_1,
         add_generation_prompt=True,  # Must add for generation
         tokenize=True,
         return_tensors="pt",
@@ -445,7 +446,7 @@ def _(model_1, tokenizer_2):
     from transformers import TextStreamer
 
     _ = model_1.generate(
-        **_inputs.to("cuda"),
+        **inputs_1.to("cuda"),
         max_new_tokens=64,  # Increase for longer outputs!
         temperature=1.0,
         top_p=0.95,
@@ -490,18 +491,18 @@ def _(TextStreamer, model_1, tokenizer_2):
         _model, _tokenizer = _FastModel.from_pretrained(
             model_name="gemma_3_lora", max_seq_length=2048, load_in_4bit=True  # YOUR MODEL YOU USED FOR TRAINING
         )
-    _messages = [
+    messages_2 = [
         {"role": "user", "content": [{"type": "text", "text": "What is Gemma-3?"}]}
     ]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages,
+    inputs_2 = tokenizer_2.apply_chat_template(
+        messages_2,
         add_generation_prompt=True,  # Must add for generation
         tokenize=True,
         return_tensors="pt",
         return_dict=True,
     )
     _ = model_1.generate(
-        **_inputs.to("cuda"),
+        **inputs_2.to("cuda"),
         max_new_tokens=64,  # Increase for longer outputs!
         temperature=1.0,
         top_p=0.95,

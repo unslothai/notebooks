@@ -2,17 +2,16 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
-#     "git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchao>=0.16.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 # ]
 #
@@ -181,15 +180,17 @@ def _(mo):
 def _(model_1, tokenizer):
     from transformers import TextStreamer
 
-    _messages = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
+    inputs = tokenizer.apply_chat_template(
+        messages,
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
         reasoning_effort="low",  # **NEW!** Set reasoning effort to low, medium or high
     ).to("cuda")
-    _ = model_1.generate(**_inputs, max_new_tokens=64, streamer=TextStreamer(tokenizer))
+    _ = model_1.generate(
+        **inputs, max_new_tokens=64, streamer=TextStreamer(tokenizer)
+    )  # **NEW!** Set reasoning effort to low, medium or high
     return (TextStreamer,)
 
 
@@ -203,15 +204,17 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, tokenizer):
-    _messages = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages_1 = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
+    inputs_1 = tokenizer.apply_chat_template(
+        messages_1,
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
         reasoning_effort="medium",  # **NEW!** Set reasoning effort to low, medium or high
     ).to("cuda")
-    _ = model_1.generate(**_inputs, max_new_tokens=64, streamer=TextStreamer(tokenizer))
+    _ = model_1.generate(
+        **inputs_1, max_new_tokens=64, streamer=TextStreamer(tokenizer)
+    )  # **NEW!** Set reasoning effort to low, medium or high
     return
 
 
@@ -225,15 +228,17 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, tokenizer):
-    _messages = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    messages_2 = [{"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."}]
+    inputs_2 = tokenizer.apply_chat_template(
+        messages_2,
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
         reasoning_effort="high",  # **NEW!** Set reasoning effort to low, medium or high
     ).to("cuda")
-    _ = model_1.generate(**_inputs, max_new_tokens=64, streamer=TextStreamer(tokenizer))
+    _ = model_1.generate(
+        **inputs_2, max_new_tokens=64, streamer=TextStreamer(tokenizer)
+    )  # **NEW!** Set reasoning effort to low, medium or high
     return
 
 
@@ -397,21 +402,23 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, tokenizer):
-    _messages = [
+    messages_3 = [
         {
             "role": "system",
             "content": "reasoning language: French\n\nYou are a helpful assistant that can solve mathematical problems.",
         },
         {"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."},
     ]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    inputs_3 = tokenizer.apply_chat_template(
+        messages_3,
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
         reasoning_effort="medium",  # **NEW!** Set reasoning effort to low, medium or high
     ).to("cuda")
-    _ = model_1.generate(**_inputs, max_new_tokens=64, streamer=TextStreamer(tokenizer))
+    _ = model_1.generate(
+        **inputs_3, max_new_tokens=64, streamer=TextStreamer(tokenizer)
+    )
     return
 
 
@@ -453,21 +460,23 @@ def _(TextStreamer, model_1, tokenizer):
             dtype=None,  # None for auto detection
             load_in_4bit=True,  # 4 bit quantization to reduce memory
         )
-    _messages = [
+    messages_4 = [
         {
             "role": "system",
             "content": "reasoning language: French\n\nYou are a helpful assistant that can solve mathematical problems.",
         },
         {"role": "user", "content": "Solve x^5 + 3x^4 - 10 = 3."},
     ]
-    _inputs = tokenizer.apply_chat_template(
-        _messages,
+    inputs_4 = tokenizer.apply_chat_template(
+        messages_4,
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
         reasoning_effort="high",  # **NEW!** Set reasoning effort to low, medium or high
     ).to("cuda")
-    _ = model_1.generate(**_inputs, max_new_tokens=64, streamer=TextStreamer(tokenizer))
+    _ = model_1.generate(
+        **inputs_4, max_new_tokens=64, streamer=TextStreamer(tokenizer)
+    )
     return
 
 

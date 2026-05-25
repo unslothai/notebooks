@@ -2,17 +2,16 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
-#     "git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchao>=0.16.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 # ]
 #
@@ -385,10 +384,17 @@ def _(mo):
 
 @app.cell
 def _(check_only_stdlib_imports):
-    sample = "\ndef matmul(A, B):\n    import numpy as np\n    from torch import matmul\n    z, s = zip, sum\n    Bt = list(z(*B))\n    return [[s(a*b for a, b in z(row, col)) for col in Bt] for row in A]\n"
-    _ok, _info = check_only_stdlib_imports(sample)
-    print("Only stdlib imports?", _ok)
-    print(_info)
+    sample = """
+    def matmul(A, B):
+        import numpy as np
+        from torch import matmul
+        z, s = zip, sum
+        Bt = list(z(*B))
+        return [[s(a*b for a, b in z(row, col)) for col in Bt] for row in A]
+    """
+    ok, info = check_only_stdlib_imports(sample)
+    print("Only stdlib imports?", ok)
+    print(info)
     return (sample,)
 
 
@@ -586,7 +592,7 @@ def _(mo):
 
 @app.cell
 def _(model_1, prompt, tokenizer):
-    _text = tokenizer.apply_chat_template(
+    text = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
         tokenize=False,
         add_generation_prompt=True,
@@ -595,7 +601,7 @@ def _(model_1, prompt, tokenizer):
     from transformers import TextStreamer
 
     _ = model_1.generate(
-        **tokenizer(_text, return_tensors="pt").to("cuda"),
+        **tokenizer(text, return_tensors="pt").to("cuda"),
         temperature=1.0,
         max_new_tokens=512,
         streamer=TextStreamer(tokenizer, skip_prompt=False),
@@ -623,10 +629,10 @@ def _(mo):
 @app.cell
 def _(prompt):
     def extract_function(text):
-        if _text.count("```") >= 2:
-            first = _text.find("```") + 3
-            second = _text.find("```", first)
-            fx = _text[first:second].strip()
+        if text.count("```") >= 2:
+            first = text.find("```") + 3
+            second = text.find("```", first)
+            fx = text[first:second].strip()
             fx = fx.removeprefix("python\n")
             fx = fx[fx.find("def") :]
             if fx.startswith("def matmul(A, B):"):
@@ -647,8 +653,8 @@ def _(mo):
 
 @app.cell
 def _(check_only_stdlib_imports):
-    _ok, _info = check_only_stdlib_imports("def a")
-    (_ok, _info)
+    ok_1, info_1 = check_only_stdlib_imports("def a")
+    (ok_1, info_1)
     return
 
 
@@ -666,8 +672,8 @@ def _(
             function = extract_function(response)
             print(function)
             if function is not None:
-                _ok, _info = check_only_stdlib_imports(function)
-            if function is None or "error" in _info:
+                ok, info = check_only_stdlib_imports(function)
+            if function is None or "error" in info:
                 score = -2.0
             else:
                 try:
@@ -698,10 +704,10 @@ def _(check_only_stdlib_imports, extract_function):
             response = completion[0]["content"]
             function = extract_function(response)
             if function is not None:
-                _ok, _info = check_only_stdlib_imports(function)
+                ok, info = check_only_stdlib_imports(function)
             else:
-                _ok = False
-            scores.append(1.0 if _ok else -20.0)  # Penalize heavily!
+                ok = False
+            scores.append(1.0 if ok else -20.0)  # Penalize heavily!
         return scores
 
     return (no_cheating,)
@@ -735,14 +741,14 @@ def _(
         scores = []
         A, A_list, B, B_list = generate_random_matrices(
             seed=np.random.randint(10000), n=128
-        )
+        )  # Generate some random matrices of size less than 128
         for completion in completions:
             score = 0
             response = completion[0]["content"]
             function = extract_function(response)
             if function is not None:
-                _ok, _info = check_only_stdlib_imports(function)
-            if function is None or "error" in _info:
+                ok, info = check_only_stdlib_imports(function)
+            if function is None or "error" in info:
                 scores.append(0)
                 continue
             try:
@@ -754,13 +760,13 @@ def _(
                 pred = new_matmul(A_list.copy(), B_list.copy())
             except:
                 scores.append(-2.0)
-                continue
+                continue  # Failed!
             true = np.matmul(A, B)
             amax_error, mse_error = calculate_difference(pred, true)
             machine_epsilon = 100 * np.finfo(np.float64).eps
             if amax_error >= 3:
                 score = -3.0
-            elif amax_error >= 2:
+            elif amax_error >= 2:  # Check correctness and score!
                 score = -2.5
             elif amax_error >= 1:
                 score = -2.0
@@ -834,14 +840,12 @@ def _(mo):
 
 @app.cell
 def _(new_results, numpy_results):
-    _negative = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
-    _positive = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
-    _reward = (
-        _negative
-        if new_results["median_ns"] >= numpy_results["median_ns"]
-        else _positive
+    negative = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
+    positive = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
+    reward = (
+        negative if new_results["median_ns"] >= numpy_results["median_ns"] else positive
     )
-    _reward
+    reward
     return
 
 
@@ -849,14 +853,14 @@ def _(new_results, numpy_results):
 def _(new_results, numpy_results):
     new_results["median_ns"] = 3
     numpy_results["median_ns"] = 1000
-    _negative = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
-    _positive = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
-    _reward = (
-        _negative
+    negative_1 = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
+    positive_1 = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
+    reward_1 = (
+        negative_1
         if new_results["median_ns"] >= numpy_results["median_ns"]
-        else _positive
+        else positive_1
     )
-    _reward
+    reward_1
     return
 
 
@@ -876,14 +880,16 @@ def _(
         A, A_list, B, B_list = generate_random_matrices(
             seed=np.random.randint(10000), n=256
         )
-        numpy_results = benchmarker.benchmark(np.matmul, [(A, B)])
+        numpy_results = benchmarker.benchmark(
+            np.matmul, [(A, B)]
+        )  # Generate some random matrices of size less than 256
         for completion in completions:
             score = 0
             response = completion[0]["content"]
             function = extract_function(response)
             if function is not None:
-                _ok, _info = check_only_stdlib_imports(function)
-            if function is None or "error" in _info:
+                ok, info = check_only_stdlib_imports(function)
+            if function is None or "error" in info:
                 scores.append(0)
                 continue
             try:
@@ -894,21 +900,21 @@ def _(
             new_results = benchmarker.benchmark(
                 new_matmul, [(A_list.copy(), B_list.copy())]
             )
-            _negative = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
-            _positive = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
+            negative = -(new_results["median_ns"] / numpy_results["median_ns"]) / 100
+            positive = +(numpy_results["median_ns"] / new_results["median_ns"]) / 100
             score = (
-                _negative
+                negative
                 if new_results["median_ns"] >= numpy_results["median_ns"]
-                else _positive
+                else positive
             )
-            if score >= 10:
+            if score >= 10:  # Get score and clip to -10, 10
                 score = 10
             if score <= -10:
                 score = -10
             scores.append(score)
         gc.collect()
         torch.cuda.empty_cache()
-        return scores
+        return scores  # Free memory to counteract OOMs
 
     return (speed_check,)
 
@@ -1061,14 +1067,14 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, prompt, tokenizer):
-    _text = tokenizer.apply_chat_template(
+    text_1 = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
         tokenize=False,
         add_generation_prompt=True,
         reasoning_effort="low",
     )
     _ = model_1.generate(
-        **tokenizer(_text, return_tensors="pt").to("cuda"),
+        **tokenizer(text_1, return_tensors="pt").to("cuda"),
         temperature=1.0,
         max_new_tokens=1024,
         streamer=TextStreamer(tokenizer, skip_prompt=False),

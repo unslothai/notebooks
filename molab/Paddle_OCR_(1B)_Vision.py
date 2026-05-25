@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -258,14 +257,14 @@ def _(mo):
 
 @app.cell
 def _():
-    _instruction = "OCR:"
+    instruction = "OCR:"
 
     def convert_to_conversation(sample):
         conversation = [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": _instruction},
+                    {"type": "text", "text": instruction},
                     {"type": "image", "image": sample["image"]},
                 ],
             },
@@ -317,27 +316,27 @@ def _(mo):
 
 @app.cell
 def _(FastVisionModel, dataset, model_1, processor, tokenizer):
-    FastVisionModel.for_inference(model_1)
-    _image = dataset[2]["image"]
-    _instruction = "OCR:"
-    _messages = [
+    FastVisionModel.for_inference(model_1)  # Enable for inference!
+    image = dataset[2]["image"]
+    instruction_1 = "OCR:"
+    messages = [
         {
             "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": _instruction}],
+            "content": [{"type": "image"}, {"type": "text", "text": instruction_1}],
         }
     ]
-    _text_prompt = processor.tokenizer.apply_chat_template(
-        _messages, tokenize=False, add_generation_prompt=True
+    text_prompt = processor.tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
     )
     inputs = processor(
-        _image, _text_prompt, add_special_tokens=False, return_tensors="pt"
+        image, text_prompt, add_special_tokens=False, return_tensors="pt"
     ).to("cuda")
     from transformers import TextStreamer
 
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    text_streamer = TextStreamer(tokenizer, skip_prompt=True)
     _ = model_1.generate(
         **inputs,
-        streamer=_text_streamer,
+        streamer=text_streamer,
         max_new_tokens=128,
         use_cache=False,
         temperature=1.5,
@@ -452,25 +451,25 @@ def _(mo):
 
 @app.cell
 def _(FastVisionModel, TextStreamer, dataset, model_1, processor, tokenizer):
-    FastVisionModel.for_inference(model_1)
-    _image = dataset[2]["image"]
-    _instruction = "OCR:"
-    _messages = [
+    FastVisionModel.for_inference(model_1)  # Enable for inference!
+    image_1 = dataset[2]["image"]
+    instruction_2 = "OCR:"
+    messages_1 = [
         {
             "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": _instruction}],
+            "content": [{"type": "image"}, {"type": "text", "text": instruction_2}],
         }
     ]
-    _text_prompt = processor.tokenizer.apply_chat_template(
-        _messages, tokenize=False, add_generation_prompt=True
+    text_prompt_1 = processor.tokenizer.apply_chat_template(
+        messages_1, tokenize=False, add_generation_prompt=True
     )
     inputs_1 = processor(
-        _image, _text_prompt, add_special_tokens=False, return_tensors="pt"
+        image_1, text_prompt_1, add_special_tokens=False, return_tensors="pt"
     ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    text_streamer_1 = TextStreamer(tokenizer, skip_prompt=True)
     _ = model_1.generate(
         **inputs_1,
-        streamer=_text_streamer,
+        streamer=text_streamer_1,
         max_new_tokens=128,
         use_cache=False,
         temperature=1.5,
@@ -515,10 +514,10 @@ def _(TextStreamer, inputs_1, model_1, tokenizer):
             model_name="paddle_ocr_lora", load_in_4bit=False  # YOUR MODEL YOU USED FOR TRAINING
         )
         _FastVisionModel.for_inference(_model)
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    text_streamer_2 = TextStreamer(tokenizer, skip_prompt=True)
     _ = model_1.generate(
         **inputs_1,
-        streamer=_text_streamer,
+        streamer=text_streamer_2,
         max_new_tokens=128,
         use_cache=False,
         temperature=1.5,

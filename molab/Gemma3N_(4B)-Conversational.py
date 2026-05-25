@@ -13,11 +13,10 @@
 #     "timm",
 #     "torchao>=0.16.0",
 #     "torchcodec",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -85,6 +84,13 @@ def _(mo):
 
     Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
     """)
+    return
+
+
+@app.cell
+def _():
+    # packages added via marimo's package management: timm !pip install --no-deps --upgrade timm
+    # Only for Gemma 3N
     return
 
 
@@ -230,6 +236,7 @@ def _():
 
 @app.cell
 def _():
+    import subprocess
     import subprocess
 
     #! wget -qqq https://www.nasa.gov/wp-content/uploads/2015/01/591240main_JFKmoonspeech.mp3 -O audio.mp3

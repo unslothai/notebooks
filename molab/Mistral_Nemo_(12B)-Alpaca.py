@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -190,25 +189,39 @@ def _(mo):
 
 @app.cell
 def _(tokenizer):
-    alpaca_prompt = "Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.\n\n### Instruction:\n{}\n\n### Input:\n{}\n\n### Response:\n{}"
+    alpaca_prompt = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+
+    ### Instruction:
+    {}
+
+    ### Input:
+    {}
+
+    ### Response:
+    {}"""
+
     EOS_TOKEN = tokenizer.eos_token  # Must add EOS_TOKEN
 
     def formatting_prompts_func(examples):
         instructions = examples["instruction"]
-        _inputs = examples["input"]
+        inputs = examples["input"]
         outputs = examples["output"]
         texts = []
-        for instruction, input, output in zip(instructions, _inputs, outputs):
+        for instruction, input, output in zip(instructions, inputs, outputs):
+            # Must add EOS_TOKEN, otherwise your generation will go on forever!
             text = alpaca_prompt.format(instruction, input, output) + EOS_TOKEN
             texts.append(text)
-        return {"text": texts}  # Must add EOS_TOKEN
+        return {
+            "text": texts,
+        }
 
     from datasets import load_dataset
 
     dataset = load_dataset("unsloth/alpaca-cleaned", split="train")
     dataset = dataset.map(
-        formatting_prompts_func, batched=True
-    )  # Must add EOS_TOKEN, otherwise your generation will go on forever!
+        formatting_prompts_func,
+        batched=True,
+    )
     return alpaca_prompt, dataset
 
 
@@ -298,8 +311,9 @@ def _(mo):
 
 @app.cell
 def _(FastLanguageModel, alpaca_prompt, model_1, tokenizer):
-    FastLanguageModel.for_inference(model_1)
-    _inputs = tokenizer(
+    # alpaca_prompt = Copied from above
+    FastLanguageModel.for_inference(model_1)  # Enable native 2x faster inference
+    inputs = tokenizer(
         [
             alpaca_prompt.format(
                 "Continue the fibonacci sequence.", "1, 1, 2, 3, 5, 8", ""
@@ -308,12 +322,11 @@ def _(FastLanguageModel, alpaca_prompt, model_1, tokenizer):
         return_tensors="pt",
     ).to("cuda")
     outputs = model_1.generate(
-        **_inputs,
-        max_new_tokens=64,
-        use_cache=True,
-        pad_token_id=tokenizer.eos_token_id,
+        **inputs, max_new_tokens=64, use_cache=True, pad_token_id=tokenizer.eos_token_id
     )
-    tokenizer.batch_decode(outputs)
+    tokenizer.batch_decode(
+        outputs
+    )
     return
 
 
@@ -327,8 +340,9 @@ def _(mo):
 
 @app.cell
 def _(FastLanguageModel, alpaca_prompt, model_1, tokenizer):
-    FastLanguageModel.for_inference(model_1)
-    _inputs = tokenizer(
+    # alpaca_prompt = Copied from above
+    FastLanguageModel.for_inference(model_1)  # Enable native 2x faster inference
+    inputs_1 = tokenizer(
         [
             alpaca_prompt.format(
                 "Continue the fibonacci sequence.", "1, 1, 2, 3, 5, 8", ""
@@ -338,11 +352,11 @@ def _(FastLanguageModel, alpaca_prompt, model_1, tokenizer):
     ).to("cuda")
     from transformers import TextStreamer
 
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    text_streamer = TextStreamer(tokenizer, skip_prompt=True)
     _ = model_1.generate(
-        input_ids=_inputs.input_ids,
-        attention_mask=_inputs.attention_mask,
-        streamer=_text_streamer,
+        input_ids=inputs_1.input_ids,
+        attention_mask=inputs_1.attention_mask,
+        streamer=text_streamer,
         max_new_tokens=128,
         pad_token_id=tokenizer.eos_token_id,
     )
@@ -396,15 +410,16 @@ def _(
             load_in_4bit=load_in_4bit,  # Use 4bit quantization to reduce memory usage. Can be False.
         )
         _FastLanguageModel.for_inference(_model)
-    _inputs = tokenizer(
+    inputs_2 = tokenizer(
         [alpaca_prompt.format("What is a famous tall tower in Paris?", "", "")],
         return_tensors="pt",
     ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    # alpaca_prompt = You MUST copy from above!
+    text_streamer_1 = TextStreamer(tokenizer, skip_prompt=True)
     _ = model_1.generate(
-        input_ids=_inputs.input_ids,
-        attention_mask=_inputs.attention_mask,
-        streamer=_text_streamer,
+        input_ids=inputs_2.input_ids,
+        attention_mask=inputs_2.attention_mask,
+        streamer=text_streamer_1,
         max_new_tokens=64,
         pad_token_id=tokenizer.eos_token_id,
     )

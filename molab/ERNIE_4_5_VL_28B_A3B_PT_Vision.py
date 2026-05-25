@@ -12,11 +12,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -257,26 +256,24 @@ def _(mo):
 
 @app.cell
 def _():
-    _instruction = "Write the LaTeX representation for this image."
+    instruction = "Write the LaTeX representation for this image."
 
     def convert_to_conversation(sample):
         conversation = [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": _instruction},
+                    {"type": "text", "text": instruction},
                     {"type": "image", "image": sample["image"]},
                 ],
             },
             {
                 "role": "assistant",
                 "content": [{"type": "text", "text": sample["text"]}],
-                "reasoning_content": "\n",
+                "reasoning_content": "\n",  # If you leave this as "\n", you train the model to output empty thoughts.
             },
         ]
-        return {
-            "messages": conversation
-        }  # If you leave this as "\n", you train the model to output empty thoughts.
+        return {"messages": conversation}
 
     return (convert_to_conversation,)
 
@@ -319,33 +316,31 @@ def _(mo):
 
 @app.cell
 def _(FastVisionModel, dataset, model_1, processor, tokenizer):
-    FastVisionModel.for_inference(model_1)
-    _image = dataset[2]["image"]
-    _instruction = "Write the LaTeX representation for this image."
-    _messages = [
+    FastVisionModel.for_inference(model_1)  # Enable for inference!
+    image = dataset[2]["image"]
+    instruction_1 = "Write the LaTeX representation for this image."
+    messages = [
         {
             "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": _instruction}],
+            "content": [{"type": "image"}, {"type": "text", "text": instruction_1}],
         }
     ]
-    _text_prompt = processor.tokenizer.apply_chat_template(
-        _messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
+    text_prompt = processor.tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
     )
     inputs = processor(
-        text=[_text_prompt],
-        images=[_image],
-        videos=[],
-        padding=True,
-        return_tensors="pt",
+        text=[text_prompt], images=[image], videos=[], padding=True, return_tensors="pt"
     )
-    _device = next(model_1.parameters()).device
-    inputs = inputs.to(_device)
+    device = next(model_1.parameters()).device
+    inputs = inputs.to(device)
     from transformers import TextStreamer
 
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    text_streamer = TextStreamer(
+        tokenizer, skip_prompt=True
+    )
     _ = model_1.generate(
         **inputs,
-        streamer=_text_streamer,
+        streamer=text_streamer,
         max_new_tokens=128,
         use_cache=False,
         temperature=1.5,
@@ -658,36 +653,37 @@ def _(mo):
 
 @app.cell
 def _(FastVisionModel, TextStreamer, dataset, model_1, processor, tokenizer):
-    FastVisionModel.for_inference(model_1)
-    _image = dataset[2]["image"]
-    _instruction = "Write the LaTeX representation for this image."
-    _messages = [
+    FastVisionModel.for_inference(model_1)  # Enable for inference!
+    image_1 = dataset[2]["image"]
+    instruction_2 = "Write the LaTeX representation for this image."
+    messages_1 = [
         {
             "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": _instruction}],
+            "content": [{"type": "image"}, {"type": "text", "text": instruction_2}],
         }
     ]
-    _text_prompt = processor.tokenizer.apply_chat_template(
-        _messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
+    text_prompt_1 = processor.tokenizer.apply_chat_template(
+        messages_1, tokenize=False, add_generation_prompt=True, enable_thinking=False
     )
     inputs_1 = processor(
-        text=[_text_prompt],
-        images=[_image],
+        text=[text_prompt_1],
+        images=[image_1],
         videos=[],
         padding=True,
         return_tensors="pt",
     )
-    _device = next(model_1.parameters()).device
-    inputs_1 = inputs_1.to(_device)
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    device_1 = next(model_1.parameters()).device
+    inputs_1 = inputs_1.to(device_1)
+    text_streamer_1 = TextStreamer(tokenizer, skip_prompt=True)
+    # Move inputs to GPU
     _ = model_1.generate(
         **inputs_1,
-        streamer=_text_streamer,
+        streamer=text_streamer_1,
         max_new_tokens=128,
         use_cache=False,
         temperature=1.5,
         min_p=0.1,
-    )
+    )  # Placeholder required for the template
     return (inputs_1,)
 
 
@@ -727,10 +723,10 @@ def _(TextStreamer, inputs_1, model_1, tokenizer):
             model_name="ernie_lora", load_in_4bit=False  # YOUR MODEL YOU USED FOR TRAINING
         )
         _FastVisionModel.for_inference(_model)
-    _text_streamer = TextStreamer(tokenizer, skip_prompt=True)
+    text_streamer_2 = TextStreamer(tokenizer, skip_prompt=True)
     _ = model_1.generate(
         **inputs_1,
-        streamer=_text_streamer,
+        streamer=text_streamer_2,
         max_new_tokens=128,
         use_cache=False,
         temperature=1.5,

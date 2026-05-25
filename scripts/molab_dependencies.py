@@ -257,6 +257,67 @@ def _normalise_pkg(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name.strip().lower())
 
 
+def _normalise_molab_spec(key: str, spec: str) -> str:
+    """Apply molab-only dependency spec rewrites."""
+    if key == "unsloth":
+        return "unsloth @ git+https://github.com/unslothai/unsloth"
+    return spec
+
+
+def _name_from_git_url(url: str) -> Optional[str]:
+    """Derive a PEP 508 project name from a bare ``git+<url>`` token.
+
+    PEP 723's ``dependencies`` array is strict PEP 508 and rejects bare
+    git+ URLs — they must be expressed as ``name @ git+<url>``.  This
+    helper extracts a reasonable ``name`` so the generator can rewrite
+    the bare URL into a valid PEP 508 string.
+
+    Two extraction rules, in order:
+
+    1. ``#subdirectory=path/to/pkg`` — take the last path segment.  This
+       is the convention pip uses to install one package from a multi-
+       package repo.  e.g.
+       ``git+https://github.com/triton-lang/triton.git@<sha>#subdirectory=python/triton_kernels``
+       -> ``triton_kernels``.
+    2. The URL's last path segment with ``.git`` and any ``@<ref>``
+       suffix stripped.  e.g.
+       ``git+https://github.com/Dao-AILab/causal-conv1d.git@main``
+       -> ``causal-conv1d``.
+
+    The derived name is an identifier-only label uv uses as the dep
+    graph key — the actual package metadata (``pyproject.toml`` /
+    ``setup.py``) is fetched from the URL, so the name does not have to
+    match the upstream distribution name (it is fine for our key to
+    differ from the canonical PyPI name).
+
+    Returns ``None`` if no plausible name can be derived.  Trailing
+    whitespace, quotes, semicolons, and commas (left behind by sloppy
+    install-cell tokenisation in some source notebooks) are stripped
+    before extraction.
+    """
+    cleaned = url.strip().rstrip(';,"\'')
+    # Strip everything from the first '#' that is NOT '#subdirectory=' —
+    # other fragments are not name-bearing.  But we DO want to peek at
+    # ``#subdirectory=`` first.
+    sub_match = re.search(r"#subdirectory=([^&\s]+)", cleaned)
+    if sub_match:
+        subdir = sub_match.group(1).rstrip("/")
+        last = subdir.rsplit("/", 1)[-1]
+        if last and re.match(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$", last):
+            return last
+    # Otherwise, derive from the repo name.  Drop the fragment + ref tail.
+    no_frag = cleaned.split("#", 1)[0]
+    # The ``@<ref>`` separator is the LAST '@' in the URL because git+https
+    # itself contains no '@' in the host/path.
+    no_ref = no_frag.rsplit("@", 1)[0] if "@" in no_frag.split("://", 1)[-1] else no_frag
+    last = no_ref.rstrip("/").rsplit("/", 1)[-1]
+    if last.endswith(".git"):
+        last = last[:-4]
+    if last and re.match(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$", last):
+        return last
+    return None
+
+
 def _split_args(arg_string: str) -> list[str]:
     """Split a pip argument string into tokens, tolerating shell quoting and
     IPython ``{var}`` expansion braces.
@@ -388,10 +449,32 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                 ))
 
             for spec in parsed.specs:
+                # Bare ``git+<url>`` tokens (no PEP 508 ``name @ url``
+                # prefix) are pip CLI syntax that PEP 723 cannot parse.
+                # The source notebooks ship several of these (e.g.
+                # ``git+https://github.com/triton-lang/triton.git@<sha>#subdirectory=python/triton_kernels``,
+                # ``git+https://github.com/Dao-AILab/causal-conv1d.git@main``).
+                # Convert each to a valid PEP 508 ``name @ url`` string by
+                # deriving the project name from the URL (either the
+                # ``#subdirectory=...`` fragment's last path segment, or
+                # the repo name with ``.git`` / ``@<ref>`` stripped).
+                if spec.startswith("git+"):
+                    derived = _name_from_git_url(spec)
+                    if derived is None:
+                        plan.dropped.append(DroppedItem(
+                            text=spec,
+                            reason="git+ URL with no derivable PEP 508 name "
+                                   "(neither #subdirectory= fragment nor a "
+                                   "parseable repo path); cannot be expressed "
+                                   "in PEP 723 dependencies",
+                        ))
+                        continue
+                    spec = f"{derived} @ {spec}"
                 name = _RE_PKG_NAME.match(spec)
                 if not name:
                     continue
                 key = _normalise_pkg(name.group(1))
+                spec = _normalise_molab_spec(key, spec)
                 # Prefer a pinned/constrained spec over a bare name, and a
                 # longer (tighter) constraint over a looser one — same
                 # tie-break intent as update_all_notebooks._install_spec_*.
@@ -399,42 +482,59 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                 if existing is None or _spec_rank(spec) > _spec_rank(existing):
                     chosen[key] = spec
 
-    # Force unsloth + unsloth_zoo to git-latest for every molab notebook.
-    # The source notebooks usually carry plain ``pip install unsloth`` which
-    # resolves to whatever uv picks; when an adjacent constraint (e.g.
-    # ``transformers==5.5.0``) is incompatible with the current PyPI
-    # release, uv silently down-resolves unsloth to a much older release.
-    # molab is the cutting-edge surface — every notebook should pull the
-    # live ``main`` branch from GitHub.  Specs that ALREADY reference a
-    # direct VCS URL (the GRPO notebooks ship explicit ``unsloth[...] @
-    # git+...`` lines) are left as authored.
-    # Keys are PEP 503-normalised (``_normalise_pkg``): hyphens, lowercase —
-    # so ``unsloth_zoo`` from the source matches the ``unsloth-zoo`` key here.
-    _GIT_LATEST: dict[str, str] = {
-        "unsloth": "unsloth @ git+https://github.com/unslothai/unsloth.git",
-        "unsloth-zoo": "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
-    }
-    for key, latest_spec in _GIT_LATEST.items():
+    # Molab should always install Unsloth from GitHub, regardless of whether
+    # the source notebook used a bare ``unsloth``, a PyPI range, or
+    # ``unsloth[base] @ git+...``.  Source notebooks keep their authored
+    # install cells; this rewrite is only for generated Molab PEP 723 metadata.
+    _UNSLOTH_GIT_SPEC = "unsloth @ git+https://github.com/unslothai/unsloth"
+    for key, latest_spec in {"unsloth": _UNSLOTH_GIT_SPEC}.items():
         spec = chosen.get(key)
         if spec is None:
             continue
-        if "@" in spec or "git+" in spec:
-            # Source already pins a direct reference; respect it.
-            continue
         chosen[key] = latest_spec
 
-    # Force-add ``unsloth_zoo`` whenever ``unsloth`` is present.  The
-    # source notebooks rely on Colab's split-branch pattern:
-    # ``pip install unsloth`` (PyPI) on the cloud branch pulls
-    # ``unsloth_zoo`` as a transitive, while the Colab branch installs
-    # it explicitly via ``--no-deps unsloth_zoo ...``.  molab uses the
-    # ``git+`` unsloth instead, which does NOT declare ``unsloth_zoo``
-    # as a runtime dep — so without this, ``from unsloth import ...``
-    # fails at runtime with::
-    #     ImportError: Unsloth: Please install unsloth_zoo via
-    #     `pip install unsloth_zoo` then retry!
-    if "unsloth" in chosen and "unsloth-zoo" not in chosen:
-        chosen["unsloth-zoo"] = _GIT_LATEST["unsloth-zoo"]
+    # Keep known Molab resolver safety pins even though Unsloth itself now
+    # comes from GitHub.  The source notebooks use --no-deps in places where
+    # Molab's PEP 723 environment resolves the full dependency graph.
+    if "unsloth" in chosen:
+        transformers_spec = chosen.get("transformers")
+        excluded_transformers = {
+            "transformers==4.57.0",
+            "transformers==4.57.4",
+            "transformers==4.57.5",
+        }
+        if transformers_spec in excluded_transformers:
+            chosen["transformers"] = "transformers==4.57.3"
+            plan.dropped.append(DroppedItem(
+                text=transformers_spec,
+                reason="replaced: this transformers release is known to break "
+                       "Molab's Unsloth dependency resolution; use the nearest "
+                       "compatible 4.57.x pin",
+            ))
+
+        trl_spec = chosen.get("trl")
+        trl_pin = re.match(r"^trl==(\d+)\.(\d+)\.(\d+)$", trl_spec or "")
+        if trl_pin and tuple(map(int, trl_pin.groups())) > (0, 24, 0):
+            chosen["trl"] = "trl==0.24.0"
+            plan.dropped.append(DroppedItem(
+                text=trl_spec,
+                reason="replaced: source Colab uses --no-deps, but Molab's "
+                       "PEP 723 environment resolves the full graph; keep "
+                       "trl on the known-compatible <=0.24.0 line",
+            ))
+
+    # Drop any explicit ``unsloth_zoo`` line from the source notebook's
+    # install cell.  The Molab dependency contract keeps one Unsloth entry:
+    # ``unsloth @ git+https://github.com/unslothai/unsloth``.  The source
+    # notebooks' Colab branch may install ``unsloth_zoo`` via ``--no-deps``;
+    # that branch is not copied into Molab.
+    if "unsloth" in chosen and "unsloth-zoo" in chosen:
+        zoo_spec = chosen.pop("unsloth-zoo")
+        plan.dropped.append(DroppedItem(
+            text=zoo_spec,
+            reason="Molab uses a single direct Unsloth git dependency; "
+                   "source Colab's explicit unsloth_zoo line is not copied",
+        ))
 
     # Floor-pin overlay for the molab Python 3.13 cascade.
     #
@@ -473,12 +573,26 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
     # reference — same convention as ``_GIT_LATEST``.  Packages absent
     # from ``chosen`` are not added; this overlay only tightens what's
     # already there.
+    # ``transformers`` is intentionally NOT in the overlay: the source
+    # notebooks already pin it explicitly (e.g. ``transformers==4.56.2``
+    # for 130 of them) and the previous ``transformers>=4.56.0`` floor
+    # silently upgraded those installs to whatever uv resolved as
+    # latest (5.5.0+).  The floor was originally added so vllm 0.21.0
+    # could resolve alongside source pins of ``==4.55.4``; vllm-bearing
+    # notebooks are now excluded at the manifest level (see
+    # ``molab_manifest.EXCLUSION_REASONS``), so the floor is no longer
+    # load-bearing.  Letting the source pin pass through means molab
+    # installs match Colab/Kaggle exactly.
+    #
+    # ``vllm`` is also retained for documentation: vllm-bearing notebooks
+    # are excluded at the manifest level so this entry should never
+    # actually fire, but it documents the intended pin if vllm support
+    # is ever re-added to the molab catalog.
     _MOLAB_FLOORS: dict[str, str] = {
-        "vllm": "vllm>=0.11.0",
+        "vllm": "vllm==0.21.0",
         "xformers": "xformers>=0.0.33",
         "bitsandbytes": "bitsandbytes>=0.43.0",
         "triton": "triton>=3.2.0",
-        "transformers": "transformers>=4.56.0",
     }
     for key, floor_spec in _MOLAB_FLOORS.items():
         spec = chosen.get(key)

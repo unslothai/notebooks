@@ -1,11 +1,12 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
-#     "git+https://github.com/Dao-AILab/causal-conv1d.git@main",
+#     "causal-conv1d @ git+https://github.com/Dao-AILab/causal-conv1d.git@main",
+#     "mamba @ git+https://github.com/state-spaces/mamba.git@main",
 #     "marimo",
 #     "torchao>=0.16.0",
-#     "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git@main",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "transformers @ git+https://github.com/huggingface/transformers.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -60,6 +61,20 @@ def _(mo):
 
     You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
     """)
+    return
+
+
+@app.cell
+def _():
+    import subprocess
+    import subprocess
+
+    # Installs Unsloth, Xformers (Flash Attention) and all other packages!
+    # packages added via marimo's package management: unsloth !pip install unsloth
+    # Get latest Unsloth
+    #! pip uninstall unsloth -y
+    subprocess.call(["pip", "uninstall", "unsloth", "-y"])
+    # packages added via marimo's package management: torchao>=0.16.0 !pip install --no-deps --upgrade "torchao>=0.16.0"
     return
 
 

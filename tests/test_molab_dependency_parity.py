@@ -287,6 +287,58 @@ _DEP_MOD = _import_dependencies()
 # ---------------------------------------------------------------------------
 
 
+def test_molab_forces_unsloth_git_for_phone_notebooks() -> None:
+    """Phone deployment notebooks use Colab --no-deps pins; molab cannot."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    plan = _DEP_MOD.plan_dependencies(
+        REPO_ROOT / "nb" / "Gemma3_(270M)_Phone_Deployment.ipynb"
+    )
+    deps = set(plan.dependencies)
+
+    assert "unsloth @ git+https://github.com/unslothai/unsloth" in deps
+    assert "unsloth>=2026.5.7" not in deps
+    assert "transformers==4.57.3" in deps
+    assert "trl==0.24.0" in deps
+    assert "trl==0.25.1" not in deps
+
+
+def test_molab_git_overlay_avoids_excluded_transformers_release() -> None:
+    """Molab's Unsloth git overlay still avoids transformers 4.57.0."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    plan = _DEP_MOD.plan_dependencies(
+        REPO_ROOT / "nb" / "Qwen3_VL_(8B)-Vision-GRPO.ipynb"
+    )
+    deps = set(plan.dependencies)
+
+    assert "unsloth @ git+https://github.com/unslothai/unsloth" in deps
+    assert "unsloth>=2026.5.7" not in deps
+    assert "transformers==4.57.3" in deps
+    assert "transformers==4.57.0" not in deps
+    assert "trl==0.24.0" in deps
+    assert "trl==0.26.2" not in deps
+
+
+def test_molab_strips_unsloth_base_extra_from_direct_reference() -> None:
+    """Molab direct Unsloth git installs should not request the base extra."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    plan = _DEP_MOD.plan_dependencies(
+        REPO_ROOT / "nb" / "Openenv_wordle_grpo.ipynb"
+    )
+    deps = set(plan.dependencies)
+
+    assert "unsloth @ git+https://github.com/unslothai/unsloth" in deps
+    assert (
+        "unsloth[base] @ git+https://github.com/unslothai/unsloth"
+        not in deps
+    )
+
+
 @pytest.mark.parametrize("py_file", _GENERATED_FILES, ids=lambda p: p.stem)
 def test_dependency_parity(py_file: Path) -> None:
     """Every source install package must appear in the generated molab file

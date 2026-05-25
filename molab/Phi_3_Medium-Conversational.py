@@ -11,11 +11,10 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth.git",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 # ]
 #
 # [tool.uv]
@@ -389,14 +388,18 @@ def _(FastLanguageModel, get_chat_template, model_1, tokenizer_1):
         },
     )
     FastLanguageModel.for_inference(model_1)
-    _messages = [
+    messages = [
         {"from": "human", "value": "Continue the fibonacci sequence: 1, 1, 2, 3, 5, 8,"}
     ]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
+    inputs = tokenizer_2.apply_chat_template(
+        messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
     ).to("cuda")
-    outputs = model_1.generate(input_ids=_inputs, max_new_tokens=64, use_cache=True)
-    tokenizer_2.batch_decode(outputs)
+    outputs = model_1.generate(
+        input_ids=inputs, max_new_tokens=64, use_cache=True
+    )  # Supports zephyr, chatml, mistral, llama, alpaca, vicuna, vicuna_old, unsloth
+    tokenizer_2.batch_decode(
+        outputs
+    )
     return (tokenizer_2,)
 
 
@@ -410,19 +413,19 @@ def _(mo):
 
 @app.cell
 def _(FastLanguageModel, model_1, tokenizer_2):
-    FastLanguageModel.for_inference(model_1)
-    _messages = [
+    FastLanguageModel.for_inference(model_1)  # Enable native 2x faster inference
+    messages_1 = [
         {"from": "human", "value": "Continue the fibonacci sequence: 1, 1, 2, 3, 5, 8,"}
     ]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
+    inputs_1 = tokenizer_2.apply_chat_template(
+        messages_1, tokenize=True, add_generation_prompt=True, return_tensors="pt"
     ).to("cuda")
     from transformers import TextStreamer
 
-    _text_streamer = TextStreamer(tokenizer_2)
+    text_streamer = TextStreamer(tokenizer_2)
     _ = model_1.generate(
-        input_ids=_inputs, streamer=_text_streamer, max_new_tokens=128, use_cache=True
-    )
+        input_ids=inputs_1, streamer=text_streamer, max_new_tokens=128, use_cache=True
+    )  # Must add for generation
     return (TextStreamer,)
 
 
@@ -465,14 +468,14 @@ def _(TextStreamer, dtype, load_in_4bit, max_seq_length, model_1, tokenizer_2):
             load_in_4bit=load_in_4bit,  # Use 4bit quantization to reduce memory usage. Can be False.
         )
         _FastLanguageModel.for_inference(_model)
-    _messages = [{"from": "human", "value": "What is a famous tall tower in Paris?"}]
-    _inputs = tokenizer_2.apply_chat_template(
-        _messages, tokenize=True, add_generation_prompt=True, return_tensors="pt"
+    messages_2 = [{"from": "human", "value": "What is a famous tall tower in Paris?"}]
+    inputs_2 = tokenizer_2.apply_chat_template(
+        messages_2, tokenize=True, add_generation_prompt=True, return_tensors="pt"
     ).to("cuda")
-    _text_streamer = TextStreamer(tokenizer_2)
+    text_streamer_1 = TextStreamer(tokenizer_2)
     _ = model_1.generate(
-        input_ids=_inputs, streamer=_text_streamer, max_new_tokens=128, use_cache=True
-    )
+        input_ids=inputs_2, streamer=text_streamer_1, max_new_tokens=128, use_cache=True
+    )  # Must add for generation
     return
 
 

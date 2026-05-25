@@ -2,17 +2,16 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
-#     "git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchao>=0.16.0",
 #     "torchvision",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 # ]
 #
@@ -596,10 +595,15 @@ def _(mo):
 def _():
     from unsloth import check_python_modules
 
-    _sample = '\ndef strategy(board):\n    import math\n    from typing import Callable\n    return "W"\n'
-    _ok, _info = check_python_modules(_sample)
-    print("Only Python imports?", _ok)
-    print(_info)
+    sample = """
+    def strategy(board):
+        import math
+        from typing import Callable
+        return "W"
+    """
+    ok, info = check_python_modules(sample)
+    print("Only Python imports?", ok)
+    print(info)
     return (check_python_modules,)
 
 
@@ -613,10 +617,10 @@ def _(mo):
 
 @app.cell
 def _(check_python_modules):
-    _sample = '\ndef strategy(board):\n    from numpy import matmul\n    return "W"\n'
-    _ok, _info = check_python_modules(_sample)
-    print("Only Python imports?", _ok)
-    print(_info)
+    sample_1 = '\ndef strategy(board):\n    from numpy import matmul\n    return "W"\n'
+    ok_1, info_1 = check_python_modules(sample_1)
+    print("Only Python imports?", ok_1)
+    print(info_1)
     return
 
 
@@ -632,10 +636,14 @@ def _(mo):
 def _():
     from unsloth import create_locked_down_function
 
-    _function = '\ndef import_numpy():\n    np.matmul\n    print("Success")\n'
-    _f = create_locked_down_function(_function)
+    function = """
+    def import_numpy():
+        np.matmul
+        print("Success")
+    """
+    f = create_locked_down_function(function)
     try:
-        _f()
+        f()
     except Exception as e:
         print(str(e))
     return (create_locked_down_function,)
@@ -643,10 +651,10 @@ def _():
 
 @app.cell
 def _(create_locked_down_function):
-    _function = "\ndef add(a, b):\n    def adder(a):\n        return a + b\n    return adder(b) + b\n"
-    _f = create_locked_down_function(_function)
+    function_1 = "\ndef add(a, b):\n    def adder(a):\n        return a + b\n    return adder(b) + b\n"
+    f_1 = create_locked_down_function(function_1)
     try:
-        print(_f(10, 20))
+        print(f_1(10, 20))
     except Exception as e:
         print(str(e))
     return
@@ -689,7 +697,7 @@ def _(mo):
 
 @app.cell
 def _(model_1, prompt, tokenizer):
-    _text = tokenizer.apply_chat_template(
+    text = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
         tokenize=False,
         add_generation_prompt=True,
@@ -698,7 +706,7 @@ def _(model_1, prompt, tokenizer):
     from transformers import TextStreamer
 
     _ = model_1.generate(
-        **tokenizer(_text, return_tensors="pt").to("cuda"),
+        **tokenizer(text, return_tensors="pt").to("cuda"),
         temperature=1.0,
         max_new_tokens=512,
         streamer=TextStreamer(tokenizer, skip_prompt=False),
@@ -725,10 +733,10 @@ def _(mo):
 @app.cell
 def _(prompt):
     def extract_function(text):
-        if _text.count("```") >= 2:
-            first = _text.find("```") + 3
-            second = _text.find("```", first)
-            fx = _text[first:second].strip()
+        if text.count("```") >= 2:
+            first = text.find("```") + 3
+            second = text.find("```", first)
+            fx = text[first:second].strip()
             fx = fx.removeprefix("python\n")
             fx = fx[fx.find("def") :]
             if fx.startswith("def strategy(board):"):
@@ -749,8 +757,8 @@ def _(mo):
 
 @app.cell
 def _(check_python_modules):
-    _ok, _info = check_python_modules("def a")
-    (_ok, _info)
+    ok_2, info_2 = check_python_modules("def a")
+    (ok_2, info_2)
     return
 
 
@@ -761,14 +769,14 @@ def _(check_python_modules, create_locked_down_function, extract_function):
         for completion in completions:
             score = 0
             response = completion[0]["content"]
-            _function = extract_function(response)
-            if _function is not None:
-                _ok, _info = check_python_modules(_function)
-            if _function is None or "error" in _info:
+            function = extract_function(response)
+            if function is not None:
+                ok, info = check_python_modules(function)
+            if function is None or "error" in info:
                 score = -2.0
             else:
                 try:
-                    new_strategy = create_locked_down_function(_function)
+                    new_strategy = create_locked_down_function(function)
                     score = 1.0
                 except:
                     score = -0.5
@@ -793,10 +801,10 @@ def _(check_python_modules, extract_function):
         for completion in completions:
             score = 0
             response = completion[0]["content"]
-            _function = extract_function(response)
-            if _function is not None:
-                _ok, _info = check_python_modules(_function)
-                scores.append(1.0 if _ok else -20.0)  # Penalize heavily!
+            function = extract_function(response)
+            if function is not None:
+                ok, info = check_python_modules(function)
+                scores.append(1.0 if ok else -20.0)  # Penalize heavily!
             else:
                 scores.append(-1.0)  # Failed creating function
         return scores
@@ -829,24 +837,24 @@ def _(
 
     def strategy_succeeds(completions, **kwargs):
         global PRINTER
-        scores = []
+        scores = []  # Generate a random game board with seed
         seed = np.random.randint(10000)
         for completion in completions:
             printed = False
             score = 0
             response = completion[0]["content"]
-            _function = extract_function(response)
+            function = extract_function(response)
             if PRINTER % 5 == 0:
                 printed = True
-                print(_function)
+                print(function)
             PRINTER = PRINTER + 1
-            if _function is not None:
-                _ok, _info = check_python_modules(_function)
-            if _function is None or "error" in _info:
+            if function is not None:
+                ok, info = check_python_modules(function)
+            if function is None or "error" in info:
                 scores.append(0)
                 continue
             try:
-                new_strategy = create_locked_down_function(_function)
+                new_strategy = create_locked_down_function(function)
             except:
                 scores.append(0)
                 continue
@@ -855,18 +863,18 @@ def _(
                 steps, game_state = execute_strategy_1(new_strategy, game)
                 print(f"Steps = {steps} State = {game_state}")
                 if printed is False:
-                    print(_function)
+                    print(function)
                 print(game.board().pretty())
                 if game_state == "success":
-                    scores.append(20.0)
+                    scores.append(20.0)  # Success - massively reward!
                 else:
-                    scores.append(2.0)
+                    scores.append(2.0)  # Failed but function works!
             except TimeoutError as e:
                 print("Timeout")
-                scores.append(-1.0)
+                scores.append(-1.0)  # Failed with timeout
             except Exception as e:
                 print(f"Exception = {str(e)}")
-                scores.append(-3.0)
+                scores.append(-3.0)  # Failed
         return scores
 
     return PRINTER, strategy_succeeds
@@ -1017,14 +1025,14 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, prompt, tokenizer):
-    _text = tokenizer.apply_chat_template(
+    text_1 = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
         tokenize=False,
         add_generation_prompt=True,
         reasoning_effort="low",
     )
     _ = model_1.generate(
-        **tokenizer(_text, return_tensors="pt").to("cuda"),
+        **tokenizer(text_1, return_tensors="pt").to("cuda"),
         temperature=1.0,
         max_new_tokens=1024,
         streamer=TextStreamer(tokenizer, skip_prompt=False),

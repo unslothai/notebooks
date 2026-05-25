@@ -3,7 +3,6 @@
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
 #     "fastapi",
-#     "git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "marimo",
 #     "open_spiel",
 #     "requests",
@@ -12,11 +11,11 @@
 #     "torchao>=0.16.0",
 #     "torchvision",
 #     "trackio",
-#     "transformers>=4.56.0",
+#     "transformers==4.56.2",
 #     "triton>=3.2.0",
+#     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
-#     "unsloth[base] @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "uv",
 #     "uvicorn",
 # ]
@@ -95,6 +94,32 @@ def _(mo):
     We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) from source:
     """)
     return
+
+
+@app.cell
+def _():
+    import subprocess
+
+    # packages added via marimo's package management: fastapi uvicorn requests open_spiel !pip install -qqq fastapi uvicorn requests open_spiel
+    # packages added via marimo's package management: fastapi uvicorn requests !pip install fastapi uvicorn requests
+    # packages added via marimo's package management: open_spiel !pip install open_spiel --prefer-binary
+    #! git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1
+    subprocess.call(
+        "git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1",
+        shell=True,
+    )
+    import os
+
+    os.chdir("OpenEnv")
+    #! git checkout 83dda10
+    subprocess.call(["git", "checkout", "83dda10"])
+    import subprocess, sys, os
+    from pathlib import Path
+
+    sys.path.insert(0, ".")  # Add OpenEnv root for envs module
+    sys.path.insert(0, "./src")
+    working_directory = str(Path.cwd().parent.absolute() / "OpenEnv")
+    return os, working_directory
 
 
 @app.cell(hide_code=True)
@@ -218,8 +243,8 @@ def _(mo):
 @app.cell
 def _(launch_openenv, openenv_process, port):
     port_1, openenv_process_1 = launch_openenv(port, openenv_process)
-    _result = openenv_process_1.reset()
-    current_state = _result.observation
+    result = openenv_process_1.reset()
+    current_state = result.observation
     current_state
     return current_state, openenv_process_1, port_1
 
@@ -355,9 +380,9 @@ def _(mo):
 
 @app.cell
 def _(OpenSpielAction, openenv_process_1, render_board):
-    _action = OpenSpielAction(action_id=0, game_name="2048")
-    _result = openenv_process_1.step(_action)
-    current_state_1 = _result.observation
+    action = OpenSpielAction(action_id=0, game_name="2048")
+    result_1 = openenv_process_1.step(action)
+    current_state_1 = result_1.observation
     print(render_board(current_state_1))
     return
 
@@ -372,9 +397,9 @@ def _(mo):
 
 @app.cell
 def _(OpenSpielAction, openenv_process_1, render_board):
-    _action = OpenSpielAction(action_id=1, game_name="2048")
-    _result = openenv_process_1.step(_action)
-    current_state_2 = _result.observation
+    action_1 = OpenSpielAction(action_id=1, game_name="2048")
+    result_2 = openenv_process_1.step(action_1)
+    current_state_2 = result_2.observation
     print(render_board(current_state_2))
     return
 
@@ -389,9 +414,9 @@ def _(mo):
 
 @app.cell
 def _(OpenSpielAction, openenv_process_1, render_board):
-    _action = OpenSpielAction(action_id=2, game_name="2048")
-    _result = openenv_process_1.step(_action)
-    current_state_3 = _result.observation
+    action_2 = OpenSpielAction(action_id=2, game_name="2048")
+    result_3 = openenv_process_1.step(action_2)
+    current_state_3 = result_3.observation
     print(render_board(current_state_3))
     return
 
@@ -406,9 +431,9 @@ def _(mo):
 
 @app.cell
 def _(OpenSpielAction, openenv_process_1, render_board):
-    _action = OpenSpielAction(action_id=3, game_name="2048")
-    _result = openenv_process_1.step(_action)
-    current_state_4 = _result.observation
+    action_3 = OpenSpielAction(action_id=3, game_name="2048")
+    result_4 = openenv_process_1.step(action_3)
+    current_state_4 = result_4.observation
     print(render_board(current_state_4))
     return (current_state_4,)
 
@@ -461,21 +486,23 @@ def _(
         total_reward = 0
         while not current_state.done:
             board, size = convert_to_board(current_state)
-            _action = strategy(board)
+            action = strategy(board)
             try:
-                _action = int(_action)
+                action = int(action)
             except:
                 return (steps, False)
             steps = steps + 1
-            if type(_action) is not int or _action not in current_state.legal_actions:
+            if type(action) is not int or action not in current_state.legal_actions:
                 return (steps, max(itertools.chain.from_iterable(board)) == 2048)
             global port, openenv_process
-            port_2, openenv_process_2 = launch_openenv(port_1, openenv_process_1)
-            _action = OpenSpielAction(action_id=_action, game_name="2048")
-            _result = openenv_process_2.step(_action)
-            current_state = _result.observation
-            if _result.reward is not None:
-                total_reward = total_reward + _result.reward
+            globals()["port"], globals()["openenv_process"] = launch_openenv(
+                port_1, openenv_process_1
+            )
+            action = OpenSpielAction(action_id=action, game_name="2048")
+            result = openenv_process_1.step(action)
+            current_state = result.observation
+            if result.reward is not None:
+                total_reward = total_reward + result.reward
         return (steps, max(itertools.chain.from_iterable(board)) == 2048)
 
     @execute_with_time_limit(2)
@@ -494,19 +521,20 @@ def _(mo):
 
 
 @app.cell
-def _(execute_strategy, launch_openenv, openenv_process_2, port_2):
+def _(execute_strategy, launch_openenv, openenv_process_1, port_1):
     def always_move_left(board):
         return 3
 
-    port_3, openenv_process_3 = launch_openenv(port_2, openenv_process_2)
-    _result = openenv_process_3.reset()
-    current_state_5 = _result.observation
+    port_2, openenv_process_2 = launch_openenv(port_1, openenv_process_1)
+    # Reset OpenEnv to an initial state!
+    result_5 = openenv_process_2.reset()
+    current_state_5 = result_5.observation
     try:
         steps, if_done = execute_strategy(always_move_left, current_state_5)
     except TimeoutError as e:
         print(f"Timed out with error = {str(e)}")
     (steps, if_done)
-    return openenv_process_3, port_3
+    return openenv_process_2, port_2
 
 
 @app.cell(hide_code=True)
@@ -542,10 +570,15 @@ def _(mo):
 def _():
     from unsloth import check_python_modules
 
-    _sample = '\ndef strategy(board):\n    import math\n    from typing import Callable\n    return "0"\n'
-    _ok, _info = check_python_modules(_sample)
-    print("Only Python imports?", _ok)
-    print(_info)
+    sample = """
+    def strategy(board):
+        import math
+        from typing import Callable
+        return "0"
+    """
+    ok, info = check_python_modules(sample)
+    print("Only Python imports?", ok)
+    print(info)
     return (check_python_modules,)
 
 
@@ -559,10 +592,10 @@ def _(mo):
 
 @app.cell
 def _(check_python_modules):
-    _sample = '\ndef strategy(board):\n    from numpy import matmul\n    return "0"\n'
-    _ok, _info = check_python_modules(_sample)
-    print("Only Python imports?", _ok)
-    print(_info)
+    sample_1 = '\ndef strategy(board):\n    from numpy import matmul\n    return "0"\n'
+    ok_1, info_1 = check_python_modules(sample_1)
+    print("Only Python imports?", ok_1)
+    print(info_1)
     return
 
 
@@ -578,10 +611,14 @@ def _(mo):
 def _():
     from unsloth import create_locked_down_function
 
-    _function = '\ndef import_numpy():\n    np.matmul\n    print("Success")\n'
-    _f = create_locked_down_function(_function)
+    function = """
+    def import_numpy():
+        np.matmul
+        print("Success")
+    """
+    f = create_locked_down_function(function)
     try:
-        _f()
+        f()
     except Exception as e:
         print(str(e))
     return (create_locked_down_function,)
@@ -589,10 +626,10 @@ def _():
 
 @app.cell
 def _(create_locked_down_function):
-    _function = "\ndef add(a, b):\n    def adder(a):\n        return a + b\n    return adder(b) + b\n"
-    _f = create_locked_down_function(_function)
+    function_1 = "\ndef add(a, b):\n    def adder(a):\n        return a + b\n    return adder(b) + b\n"
+    f_1 = create_locked_down_function(function_1)
     try:
-        print(_f(10, 20))
+        print(f_1(10, 20))
     except Exception as e:
         print(str(e))
     return
@@ -635,7 +672,7 @@ def _(mo):
 
 @app.cell
 def _(model_1, prompt, tokenizer):
-    _text = tokenizer.apply_chat_template(
+    text = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
         tokenize=False,
         add_generation_prompt=True,
@@ -644,7 +681,7 @@ def _(model_1, prompt, tokenizer):
     from transformers import TextStreamer
 
     _ = model_1.generate(
-        **tokenizer(_text, return_tensors="pt").to("cuda"),
+        **tokenizer(text, return_tensors="pt").to("cuda"),
         temperature=1.0,
         max_new_tokens=512,
         streamer=TextStreamer(tokenizer, skip_prompt=False),
@@ -671,10 +708,10 @@ def _(mo):
 @app.cell
 def _(prompt):
     def extract_function(text):
-        if _text.count("```") >= 2:
-            first = _text.find("```") + 3
-            second = _text.find("```", first)
-            fx = _text[first:second].strip()
+        if text.count("```") >= 2:
+            first = text.find("```") + 3
+            second = text.find("```", first)
+            fx = text[first:second].strip()
             fx = fx.removeprefix("python\n")
             fx = fx[fx.find("def") :]
             if fx.startswith("def strategy(board):"):
@@ -695,8 +732,8 @@ def _(mo):
 
 @app.cell
 def _(check_python_modules):
-    _ok, _info = check_python_modules("def a")
-    (_ok, _info)
+    ok_2, info_2 = check_python_modules("def a")
+    (ok_2, info_2)
     return
 
 
@@ -707,14 +744,14 @@ def _(check_python_modules, create_locked_down_function, extract_function):
         for completion in completions:
             score = 0
             response = completion[0]["content"]
-            _function = extract_function(response)
-            if _function is not None:
-                _ok, _info = check_python_modules(_function)
-            if _function is None or "error" in _info:
+            function = extract_function(response)
+            if function is not None:
+                ok, info = check_python_modules(function)
+            if function is None or "error" in info:
                 score = -2.0
             else:
                 try:
-                    new_strategy = create_locked_down_function(_function)
+                    new_strategy = create_locked_down_function(function)
                     score = 1.0
                 except:
                     score = -0.5
@@ -739,10 +776,10 @@ def _(check_python_modules, extract_function):
         for completion in completions:
             score = 0
             response = completion[0]["content"]
-            _function = extract_function(response)
-            if _function is not None:
-                _ok, _info = check_python_modules(_function)
-                scores.append(1.0 if _ok else -20.0)  # Penalize heavily!
+            function = extract_function(response)
+            if function is not None:
+                ok, info = check_python_modules(function)
+                scores.append(1.0 if ok else -20.0)  # Penalize heavily!
             else:
                 scores.append(-1.0)  # Failed creating function
         return scores
@@ -768,9 +805,9 @@ def _(
     extract_function,
     launch_openenv,
     openenv_process,
-    openenv_process_3,
+    openenv_process_2,
     port,
-    port_3,
+    port_2,
     render_board,
 ):
     global PRINTER
@@ -783,30 +820,32 @@ def _(
             printed = False
             score = 0
             response = completion[0]["content"]
-            _function = extract_function(response)
+            function = extract_function(response)
             if PRINTER % 5 == 0:
                 printed = True
-                print(_function)
+                print(function)
             PRINTER = PRINTER + 1
-            if _function is not None:
-                _ok, _info = check_python_modules(_function)
-            if _function is None or "error" in _info:
+            if function is not None:
+                ok, info = check_python_modules(function)
+            if function is None or "error" in info:
                 scores.append(0)
                 continue
             try:
-                new_strategy = create_locked_down_function(_function)
+                new_strategy = create_locked_down_function(function)
             except:
                 scores.append(0)
                 continue
             try:
                 global port, openenv_process
-                port_4, openenv_process_4 = launch_openenv(port_3, openenv_process_3)
-                _result = openenv_process_4.reset()
-                current_state = _result.observation
+                globals()["port"], globals()["openenv_process"] = launch_openenv(
+                    port_2, openenv_process_2
+                )
+                result = openenv_process_2.reset()
+                current_state = result.observation
                 steps, if_done = execute_strategy_1(new_strategy, current_state)
                 print(f"Steps = {steps} If Done = {if_done}")
                 if printed is False:
-                    print(_function)
+                    print(function)
                 print(render_board(current_state))
                 if if_done:
                     scores.append(20.0)
@@ -970,14 +1009,14 @@ def _(mo):
 
 @app.cell
 def _(TextStreamer, model_1, prompt, tokenizer):
-    _text = tokenizer.apply_chat_template(
+    text_1 = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
         tokenize=False,
         add_generation_prompt=True,
         reasoning_effort="low",
     )
     _ = model_1.generate(
-        **tokenizer(_text, return_tensors="pt").to("cuda"),
+        **tokenizer(text_1, return_tensors="pt").to("cuda"),
         temperature=1.0,
         max_new_tokens=1024,
         streamer=TextStreamer(tokenizer, skip_prompt=False),
