@@ -245,9 +245,9 @@ def _row_to_orpheus(example):
     audio = None
     if raw:
         try:
-            arr, sr = sf.read(io.BytesIO(raw), dtype="float32", always_2d=False)
+            arr, sr = sf.read(io.BytesIO(raw), dtype = "float32", always_2d = False)
             if hasattr(arr, "ndim") and arr.ndim > 1:
-                arr = arr.mean(axis=-1)
+                arr = arr.mean(axis = -1)
             audio = {"array": arr, "sampling_rate": int(sr)}
         except Exception as _e:
             audio = None
@@ -256,11 +256,11 @@ def _row_to_orpheus(example):
 def _load_laion_shimmer():
     locals_ = []
     for shard in _LAION_SHARDS:
-        locals_.append(hf_hub_download(_LAION_REPO, shard, repo_type="dataset"))
+        locals_.append(hf_hub_download(_LAION_REPO, shard, repo_type = "dataset"))
     tables = [pq.read_table(p) for p in locals_]
-    table = pa.concat_tables(tables, promote_options="default") if len(tables) > 1 else tables[0]
+    table = pa.concat_tables(tables, promote_options = "default") if len(tables) > 1 else tables[0]
     ds = Dataset(table)
-    ds = ds.map(_row_to_orpheus, remove_columns=ds.column_names)
+    ds = ds.map(_row_to_orpheus, remove_columns = ds.column_names)
     ds = ds.cast_column("audio", Audio())
     return ds
 

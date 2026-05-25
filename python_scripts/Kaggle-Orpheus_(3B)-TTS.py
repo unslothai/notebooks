@@ -142,6 +142,7 @@ _LAION_SHARDS = [
 _CUE_KEYWORDS = (
     ("chortle",  "<laughs>"),
     ("chuckle",  "<laughs>"),
+    ("cackle",   "<laughs>"),
     ("giggle",   "<giggles>"),
     ("snicker",  "<giggles>"),
     ("snigger",  "<giggles>"),
@@ -167,10 +168,20 @@ _CUE_KEYWORDS = (
     ("sob",      "<cries>"),
 )
 
-# Pre-compiled word-boundary patterns. `\b` plus `\w*` so plurals
-# ("laughs"), gerunds ("laughing"), and past tense ("breathed") all hit.
+# Constrained-suffix patterns: `\bkw(s|es|ed|ing|er|ers|ly)?\b`. The
+# previous `\b{kw}\w*` form silently matched "human" from "hum",
+# "cryptic" from "cry", "sober" from "sob". Limiting to a fixed
+# verb/noun-suffix list keeps the desired plurals/gerunds
+# ("laughs", "laughing", "breathed") while rejecting unrelated
+# words that just happen to share a prefix.
 _CUE_PATTERNS = tuple(
-    (re.compile(rf"\b{re.escape(kw)}\w*", re.IGNORECASE), tok)
+    (
+        re.compile(
+            rf"\b{re.escape(kw)}(?:s|es|ed|ing|er|ers|ly)?\b",
+            re.IGNORECASE,
+        ),
+        tok,
+    )
     for kw, tok in _CUE_KEYWORDS
 )
 
