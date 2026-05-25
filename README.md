@@ -722,13 +722,10 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 
 | Notebook | Open |
 | --- | --- |
-| Advanced Llama3 1 (3B) GRPO LoRA | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Advanced_Llama3_1_(3B)_GRPO_LoRA.py) |
-| Advanced Llama3 2 (3B) GRPO LoRA | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Advanced_Llama3_2_(3B)_GRPO_LoRA.py) |
 | All MiniLM L6 v2 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/All_MiniLM_L6_v2.py) |
 | BGE M3 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/BGE_M3.py) |
 | CodeForces - cot - Finetune for Reasoning on CodeForces | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.py) |
 | CodeGemma (7B) - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/CodeGemma_(7B)-Conversational.py) |
-| DeepSeek R1 0528 Qwen3 (8B) GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/DeepSeek_R1_0528_Qwen3_(8B)_GRPO.py) |
 | Deepseek OCR (3B) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B).py) |
 | Deepseek OCR (3B) - Eval | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B)-Eval.py) |
 | Deepseek OCR (3B) - Evaluation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B)-Evaluation.py) |
@@ -751,13 +748,11 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Gemma3N (4B) - Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3N_(4B)-Audio.py) |
 | Gemma3N (4B) - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3N_(4B)-Conversational.py) |
 | Gemma3N (4B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3N_(4B)-Vision.py) |
-| Gemma3 (1B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(1B)-GRPO.py) |
 | Gemma3 (270M) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(270M).py) |
 | Gemma3 (270M) Phone Deployment | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(270M)_Phone_Deployment.py) |
 | Gemma3 (27B) A100 - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(27B)_A100-Conversational.py) |
 | Gemma3 (4B) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(4B).py) |
 | Gemma3 (4B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(4B)-Vision.py) |
-| Gemma3 (4B) - Vision - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(4B)-Vision-GRPO.py) |
 | Gemma4 (26B A4B) - Text | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(26B_A4B)-Text.py) |
 | Gemma4 (26B A4B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(26B_A4B)-Vision.py) |
 | Gemma4 (31B) - Text | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(31B)-Text.py) |
@@ -765,7 +760,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Gemma4 (E2B) - Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Audio.py) |
 | Gemma4 (E2B) - Text | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Text.py) |
 | Gemma4 (E2B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Vision.py) |
-| Gemma4 (E2B) GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_GRPO.py) |
 | Gemma4 (E2B) Reinforcement Learning 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_Reinforcement_Learning_2048_Game.py) |
 | Gemma4 (E2B) Reinforcement Learning Sudoku Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.py) |
 | Gemma4 (E4B) - Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E4B)-Audio.py) |
@@ -773,33 +767,17 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Gemma4 (E4B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E4B)-Vision.py) |
 | Granite4.0 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Granite4.0.py) |
 | Granite4.0 350M | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Granite4.0_350M.py) |
-| HuggingFace Course - Advanced Llama3 1 (3B) GRPO LoRA | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Advanced_Llama3_1_(3B)_GRPO_LoRA.py) |
-| HuggingFace Course - Advanced Llama3 2 (3B) GRPO LoRA | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Advanced_Llama3_2_(3B)_GRPO_LoRA.py) |
-| HuggingFace Course - DeepSeek R1 0528 Qwen3 (8B) GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.py) |
-| HuggingFace Course - Gemma3 (1B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Gemma3_(1B)-GRPO.py) |
-| HuggingFace Course - Gemma3 (4B) - Vision - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Gemma3_(4B)-Vision-GRPO.py) |
-| HuggingFace Course - Llama3.1 (8B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Llama3.1_(8B)-GRPO.py) |
-| HuggingFace Course - Llama FP8 GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Llama_FP8_GRPO.py) |
-| HuggingFace Course - Mistral v0.3 (7B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Mistral_v0.3_(7B)-GRPO.py) |
-| HuggingFace Course - Phi 4 (14B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Phi_4_(14B)-GRPO.py) |
-| HuggingFace Course - Qwen2.5 (3B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Qwen2.5_(3B)-GRPO.py) |
-| HuggingFace Course - Qwen2 5 7B VL GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Qwen2_5_7B_VL_GRPO.py) |
-| HuggingFace Course - Qwen3 (4B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Qwen3_(4B)-GRPO.py) |
-| HuggingFace Course - Qwen3 8B FP8 GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Qwen3_8B_FP8_GRPO.py) |
-| HuggingFace Course - Qwen3 VL (8B) - Vision - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-Qwen3_VL_(8B)-Vision-GRPO.py) |
 | HuggingFace Course - gpt - oss - (20B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-gpt-oss-(20B)-GRPO.py) |
 | HuggingFace Course - gpt - oss - (20B) A100 - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-gpt-oss-(20B)_A100-GRPO.py) |
 | HuggingFace Course - gpt oss (20B) GRPO BF16 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-gpt_oss_(20B)_GRPO_BF16.py) |
 | HuggingFace Course - gpt oss (20B) Reinforcement Learning GRPO Minesweeper Game BF16 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/HuggingFace Course-gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py) |
 | LFM2.5 (1.2B) - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_(1.2B)-Conversational.py) |
-| LFM2.5 (1.2B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_(1.2B)-GRPO.py) |
 | LFM2.5 (1.2B) - Text Completion | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_(1.2B)-Text_Completion.py) |
 | LFM2.5 (1.2B) - Translation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_(1.2B)-Translation.py) |
 | LFM2.5 VL (1.6B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_VL_(1.6B)-Vision.py) |
 | Liquid LFM2 - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Liquid_LFM2-Conversational.py) |
 | Liquid LFM2 (1.2B) - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Liquid_LFM2_(1.2B)-Conversational.py) |
 | Llama 3.1 (8B) — Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.1_(8B)-Alpaca.py) |
-| Llama3.1 (8B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.1_(8B)-GRPO.py) |
 | Llama3.1 (8B) - Inference | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.1_(8B)-Inference.py) |
 | Llama3.2 (11B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.2_(11B)-Vision.py) |
 | Llama3.2 (1B) - RAFT | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.2_(1B)-RAFT.py) |
@@ -809,12 +787,9 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Llama3 (8B) - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3_(8B)-Conversational.py) |
 | Llama3 (8B) - ORPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3_(8B)-ORPO.py) |
 | Llama3 (8B) - Ollama | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3_(8B)-Ollama.py) |
-| Llama FP8 GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama_FP8_GRPO.py) |
 | Llasa TTS (1B) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llasa_TTS_(1B).py) |
 | Llasa TTS (3B) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llasa_TTS_(3B).py) |
 | Magistral (24B) - Reasoning - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Magistral_(24B)-Reasoning-Conversational.py) |
-| Meta - Synthetic - Data - Llama3.1 (8B) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Meta-Synthetic-Data-Llama3.1_(8B).py) |
-| Meta Synthetic Data Llama3 2 (3B) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Meta_Synthetic_Data_Llama3_2_(3B).py) |
 | Ministral 3 (3B) Reinforcement Learning Sudoku Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.py) |
 | Ministral 3 VL (3B) Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Ministral_3_VL_(3B)_Vision.py) |
 | Mistral (7B) - Text Completion | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_(7B)-Text_Completion.py) |
@@ -823,7 +798,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Mistral v0.3 (7B) - Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_v0.3_(7B)-Alpaca.py) |
 | Mistral v0.3 (7B) - CPT | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_v0.3_(7B)-CPT.py) |
 | Mistral v0.3 (7B) - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_v0.3_(7B)-Conversational.py) |
-| Mistral v0.3 (7B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_v0.3_(7B)-GRPO.py) |
 | ModernBert | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ModernBert.py) |
 | NeMo - Gym - Multi - Environment | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/NeMo-Gym-Multi-Environment.py) |
 | NeMo - Gym - Sudoku | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/NeMo-Gym-Sudoku.py) |
@@ -838,15 +812,12 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Phi 3.5 Mini - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Phi_3.5_Mini-Conversational.py) |
 | Phi 3 Medium - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Phi_3_Medium-Conversational.py) |
 | Phi 4 - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Phi_4-Conversational.py) |
-| Phi 4 (14B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Phi_4_(14B)-GRPO.py) |
 | Pixtral (12B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Pixtral_(12B)-Vision.py) |
-| Qwen2.5 (3B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_(3B)-GRPO.py) |
 | Qwen2.5 (7B) - Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_(7B)-Alpaca.py) |
 | Qwen2.5 Coder (1.5B) - Tool Calling | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_Coder_(1.5B)-Tool_Calling.py) |
 | Qwen2.5 Coder (14B) - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_Coder_(14B)-Conversational.py) |
 | Qwen2.5 VL (7B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_VL_(7B)-Vision.py) |
 | Qwen2 (7B) - Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2_(7B)-Alpaca.py) |
-| Qwen2 5 7B VL GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2_5_7B_VL_GRPO.py) |
 | Qwen2 VL (7B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2_VL_(7B)-Vision.py) |
 | Qwen3 (0.6B) - Reasoning - Conversational - ExecuTorch | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch.py) |
 | Qwen3 (0 6B) - Phone Deployment | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(0_6B)-Phone_Deployment.py) |
@@ -854,7 +825,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Qwen3 (14B) - Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B)-Alpaca.py) |
 | Qwen3 (14B) - Reasoning - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B)-Reasoning-Conversational.py) |
 | Qwen3 (32B) A100 - Reasoning - Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(32B)_A100-Reasoning-Conversational.py) |
-| Qwen3 (4B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)-GRPO.py) |
 | Qwen3 (4B) - Instruct | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)-Instruct.py) |
 | Qwen3 (4B) - Thinking | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)-Thinking.py) |
 | Qwen3 (4B) Instruct - QAT | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)_Instruct-QAT.py) |
@@ -864,7 +834,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Qwen3 5 (4B) Vision GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(4B)_Vision_GRPO.py) |
 | Qwen3 5 MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_MoE.py) |
 | Qwen3 6 MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_6_MoE.py) |
-| Qwen3 8B FP8 GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_8B_FP8_GRPO.py) |
 | Qwen3 Embedding (0.6B) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_Embedding_(0_6B).py) |
 | Qwen3 Embedding (4B) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_Embedding_(4B).py) |
 | Qwen3 MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_MoE.py) |

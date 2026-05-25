@@ -27,12 +27,20 @@ record per included notebook.  Add a new template and it shows up in
 the catalog the next time the generator runs.  The AMD, Kaggle, and
 python_scripts generators work the same way.
 
-Three families are filtered out:
+Four families are filtered out:
 
 - ``AMD-`` prefixed.  Different ROCm install stack, has its own generator.
 - ``Kaggle-`` prefixed.  Environment-specific, relies on Kaggle's
   secret/credential model.
 - ``hf_course``.  Hugging Face course duplicates, not Unsloth-authored.
+- ``vllm``-pulling notebooks (content-based, not stem-prefix).  vllm's
+  dep tree has many version-specific torch hard-pins and historically
+  cp313-only abi3 wheels; uv on hosted molab silently aborts the
+  resolution when vllm is constrained alongside our other floor pins.
+  Until a workable wheel/resolver combination is found, GRPO notebooks
+  that pull vllm are excluded from the molab catalog.  Source notebooks
+  are unaffected — they continue to ship via the Colab/Kaggle/AMD
+  generators.
 
 No per-notebook skip list
 =========================
@@ -67,6 +75,7 @@ test on a hosted GPU backend.
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,6 +102,15 @@ EXCLUSION_REASONS: dict[str, str] = {
     ),
     "hf_course": (
         "Hugging Face course duplicate notebooks are not Unsloth-authored content."
+    ),
+    "vllm": (
+        "Notebooks whose install cells pull in vllm are excluded from the molab "
+        "catalog: vllm's dep tree (torch==, xformers==, flashinfer-python==) "
+        "interacts badly with uv on hosted molab's Python 3.13 runtime and "
+        "silently aborts the resolution. Until a workable combination is found, "
+        "GRPO notebooks that need vllm fast inference are not generated for "
+        "molab. The same source notebooks still ship via Colab / Kaggle / AMD "
+        "generators."
     ),
 }
 
@@ -188,6 +206,46 @@ def _is_excluded(stem: str) -> bool:
     return False
 
 
+# A pip install line whose argv list contains ``vllm`` as a distribution
+# token.  Matches both ``!pip install ... vllm ...`` and ``%pip install vllm``;
+# also accepts ``vllm[extras]`` and ``vllm==X.Y.Z`` / ``vllm>=X.Y.Z``.  The
+# negative lookbehind (?<![\w.-]) prevents matching tokens like ``my-vllm-fork``;
+# the negative lookahead (?![\w.-]) prevents ``vllm-tools``.
+_RE_INSTALL_LINE = re.compile(r"\s*[!%]?\s*(?:uv\s+)?pip\s+install\b")
+_RE_VLLM_TOKEN = re.compile(r"(?<![\w.-])vllm(?:\[[^\]]+\])?(?:[<>=!~]|$|\s)")
+
+
+def _install_cell_pulls_vllm(nb_path: Path) -> bool:
+    """Return True iff any code cell in ``nb_path`` runs ``pip install`` with
+    ``vllm`` in its argument list.
+
+    Used for the ``vllm`` content-based exclusion family.  Reads the .ipynb
+    JSON directly (no notebook_inventory import) so manifest scan stays
+    cheap and free of cycles with ``molab_dependencies``.
+
+    Returns False if the file is missing or unparseable — the rest of the
+    pipeline will surface that separately via ``resolve_nb_source``.
+    """
+    try:
+        nb = json.loads(nb_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        source = cell.get("source", "")
+        if isinstance(source, list):
+            source = "".join(source)
+        # Only look at lines that are pip install commands; vllm can show up
+        # in markdown / prose without being installed.
+        for raw_line in source.splitlines():
+            if not _RE_INSTALL_LINE.match(raw_line):
+                continue
+            if _RE_VLLM_TOKEN.search(raw_line):
+                return True
+    return False
+
+
 def _scan_manifest() -> list[MolabNotebook]:
     """Scan ``original_template/`` AND ``nb/`` and materialise the catalog.
 
@@ -232,10 +290,23 @@ def _scan_manifest() -> list[MolabNotebook]:
             tier=tier,
         )
 
+    def _content_excluded(stem: str) -> bool:
+        """Content-based exclusion: check the post-injection nb/<stem>.ipynb
+        for any pip install line that pulls in vllm.  The molab install
+        harness silently aborts uv resolution when vllm is constrained
+        alongside our other floor pins, so these are excluded until a
+        workable wheel/resolver combination is found."""
+        nb_file = nb_dir / f"{stem}.ipynb"
+        if not nb_file.exists():
+            return False
+        return _install_cell_pulls_vllm(nb_file)
+
     # Pass 1 — canonical templates.
     for ipynb in sorted(template_dir.glob("*.ipynb")):
         stem = ipynb.stem
         if _is_excluded(stem) or stem in seen_stems:
+            continue
+        if _content_excluded(stem):
             continue
         seen_stems.add(stem)
         tier: SupportTier = "p0" if stem in _P0_STEMS else "catalog"
@@ -246,6 +317,8 @@ def _scan_manifest() -> list[MolabNotebook]:
         for ipynb in sorted(nb_dir.glob("*.ipynb")):
             stem = ipynb.stem
             if _is_excluded(stem) or stem in seen_stems:
+                continue
+            if _install_cell_pulls_vllm(ipynb):
                 continue
             seen_stems.add(stem)
             out.append(_make(ipynb, stem, "catalog"))
