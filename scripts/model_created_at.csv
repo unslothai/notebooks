@@ -141,6 +141,7 @@ ibm-granite/granite-4.0-micro-base,2025-09-16T19:55:44Z,157982,40,,2026-04-08T08
 imdatta0/tiny_qwen3_moe_2.8B_0.7B,2026-01-15T11:48:48Z,439,2,,2026-05-18T11:06:35Z,ok
 initial/base,,0,0,,2026-04-08T08:58:06Z,not_found
 kadirnar/Emilia-DE-B000000,,0,0,,2026-04-08T08:58:06Z,not_found
+keithito/lj_speech,,0,0,,2026-05-25T11:29:13Z,not_found
 llava-hf/llava-1.5-7b-hf,2023-12-05T09:31:24Z,2836744,354,,2026-04-08T08:58:28Z,ok
 llava-hf/llava-v1.6-mistral-7b-hf,2024-02-20T08:01:48Z,541018,305,,2026-04-08T08:58:28Z,ok
 max_seq_length/2,,0,0,,2026-04-08T08:58:06Z,not_found
@@ -434,5 +435,6 @@ vision/audio,,0,0,,2026-04-08T08:58:06Z,not_found
 wikimedia/wikipedia,,0,0,,2026-04-08T08:58:06Z,not_found
 win/lose,,0,0,,2026-04-08T08:58:06Z,not_found
 yahma/alpaca-cleaned,,0,0,,2026-04-08T08:58:06Z,not_found
+ylacombe/jenny-tts-6h,,0,0,,2026-05-25T11:29:13Z,not_found
 your-username/minesweeper-gpt-oss,,0,0,,2026-04-08T11:44:51Z,not_found
 zai-org/GLM-4.7-Flash,2026-01-19T06:28:10Z,924935,1656,,2026-04-08T08:58:28Z,ok

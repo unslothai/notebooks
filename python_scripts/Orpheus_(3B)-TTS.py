@@ -98,7 +98,7 @@ model = FastLanguageModel.get_peft_model(
 # <a name="Data"></a>
 # ### Data Prep  
 # 
-# We will use the `MrDragonFox/Elise`, which is designed for training TTS models. Ensure that your dataset follows the required format: **text, audio** for single-speaker models or **source, text, audio** for multi-speaker models. You can modify this section to accommodate your own dataset, but maintaining the correct structure is essential for optimal training.
+# We will use `ylacombe/jenny-tts-6h` (Jenny TTS, ~6 h single-speaker English; commercial use, redistribution, and TTS training are permitted by the upstream Dioco licence at https://github.com/dioco-group/jenny-tts-dataset, with attribution "Jenny (Dioco)" required if you ship a user-facing voice interface). Fallback is `keithito/lj_speech`, the public-domain LJSpeech corpus (Linda Johnson via LibriVox). Ensure that your dataset follows the required format: **text, audio** for single-speaker models or **source, text, audio** for multi-speaker models. The original `MrDragonFox/Elise` was DMCA-disabled on 2026-04-24, and re-uploads of the same audio under other usernames (e.g. `BarryFutureman/elise_v2`, `mrfakename/Elise`) carry the same legal risk because the claim is over the underlying voice recordings. Neither Jenny nor LJSpeech includes `<laughs>` / `<sighs>` / `<giggles>` non-verbal cue tokens, so this fine-tune teaches voice timbre only; Orpheus's pretrained cue tokens remain in the vocabulary and still work at inference.
 
 # In[ ]:
 
@@ -106,15 +106,20 @@ model = FastLanguageModel.get_peft_model(
 from datasets import load_dataset
 from huggingface_hub.utils import HfHubHTTPError
 
-# `MrDragonFox/Elise` was DMCA-disabled on the HF Hub (2026-04-24).
-# `BarryFutureman/elise_v2` is a public MIT-licensed mirror with the
-# same {audio, text} schema. Override with the ORPHEUS_DATASET env var
-# to point at any HF dataset that exposes `audio` and `text` columns.
+# `MrDragonFox/Elise` and `Jinsaryko/Elise` were DMCA-disabled on the
+# HF Hub on 2026-04-24 by the original voice talent (Moon Silk Audios).
+# The takedown covers the underlying audio recordings, so re-uploads
+# of the same audio under different usernames (e.g. `BarryFutureman/
+# elise_v2`, `mrfakename/Elise`) carry the same risk regardless of the
+# licence string the re-uploader sets. We default to Jenny TTS (Dioco
+# licence, commercial OK, attribution required), with public-domain
+# LJSpeech as the pure-PD fallback. Override with the ORPHEUS_DATASET
+# env var to point at any HF dataset that exposes audio + text columns.
 import os
 _user = os.environ.get("ORPHEUS_DATASET")
 DATASET_CANDIDATES = [_user] if _user else [
-    "BarryFutureman/elise_v2",  # primary (public, MIT, 1195 rows)
-    "MrDragonFox/Elise",        # legacy name; kept in case it is restored
+    "ylacombe/jenny-tts-6h",  # primary: Jenny (Dioco) - commercial OK, attribute "Jenny (Dioco)"
+    "keithito/lj_speech",     # fallback: Linda Johnson via LibriVox - public domain
 ]
 
 dataset = None
@@ -122,6 +127,15 @@ last_err = None
 for _name in DATASET_CANDIDATES:
     try:
         dataset = load_dataset(_name, split = "train")
+        # Normalise the text column so the rest of the notebook keeps
+        # using `dataset[i]["text"]`. Jenny uses `transcription`,
+        # LJSpeech uses `text`, Common Voice / others use `sentence`.
+        _cols = dataset.column_names
+        if "text" not in _cols:
+            for _alt in ("transcription", "normalized_text", "sentence"):
+                if _alt in _cols:
+                    dataset = dataset.rename_column(_alt, "text")
+                    break
         print(f"Loaded dataset: {_name}")
         break
     except (FileNotFoundError, HfHubHTTPError, ValueError) as e:
@@ -130,11 +144,11 @@ for _name in DATASET_CANDIDATES:
 
 if dataset is None:
     raise RuntimeError(
-        "Could not load any Elise-compatible dataset. The original "
-        "`MrDragonFox/Elise` was disabled on the Hugging Face Hub "
-        "(DMCA, 2026-04-24). Set ORPHEUS_DATASET to any HF dataset "
-        "that exposes `audio` and `text` columns (any sample rate; "
-        "the notebook resamples to 24 kHz for SNAC)."
+        "Could not load any TTS dataset. Set ORPHEUS_DATASET to any HF "
+        "dataset that exposes `audio` and `text` columns (any sample "
+        "rate; the notebook resamples to 24 kHz for SNAC). Avoid Elise "
+        "mirrors: the original `MrDragonFox/Elise` and `Jinsaryko/Elise` "
+        "were DMCA-disabled on 2026-04-24."
     ) from last_err
 
 
@@ -354,7 +368,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 
 
 prompts = [
-    "Hey there my name is Elise, <giggles> and I'm a speech generation model that can sound like a person.",
+    "Hey there my name is Jenny, <giggles> and I'm a speech generation model that can sound like a person.",
 ]
 
 chosen_voice = None # None for single-speaker
