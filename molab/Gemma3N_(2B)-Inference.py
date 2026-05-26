@@ -117,22 +117,8 @@ def _():
     # tail vllm logs. Check server has been started correctly
     #! while ! grep -q "The server is fired up and ready to roll" sglang.log; do tail -n 1 sglang.log; sleep 5; done
     subprocess.call(
-        [
-            "while",
-            "!",
-            "grep",
-            "-q",
-            "The server is fired up and ready to roll",
-            "sglang.log;",
-            "do",
-            "tail",
-            "-n",
-            "1",
-            "sglang.log;",
-            "sleep",
-            "5;",
-            "done",
-        ]
+        "while ! grep -q 'The server is fired up and ready to roll' sglang.log; do tail -n 1 sglang.log; sleep 5; done",
+        shell=True,
     )
     return
 

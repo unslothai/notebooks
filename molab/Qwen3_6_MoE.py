@@ -141,6 +141,7 @@ def _():
         find("fla-org/flash-linear-attention", "v0.4.2", lambda n: n.endswith(whl))
         or "https://github.com/fla-org/flash-linear-attention/archive/refs/tags/v0.4.2.tar.gz"
     )
+    #! pip uninstall -y sentence-transformers torchcodec
     subprocess.call(["pip", "uninstall", "-y", "sentence-transformers", "torchcodec"])
     # torchcodec import broken on molab
     return (torch,)

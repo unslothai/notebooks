@@ -70,6 +70,7 @@ import argparse
 import ast
 import json
 import re
+import shlex
 import sys
 import textwrap
 from pathlib import Path
@@ -306,6 +307,62 @@ _SHELL_METACHARS: frozenset[str] = frozenset(
     {"|", "||", "&", "&&", ">", ">>", "<", ";", "2>", "2>&1", "&>"}
 )
 
+# Shell control-flow keywords / operators that show up as standalone
+# tokens in marimo's whitespace-split argv when the source ``!`` magic
+# was a compound shell statement (``!while ... done``, ``!if ...; fi``,
+# ``!for x in ...``).  ``!`` by itself is shell's negation prefix
+# (``while ! grep ...``).  None of these are runnable as a process, so
+# any argv list containing one means we MUST rewrite to ``shell=True``.
+_SHELL_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "while", "do", "done", "until",
+        "for", "in",
+        "if", "then", "elif", "else", "fi",
+        "case", "esac",
+        "!",
+    }
+)
+
+
+def _token_looks_shellish(tok: str) -> bool:
+    """Return True when ``tok`` proves the argv list cannot be passed
+    directly to the OS — i.e. one of: a standalone shell metacharacter,
+    a shell control-flow keyword, or a token whose tail is a statement
+    separator that marimo glued onto the previous word (``sglang.log;``,
+    ``5;``, ``foo&``).
+    """
+    if tok in _SHELL_METACHARS or tok in _SHELL_KEYWORDS:
+        return True
+    # marimo splits the source ``!`` line on whitespace only, so a
+    # trailing ``;`` / ``&`` / ``|`` gets fused onto the preceding
+    # token.  The shell would still treat it as a separator, but
+    # subprocess argv mode cannot.
+    if len(tok) > 1 and tok[-1] in {";", "&", "|"}:
+        return True
+    return False
+
+
+# Tokens that survive bare in the rewritten shell command — no quoting
+# needed because the shell re-tokenises them correctly.  Anything
+# matching this pattern is safe to emit verbatim; anything else gets
+# ``shlex.quote``d so embedded whitespace / quotes / dollar / backtick
+# don't blow up the shell-side parse.  Critically, shell keywords and
+# bare metachars MUST pass through unquoted so the shell still
+# interprets them as control flow / redirection.  We also allow ``;``,
+# ``&``, ``|`` inside the bareword class because marimo's whitespace
+# split glues those statement separators onto the previous token
+# (``5;``, ``sglang.log;``) and the shell will re-tokenise on them
+# regardless of surrounding whitespace.
+_SHELL_BAREWORD_RE = re.compile(r"[A-Za-z0-9@%+=:,./_;&|\-]+")
+
+
+def _shell_quote_if_needed(tok: str) -> str:
+    if tok in _SHELL_METACHARS or tok in _SHELL_KEYWORDS:
+        return tok
+    if _SHELL_BAREWORD_RE.fullmatch(tok):
+        return tok
+    return shlex.quote(tok)
+
 
 _RE_SUBPROCESS_USE = re.compile(r"\bsubprocess\.\w+\(")
 _RE_SUBPROCESS_IMPORT = re.compile(
@@ -350,11 +407,16 @@ def _fix_shell_subprocess(code: str) -> str:
     whitespace and passes the result as argv to ``subprocess.call``.  Shell
     metacharacters end up as literal argv elements (``"|"``, ``">"``,
     ``"&"``, ``"while"``-loop tokens, etc.) which the OS cannot interpret.
-    Detect such broken calls — argv lists that contain any token from
-    ``_SHELL_METACHARS`` — and rewrite to
+    Detect such broken calls — argv lists that contain any token flagged
+    by :func:`_token_looks_shellish` (metachar, control-flow keyword, or
+    token with a trailing ``;`` / ``&`` / ``|``) — and rewrite to
     ``subprocess.X("joined command", shell=True)`` so the shell handles
-    the metacharacter as intended.  Other ``subprocess.X([...])`` calls
-    are left alone.
+    the metacharacter as intended.  Tokens that contain whitespace or
+    quote characters are shell-quoted via :func:`_shell_quote_if_needed`
+    before joining so the original argument boundaries survive the
+    round-trip; shell keywords and bare metachars pass through unquoted
+    so control flow / redirection still parses on the shell side.
+    Other ``subprocess.X([...])`` calls are left alone.
     """
 
     pattern = re.compile(
@@ -368,9 +430,9 @@ def _fix_shell_subprocess(code: str) -> str:
         # marimo emits when converting `!shell` magics).
         items = re.findall(r"\"([^\"]*)\"|'([^']*)'", list_body)
         items = [a or b for a, b in items]
-        if not items or not any(t in _SHELL_METACHARS for t in items):
+        if not items or not any(_token_looks_shellish(t) for t in items):
             return match.group(0)
-        joined = " ".join(items)
+        joined = " ".join(_shell_quote_if_needed(t) for t in items)
         return f"subprocess.{verb}({joined!r}, shell=True"
 
     return pattern.sub(_maybe_rewrite, code)

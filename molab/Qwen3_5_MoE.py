@@ -8,9 +8,9 @@
 #     "marimo",
 #     "tilelang==0.1.8",
 #     "tokenizers>=0.22.0,<=0.23.0",
-#     "torch==2.8.0",
+#     "torch",
 #     "torchao>=0.16.0",
-#     "torchcodec==0.7.0",
+#     "torchcodec",
 #     "torchvision",
 #     "transformers==5.2.0",
 #     "triton>=3.2.0",
@@ -141,6 +141,7 @@ def _():
         find("fla-org/flash-linear-attention", "v0.4.2", lambda n: n.endswith(whl))
         or "https://github.com/fla-org/flash-linear-attention/archive/refs/tags/v0.4.2.tar.gz"
     )
+    #! pip uninstall -y sentence-transformers torchcodec
     subprocess.call(["pip", "uninstall", "-y", "sentence-transformers", "torchcodec"])
     # torchcodec import broken on molab
     return (torch,)

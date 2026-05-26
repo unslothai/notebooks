@@ -385,6 +385,30 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
 # ===========================================================================
 # Planning
 # ===========================================================================
+
+# Per-notebook pin relaxations for the molab catalog.  Maps
+# ``nb_path.stem`` (the source notebook filename without ``.ipynb``) to
+# a ``{normalised_pkg_key: relaxed_pep508_spec}`` overlay applied AFTER
+# ``_MOLAB_FLOORS`` and the cuda-tile workaround, just before the PEP
+# 723 list is materialised.  Each entry is an explicit, audited
+# decision — adding a notebook here is the canonical place to break a
+# Colab pin that doesn't resolve on molab.  Keep this dict short:
+# every entry is a divergence from "source notebook is truth" and
+# should carry a comment explaining the molab-specific failure mode it
+# works around.
+_MOLAB_PER_NOTEBOOK_RELAX: dict[str, dict[str, str]] = {
+    # Qwen3_5_MoE source pins torch==2.8.0 and torchcodec==0.7.0 (set
+    # for Colab where those exact builds are wheel-available).  On
+    # molab uv cannot resolve either pin and aborts the venv install
+    # silently.  Drop both to bare-name so molab gets the latest
+    # compatible wheel.
+    "Qwen3_5_MoE": {
+        "torch": "torch",
+        "torchcodec": "torchcodec",
+    },
+}
+
+
 def plan_dependencies(nb_path: Path) -> DependencyPlan:
     """Build a :class:`DependencyPlan` from a post-injection ``nb/*.ipynb``.
 
@@ -601,6 +625,31 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
     # are not affected.
     if "vllm" in chosen:
         chosen["cuda-tile"] = "cuda-tile==1.2.0"
+
+    # Per-notebook pin relaxations.  Some source notebooks pin specific
+    # torch / torchcodec / xformers builds that resolve cleanly on Colab
+    # but cause uv to silently abort on molab (different CUDA / cuDNN /
+    # Python combination, no matching wheel).  Relaxing the pin to a
+    # bare name lets uv pick the latest compatible wheel for molab's
+    # interpreter.  Keep the source ``.ipynb`` strict so Colab is
+    # unaffected.  Keyed on ``nb_path.stem`` (the notebook filename
+    # without the ``.ipynb`` suffix).
+    nb_stem = nb_path.stem
+    relax_overrides = _MOLAB_PER_NOTEBOOK_RELAX.get(nb_stem, {})
+    for key, relaxed_spec in relax_overrides.items():
+        original = chosen.get(key)
+        if original is None or original == relaxed_spec:
+            continue
+        chosen[key] = relaxed_spec
+        plan.dropped.append(
+            DroppedItem(
+                text=original,
+                reason=(
+                    f"molab: relaxed strict pin to '{relaxed_spec}' for "
+                    f"{nb_stem} (source pin blocks uv resolution on molab)"
+                ),
+            )
+        )
 
     # Materialise the PEP 723 dependency list.
     for key in sorted(chosen):
