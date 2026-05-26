@@ -7,6 +7,7 @@
 #     "torchao>=0.16.0",
 #     "transformers @ git+https://github.com/huggingface/transformers.git",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
+#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 # ]
 #
 # [tool.uv]

@@ -20,6 +20,7 @@
 #     "triton>=3.2.0",
 #     "trl==0.15.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
+#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 #     "vector_quantize_pytorch",
 #     "xcodec2==0.1.5",
 # ]

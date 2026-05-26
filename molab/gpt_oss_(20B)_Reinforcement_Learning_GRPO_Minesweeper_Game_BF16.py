@@ -12,6 +12,7 @@
 #     "triton_kernels @ git+https://github.com/triton-lang/triton.git@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
+#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 #     "uv",
 # ]
 #

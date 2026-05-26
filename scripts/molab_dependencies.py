@@ -506,16 +506,34 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                 if existing is None or _spec_rank(spec) > _spec_rank(existing):
                     chosen[key] = spec
 
-    # Molab should always install Unsloth from GitHub, regardless of whether
-    # the source notebook used a bare ``unsloth``, a PyPI range, or
-    # ``unsloth[base] @ git+...``.  Source notebooks keep their authored
-    # install cells; this rewrite is only for generated Molab PEP 723 metadata.
+    # Molab should always install Unsloth (and its sibling unsloth_zoo) from
+    # GitHub main, regardless of whether the source notebook used a bare
+    # ``unsloth``, a PyPI range, or ``unsloth[base] @ git+...``.  Source
+    # notebooks keep their authored install cells; this rewrite is only for
+    # generated Molab PEP 723 metadata.  ``unsloth_zoo`` is published in
+    # lockstep with ``unsloth``; pinning both to the same git main avoids
+    # the version-skew failure mode where uv resolves ``unsloth`` from git
+    # but pulls an older ``unsloth_zoo`` from PyPI transitively.
     _UNSLOTH_GIT_SPEC = "unsloth @ git+https://github.com/unslothai/unsloth"
-    for key, latest_spec in {"unsloth": _UNSLOTH_GIT_SPEC}.items():
+    _UNSLOTH_ZOO_GIT_SPEC = (
+        "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"
+    )
+    _UNSLOTH_GIT_REWRITES = {
+        "unsloth": _UNSLOTH_GIT_SPEC,
+        "unsloth-zoo": _UNSLOTH_ZOO_GIT_SPEC,
+    }
+    for key, latest_spec in _UNSLOTH_GIT_REWRITES.items():
         spec = chosen.get(key)
         if spec is None:
             continue
         chosen[key] = latest_spec
+
+    # When ``unsloth`` is installed from git but the source notebook did
+    # not list ``unsloth_zoo`` explicitly, add the git spec for the zoo
+    # alongside it.  This makes the Molab install deterministic: both
+    # halves come from the same main branch, in the same install pass.
+    if chosen.get("unsloth") == _UNSLOTH_GIT_SPEC and "unsloth-zoo" not in chosen:
+        chosen["unsloth-zoo"] = _UNSLOTH_ZOO_GIT_SPEC
 
     # Keep known Molab resolver safety pins even though Unsloth itself now
     # comes from GitHub.
@@ -534,19 +552,6 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                        "Molab's Unsloth dependency resolution; use the nearest "
                        "compatible 4.57.x pin",
             ))
-
-    # Drop any explicit ``unsloth_zoo`` line from the source notebook's
-    # install cell.  The Molab dependency contract keeps one Unsloth entry:
-    # ``unsloth @ git+https://github.com/unslothai/unsloth``.  The source
-    # notebooks' Colab branch may install ``unsloth_zoo`` via ``--no-deps``;
-    # that branch is not copied into Molab.
-    if "unsloth" in chosen and "unsloth-zoo" in chosen:
-        zoo_spec = chosen.pop("unsloth-zoo")
-        plan.dropped.append(DroppedItem(
-            text=zoo_spec,
-            reason="Molab uses a single direct Unsloth git dependency; "
-                   "source Colab's explicit unsloth_zoo line is not copied",
-        ))
 
     # Floor-pin overlay for the molab Python 3.13 cascade.
     #

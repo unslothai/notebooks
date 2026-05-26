@@ -4,6 +4,7 @@
 #     "marimo",
 #     "omegaconf",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
+#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 # ]
 #
 # [tool.uv]

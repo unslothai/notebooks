@@ -17,6 +17,7 @@
 #     "triton>=3.2.0",
 #     "trl",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
+#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 #     "xformers>=0.0.33",
 # ]
 #
