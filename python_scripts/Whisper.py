@@ -95,7 +95,9 @@ model = FastModel.get_peft_model(
 # <a name="Data"></a>
 # ### Data Prep  
 # 
-# We will use the `MrDragonFox/Elise`, which is designed for training TTS models. Ensure that your dataset follows the required format: **text, audio**. You can modify this section to accommodate your own dataset, but maintaining the correct structure is essential for optimal training.
+# We default to `vysakh25/laion-nonverbal-filtered` (single voice `shimmer`, GPT-4o TTS clips re-licensed CC-BY-4.0 by LAION, ~24 kHz, three emotion buckets sampled by default). Public-domain `keithito/lj_speech` (Linda Johnson via LibriVox) is the safety net. The original `MrDragonFox/Elise` and all known mirrors (`Jinsaryko/Elise`, `BarryFutureman/elise_v2`, `mrfakename/Elise`, etc.) were DMCA-disabled on 2026-04-24 (Moon Silk Audios); re-uploads under different usernames carry the same legal risk regardless of the licence tag the uploader sets. Set the `TTS_DATASET` env var to override with any HF dataset that exposes `audio` and `text` columns.
+# 
+# **Licensing notes.** The LAION default is GPT-4o TTS audio re-licensed CC-BY-4.0 by LAION. (a) OpenAI's Terms of Use restrict using OpenAI service Output to develop AI models that compete with OpenAI's own services; whether a fine-tune triggers that clause depends on your end use, and you should review the terms yourself. For unrestricted commercial use, switch to LJSpeech (public domain) or your own recordings. (b) CC-BY-4.0 requires attribution: if you redistribute checkpoints fine-tuned on this data, credit LAION (`vysakh25/laion-nonverbal-filtered`) in the model card.
 
 # In[4]:
 
@@ -120,9 +122,105 @@ def formatting_prompts_func(example):
         "input_features": features.input_features[0],
         "labels": tokenized_text.input_ids,
     }
-from datasets import load_dataset, Audio
-dataset = load_dataset("MrDragonFox/Elise", split = "train")
+# `MrDragonFox/Elise` and all known mirrors (`Jinsaryko/Elise`,
+# `BarryFutureman/elise_v2`, `mrfakename/Elise`, etc.) were
+# DMCA-disabled by Moon Silk Audios on 2026-04-24; re-uploads under
+# different usernames carry the same legal risk regardless of the
+# licence string set by the re-uploader. Default to LAION's `shimmer`
+# voice slices of `vysakh25/laion-nonverbal-filtered` (CC-BY-4.0
+# GPT-4o TTS clips, ~24 kHz, three emotion buckets, single voice).
+# Public-domain `keithito/lj_speech` is the safety net. Override via
+# the `TTS_DATASET` env var with any HF dataset that exposes `audio`
+# and `text` columns.
+#
+# Licensing notes: (a) The LAION default is GPT-4o TTS audio re-licensed
+# CC-BY-4.0 by LAION; OpenAI's Terms of Use restrict using OpenAI
+# service Output to develop AI models that compete with OpenAI's own
+# services. Whether a fine-tune triggers that clause depends on your
+# end use; review the terms yourself. For unrestricted commercial use,
+# switch to LJSpeech (public domain) or your own recordings.
+# (b) CC-BY-4.0 requires attribution: credit LAION
+# (`vysakh25/laion-nonverbal-filtered`) in any redistributed model card.
+import io
+import os
 
+import pyarrow as pa
+import pyarrow.parquet as pq
+from datasets import Audio, Dataset, load_dataset
+from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import HfHubHTTPError
+
+_LAION_REPO = "vysakh25/laion-nonverbal-filtered"
+_LAION_SHARDS = [
+    "parquets/english_shimmer_intense_contentment_relaxation_peacefulness_calmness_satisfaction_and_serenity.parquet",
+    "parquets/english_shimmer_intense_teasing_bantering_and_playful_mocking.parquet",
+    "parquets/english_shimmer_intense_happiness_excitement_joy_exhilaration_delight_jubilation_and_bliss.parquet",
+]
+
+def _row_to_audio_text(example):
+    """Decode LAION's `audio_bytes` and pair with `text_clean`.
+    Returns `{text, audio}` matching the schema the trainer expects.
+    """
+    import soundfile as sf
+    text = (example.get("text_clean") or example.get("text_original") or "").strip()
+    raw = example.get("audio_bytes")
+    if isinstance(raw, dict) and "bytes" in raw:
+        raw = raw["bytes"]
+    audio = None
+    if raw:
+        try:
+            arr, sr = sf.read(io.BytesIO(raw), dtype = "float32", always_2d = False)
+            if hasattr(arr, "ndim") and arr.ndim > 1:
+                arr = arr.mean(axis = -1)
+            audio = {"array": arr, "sampling_rate": int(sr)}
+        except Exception:
+            audio = None
+    return {"text": text, "audio": audio}
+
+def _load_laion_shimmer():
+    locals_ = []
+    for shard in _LAION_SHARDS:
+        locals_.append(hf_hub_download(_LAION_REPO, shard, repo_type = "dataset"))
+    tables = [pq.read_table(p) for p in locals_]
+    table = pa.concat_tables(tables, promote_options = "default") if len(tables) > 1 else tables[0]
+    ds = Dataset(table)
+    ds = ds.map(_row_to_audio_text, remove_columns = ds.column_names)
+    ds = ds.cast_column("audio", Audio())
+    return ds
+
+def _load_via_hf(name):
+    ds = load_dataset(name, split = "train")
+    cols = ds.column_names
+    if "text" not in cols:
+        for _alt in ("transcription", "normalized_text", "sentence"):
+            if _alt in cols:
+                ds = ds.rename_column(_alt, "text")
+                break
+    return ds
+
+_user = os.environ.get("TTS_DATASET")
+DATASET_CANDIDATES = [_user] if _user else ["__laion_shimmer__", "keithito/lj_speech"]
+
+dataset = None
+_last_err = None
+for _name in DATASET_CANDIDATES:
+    try:
+        dataset = _load_laion_shimmer() if _name == "__laion_shimmer__" else _load_via_hf(_name)
+        print(f"Loaded dataset: {_name} ({len(dataset)} rows)")
+        break
+    except (FileNotFoundError, HfHubHTTPError, ValueError, OSError, ConnectionError) as e:
+        _last_err = e
+        print(f"Could not load {_name}: {type(e).__name__}: {e}")
+
+if dataset is None:
+    raise RuntimeError(
+        "Could not load any TTS dataset. Set TTS_DATASET to any HF "
+        "dataset that exposes `audio` and `text` columns (any sample "
+        "rate; notebooks resample as needed). Avoid Elise mirrors: "
+        "`MrDragonFox/Elise` and all known mirrors (`Jinsaryko/Elise`, "
+        "`BarryFutureman/elise_v2`, `mrfakename/Elise`, etc.) were "
+        "DMCA-disabled by Moon Silk Audios on 2026-04-24."
+    ) from _last_err
 dataset = dataset.cast_column("audio", Audio(sampling_rate = 16000))
 dataset = dataset.train_test_split(test_size = 0.06)
 train_dataset = [formatting_prompts_func(example) for example in tqdm.tqdm(dataset['train'], desc = 'Train split')]

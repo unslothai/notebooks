@@ -140,6 +140,7 @@ ibm-granite/granite-4.0-micro-base,2025-09-16T19:55:44Z,157982,40,,2026-04-08T08
 imdatta0/tiny_qwen3_moe_2.8B_0.7B,2026-01-15T11:48:48Z,439,2,,2026-05-18T11:06:35Z,ok
 initial/base,,0,0,,2026-04-08T08:58:06Z,not_found
 kadirnar/Emilia-DE-B000000,,0,0,,2026-04-08T08:58:06Z,not_found
+keithito/lj_speech,,0,0,,2026-05-26T00:36:27Z,not_found
 llava-hf/llava-1.5-7b-hf,2023-12-05T09:31:24Z,2836744,354,,2026-04-08T08:58:28Z,ok
 llava-hf/llava-v1.6-mistral-7b-hf,2024-02-20T08:01:48Z,541018,305,,2026-04-08T08:58:28Z,ok
 max_seq_length/2,,0,0,,2026-04-08T08:58:06Z,not_found
@@ -194,6 +195,7 @@ openai/gpt-oss-20b,2025-08-04T22:33:29Z,5766017,4512,,2026-04-08T08:58:28Z,ok
 openai/gsm8k,,0,0,,2026-04-08T08:58:06Z,not_found
 openai/whisper-large-v3,2023-11-07T18:41:14Z,4735324,5554,,2026-04-08T08:58:28Z,ok
 openenv/wordle,,0,0,,2026-04-08T08:58:06Z,not_found
+parquets/english_shimmer_intense_teasing_bantering_and_playful_mocking.parquet,,0,0,,2026-05-26T00:36:27Z,not_found
 philschmid/guanaco-sharegpt-style,,0,0,,2026-04-08T08:58:06Z,not_found
 reciperesearch/dolphin-sft-v0.1-preference,,0,0,,2026-04-08T08:58:06Z,not_found
 roneneldan/TinyStories,2023-05-12T19:01:50Z,90338,65,,2026-05-18T11:06:35Z,ok
@@ -430,6 +432,7 @@ unsloth/zephyr-sft-bnb-4bit,2023-12-31T06:51:02Z,590,5,,2026-05-18T11:06:35Z,ok
 versions/edge,,0,0,,2026-04-08T08:58:06Z,not_found
 vicgalle/alpaca-gpt4,,0,0,,2026-04-08T08:58:06Z,not_found
 vision/audio,,0,0,,2026-04-08T08:58:06Z,not_found
+vysakh25/laion-nonverbal-filtered,,0,0,,2026-05-26T00:36:27Z,not_found
 wikimedia/wikipedia,,0,0,,2026-04-08T08:58:06Z,not_found
 win/lose,,0,0,,2026-04-08T08:58:06Z,not_found
 yahma/alpaca-cleaned,,0,0,,2026-04-08T08:58:06Z,not_found
