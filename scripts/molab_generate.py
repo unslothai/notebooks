@@ -288,6 +288,35 @@ def _replace_colab_mentions(code: str) -> str:
     return "".join(out)
 
 
+# Source notebooks open with the Colab-era instruction
+# ``To run this, press the **Run** button beside each cell[on <GPU> instance]!``
+# which is wrong for molab — marimo is reactive and runs every cell from a
+# single "Run all" button in the bottom-right.  Rewrite to the modern phrasing
+# while preserving any GPU-class qualifier the source notebook carried (e.g.
+# "on a molab A100 instance"), so users still see the GPU requirement.
+_RUN_INSTRUCTION_RE = re.compile(
+    r"To run this, press the \*\*Run\*\* button beside each cell([^!]*)!"
+)
+
+
+def _modernize_run_instruction(code: str) -> str:
+    """Replace the Colab-style "press Run beside each cell" prompt with the
+    molab-correct "Run all" instruction.  The captured tail (if any) is moved
+    to sit right after "notebook" so the GPU-class qualifier survives.
+    """
+
+    def _repl(m: re.Match[str]) -> str:
+        tail = m.group(1) or ""
+        return (
+            "To run this notebook"
+            f"{tail}"
+            ", hit the **▶ Run all** button in the bottom-right corner"
+            " - or use `Ctrl/Cmd + Shift + R`."
+        )
+
+    return _RUN_INSTRUCTION_RE.sub(_repl, code)
+
+
 _MARIMO_PACKAGE_MANAGEMENT_COMMENT_RE = re.compile(
     r"^\s*# packages added via marimo's package management:.*(?:\r?\n)?",
     flags=re.MULTILINE,
@@ -946,6 +975,7 @@ def _post_pass(ir, plan):
 
         hide = bool(cell.options.get("hide_code", False))
         code = _replace_colab_mentions(code)
+        code = _modernize_run_instruction(code)
         code = _strip_google_colab_import(code)
         code = _fix_env_assignments(code)
         code = _fix_shell_subprocess(code)

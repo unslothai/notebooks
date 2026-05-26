@@ -54,7 +54,7 @@ def _(mo):
     3. [Official Github Page ](https://github.com/tiiuae/Falcon-H1)
     4. [HF Collection](https://huggingface.co/collections/tiiuae/falcon-h1-6819f2795bc406da60fab8df)
 
-    To run this, press the **Run** button beside each cell!
+    To run this notebook, hit the **▶ Run all** button in the bottom-right corner - or use `Ctrl/Cmd + Shift + R`.
     <div class="align-center">
     <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
     <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>

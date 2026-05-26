@@ -32,7 +32,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    <!-- To run this, press the **Run** button beside each cell! -->
+    <!-- To run this notebook, hit the **▶ Run all** button in the bottom-right corner - or use `Ctrl/Cmd + Shift + R`. -->
     <div class="align-center">
     <a href="https://nvidia.com/"><img src="https://www.nvidia.com/content/dam/en-zz/Solutions/about-nvidia/logo-and-brand/01-nvidia-logo-horiz-500x200-2c50-d@2x.png" width="115"></a>
 

@@ -396,16 +396,23 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
 # every entry is a divergence from "source notebook is truth" and
 # should carry a comment explaining the molab-specific failure mode it
 # works around.
+# The Qwen3_5 family source notebooks (MoE + Vision variants) all pin
+# ``torch==2.8.0`` and ``torchcodec==0.7.0`` for Colab, where those exact
+# builds are wheel-available.  On molab uv cannot resolve either pin and
+# aborts the venv install silently.  Drop both to bare-name so molab
+# gets the latest compatible wheel.  Identical overlay for every member
+# of the family — declared once and reused below.
+_QWEN3_5_TORCH_RELAX: dict[str, str] = {
+    "torch": "torch",
+    "torchcodec": "torchcodec",
+}
+
 _MOLAB_PER_NOTEBOOK_RELAX: dict[str, dict[str, str]] = {
-    # Qwen3_5_MoE source pins torch==2.8.0 and torchcodec==0.7.0 (set
-    # for Colab where those exact builds are wheel-available).  On
-    # molab uv cannot resolve either pin and aborts the venv install
-    # silently.  Drop both to bare-name so molab gets the latest
-    # compatible wheel.
-    "Qwen3_5_MoE": {
-        "torch": "torch",
-        "torchcodec": "torchcodec",
-    },
+    "Qwen3_5_MoE": _QWEN3_5_TORCH_RELAX,
+    "Qwen3_5_(0_8B)_Vision": _QWEN3_5_TORCH_RELAX,
+    "Qwen3_5_(2B)_Vision": _QWEN3_5_TORCH_RELAX,
+    "Qwen3_5_(4B)_Vision": _QWEN3_5_TORCH_RELAX,
+    "Qwen3_5_(4B)_Vision_GRPO": _QWEN3_5_TORCH_RELAX,
 }
 
 

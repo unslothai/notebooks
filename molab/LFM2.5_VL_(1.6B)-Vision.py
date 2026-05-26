@@ -45,7 +45,7 @@ def _(mo):
     mo.md(r"""
     # 💧 LFM2.5-VL - SFT with Unsloth
 
-    To run this, press the **Run** button beside each cell on your L4 molab Pro instance!
+    To run this notebook on your L4 molab Pro instance, hit the **▶ Run all** button in the bottom-right corner - or use `Ctrl/Cmd + Shift + R`.
     <div class="align-center">
     <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
     <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>

@@ -8,9 +8,9 @@
 #     "marimo",
 #     "tilelang==0.1.8",
 #     "tokenizers>=0.22.0,<=0.23.0",
-#     "torch==2.8.0",
+#     "torch",
 #     "torchao>=0.16.0",
-#     "torchcodec==0.7.0",
+#     "torchcodec",
 #     "torchvision",
 #     "transformers==5.2.0",
 #     "triton>=3.2.0",
@@ -46,7 +46,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    To run this, press the **Run** button beside each cell!
+    To run this notebook, hit the **▶ Run all** button in the bottom-right corner - or use `Ctrl/Cmd + Shift + R`.
     <div class="align-center">
     <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
     <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
