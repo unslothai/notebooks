@@ -254,7 +254,12 @@ def _inline_parens_to_cues(txt):
 
 def _row_to_orpheus(example):
     """Re-inject Orpheus cue tokens INLINE into the transcript and decode `audio_bytes`."""
-    import soundfile as sf
+    try:
+        import soundfile as sf
+    except ImportError:
+        import subprocess, sys
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "soundfile"], check=True)
+        import soundfile as sf
     # Prefer `text_original` so cue tokens land at the position where
     # the audio actually performs the cue. Fall back to `text_clean`
     # (cues prepended) when text_original is empty.

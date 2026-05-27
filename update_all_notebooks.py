@@ -338,9 +338,13 @@ installation_grpo_synthetic_data_content = update_or_append_pip_install(
     UV_PIN_TRL,
 )
 
-# Add install snac under install unsloth
-installation_orpheus_content = installation_content + """\n!pip install snac torchcodec \"datasets>=3.4.1,<4.0.0\""""
-installation_orpheus_kaggle_content = installation_kaggle_content + """\n!pip install snac torchcodec \"datasets>=3.4.1,<4.0.0\""""
+# Add install snac under install unsloth.
+# `soundfile` is consumed by the LAION fallback path in _row_to_orpheus
+# to decode audio_bytes blobs from the parquet shards. Without it the
+# dataset.map() step raises ModuleNotFoundError before any fallback
+# dataset is even tried, breaking fresh runs.
+installation_orpheus_content = installation_content + """\n!pip install snac soundfile torchcodec \"datasets>=3.4.1,<4.0.0\""""
+installation_orpheus_kaggle_content = installation_kaggle_content + """\n!pip install snac soundfile torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 installation_whisper_content = installation_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
 installation_whisper_kaggle_content = installation_kaggle_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
