@@ -235,7 +235,7 @@ FastVisionModel.for_training(model) # Enable for training!
 
 trainer = SFTTrainer(
     model = model,
-    tokenizer = tokenizer,
+    processing_class = tokenizer,
     data_collator = UnslothVisionDataCollator(model, tokenizer), # Must use!
     train_dataset = converted_dataset,
     args = SFTConfig(
@@ -258,6 +258,7 @@ trainer = SFTTrainer(
         dataset_text_field = "",
         dataset_kwargs = {"skip_prepare_dataset": True},
         max_length = 2048,
+        eos_token = tokenizer.tokenizer.eos_token,
     ),
 )
 
