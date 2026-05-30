@@ -6060,4 +6060,25 @@ if __name__ == "__main__":
             executor_type=args.executor,
         )
 
+    # molab (marimo) notebooks. Generated from the molab manifest's curated
+    # allowlist into molab/*.py — a SEPARATE native-marimo tree, deliberately
+    # NOT routed through convert_folder()/python_scripts/. Two call sites:
+    # (1) regenerate molab/*.py, (2) refresh the README molab section between
+    # the <!-- MOLAB:START --> / <!-- MOLAB:END --> markers.
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+        import molab_generate as _molab_generate
+
+        for _molab_path in _molab_generate.generate_all():
+            print(f"Generated molab notebook {_molab_path}")
+        if _molab_generate.update_readme():
+            print("Updated README molab section.")
+    except Exception as _molab_exc:  # noqa: BLE001 - keep molab failures non-fatal
+        # Preserve the traceback so the operator can debug — mirrors the
+        # pattern used by the convert_folder handler in this same file
+        # (review P1 / PY-01 / C-1).
+        import traceback as _molab_tb
+        print(f"WARNING: molab generation step failed: {_molab_exc}")
+        _molab_tb.print_exc()
+
     _summarize_git_diff()

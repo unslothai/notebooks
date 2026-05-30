@@ -3,3 +3,5 @@ __pycache__/
 *.py[cod]
 *$py.class
 unsloth_compiled_cache/
+/.claude
+/.codex

@@ -28,12 +28,14 @@ on:
       - 'nb/**'
       - 'kaggle/**'
       - 'python_scripts/**'
+      - 'molab/**'
       - 'update_all_notebooks.py'
       - 'replace_text.py'
       - 'update_max_seq_length.py'
       - 'scripts/**'
       - 'tests/**'
       - 'pyproject.toml'
+      - 'README.md'
       - '.github/workflows/notebooks-tests-ci.yml'
   push:
     branches: [main]
@@ -82,6 +84,18 @@ jobs:
           pip install pytest pyyaml nbformat nbconvert ipython \
             pyspellchecker tqdm huggingface_hub
 
+      - name: Install marimo + ruff (molab generator + format pass)
+        # Generator deps. Kept as a separate step so they are easy to spot
+        # and to pin/skip independently if either is yanked upstream.
+        #   marimo  — scripts/molab_generate.py (marimo.App / @app.cell
+        #             emission) + test_molab_marimo_validity.py (marimo
+        #             check) + test_molab_generation_parity.py
+        #   ruff    — scripts/molab_generate.py runs `ruff format` over
+        #             every generated notebook to re-wrap the lines that
+        #             marimo's IR conversion ast-unparses (rename pass).
+        #             Pinned so regeneration is byte-stable across CI runs.
+        run: pip install 'marimo>=0.23,<0.24' 'ruff>=0.15,<0.16'
+
       - name: tests/test_notebook_json_validity.py
         run: |
           python -m pytest tests/test_notebook_json_validity.py -q --tb=short
@@ -103,6 +117,30 @@ jobs:
         # per-cell static parse cannot see. ~2 min sequential.
         run: |
           python -m pytest tests/test_python_scripts_regen_parity.py -q --tb=short
+
+      - name: tests/test_molab_manifest.py
+        run: |
+          python -m pytest tests/test_molab_manifest.py -q --tb=short
+
+      - name: tests/test_molab_generation_parity.py
+        run: |
+          python -m pytest tests/test_molab_generation_parity.py -q --tb=short
+
+      - name: tests/test_molab_marimo_validity.py
+        run: |
+          python -m pytest tests/test_molab_marimo_validity.py -q --tb=short
+
+      - name: tests/test_molab_dependency_parity.py
+        run: |
+          python -m pytest tests/test_molab_dependency_parity.py -q --tb=short
+
+      - name: tests/test_molab_readme_links.py
+        run: |
+          python -m pytest tests/test_molab_readme_links.py -q --tb=short
+
+      - name: tests/test_molab_no_colab_markers.py
+        run: |
+          python -m pytest tests/test_molab_no_colab_markers.py -q --tb=short
 
   api-drift:
     # The flagship matrix: assert every classmethod / kwarg the
