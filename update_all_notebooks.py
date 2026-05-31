@@ -1115,27 +1115,45 @@ README_SKIP_NOTEBOOKS = [
     "Meta_Synthetic_Data_Llama3_2_(3B).ipynb"
 ]
 
-# Per-notebook overrides for the Model column in README.md tables. Keyed by
-# the on-disk basename (with .ipynb). The value is the literal Markdown text
-# rendered between the surrounding ** ** bold markers, so HTML tags such as
-# <br> can be embedded for multi-line cells. Set this for notebooks whose
-# computed model name is too long to fit on a single README row.
+# Per-notebook overrides for the Model column in README.md tables. Keyed by the
+# prefix-stripped basename (Colab/Kaggle/AMD share one key). The value is the
+# literal Markdown text rendered between the surrounding ** ** bold markers, so
+# HTML tags such as <br> can be embedded for multi-line cells. Set this for
+# notebooks whose computed model name is too long to fit on a single README row.
 README_MODEL_NAME_OVERRIDES = {
     "CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb":
         "CodeForces CoT Reasoning",
-    "Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb":
-        "CodeForces CoT Reasoning",
-    "AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb":
-        "CodeForces CoT Reasoning",
 }
 
-# Per-notebook overrides for the Type column, keyed by on-disk basename.
-# Blank where the shortened Model name already carries the task, so the row
-# does not repeat it.
+# Per-notebook overrides for the Type column, keyed by the prefix-stripped
+# basename. Fills the Type for notebooks whose filename carries no task keyword,
+# or blanks it where the Model name already carries the task.
 README_TYPE_OVERRIDES = {
     "CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb": "",
-    "Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb": "",
-    "AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb": "",
+    # Embeddings
+    "All_MiniLM_L6_v2.ipynb": "Embeddings",
+    "BGE_M3.ipynb": "Embeddings",
+    "EmbeddingGemma_(300M).ipynb": "Embeddings",
+    "Qwen3_Embedding_(0_6B).ipynb": "Embeddings",
+    "Qwen3_Embedding_(4B).ipynb": "Embeddings",
+    # Mixture of Experts
+    "Qwen3_MoE.ipynb": "MoE",
+    "Qwen3_5_MoE.ipynb": "MoE",
+    "Qwen3_6_MoE.ipynb": "MoE",
+    "TinyQwen3_MoE.ipynb": "MoE",
+    # Phone deployment
+    "Gemma3_(270M)_Phone_Deployment.ipynb": "Phone Deployment",
+    "Qwen3_(0_6B)-Phone_Deployment.ipynb": "Phone Deployment",
+    # Plain base / instruct models
+    "Nemotron-3-Nano-30B-A3B_A100.ipynb": "Conversational",
+    "Nemotron-Nano-3-30B-A3B_A100.ipynb": "Conversational",
+    "GLM_Flash_A100(80GB).ipynb": "Conversational",
+    "Qwen3_(14B).ipynb": "Conversational",
+    "Qwen_3_5_27B_A100(80GB).ipynb": "Conversational",
+    # Misc single-task notebooks
+    "ModernBert.ipynb": "Classification",
+    "Deepseek_OCR_2_(3B).ipynb": "Fine Tuning",
+    "LFM2.5_(1.2B)-Translation.ipynb": "Translation",
 }
 
 
@@ -4757,16 +4775,17 @@ def update_readme(
             continue
 
         notebook_name = os.path.basename(path)
-        old_notebook_name = notebook_name
-        check = False
-        if notebook_name in FIRST_MAPPING_NAME:
-            notebook_name = FIRST_MAPPING_NAME[notebook_name]
-            check = True
-        
-        # For Kaggle
-        if notebook_name.lstrip("Kaggle-") in FIRST_MAPPING_NAME:
-            notebook_name = FIRST_MAPPING_NAME[notebook_name.lstrip("Kaggle-")]
-            notebook_name = "Kaggle-" + notebook_name
+        # Strip the platform prefix so the shared FIRST_MAPPING_NAME and the
+        # override maps below apply to Colab, Kaggle and AMD alike. The prefix is
+        # only used for parsing here; the link is built from `path`, so dropping
+        # it keeps size/name extraction clean (a "AMD-(OpenEnv)-..." prefix would
+        # otherwise be misread as the model size).
+        platform_prefix = next(
+            (p for p in ("Kaggle-", "AMD-") if notebook_name.startswith(p)), ""
+        )
+        bare_basename = notebook_name[len(platform_prefix):]
+        if bare_basename in FIRST_MAPPING_NAME:
+            notebook_name = FIRST_MAPPING_NAME[bare_basename]
 
         std_notebook_name = notebook_name.replace("-", "_")
         is_kaggle = is_path_contains_any(path.lower(), ["kaggle"]) 
@@ -4782,12 +4801,11 @@ def update_readme(
             info = {'name': notebook_name.replace('.ipynb',''), 'size': None, 'type': 'Error', 'architecture': None, 'requires_a100': False} # Fallback
 
         model_name = info['name'] if info and info['name'] else notebook_name.replace('.ipynb','')
-        # Apply per-notebook display-name override (keyed by on-disk basename)
-        # so notebooks with very long auto-derived names can wrap onto multiple
-        # lines in the rendered Markdown table.
-        on_disk_basename = os.path.basename(path)
-        if on_disk_basename in README_MODEL_NAME_OVERRIDES:
-            model_name = README_MODEL_NAME_OVERRIDES[on_disk_basename]
+        # Apply per-notebook display-name override (keyed by prefix-stripped
+        # basename) so notebooks with very long auto-derived names can wrap onto
+        # multiple lines in the rendered Markdown table.
+        if bare_basename in README_MODEL_NAME_OVERRIDES:
+            model_name = README_MODEL_NAME_OVERRIDES[bare_basename]
         model_type = info['type'] if info and info['type'] else ""
         # Classify RL/GRPO notebooks by the task they actually train on
         # (GSM8K Math, DAPO Math, Vision Math, Wordle, Sudoku, 2048 Game,
@@ -4841,9 +4859,10 @@ def update_readme(
         # clean.
         if is_grpo_trainer and notebook_uses_fast_inference(path):
             model_type = (model_type or "GRPO") + " + vLLM"
-        # Per-notebook Type override (after RL classification) keyed by basename.
-        if on_disk_basename in README_TYPE_OVERRIDES:
-            model_type = README_TYPE_OVERRIDES[on_disk_basename]
+        # Per-notebook Type override (after RL classification), keyed by the
+        # prefix-stripped basename so it applies on Colab, Kaggle and AMD.
+        if bare_basename in README_TYPE_OVERRIDES:
+            model_type = README_TYPE_OVERRIDES[bare_basename]
         architecture = info['architecture'] if info else None
         size = info['size']
         size = size.replace(r"_", " ") if size else None

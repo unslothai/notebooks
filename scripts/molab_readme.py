@@ -83,14 +83,77 @@ _TYPE_MAPPING = {
 }
 
 
+# Per-notebook (model, type, size) overrides so the molab row matches the Colab
+# table row for the same notebook (the molab port is built from the Colab one).
+# Mirrors update_all_notebooks.py's FIRST_MAPPING_NAME + README_TYPE_OVERRIDES,
+# plus its content-derived RL task names (2048 Game, Sudoku, Minesweeper Game,
+# Wordle + vLLM, Auto Kernel Creation, Vision Math) that a filename alone can't
+# yield.
+_MODEL_TYPE_SIZE_OVERRIDES = {
+    'All_MiniLM_L6_v2': ('All MiniLM L6 v2', 'Embeddings', ''),
+    'BGE_M3': ('BGE M3', 'Embeddings', ''),
+    'CodeForces-cot-Finetune_for_Reasoning_on_CodeForces': ('CodeForces CoT Reasoning', '', ''),
+    'Deepseek_OCR_(3B)': ('Deepseek OCR', 'Fine Tuning', '3B'),
+    'Deepseek_OCR_2_(3B)': ('Deepseek OCR 2', 'Fine Tuning', '3B'),
+    'EmbeddingGemma_(300M)': ('EmbeddingGemma', 'Embeddings', '300M'),
+    'FunctionGemma_(270M)': ('FunctionGemma', 'Conversational', '270M'),
+    'FunctionGemma_(270M)-LMStudio': ('FunctionGemma', 'Inference', '270M'),
+    'GLM_Flash_A100(80GB)': ('GLM Flash(80GB)', 'Conversational', ''),
+    'GPT_OSS_BNB_(20B)-Inference': ('gpt oss BNB', 'Inference', '20B'),
+    'GPT_OSS_MXFP4_(20B)-Inference': ('gpt oss MXFP4', 'Inference', '20B'),
+    'Gemma3_(270M)': ('Gemma3', 'Conversational', '270M'),
+    'Gemma3_(270M)_Phone_Deployment': ('Gemma3', 'Phone Deployment', '270M'),
+    'Gemma3_(4B)': ('Gemma3', 'Conversational', '4B'),
+    'Gemma4_(26B_A4B)-Text': ('Gemma4', 'Conversational', '26B_A4B'),
+    'Gemma4_(31B)-Text': ('Gemma4', 'Conversational', '31B'),
+    'Gemma4_(E2B)-Text': ('Gemma4', 'Conversational', 'E2B'),
+    'Gemma4_(E2B)_Reinforcement_Learning_2048_Game': ('Gemma4', '2048 Game', 'E2B'),
+    'Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game': ('Gemma4', 'Sudoku', 'E2B'),
+    'Gemma4_(E4B)-Text': ('Gemma4', 'Conversational', 'E4B'),
+    'Granite4.0': ('Granite4.0', 'Conversational', '3B'),
+    'Granite4.0_350M': ('Granite4.0', 'Conversational', '350M'),
+    'LFM2.5_(1.2B)-Translation': ('LFM2.5', 'Translation', '1.2B'),
+    'Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game': ('Ministral3', 'Sudoku', '3B'),
+    'Ministral_3_VL_(3B)_Vision': ('Ministral3 VL', 'Vision', '3B'),
+    'ModernBert': ('ModernBert', 'Classification', ''),
+    'NeMo-Gym-Multi-Environment': ('NeMo Gym Multi Environment', 'Multi Environment', ''),
+    'NeMo-Gym-Sudoku': ('NeMo Gym Sudoku', 'Sudoku', ''),
+    'Nemotron-3-Nano-30B-A3B_A100': ('Nemotron 3 Nano 30B A3B', 'Conversational', ''),
+    'Nemotron-Nano-3-30B-A3B_A100': ('Nemotron Nano 3 30B A3B', 'Conversational', ''),
+    'OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game': ('(OpenEnv) gpt oss', '2048 Game', '20B'),
+    'OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16': ('(OpenEnv) gpt oss BF16', '2048 Game', '20B'),
+    'Openenv_wordle_grpo': ('Openenv wordle', 'Wordle + vLLM', ''),
+    'Qwen3_(0_6B)-Phone_Deployment': ('Qwen3', 'Phone Deployment', '0_6B'),
+    'Qwen3_(14B)': ('Qwen3', 'Conversational', '14B'),
+    'Qwen3_(4B)-Instruct': ('Qwen3', 'Conversational', '4B'),
+    'Qwen3_5_(4B)_Vision_GRPO': ('Qwen3 5', 'Vision Math (GRPO RL)', '4B'),
+    'Qwen3_5_MoE': ('Qwen3 5 MoE', 'MoE', ''),
+    'Qwen3_6_MoE': ('Qwen3 6 MoE', 'MoE', ''),
+    'Qwen3_Embedding_(0_6B)': ('Qwen3 Embedding', 'Embeddings', '0_6B'),
+    'Qwen3_Embedding_(4B)': ('Qwen3 Embedding', 'Embeddings', '4B'),
+    'Qwen3_MoE': ('Qwen3 MoE', 'MoE', ''),
+    'Qwen3_VL_(8B)-Vision-GRPO': ('Qwen3 VL', 'Vision Math (GRPO RL)', '8B'),
+    'Qwen_3_5_27B_A100(80GB)': ('Qwen 3 5 27B(80GB)', 'Conversational', ''),
+    'Spark_TTS_(0_5B)': ('Spark TTS', 'TTS', '0.5B'),
+    'TinyQwen3_MoE': ('TinyQwen3 MoE', 'MoE', ''),
+    'Whisper': ('Whisper', 'Fine Tuning', 'Large'),
+    'bert_classification': ('ModernBERT', 'Classification', 'Large'),
+    'gpt-oss-(20B)-GRPO': ('gpt oss', 'Auto Kernel Creation', '20B'),
+    'gpt-oss-(20B)_A100-GRPO': ('(A100) gpt oss', 'Auto Kernel Creation', '20B'),
+    'gpt_oss_(20B)_GRPO_BF16': ('gpt oss', 'Auto Kernel Creation', '20B'),
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game': ('gpt oss', '2048 Game', '20B'),
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16': ('gpt oss BF16', '2048 Game', '20B'),
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark': ('(DGX Spark) gpt oss', '2048 Game', '20B'),
+    'gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16': ('gpt oss', 'Minesweeper Game', '20B'),
+}
+
+
 def _model_type_size(stem: str) -> "tuple[str, str, str]":
     """Split a notebook stem into (model, type, size), like the Colab/AMD
     tables: type is the first matching keyword, size is the ``_(...)`` group,
     model is the remaining name."""
-    # Shorten the verbose CodeForces label (matches README_MODEL_NAME_OVERRIDES
-    # in update_all_notebooks.py); the short name carries the task, so blank Type.
-    if re.search(r"codeforces.*finetune.*reasoning.*codeforces", stem, re.IGNORECASE):
-        return "CodeForces CoT Reasoning", "", ""
+    if stem in _MODEL_TYPE_SIZE_OVERRIDES:
+        return _MODEL_TYPE_SIZE_OVERRIDES[stem]
     s = stem.replace("-", "_")  # standardize separators before parsing
     if "A100" in s:
         s = s.replace("_A100", "")
@@ -121,6 +184,7 @@ def _model_type_size(stem: str) -> "tuple[str, str, str]":
 def _row(nb: "MolabNotebook") -> str:
     """Return one ``| Model | Type | Notebook |`` row, like the AMD table."""
     model, type_, size = _model_type_size(nb.output.stem)
+    size = size.replace("_", " ")  # match the Colab/AMD size formatting
     model_cell = f"**{model}** **({size})**" if size else f"**{model}**"
     return f"| {model_cell} | {type_} | {_badge_markdown(nb)} |"
 

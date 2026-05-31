@@ -352,7 +352,9 @@ def test_renderer_model_type_columns() -> None:
         "Qwen3_(14B)-Reasoning-Conversational": ("Qwen3", "Reasoning Conversational", "14B"),
         "Gemma3N_(4B)-Conversational": ("Gemma3N", "Multimodal", "4B"),  # TYPE_MAPPING remap
         "Unsloth_Studio": ("Unsloth", "Studio", ""),
-        "Whisper": ("Whisper", "", ""),
+        # FIRST_MAPPING remaps Whisper.ipynb -> Whisper_(Large)-Fine-Tuning, so the
+        # molab row matches the Colab/AMD tables (Fine Tuning, Large) not a blank.
+        "Whisper": ("Whisper", "Fine Tuning", "Large"),
         # Verbose label is shortened and Type blanked (matches update_all_notebooks.py).
         "CodeForces-cot-Finetune_for_Reasoning_on_CodeForces": ("CodeForces CoT Reasoning", "", ""),
     }
