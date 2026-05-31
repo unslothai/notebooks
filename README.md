@@ -716,7 +716,7 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 <!-- End of Notebook Links -->
 
 <!-- MOLAB:START -->
-## 🍃 Open in molab
+# 🍃 Open in molab
 
 Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebooks. They're reactive: change a value in one cell, the cells below recompute on their own.
 
