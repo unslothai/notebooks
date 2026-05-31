@@ -336,6 +336,31 @@ def test_renderer_popular_split() -> None:
     )
 
 
+def test_renderer_model_type_columns() -> None:
+    """The renderer emits AMD-style ``| Model | Type | Notebook |`` tables and
+    derives the Type from the stem the same way the Colab/AMD tables do."""
+    _renderer_skip_if_absent()
+    result = _README_MOD.render_molab_readme_section(mm.MOLAB_NOTEBOOKS)
+    assert "| Model | Type | Notebook |" in result, (
+        "Expected the AMD-style three-column header."
+    )
+    if not hasattr(_README_MOD, "_model_type_size"):
+        pytest.skip("renderer does not expose _model_type_size.")
+    cases = {
+        "Gemma4_(E2B)-Vision": ("Gemma4", "Vision", "E2B"),
+        "gpt-oss-(20B)-Fine-tuning": ("gpt oss", "Fine Tuning", "20B"),
+        "Qwen3_(14B)-Reasoning-Conversational": ("Qwen3", "Reasoning Conversational", "14B"),
+        "Gemma3N_(4B)-Conversational": ("Gemma3N", "Multimodal", "4B"),  # TYPE_MAPPING remap
+        "Unsloth_Studio": ("Unsloth", "Studio", ""),
+        "Whisper": ("Whisper", "", ""),
+    }
+    for stem, expected in cases.items():
+        assert _README_MOD._model_type_size(stem) == expected, (
+            f"_model_type_size({stem!r}) = {_README_MOD._model_type_size(stem)!r}, "
+            f"expected {expected!r}."
+        )
+
+
 # ---------------------------------------------------------------------------
 # AXIS 2 — committed README tests (read README.md between markers)
 # ---------------------------------------------------------------------------
