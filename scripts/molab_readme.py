@@ -122,7 +122,7 @@ def _row(nb: "MolabNotebook") -> str:
 
 
 _INTRO = (
-    "## 🍃 Open in molab\n"
+    "# 🍃 Open in molab\n"
     "\n"
     "Run any of these on [molab](https://molab.marimo.io), Marimo's "
     "hosted GPU notebooks. They're reactive: change a value in one "
