@@ -1455,6 +1455,52 @@ def _load_generation_status() -> dict[str, str]:
     return data if isinstance(data, dict) else {}
 
 
+# Most popular molab notebooks shown in the top README table before the rest
+# fold into a collapsible <details>. Matches the AMD section's top-6.
+_MOLAB_POPULAR_COUNT = 6
+
+
+def _popular_molab_stems(available: list["molab_manifest.MolabNotebook"]) -> list[str]:
+    """Return the stems of the most popular molab notebooks.
+
+    Like the AMD section: the molab siblings of the hand-written
+    ``### Main Notebooks`` README table, in Main order, capped at
+    ``_MOLAB_POPULAR_COUNT``. Only stems present in ``available`` are kept, so a
+    sibling with no molab output (e.g. a vllm/GRPO notebook) is skipped. Returns
+    ``[]`` if the README or its Main Notebooks block is missing, so the renderer
+    falls back to a single flat table.
+    """
+    import urllib.parse
+
+    readme_path = _REPO_ROOT / "README.md"
+    try:
+        readme = readme_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    main_match = re.search(
+        r"^### Main Notebooks\b(.*?)(?=^### |^# |^<!--|\Z)",
+        readme,
+        re.MULTILINE | re.DOTALL,
+    )
+    if not main_match:
+        return []
+
+    available_stems = {nb.output.stem for nb in available}
+    popular: list[str] = []
+    for url_match in re.finditer(
+        r"/blob/main/nb/([^)\s\"']+\.ipynb)", main_match.group(1)
+    ):
+        # Main Notebook URLs encode parens as %28/%29; unquote so the stem
+        # matches the manifest stem (e.g. Gemma4_(E2B)-Vision).
+        stem = urllib.parse.unquote(url_match.group(1))[: -len(".ipynb")]
+        if stem in available_stems and stem not in popular:
+            popular.append(stem)
+        if len(popular) >= _MOLAB_POPULAR_COUNT:
+            break
+    return popular
+
+
 def render_readme_section() -> str:
     """Return the molab README section body (no markers) by delegating to
     readme-implementer's pure renderer.
@@ -1467,6 +1513,10 @@ def render_readme_section() -> str:
 
     The on-disk ``output.exists()`` check is a belt-and-braces secondary
     guard: if the status file is stale, a missing file is still excluded.
+
+    The most popular notebooks (the molab siblings of the README Main Notebooks
+    table) are surfaced in a short top table while the rest fold into a
+    collapsible ``<details>``, mirroring the AMD Notebooks section.
     """
     import molab_readme
 
@@ -1476,7 +1526,9 @@ def render_readme_section() -> str:
         for nb in molab_manifest.get_active_notebooks()
         if status.get(nb.output.stem) == "ok" and nb.output.exists()
     ]
-    return molab_readme.render_molab_readme_section(available)
+    return molab_readme.render_molab_readme_section(
+        available, popular_stems=_popular_molab_stems(available)
+    )
 
 
 def update_readme(readme_path: Path | None = None) -> bool:

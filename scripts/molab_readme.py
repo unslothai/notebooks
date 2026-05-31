@@ -64,7 +64,29 @@ def _badge_markdown(nb: "MolabNotebook") -> str:
     return f"[![Open in molab]({_BADGE_IMAGE})]({url})"
 
 
-def render_molab_readme_section(notebooks: Iterable["MolabNotebook"]) -> str:
+def _row(nb: "MolabNotebook") -> str:
+    """Return one markdown table row for a notebook.
+
+    Column layout mirrors the existing Main Notebooks table: Notebook | Open.
+    """
+    return f"| {nb.display_name} | {_badge_markdown(nb)} |"
+
+
+_INTRO = (
+    "## Open in molab\n"
+    "\n"
+    "Run any of these on [molab](https://molab.marimo.io), Marimo's "
+    "hosted GPU notebooks. They're reactive: change a value in one "
+    "cell, the cells below recompute on their own.\n"
+    "\n"
+)
+_TABLE_HEADER = "| Notebook | Open |\n| --- | --- |\n"
+
+
+def render_molab_readme_section(
+    notebooks: Iterable["MolabNotebook"],
+    popular_stems: "list[str] | None" = None,
+) -> str:
     """Render the molab README section as a markdown string.
 
     Parameters
@@ -75,6 +97,12 @@ def render_molab_readme_section(notebooks: Iterable["MolabNotebook"]) -> str:
         ``molab_manifest.get_p0_notebooks()``).  Entries with ``skip=True``
         are silently excluded.  The iteration order determines row order in the
         rendered table — pass a sorted/stable list for deterministic output.
+    popular_stems:
+        Optional list of ``output.stem`` values for the "most popular"
+        notebooks. When given, they render in a short top table (in
+        ``popular_stems`` order) and the rest fold into a collapsible
+        ``<details>`` block, like the AMD Notebooks section. When ``None`` or
+        empty (default), all active notebooks render in a single flat table.
 
     Returns
     -------
@@ -85,24 +113,34 @@ def render_molab_readme_section(notebooks: Iterable["MolabNotebook"]) -> str:
     """
     active = [nb for nb in notebooks if not nb.skip]
 
-    # Build the table rows — one row per active notebook.
-    # Column layout mirrors the existing Main Notebooks table: Notebook | Open
-    rows: list[str] = []
-    for nb in active:
-        badge = _badge_markdown(nb)
-        rows.append(f"| {nb.display_name} | {badge} |")
+    popular: list["MolabNotebook"] = []
+    if popular_stems:
+        by_stem = {nb.output.stem: nb for nb in active}
+        seen: set[str] = set()
+        for stem in popular_stems:
+            nb = by_stem.get(stem)
+            if nb is not None and stem not in seen:
+                popular.append(nb)
+                seen.add(stem)
 
-    table_body = "\n".join(rows)
+    popular_set = {nb.output.stem for nb in popular}
+    rest = [nb for nb in active if nb.output.stem not in popular_set]
 
-    section = (
-        "## Open in molab\n"
+    # Nothing to split: render one flat table (avoids an empty table/details).
+    if not popular or not rest:
+        body = "\n".join(_row(nb) for nb in active)
+        return f"{_INTRO}{_TABLE_HEADER}{body}\n"
+
+    popular_body = "\n".join(_row(nb) for nb in popular)
+    rest_body = "\n".join(_row(nb) for nb in rest)
+    return (
+        f"{_INTRO}{_TABLE_HEADER}{popular_body}\n"
         "\n"
-        "Run any of these on [molab](https://molab.marimo.io), Marimo's "
-        "hosted GPU notebooks. They're reactive: change a value in one "
-        "cell, the cells below recompute on their own.\n"
+        "<details>\n"
+        "  <summary>\n"
+        "    Click for all our molab notebooks:\n"
+        "  </summary>\n"
         "\n"
-        "| Notebook | Open |\n"
-        "| --- | --- |\n"
-        f"{table_body}\n"
+        f"{_TABLE_HEADER}{rest_body}\n"
+        "</details>\n"
     )
-    return section

@@ -722,6 +722,20 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 
 | Notebook | Open |
 | --- | --- |
+| Unsloth Studio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Unsloth_Studio.py) |
+| Gemma4 (E2B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Vision.py) |
+| Qwen3 5 (4B) Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(4B)_Vision.py) |
+| Qwen3 5 (2B) Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(2B)_Vision.py) |
+| gpt - oss - (20B) - Fine - tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)-Fine-tuning.py) |
+| gpt - oss - (20B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)-GRPO.py) |
+
+<details>
+  <summary>
+    Click for all our molab notebooks:
+  </summary>
+
+| Notebook | Open |
+| --- | --- |
 | All MiniLM L6 v2 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/All_MiniLM_L6_v2.py) |
 | BGE M3 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/BGE_M3.py) |
 | CodeForces - cot - Finetune for Reasoning on CodeForces | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.py) |
@@ -759,7 +773,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Gemma4 (31B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(31B)-Vision.py) |
 | Gemma4 (E2B) - Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Audio.py) |
 | Gemma4 (E2B) - Text | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Text.py) |
-| Gemma4 (E2B) - Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Vision.py) |
 | Gemma4 (E2B) Reinforcement Learning 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_Reinforcement_Learning_2048_Game.py) |
 | Gemma4 (E2B) Reinforcement Learning Sudoku Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.py) |
 | Gemma4 (E4B) - Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E4B)-Audio.py) |
@@ -829,8 +842,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Qwen3 (4B) - Thinking | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)-Thinking.py) |
 | Qwen3 (4B) Instruct - QAT | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)_Instruct-QAT.py) |
 | Qwen3 5 (0 8B) Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(0_8B)_Vision.py) |
-| Qwen3 5 (2B) Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(2B)_Vision.py) |
-| Qwen3 5 (4B) Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(4B)_Vision.py) |
 | Qwen3 5 (4B) Vision GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(4B)_Vision_GRPO.py) |
 | Qwen3 5 MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_MoE.py) |
 | Qwen3 6 MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_6_MoE.py) |
@@ -845,13 +856,10 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | Synthetic Data Hackathon | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Synthetic_Data_Hackathon.py) |
 | TinyLlama (1.1B) — Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/TinyLlama_(1.1B)-Alpaca.py) |
 | TinyQwen3 MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/TinyQwen3_MoE.py) |
-| Unsloth Studio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Unsloth_Studio.py) |
 | Whisper | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Whisper.py) |
 | Zephyr (7B) - DPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Zephyr_(7B)-DPO.py) |
 | bert classification | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/bert_classification.py) |
 | gpt - oss - (120B) A100 - Fine - tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(120B)_A100-Fine-tuning.py) |
-| gpt - oss - (20B) - Fine - tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)-Fine-tuning.py) |
-| gpt - oss - (20B) - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)-GRPO.py) |
 | gpt - oss - (20B) A100 - GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)_A100-GRPO.py) |
 | gpt oss (20B) 500K Context Fine tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_500K_Context_Fine_tuning.py) |
 | gpt oss (20B) GRPO BF16 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_GRPO_BF16.py) |
@@ -859,6 +867,7 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | gpt oss (20B) Reinforcement Learning 2048 Game BF16 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py) |
 | gpt oss (20B) Reinforcement Learning 2048 Game DGX Spark | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.py) |
 | gpt oss (20B) Reinforcement Learning GRPO Minesweeper Game BF16 | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py) |
+</details>
 <!-- MOLAB:END -->
 
 ## Known Issues / Environment Notes
