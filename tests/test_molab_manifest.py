@@ -49,8 +49,10 @@ import molab_manifest as mm  # noqa: E402
 _EXCLUDED_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("amd", re.compile(r"^amd[-_]", re.IGNORECASE)),
     ("kaggle", re.compile(r"^kaggle[-_]", re.IGNORECASE)),
-    # HF-course duplicates carry "HF_course" or "huggingface_course" in the name.
-    ("hf_course", re.compile(r"hf[_-]course|huggingface[_-]course", re.IGNORECASE)),
+    # HF-course duplicates carry "HF_course" or "HuggingFace Course" in the
+    # name; the real files use a space ("HuggingFace Course-*"), so allow any
+    # separator between the two words.
+    ("hf_course", re.compile(r"hf[\s_-]course|huggingface[\s_-]course", re.IGNORECASE)),
 ]
 
 # Minimum set of family tags that MUST appear in EXCLUSION_REASONS.

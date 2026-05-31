@@ -39,6 +39,7 @@ Rules:
 """
 from __future__ import annotations
 
+import re
 from typing import Iterable, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -64,23 +65,71 @@ def _badge_markdown(nb: "MolabNotebook") -> str:
     return f"[![Open in molab]({_BADGE_IMAGE})]({url})"
 
 
-def _row(nb: "MolabNotebook") -> str:
-    """Return one markdown table row for a notebook.
+# Task-type keywords and remaps, mirrored from update_all_notebooks.py
+# (KNOWN_TYPES_ORDERED / TYPE_MAPPING) so the molab Type column matches the
+# Colab and AMD tables. Longer phrases first so they win over substrings.
+_KNOWN_TYPES_ORDERED = [
+    "Tool Calling", "Text Completion", "Synthetic Data",
+    "Reasoning Conversational", "Vision GRPO", "Fine Tuning", "500K Context",
+    "QAT", "Conversational", "Alpaca", "Vision", "Reasoning", "Completion",
+    "Finetune", "Studio", "Coder", "Inference", "Ollama", "Audio", "Thinking",
+    "FP8 GRPO", "GRPO 2048", "GRPO Sudoku", "ORPO", "GRPO", "DPO", "CPT",
+    "TTS", "LoRA", "VL", "RAFT", "Evaluation", "Eval", "Classification",
+    "Mobile Actions",
+]
+_TYPE_MAPPING = {
+    "Gemma3N": {"Conversational": "Multimodal"},
+    "Meta Synthetic Data": {"Synthetic Data": "GRPO", "GRPO LoRA": "GRPO"},
+}
 
-    Column layout mirrors the existing Main Notebooks table: Notebook | Open.
-    """
-    return f"| {nb.display_name} | {_badge_markdown(nb)} |"
+
+def _model_type_size(stem: str) -> "tuple[str, str, str]":
+    """Split a notebook stem into (model, type, size), like the Colab/AMD
+    tables: type is the first matching keyword, size is the ``_(...)`` group,
+    model is the remaining name."""
+    s = stem.replace("-", "_")  # standardize separators before parsing
+    if "A100" in s:
+        s = s.replace("_A100", "")
+    searchable = s.lower().replace("_", " ").replace("+", " ")
+    type_ = ""
+    for kw in _KNOWN_TYPES_ORDERED:
+        if re.search(r"\b" + re.escape(kw.lower()) + r"\b", searchable):
+            type_ = kw
+            break
+    size = ""
+    size_match = re.search(r"_\((.*?)\)", s)
+    if size_match:
+        size = size_match.group(1)
+        model = s[: size_match.start()].replace("_", " ").strip()
+        if not model:  # size leads the name, e.g. "_(300M)-..."
+            model = s[size_match.end():].lstrip("_+").replace("_", " ").strip()
+    else:
+        model = s.replace("_", " ").strip()
+        if type_ and model.lower().endswith(type_.lower()):
+            model = model[: -len(type_)].strip()
+    for key in _TYPE_MAPPING:  # per-model type remaps
+        if key.lower() in model.lower():
+            type_ = _TYPE_MAPPING[key].get(type_, type_)
+            break
+    return model, type_, size
+
+
+def _row(nb: "MolabNotebook") -> str:
+    """Return one ``| Model | Type | Notebook |`` row, like the AMD table."""
+    model, type_, size = _model_type_size(nb.output.stem)
+    model_cell = f"**{model}** **({size})**" if size else f"**{model}**"
+    return f"| {model_cell} | {type_} | {_badge_markdown(nb)} |"
 
 
 _INTRO = (
-    "## Open in molab\n"
+    "## 🍃 Open in molab\n"
     "\n"
     "Run any of these on [molab](https://molab.marimo.io), Marimo's "
     "hosted GPU notebooks. They're reactive: change a value in one "
     "cell, the cells below recompute on their own.\n"
     "\n"
 )
-_TABLE_HEADER = "| Notebook | Open |\n| --- | --- |\n"
+_TABLE_HEADER = "| Model | Type | Notebook |\n| --- | --- | --- |\n"
 
 
 def render_molab_readme_section(

@@ -101,7 +101,9 @@ EXCLUSION_REASONS: dict[str, str] = {
         "on the Kaggle secret/credential model."
     ),
     "hf_course": (
-        "Hugging Face course duplicate notebooks are not Unsloth-authored content."
+        "Hugging Face course duplicate notebooks (named 'HuggingFace Course-*', "
+        "with a space) are not Unsloth-authored content; their spaced filenames "
+        "also produce broken molab links."
     ),
     "vllm": (
         "Notebooks whose install cells pull in vllm are excluded from the molab "
@@ -198,10 +200,14 @@ def _derive_display_name(stem: str) -> str:
 def _is_excluded(stem: str) -> bool:
     """True for filename stems that match an excluded family.
 
-    Excluded: ``AMD-`` prefix, ``Kaggle-`` prefix, ``hf_course`` substring."""
+    Excluded: ``AMD-`` prefix, ``Kaggle-`` prefix, and HF-course duplicates.
+    The course notebooks are named ``HuggingFace Course-*`` (with a space) and
+    also appear as ``hf_course`` / ``hf-course`` / ``huggingface_course``, so
+    match any separator. The space variant ships broken molab links (spaces in
+    the URL), so it must be caught here."""
     if stem.startswith("AMD-") or stem.startswith("Kaggle-"):
         return True
-    if "hf_course" in stem.lower():
+    if re.search(r"hf[\s_-]course|huggingface[\s_-]course", stem, re.IGNORECASE):
         return True
     return False
 
