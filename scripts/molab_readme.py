@@ -87,6 +87,10 @@ def _model_type_size(stem: str) -> "tuple[str, str, str]":
     """Split a notebook stem into (model, type, size), like the Colab/AMD
     tables: type is the first matching keyword, size is the ``_(...)`` group,
     model is the remaining name."""
+    # Shorten the verbose CodeForces label (matches README_MODEL_NAME_OVERRIDES
+    # in update_all_notebooks.py); the short name carries the task, so blank Type.
+    if re.search(r"codeforces.*finetune.*reasoning.*codeforces", stem, re.IGNORECASE):
+        return "CodeForces CoT Reasoning", "", ""
     s = stem.replace("-", "_")  # standardize separators before parsing
     if "A100" in s:
         s = s.replace("_A100", "")

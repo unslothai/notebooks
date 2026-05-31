@@ -326,7 +326,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 ### Other Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **CodeForces cot Finetune<br>for Reasoning on CodeForces**  | Reasoning | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **CodeForces CoT Reasoning**  |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Synthetic Data Hackathon**  | Synthetic Data | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Synthetic_Data_Hackathon.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Unsloth**  | Studio | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Unsloth_Studio.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
@@ -543,7 +543,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 ### Other Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
-| **CodeForces cot Finetune<br>for Reasoning on CodeForces**  | Reasoning | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **CodeForces CoT Reasoning**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Unsloth**  | Studio | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Unsloth_Studio.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 </details>
@@ -623,7 +623,7 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **Qwen3 5** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision_GRPO.ipynb) |
 | **Qwen3** **(14B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B).ipynb) |
 | **Qwen3** **(14B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B)-Reasoning-Conversational.ipynb) |
-| **CodeForces cot Finetune for Reasoning on CodeForces** | Reasoning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
+| **CodeForces CoT Reasoning** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
 | **Llama3.3** **(70B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.3_(70B)_A100-Conversational.ipynb) |
 | **Synthetic Data Hackathon** | Synthetic Data | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Synthetic_Data_Hackathon.ipynb) |
 | **Gemma3** **(4B)** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B).ipynb) |
@@ -738,7 +738,7 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | --- | --- | --- |
 | **All MiniLM L6 v2** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/All_MiniLM_L6_v2.py) |
 | **BGE M3** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/BGE_M3.py) |
-| **CodeForces cot Finetune for Reasoning on CodeForces** | Reasoning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.py) |
+| **CodeForces CoT Reasoning** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.py) |
 | **CodeGemma** **(7B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/CodeGemma_(7B)-Conversational.py) |
 | **Deepseek OCR** **(3B)** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B).py) |
 | **Deepseek OCR** **(3B)** | Eval | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B)-Eval.py) |

@@ -1118,13 +1118,24 @@ README_SKIP_NOTEBOOKS = [
 # Per-notebook overrides for the Model column in README.md tables. Keyed by
 # the on-disk basename (with .ipynb). The value is the literal Markdown text
 # rendered between the surrounding ** ** bold markers, so HTML tags such as
-# <br> can be embedded for multi-line cells. Only set this for notebooks
-# whose computed model name is too long to fit on a single README row.
+# <br> can be embedded for multi-line cells. Set this for notebooks whose
+# computed model name is too long to fit on a single README row.
 README_MODEL_NAME_OVERRIDES = {
     "CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb":
-        "CodeForces cot Finetune<br>for Reasoning on CodeForces",
+        "CodeForces CoT Reasoning",
     "Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb":
-        "CodeForces cot Finetune<br>for Reasoning on CodeForces",
+        "CodeForces CoT Reasoning",
+    "AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb":
+        "CodeForces CoT Reasoning",
+}
+
+# Per-notebook overrides for the Type column, keyed by on-disk basename.
+# Blank where the shortened Model name already carries the task, so the row
+# does not repeat it.
+README_TYPE_OVERRIDES = {
+    "CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb": "",
+    "Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb": "",
+    "AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb": "",
 }
 
 
@@ -4830,6 +4841,9 @@ def update_readme(
         # clean.
         if is_grpo_trainer and notebook_uses_fast_inference(path):
             model_type = (model_type or "GRPO") + " + vLLM"
+        # Per-notebook Type override (after RL classification) keyed by basename.
+        if on_disk_basename in README_TYPE_OVERRIDES:
+            model_type = README_TYPE_OVERRIDES[on_disk_basename]
         architecture = info['architecture'] if info else None
         size = info['size']
         size = size.replace(r"_", " ") if size else None
