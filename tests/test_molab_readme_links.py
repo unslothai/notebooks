@@ -285,6 +285,57 @@ def test_renderer_link_targets_exist_for_generated_files() -> None:
         )
 
 
+def test_renderer_popular_split() -> None:
+    """When ``popular_stems`` is provided, the renderer surfaces those notebooks
+    in a top table and folds the rest into a collapsible ``<details>`` block,
+    mirroring the AMD Notebooks section (R-readme).
+
+    Invariants:
+      - a single ``<details>`` collapsible is emitted,
+      - every popular badge appears BEFORE the ``<details>`` opens,
+      - every input notebook still appears exactly once (none dropped/duplicated),
+      - passing ``popular_stems=None`` reproduces the flat single-table output.
+    """
+    _renderer_skip_if_absent()
+    active = [nb for nb in mm.MOLAB_NOTEBOOKS if not nb.skip]
+    if len(active) < 4:
+        pytest.skip("Not enough active notebooks to exercise the popular split.")
+
+    popular = active[:3]
+    popular_stems = [nb.output.stem for nb in popular]
+    result = _README_MOD.render_molab_readme_section(
+        mm.MOLAB_NOTEBOOKS, popular_stems=popular_stems
+    )
+
+    # Exactly one collapsible, and it opens after the popular rows.
+    assert result.count("<details>") == 1 and result.count("</details>") == 1, (
+        "Expected exactly one <details> collapsible in the split rendering."
+    )
+    details_at = result.index("<details>")
+    for nb in popular:
+        url_frag = f"/molab/{nb.output.name}"
+        first = result.find(url_frag)
+        assert first != -1, f"Popular notebook {nb.output.name} missing from output."
+        assert first < details_at, (
+            f"Popular notebook {nb.output.name} must render before <details>, "
+            "not inside the collapsible."
+        )
+
+    # Every active notebook appears exactly once across both tables.
+    for nb in active:
+        url_frag = f"/molab/{nb.output.name}"
+        assert result.count(url_frag) == 1, (
+            f"{nb.output.name} should appear exactly once; "
+            f"found {result.count(url_frag)}."
+        )
+
+    # popular_stems=None is the legacy flat table (no collapsible).
+    flat = _README_MOD.render_molab_readme_section(mm.MOLAB_NOTEBOOKS)
+    assert "<details>" not in flat, (
+        "Default (popular_stems=None) must render a single flat table."
+    )
+
+
 # ---------------------------------------------------------------------------
 # AXIS 2 — committed README tests (read README.md between markers)
 # ---------------------------------------------------------------------------
