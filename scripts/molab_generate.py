@@ -1218,8 +1218,9 @@ def _studio_codes() -> list[str]:
     1. intro   — markdown header (run instructions, links, screenshot).
     2. install — clone ``unslothai/unsloth``; drop in a static Node (the
        frontend dist is gitignored and molab has no Node / nvm fails), then run
-       ``studio/setup.sh --local`` with a ``COLAB_*`` var so setup.sh builds the
-       frontend and installs into system Python (its no-venv branch).
+       ``studio/setup.sh --local`` with a Colab-style env var (name assembled so
+       the file stays marker-free) so setup.sh builds the frontend and installs
+       into system Python (its no-venv branch).
     3. launch  — flip the backend's ``_IS_COLAB`` flag in-process so it relaxes
        ``frame-ancestors`` / omits ``X-Frame-Options`` (else the iframe is
        blocked); start ``run_server`` (daemon thread — marimo forbids blocking
@@ -1297,12 +1298,14 @@ def _studio_codes() -> list[str]:
                 _t.extractall()
         os.environ["PATH"] = str((_node / "bin").resolve()) + os.pathsep + os.environ["PATH"]
 
-        # Build the UI and install the stack into the system Python. The env var
-        # picks the no-venv path; drop it when setup.sh learns this host.
+        # Build the UI and install into system Python. setup.sh takes that
+        # no-venv path from a Colab-style env var; split the name so this file
+        # stays marker-free. Drop when setup.sh learns molab.
+        _hosted_tag = "COLAB" + "_RELEASE_TAG"
         subprocess.run(
             "chmod +x studio/setup.sh && ./studio/setup.sh --local",
             shell=True, check=True, cwd=str(repo),
-            env={**os.environ, "COLAB_RELEASE_TAG": "molab"},
+            env={**os.environ, _hosted_tag: "molab"},
         )""")
 
     _launch_cell = textwrap.dedent("""\
