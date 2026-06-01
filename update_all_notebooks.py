@@ -1156,6 +1156,13 @@ README_TYPE_OVERRIDES = {
     "LFM2.5_(1.2B)-Translation.ipynb": "Translation",
 }
 
+# Per-notebook (Model, Type) overrides that apply ONLY to the AMD Notebooks
+# section, keyed by the prefix-stripped basename. Colab/Kaggle keep the shared
+# overrides above and the filename-derived name/type.
+README_AMD_NAME_TYPE_OVERRIDES = {
+    "Unsloth_Studio.ipynb": ("Unsloth Studio", "Chat UI"),
+}
+
 
 FIRST_MAPPING_NAME = {
     "gpt-oss-(20B)-Fine-tuning.ipynb" : "gpt_oss_(20B)-Fine-tuning.ipynb",
@@ -4961,6 +4968,10 @@ def update_readme(
         # are routed to a dedicated "AMD Notebooks" section at the very end
         # of the README with bare GitHub links (no Colab badge).
         is_amd_notebook = os.path.basename(path).startswith("AMD-")
+
+        # AMD-only Model/Type override (Colab/Kaggle keep their own labels).
+        if is_amd_notebook and bare_basename in README_AMD_NAME_TYPE_OVERRIDES:
+            model_name, model_type = README_AMD_NAME_TYPE_OVERRIDES[bare_basename]
 
         notebook_data.append(
             {
