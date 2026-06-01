@@ -553,7 +553,7 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 
 | Model | Type | Notebook |
 | --- | --- | --- |
-| **Unsloth** | Studio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Unsloth_Studio.ipynb) |
+| **Unsloth Studio** | Chat UI | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Unsloth_Studio.ipynb) |
 | **Gemma4** **(E2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Vision.ipynb) |
 | **Qwen3 5** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision.ipynb) |
 | **Qwen3 5** **(2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(2B)_Vision.ipynb) |
@@ -722,7 +722,7 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 
 | Model | Type | Notebook |
 | --- | --- | --- |
-| **Unsloth** | Studio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Unsloth_Studio.py) |
+| **Unsloth Studio** | Chat UI | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Unsloth_Studio.py) |
 | **Gemma4** **(E2B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Vision.py) |
 | **Qwen3 5** **(4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(4B)_Vision.py) |
 | **Qwen3 5** **(2B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(2B)_Vision.py) |

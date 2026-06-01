@@ -351,7 +351,7 @@ def test_renderer_model_type_columns() -> None:
         "gpt-oss-(20B)-Fine-tuning": ("gpt oss", "Fine Tuning", "20B"),
         "Qwen3_(14B)-Reasoning-Conversational": ("Qwen3", "Reasoning Conversational", "14B"),
         "Gemma3N_(4B)-Conversational": ("Gemma3N", "Multimodal", "4B"),  # TYPE_MAPPING remap
-        "Unsloth_Studio": ("Unsloth", "Studio", ""),
+        "Unsloth_Studio": ("Unsloth Studio", "Chat UI", ""),
         # FIRST_MAPPING remaps Whisper.ipynb -> Whisper_(Large)-Fine-Tuning, so the
         # molab row matches the Colab/AMD tables (Fine Tuning, Large) not a blank.
         "Whisper": ("Whisper", "Fine Tuning", "Large"),

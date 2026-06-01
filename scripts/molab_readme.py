@@ -136,6 +136,7 @@ _MODEL_TYPE_SIZE_OVERRIDES = {
     'Qwen_3_5_27B_A100(80GB)': ('Qwen 3 5 27B(80GB)', 'Conversational', ''),
     'Spark_TTS_(0_5B)': ('Spark TTS', 'TTS', '0.5B'),
     'TinyQwen3_MoE': ('TinyQwen3 MoE', 'MoE', ''),
+    'Unsloth_Studio': ('Unsloth Studio', 'Chat UI', ''),
     'Whisper': ('Whisper', 'Fine Tuning', 'Large'),
     'bert_classification': ('ModernBERT', 'Classification', 'Large'),
     'gpt-oss-(20B)-GRPO': ('gpt oss', 'Auto Kernel Creation', '20B'),
