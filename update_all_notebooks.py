@@ -514,6 +514,12 @@ else:
 !pip install torchcodec
 import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 
+# Gemma 4 12B needs a newer transformers (5.10.1) than the other Gemma 4 sizes,
+# which pin 5.5.0. Same install block otherwise, so derive it from the shared one.
+installation_gemma4_12b_content = installation_gemma4_content.replace(
+    "transformers==5.5.0", "transformers==5.10.1"
+)
+
 # ---------------------------------------------------------------------------
 # AMD Dev Cloud install template (single canonical %%bash cell shared by every
 # AMD notebook variant). Notebook-specific extra packages (vllm, torchcodec,
@@ -560,6 +566,11 @@ installation_amd_extras_gemma4 = """\
 # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
 !uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
 """
+
+# Gemma 4 12B needs transformers >= 5.10.1 (newer than the other Gemma 4 sizes).
+installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
+    "transformers>=5.5.0", "transformers>=5.10.1"
+).replace("Gemma 4 requires", "Gemma 4 12B requires")
 
 # Backwards-compatible aliases. Several places in the script (and external
 # callers) reference these names; keep them pointing at the shared template
@@ -1193,6 +1204,7 @@ FIRST_MAPPING_NAME = {
     "Gemma4_(E4B)-Text.ipynb" : "Gemma4_(E4B)-Conversational.ipynb",
     "Gemma4_(31B)-Text.ipynb" : "Gemma4_(31B)-Conversational.ipynb",
     "Gemma4_(26B_A4B)-Text.ipynb" : "Gemma4_(26B_A4B)-Conversational.ipynb",
+    "Gemma4_(12B)_Text.ipynb" : "Gemma4_(12B)_Conversational.ipynb",
 
     # Granite
     "Granite4.0_350M.ipynb" : "Granite4.0_(350M)-Conversational.ipynb",
@@ -2704,7 +2716,10 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     lowered = notebook_path.lower()
     source_install_blob = "\n".join(text for text in source_install_texts if text).lower()
     if is_path_contains_any(lowered, ["gemma4"]):
-        variant_extras = installation_amd_extras_gemma4
+        if is_path_contains_any(lowered, ["(12b)"]):
+            variant_extras = installation_amd_extras_gemma4_12b
+        else:
+            variant_extras = installation_amd_extras_gemma4
     elif _is_amd_grpo_like_path(notebook_path) and "vllm" in source_install_blob:
         variant_extras = installation_amd_extras_grpo
     else:
@@ -4035,7 +4050,10 @@ def update_notebook_sections(
                         # Gemma4 INSTALLATION: preserve the custom
                         # transformers==5.5.0 --no-deps + torchcodec block.
                         if is_path_contains_any(notebook_path.lower(), ["gemma4"]):
-                            installation = installation_gemma4_content
+                            if is_path_contains_any(notebook_path.lower(), ["(12b)"]):
+                                installation = installation_gemma4_12b_content
+                            else:
+                                installation = installation_gemma4_content
 
                         # ERNIE VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["ernie_4_5_vl"]):
