@@ -1165,6 +1165,7 @@ README_TYPE_OVERRIDES = {
     "ModernBert.ipynb": "Classification",
     "Deepseek_OCR_2_(3B).ipynb": "Fine Tuning",
     "LFM2.5_(1.2B)-Translation.ipynb": "Translation",
+    "DiffusionGemma_(26B-A4B)-Sudoku.ipynb": "Sudoku",
 }
 
 # Per-notebook (Model, Type) overrides that apply ONLY to the AMD Notebooks
