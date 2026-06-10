@@ -2,6 +2,7 @@ model_repo,created_at,downloads,likes,base_model,fetched_at,status
 AI4Math/MathVista,,0,0,,2026-04-08T08:58:06Z,not_found
 AudioProcessor/DacInterface,,0,0,,2026-04-08T08:58:06Z,not_found
 Dao-AILab/causal-conv1d,,0,0,,2026-04-18T00:43:34Z,not_found
+Etherll/kaira,2026-06-10T15:54:00Z,0,0,,2026-06-10T18:15:12Z,ok
 Fallback/augmentation,,0,0,,2026-04-08T08:58:06Z,not_found
 Flag/unflag,,0,0,,2026-04-08T11:44:51Z,not_found
 FreedomIntelligence/alpaca-gpt4-korean,,0,0,,2026-04-08T08:58:06Z,not_found
@@ -15,7 +16,6 @@ LiquidAI/LFM2-700M,2025-07-10T12:01:39Z,12417,110,,2026-04-08T08:58:28Z,ok
 LiquidAI/LFM2.5-1.2B-Base,2026-01-05T16:27:32Z,18776,126,,2026-05-18T11:06:35Z,ok
 LiquidAI/LFM2.5-1.2B-Instruct,2026-01-06T00:28:46Z,305212,554,LiquidAI/LFM2.5-1.2B-Base,2026-04-08T08:58:28Z,ok
 LiquidAI/LFM2.5-VL-1.6B,2026-01-05T19:07:50Z,83139,284,LiquidAI/LFM2.5-1.2B-Base,2026-05-18T11:06:35Z,ok
-MrDragonFox/Elise,,0,0,,2026-04-08T08:58:06Z,not_found
 OuteAI/Llama-OuteTTS-1.0-1B,2025-04-06T14:22:37Z,4786,240,,2026-05-18T11:06:35Z,ok
 Qwen/Qwen2-VL-2B,2024-09-05T07:14:45Z,3286,62,,2026-04-08T09:26:16Z,ok
 Qwen/Qwen2-VL-2B-Instruct,2024-08-28T09:02:15Z,2206780,497,Qwen/Qwen2-VL-2B,2026-04-08T08:58:28Z,ok
