@@ -157,7 +157,7 @@ def _(mo):
     <a name="Data"></a>
     ### Data Prep
 
-    We will use the `MrDragonFox/Elise`, which is designed for training TTS models. Ensure that your dataset follows the required format: **text, audio**. You can modify this section to accommodate your own dataset, but maintaining the correct structure is essential for optimal training.
+    We will use the `Etherll/kaira`, which is designed for training TTS models. Ensure that your dataset follows the required format: **text, audio**. You can modify this section to accommodate your own dataset, but maintaining the correct structure is essential for optimal training.
     """)
     return
 
@@ -187,7 +187,7 @@ def _(model_1, tokenizer):
 
     from datasets import load_dataset, Audio
 
-    dataset = load_dataset("MrDragonFox/Elise", split="train")
+    dataset = load_dataset("Etherll/kaira", split="train")
     dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
     dataset = dataset.train_test_split(test_size=0.06)
     train_dataset = [

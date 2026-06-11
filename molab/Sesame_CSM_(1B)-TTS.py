@@ -152,7 +152,7 @@ def _(mo):
     <a name="Data"></a>
     ### Data Prep
 
-    We will use the `MrDragonFox/Elise`, which is designed for training TTS models. Ensure that your dataset follows the required format: **text, audio** for single-speaker models or **source, text, audio** for multi-speaker models. You can modify this section to accommodate your own dataset, but maintaining the correct structure is essential for optimal training.
+    We will use the `Etherll/kaira`, which is designed for training TTS models. Ensure that your dataset follows the required format: **text, audio** for single-speaker models or **source, text, audio** for multi-speaker models. You can modify this section to accommodate your own dataset, but maintaining the correct structure is essential for optimal training.
     """)
     return
 
@@ -165,7 +165,7 @@ def _(torch):
     from transformers import AutoProcessor
 
     processor_1 = AutoProcessor.from_pretrained("unsloth/csm-1b")
-    raw_ds = load_dataset("MrDragonFox/Elise", split="train")
+    raw_ds = load_dataset("Etherll/kaira", split="train")
     speaker_key = "source"
     if "source" not in raw_ds.column_names and "speaker_id" not in raw_ds.column_names:
         # Getting the speaker id is important for multi-speaker models and speaker consistency

@@ -168,7 +168,7 @@ def _(mo):
     <a name="Data"></a>
     ### Data Prep
 
-    We will use the `MrDragonFox/Elise`, which is designed for training TTS models. Ensure that your dataset follows the required format:
+    We will use the `Etherll/kaira`, which is designed for training TTS models. Ensure that your dataset follows the required format:
     **text, audio**. You can modify this section to accommodate your own dataset, but maintaining the correct structure is essential for optimal training.
     """)
     return
@@ -178,7 +178,7 @@ def _(mo):
 def _():
     from datasets import load_dataset
 
-    dataset = load_dataset("MrDragonFox/Elise", split="train")
+    dataset = load_dataset("Etherll/kaira", split="train")
     OUTPUT_DIR = "processed_data_memmap"
     return OUTPUT_DIR, dataset
 
@@ -604,7 +604,7 @@ def _(mo):
 
 @app.cell
 def _():
-    input_text = "Hey there my name is Elise, <giggles> and I'm a speech generation model that can sound like a person."
+    input_text = "Hey there my name is Kaira, <giggle> and I'm a speech generation model that can sound like a person."
     return (input_text,)
 
 

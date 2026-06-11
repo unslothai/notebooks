@@ -101,13 +101,13 @@ model = FastModel.get_peft_model(
 # <a name="Data"></a>
 # ### Data Prep  
 # 
-# We will use the `MrDragonFox/Elise`, which is designed for training TTS models. Ensure that your dataset follows the required format: **text, audio**, but maintaining the correct structure is essential for optimal training.
+# We will use the `Etherll/kaira`, which is designed for training TTS models. Ensure that your dataset follows the required format: **text, audio**, but maintaining the correct structure is essential for optimal training.
 
 # In[4]:
 
 
 from datasets import load_dataset,Audio,Dataset
-dataset = load_dataset("MrDragonFox/Elise", split = "train")
+dataset = load_dataset("Etherll/kaira", split = "train")
 dataset = dataset.cast_column("audio", Audio(sampling_rate = 24000))
 
 
@@ -376,7 +376,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # In[10]:
 
 
-input_text = "Hey there my name is Elise, and I'm a speech generation model that can sound like a person."
+input_text = "Hey there my name is Kaira, and I'm a speech generation model that can sound like a person."
 
 
 # In[11]:
