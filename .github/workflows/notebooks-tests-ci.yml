@@ -94,7 +94,9 @@ jobs:
         #             every generated notebook to re-wrap the lines that
         #             marimo's IR conversion ast-unparses (rename pass).
         #             Pinned so regeneration is byte-stable across CI runs.
-        run: pip install 'marimo>=0.23,<0.24' 'ruff>=0.15,<0.16'
+        # Exact pins: marimo stamps its version into __generated_with, so
+        # any release drifts parity. Bump pins together with a regen commit.
+        run: pip install 'marimo==0.23.8' 'ruff==0.15.16'
 
       - name: tests/test_notebook_json_validity.py
         run: |
