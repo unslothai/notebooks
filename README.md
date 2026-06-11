@@ -767,6 +767,9 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **Gemma3** **(27B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(27B)_A100-Conversational.py) |
 | **Gemma3** **(4B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(4B).py) |
 | **Gemma3** **(4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(4B)-Vision.py) |
+| **Gemma4** **(12B)** | Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(12B)_Audio.py) |
+| **Gemma4** **(12B)** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(12B)_Text.py) |
+| **Gemma4** **(12B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(12B)_Vision.py) |
 | **Gemma4** **(26B A4B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(26B_A4B)-Text.py) |
 | **Gemma4** **(26B A4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(26B_A4B)-Vision.py) |
 | **Gemma4** **(31B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(31B)-Text.py) |
