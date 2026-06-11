@@ -51,10 +51,19 @@ import torch
 
 # DiffusionGemma is a 26B-A4B block-diffusion MoE on the Gemma-4 backbone. FastModel auto-detects the
 # diffusion model_type and routes to the transformers-only FastDiffusionModel slow path.
+# It is ~52GB in bf16: the 128 MoE experts alone are ~46GB and stay bf16 (fused 3D params, so bnb 4bit
+# cannot shrink them). Use a >= ~50GB GPU (A100 80GB / H100 / B200); a 40GB GPU offloads weights to the
+# meta/CPU device and the run becomes impractically slow.
+if torch.cuda.is_available():
+    free_gb = torch.cuda.mem_get_info()[0] / 1e9
+    if free_gb < 50:
+        print(f"[warn] {free_gb:.0f}GB free < ~52GB needed: weights will offload (meta/CPU) and run very "
+              "slowly. Use an 80GB GPU (A100 80GB / H100) for a real run.")
+
 model, tokenizer = FastModel.from_pretrained(
     model_name = "unsloth/diffusiongemma-26B-A4B-it",
     dtype = torch.bfloat16,
-    load_in_4bit = False,  # set True to fit a smaller GPU
+    load_in_4bit = False,  # 4bit cannot shrink the ~46GB of MoE experts, so it needs ~50GB either way
     # token = "YOUR_HF_TOKEN",
 )
 processor = tokenizer  # diffusion checkpoints ship a processor (chat template + tokenizer)
@@ -206,7 +215,9 @@ print("usable examples:", len(examples))
 
 
 import time
-dev = next(model.parameters()).device
+# compute device, not a "meta" param (offloaded weights report device = meta -> indexing fails)
+dev = next((p.device for p in model.parameters() if p.device.type != "meta"),
+           torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 STEPS, GRAD_ACCUM, LR, T_LO = 500, 4, 1e-4, 0.1  # full run in our report: 4000 steps, 8 GPUs
 
 model.config.use_cache = True
