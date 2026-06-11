@@ -191,7 +191,9 @@ def _row(nb: "MolabNotebook") -> str:
 
 
 _INTRO = (
-    "# 🍃 Open in molab\n"
+    # Heading matches the hand-edited README (b87c708); badges keep the
+    # "Open in molab" wording the tests require.
+    "# 🍃 Molab Notebooks\n"
     "\n"
     "Run any of these on [molab](https://molab.marimo.io), Marimo's "
     "hosted GPU notebooks. They're reactive: change a value in one "
