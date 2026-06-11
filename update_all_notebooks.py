@@ -520,6 +520,25 @@ installation_gemma4_12b_content = installation_gemma4_content.replace(
     "transformers==5.5.0", "transformers==5.10.1"
 )
 
+# DiffusionGemma: FastDiffusionModel is in unsloth main (not a release yet), so install unsloth +
+# unsloth_zoo from main. transformers 5.11.0 ships the diffusion_gemma architecture (model saved at 5.8.0.dev0).
+installation_diffusiongemma_content = """%%capture
+import os, re
+if "COLAB_" not in "".join(os.environ.keys()):
+    !pip install unsloth  # local & cloud: pull deps, then upgrade unsloth + unsloth_zoo to main below
+    !pip install --no-deps --upgrade --force-reinstall git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git
+else:
+    import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
+    __XFORMERS_INSTALL__
+    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
+    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton
+    !pip install --no-deps --upgrade git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git
+    !pip install --no-deps --upgrade "torchao>=0.16.0"
+!pip install --no-deps transformers==5.11.0 "tokenizers>=0.22.0,<=0.23.0"
+import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+
+installation_diffusiongemma_kaggle_content = installation_diffusiongemma_content
+
 # ---------------------------------------------------------------------------
 # AMD Dev Cloud install template (single canonical %%bash cell shared by every
 # AMD notebook variant). Notebook-specific extra packages (vllm, torchcodec,
@@ -1165,6 +1184,7 @@ README_TYPE_OVERRIDES = {
     "ModernBert.ipynb": "Classification",
     "Deepseek_OCR_2_(3B).ipynb": "Fine Tuning",
     "LFM2.5_(1.2B)-Translation.ipynb": "Translation",
+    "DiffusionGemma_(26B-A4B)-Sudoku.ipynb": "Sudoku",
 }
 
 # Per-notebook (Model, Type) overrides that apply ONLY to the AMD Notebooks
@@ -4054,6 +4074,13 @@ def update_notebook_sections(
                                 installation = installation_gemma4_12b_content
                             else:
                                 installation = installation_gemma4_content
+
+                        # DIFFUSIONGEMMA INSTALLATION: unsloth + unsloth_zoo from main, transformers 5.11.0.
+                        if is_path_contains_any(notebook_path.lower(), ["diffusiongemma"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_diffusiongemma_kaggle_content
+                            else:
+                                installation = installation_diffusiongemma_content
 
                         # ERNIE VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["ernie_4_5_vl"]):
