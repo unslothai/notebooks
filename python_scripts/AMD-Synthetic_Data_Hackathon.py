@@ -127,7 +127,7 @@ from datasets import Dataset
 
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template, standardize_sharegpt, train_on_responses_only
-from trl import SFTConfig, SFTTrainer
+from unsloth import UnslothTrainer, UnslothTrainingArguments
 from transformers import DataCollatorForSeq2Seq
 
 
@@ -136,7 +136,7 @@ from transformers import DataCollatorForSeq2Seq
 # Imports specialized libraries for efficient fine-tuning:
 # - `FastLanguageModel` from Unsloth: Optimized model loading and training
 # - `get_chat_template`, `standardize_sharegpt`, `train_on_responses_only`: Chat formatting utilities
-# - `SFTConfig`, `SFTTrainer`: Supervised fine-tuning configuration and trainer from TRL
+# - `UnslothTrainingArguments`, `UnslothTrainer`: Supervised fine-tuning configuration and trainer from Unsloth
 # - `DataCollatorForSeq2Seq`: Handles batching and padding for sequence-to-sequence training
 
 # ### Setup Unsloth model and tokenizer for ROCm without bitsandbytes
@@ -266,7 +266,7 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
 # Setup trainer with ROCm-friendly settings and proper data handling
-trainer = SFTTrainer(
+trainer = UnslothTrainer(
     model = model,
     tokenizer = tokenizer,
     train_dataset = dataset,
@@ -274,7 +274,7 @@ trainer = SFTTrainer(
     max_seq_length = max_seq_length,
     data_collator = DataCollatorForSeq2Seq(tokenizer = tokenizer, padding = True),
     packing = False,
-    args = SFTConfig(
+    args = UnslothTrainingArguments(
         per_device_train_batch_size = 64,  # 🚀 MI300X can handle this with 192GB HBM3!
         gradient_accumulation_steps = 1,   # Effective batch size = 8*2 = 16
         warmup_steps = 5,
@@ -313,7 +313,7 @@ trainer_stats = trainer.train()
 # 
 # This cell configures and executes the fine-tuning process:
 # 
-# **Training Configuration (SFTConfig):**
+# **Training Configuration (UnslothTrainingArguments):**
 # - **Batch size**: 64 per device - leveraging the AMD MI300X's massive 192GB HBM3 memory
 # - **Gradient accumulation**: 1 step
 # - **Warmup**: 5 steps

@@ -43,7 +43,6 @@
 
 
 from unsloth import FastVisionModel # FastLanguageModel for LLMs
-import torch
 
 # 4bit pre quantized models we support for 4x faster downloading + no OOMs.
 fourbit_models = [
@@ -252,16 +251,16 @@ result = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128
 
 
 from unsloth.trainer import UnslothVisionDataCollator
-from trl import SFTTrainer, SFTConfig
+from unsloth import UnslothTrainer, UnslothTrainingArguments
 
 FastVisionModel.for_training(model) # Enable for training!
 
-trainer = SFTTrainer(
+trainer = UnslothTrainer(
     model = model,
     train_dataset = converted_dataset,
     processing_class = processor.tokenizer,
     data_collator = UnslothVisionDataCollator(model, processor),
-    args = SFTConfig(
+    args = UnslothTrainingArguments(
         per_device_train_batch_size = 1,
         gradient_accumulation_steps = 4,
         gradient_checkpointing = True,
@@ -295,9 +294,9 @@ trainer = SFTTrainer(
 
 
 # @title Show current memory stats
-gpu_stats = torch.cuda.get_device_properties(0)
-start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
-max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+from unsloth import get_gpu_memory_stats
+
+gpu_stats, start_gpu_memory, max_memory = get_gpu_memory_stats()
 print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
@@ -312,13 +311,15 @@ trainer_stats = trainer.train()
 
 
 # @title Show final memory and time stats
-used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+from unsloth import get_gpu_memory_stats
+used_memory = get_gpu_memory_stats()[1]
 used_memory_for_lora = round(used_memory - start_gpu_memory, 3)
 used_percentage = round(used_memory / max_memory * 100, 3)
 lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
-print(f"{trainer_stats.metrics['train_runtime']} seconds used for training.")
+trainer_stats_metrics = trainer_stats if isinstance(trainer_stats, dict) else trainer_stats.metrics
+print(f"{trainer_stats_metrics['train_runtime']} seconds used for training.")
 print(
-    f"{round(trainer_stats.metrics['train_runtime']/60, 2)} minutes used for training."
+    f"{round(trainer_stats_metrics['train_runtime']/60, 2)} minutes used for training."
 )
 print(f"Peak reserved memory = {used_memory} GB.")
 print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")

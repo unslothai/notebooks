@@ -31,7 +31,7 @@
 
 # # ### Installation
 # 
-# # In[ ]:
+# # In[1]:
 # 
 # 
 # get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # local & cloud: pull deps, then upgrade unsloth + unsloth_zoo to main below\n    !pip install --no-deps --upgrade --force-reinstall git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton\n    !pip install --no-deps --upgrade git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps transformers==5.11.0 "tokenizers>=0.22.0,<=0.23.0"\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
@@ -43,7 +43,7 @@
 # 
 # DiffusionGemma needs a transformers build that ships the DiffusionGemma classes; `FastModel` auto-detects the diffusion architecture and routes to the transformers-only slow path.
 
-# In[ ]:
+# In[2]:
 
 
 from unsloth import FastModel
@@ -74,7 +74,7 @@ print("vocab", vocab, "| canvas", canvas_len)
 
 # We add LoRA adapters so we only train a few percent of the parameters. We target the attention and the dense MLP of the shared Gemma-4 backbone; the 128 fused MoE experts stay frozen.
 
-# In[ ]:
+# In[3]:
 
 
 model = FastModel.get_peft_model(
@@ -90,7 +90,7 @@ model = FastModel.get_peft_model(
 # 
 # We generate puzzle -> solution pairs procedurally, each with a **unique** solution (verified by a solver), so the target is the only correct answer. The 9x9 grid is written as 9 newline-separated rows of compact digits; the Gemma tokenizer splits digits individually, so every cell is exactly one token at a fixed canvas position. `0` marks an empty cell.
 
-# In[ ]:
+# In[4]:
 
 
 import random
@@ -172,7 +172,7 @@ print(len(train_rows), "train /", len(eval_rows), "eval puzzles")
 
 # A training example - the user message is the puzzle, the assistant message is the solved grid:
 
-# In[ ]:
+# In[5]:
 
 
 print(train_rows[0]["messages"][0]["content"])
@@ -185,7 +185,7 @@ print(train_rows[0]["messages"][1]["content"])
 # 
 # DiffusionGemma is not trained the autoregressive way (no `SFTTrainer`). Instead we use its own block-diffusion objective: pad the target solution to the 256-token canvas, **corrupt** the canvas by replacing each token with probability `t` by a random token, then ask the model to predict the clean grid. The loss is cross-entropy on the solution tokens plus the `eos` (the padding tail is ignored).
 
-# In[ ]:
+# In[6]:
 
 
 eos = (model.generation_config.eos_token_id or [1])
@@ -211,7 +211,7 @@ examples = build_examples(train_rows)
 print("usable examples:", len(examples))
 
 
-# In[ ]:
+# In[7]:
 
 
 import time
@@ -258,7 +258,7 @@ for step in range(1, STEPS + 1):
 # 
 # We solve held-out puzzles by block-diffusion generation and score the **exact-solve rate**. Crucially we sweep the number of denoising steps: one shot (predict the grid once) is weak, but letting the model **revise over steps** is where it wins.
 
-# In[ ]:
+# In[8]:
 
 
 import copy
@@ -295,7 +295,7 @@ for s in (1, 16, 64):
 # <a name="Inference"></a>
 # # Solve a puzzle
 
-# In[ ]:
+# In[9]:
 
 
 puzzle = eval_rows[0]["messages"][0]["content"]
@@ -307,7 +307,7 @@ print("\n".join("".join(str(g[r*9+c]) for c in range(9)) for r in range(9)) if g
 # <a name="Save"></a>
 # # Save the LoRA
 
-# In[ ]:
+# In[10]:
 
 
 model.save_pretrained("diffusiongemma_lora")

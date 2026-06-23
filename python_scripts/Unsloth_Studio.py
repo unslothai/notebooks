@@ -1,30 +1,47 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# <a href="https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+# To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
+# <div class="align-center">
+# <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+# <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# </div>
+# 
+# To install Unsloth Studio on your local device, follow [our guide](https://unsloth.ai/docs/new/unsloth-studio/install). Unsloth Studio is licensed [AGPL-3.0](https://github.com/unslothai/unsloth/blob/main/studio/LICENSE.AGPL-3.0).
+# 
+# ### Unsloth Studio
+# 
+# Train and run open models with [**Unsloth Studio**](https://unsloth.ai/docs/new/unsloth-studio/start). NEW! Installation should now only take 2 mins!
+# 
+# 
+# We are actively working on making Unsloth Studio install on Colab T4 GPUs faster.
+# 
+# [Features](https://unsloth.ai/docs/new/unsloth-studio#features) • [Quickstart](https://unsloth.ai/docs/new/unsloth-studio/start) • [Data Recipes](https://unsloth.ai/docs/new/unsloth-studio/data-recipe) • [Studio Chat](https://unsloth.ai/docs/new/unsloth-studio/chat) • [Export](https://unsloth.ai/docs/new/unsloth-studio/export)
+
+# <p align="left"><img src="https://github.com/unslothai/unsloth/raw/main/studio/frontend/public/studio%20github%20landscape%20colab%20display.png" width="600"></p>
+
+# ### Setup: Clone repo and run setup
+
 # In[ ]:
 
 
-# @title ↙️ Press ▶ to start 🦥 Unsloth Studio Chat for Llama-3.1 8b
+get_ipython().system('git clone --depth 1 --branch main https://github.com/unslothai/unsloth.git')
+get_ipython().run_line_magic('cd', '/content/unsloth')
+get_ipython().system('chmod +x studio/setup.sh && ./studio/setup.sh --local')
 
-# Unsloth Studio
-# Copyright (C) 2024-present the Unsloth AI team. All rights reserved.
 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published
-# by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# ### Start Unsloth Studio
 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
+# In[ ]:
 
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-get_ipython().system('git clone https://github.com/unslothai/studio > /dev/null 2>&1')
-with open("studio/unsloth_studio/chat.py", "r") as chat_module:
-    code = chat_module.read()
-exec(code)
+
+import sys
+sys.path.insert(0, "/content/unsloth/studio/backend")
+from colab import start
+start()
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
@@ -43,5 +60,5 @@ exec(code)
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
 # 
-#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
+#   <b>This notebook is licensed <a href="https://github.com/unslothai/unsloth/blob/main/studio/LICENSE.AGPL-3.0">AGPL-3.0</a></b>
 # </div>
