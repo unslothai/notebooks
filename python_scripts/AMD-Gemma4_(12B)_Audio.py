@@ -10,7 +10,7 @@
 # 
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
-# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
 
 # ### News
 
@@ -40,7 +40,7 @@
 # # In[ ]:
 # 
 # 
-# # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
+# # Gemma 4 12B requires transformers >= 5.5.0 / trl >= 0.28.0
 # 
 # import torch; torch._dynamo.config.recompile_limit = 64;
 # get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "transformers>=5.10.1" "huggingface_hub>=1.5.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" timm')
@@ -177,6 +177,7 @@ model = FastModel.get_peft_model(
     finetune_language_layers   = True,  # False if not finetuning language layers
     finetune_attention_modules = True,  # False if not finetuning attention layers
     finetune_mlp_modules       = True,  # False if not finetuning MLP layers
+    finetune_audio_layers      = True,  # Finetune the audio encoder + audio embedder
 
     r = 8,                              # The larger, the higher the accuracy, but might overfit
     lora_alpha = 16,                    # Recommended alpha == r at least
@@ -185,16 +186,6 @@ model = FastModel.get_peft_model(
     random_state = 3407,
     use_rslora = False,                 # We support rank stabilized LoRA
     loftq_config = None,                # And LoftQ
-    target_modules = [
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
-
-        # Audio layers
-        "post", "linear_start", "linear_end",
-        "embedding_projection",
-        "ffw_layer_1", "ffw_layer_2",
-        "output_proj",
-    ]
 )
 
 
