@@ -24,8 +24,8 @@ dependencies = [
 #   Exact pins: marimo stamps its version into __generated_with, so any
 #     release drifts parity. Bump pins together with a regen commit.
 generator = [
-    "marimo==0.23.8",
-    "ruff==0.15.16",
+    "marimo==0.23.9",
+    "ruff==0.15.17",
 ]
 
 [tool.pytest.ini_options]
