@@ -173,6 +173,7 @@ model = FastModel.get_peft_model(
     finetune_language_layers   = True,  # False if not finetuning language layers
     finetune_attention_modules = True,  # False if not finetuning attention layers
     finetune_mlp_modules       = True,  # False if not finetuning MLP layers
+    finetune_audio_layers      = True,  # Finetune the audio encoder + audio embedder
 
     r = 8,                              # The larger, the higher the accuracy, but might overfit
     lora_alpha = 16,                    # Recommended alpha == r at least
@@ -181,16 +182,6 @@ model = FastModel.get_peft_model(
     random_state = 3407,
     use_rslora = False,                 # We support rank stabilized LoRA
     loftq_config = None,                # And LoftQ
-    target_modules = [
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
-
-        # Audio layers
-        "post", "linear_start", "linear_end",
-        "embedding_projection",
-        "ffw_layer_1", "ffw_layer_2",
-        "output_proj",
-    ]
 )
 
 
