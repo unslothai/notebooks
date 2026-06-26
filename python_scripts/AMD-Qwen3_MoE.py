@@ -53,7 +53,7 @@
 # In[5]:
 
 
-import os, torch
+import os
 # os.environ['UNSLOTH_MOE_BACKEND'] = 'grouped_mm' # switch to 'unsloth_triton' or 'native_torch'
 # grouped_mm is only supported on torch 2.9 or newer.
 # Make sure that we have at least 64GB VRAM because the model itself takes 60GB in 16bit
@@ -70,8 +70,7 @@ lora_rank = 32 # Larger rank = smarter, but slower
 # In[ ]:
 
 
-from unsloth import FastLanguageModel
-import torch
+from unsloth import FastLanguageModel, clear_gpu_memory
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name,
@@ -248,12 +247,12 @@ dataset
 # In[16]:
 
 
-from trl import SFTTrainer, SFTConfig
-trainer = SFTTrainer(
+from unsloth import UnslothTrainer, UnslothTrainingArguments
+trainer = UnslothTrainer(
     model = model,
     tokenizer = tokenizer,
     train_dataset = dataset,
-    args = SFTConfig(
+    args = UnslothTrainingArguments(
         dataset_text_field = "text",
         per_device_train_batch_size = 1,
         gradient_accumulation_steps = 1, # Use GA to mimic batch size!
@@ -304,7 +303,7 @@ _ = model.generate(
 
 
 del dataset
-torch.cuda.empty_cache()
+clear_gpu_memory()
 import gc
 gc.collect()
 
