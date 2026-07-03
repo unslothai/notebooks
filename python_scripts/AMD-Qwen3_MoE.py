@@ -225,7 +225,7 @@ tokenizer.apply_chat_template(dataset["Messages"][0], tokenize = False)
 # In[14]:
 
 
-dataset["N"] = dataset["Messages"].apply(lambda x: len(tokenizer.apply_chat_template(x)['input_ids']))
+dataset["N"] = dataset["Messages"].apply(lambda x: len(tokenizer.apply_chat_template(x)))
 
 dataset = dataset.loc[dataset["N"] <= max_seq_length/2].copy()
 dataset.shape
