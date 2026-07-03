@@ -760,7 +760,7 @@ trainer = GRPOTrainer(
 
 # And let's train the model!
 # 
-# **NOTE** A T4 free GPU might take 5 minutes for one generation sadly since it's an old GPU - A100 or H100 will be much faster!
+# **NOTE** An AMD MI300X GPU should complete one generation much faster.
 
 # In[ ]:
 
@@ -849,7 +849,7 @@ if False:
 # * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
 # * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
 # 
-# [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
+# [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Ollama.ipynb)
 
 # In[ ]:
 
@@ -883,9 +883,9 @@ if False:
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
+# 1. Train your own reasoning model - Llama GRPO notebook [Free AMD Dev Cloud](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb)
+# 2. Saving finetunes to Ollama. [Free AMD Dev Cloud](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Ollama.ipynb)
+# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free AMD Dev Cloud](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb)
 # 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">

@@ -592,8 +592,8 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **Llama3** **(8B)** | ORPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-ORPO.ipynb) |
 | **Llama3** **(8B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Alpaca.ipynb) |
 | **Openenv wordle** | Wordle + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Openenv_wordle_grpo.ipynb) |
-| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)_A100-GRPO.ipynb) |
-| **gpt oss** **(120B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(120B)_A100-Fine-tuning.ipynb) |
+| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(20B)_MI300X-GRPO.ipynb) |
+| **gpt oss** **(120B)** | Fine Tuning | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-gpt-oss-(120B)_MI300X-Fine-tuning.ipynb) |
 | **Qwen2.5** **(3B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2.5_(3B)-GRPO.ipynb) |
 | **ModernBert** | Classification | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-ModernBert.ipynb) |
 | **Qwen3** **(4B)** | QAT | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)_Instruct-QAT.ipynb) |
@@ -619,22 +619,22 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **Meta Synthetic Data Llama3.1** **(8B)** | GRPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Meta-Synthetic-Data-Llama3.1_(8B).ipynb) |
 | **Meta Synthetic Data Llama3 2** **(3B)** | GRPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Meta_Synthetic_Data_Llama3_2_(3B).ipynb) |
 | **Llama3.2** **(1B and 3B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(1B_and_3B)-Conversational.ipynb) |
-| **Qwen 3 5 27B(80GB)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen_3_5_27B_A100(80GB).ipynb) |
-| **Qwen3** **(32B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(32B)_A100-Reasoning-Conversational.ipynb) |
+| **Qwen 3 5 27B(192GB)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen_3_5_27B_MI300X(192GB).ipynb) |
+| **Qwen3** **(32B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(32B)_MI300X-Reasoning-Conversational.ipynb) |
 | **Llama3.1** **(8B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-Alpaca.ipynb) |
 | **Qwen3 5** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision_GRPO.ipynb) |
 | **Qwen3** **(14B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B).ipynb) |
 | **Qwen3** **(14B)** | Reasoning Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B)-Reasoning-Conversational.ipynb) |
 | **CodeForces CoT Reasoning** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
-| **Llama3.3** **(70B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.3_(70B)_A100-Conversational.ipynb) |
+| **Llama3.3** **(70B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.3_(70B)_MI300X-Conversational.ipynb) |
 | **Synthetic Data Hackathon** | Synthetic Data | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Synthetic_Data_Hackathon.ipynb) |
 | **Gemma3** **(4B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B).ipynb) |
 | **Gemma3** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B)-Vision-GRPO.ipynb) |
 | **Phi 4** **(14B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_4_(14B)-GRPO.ipynb) |
 | **Phi 4** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_4-Conversational.ipynb) |
-| **Gemma3** **(27B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(27B)_A100-Conversational.ipynb) |
+| **Gemma3** **(27B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(27B)_MI300X-Conversational.ipynb) |
 | **Qwen3 5** **(0 8B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(0_8B)_Vision.ipynb) |
-| **GLM Flash(80GB)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GLM_Flash_A100(80GB).ipynb) |
+| **GLM Flash(192GB)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-GLM_Flash_MI300X(192GB).ipynb) |
 | **Sesame CSM** **(1B)** | TTS | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Sesame_CSM_(1B)-TTS.ipynb) |
 | **Gemma4** **(31B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(31B)-Text.ipynb) |
 | **Gemma4** **(31B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(31B)-Vision.ipynb) |
@@ -642,8 +642,8 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **Qwen3** **(4B)** | Thinking | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(4B)-Thinking.ipynb) |
 | **Qwen3 MoE** | MoE | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_MoE.ipynb) |
 | **Gemma3** **(1B)** | GSM8K Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(1B)-GRPO.ipynb) |
-| **Nemotron Nano 3 30B A3B** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Nemotron-Nano-3-30B-A3B_A100.ipynb) |
-| **Nemotron 3 Nano 30B A3B** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Nemotron-3-Nano-30B-A3B_A100.ipynb) |
+| **Nemotron Nano 3 30B A3B** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Nemotron-Nano-3-30B-A3B_MI300X.ipynb) |
+| **Nemotron 3 Nano 30B A3B** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Nemotron-3-Nano-30B-A3B_MI300X.ipynb) |
 | **Gemma4** **(E4B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Text.ipynb) |
 | **Gemma4** **(E4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Vision.ipynb) |
 | **Gemma4** **(E4B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E4B)-Audio.ipynb) |

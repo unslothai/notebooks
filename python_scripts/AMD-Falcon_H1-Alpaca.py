@@ -37,7 +37,7 @@ import os
 os.environ['TRITON_JIT_DISABLE_OPT'] = '1' # Likely the most critical change
 
 max_seq_length = 2048 # Choose any! We auto support RoPE Scaling internally!
-dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
+dtype = None # None for auto detection. Float16 or Bfloat16 for AMD GPUs (ROCm)
 load_in_4bit = True # Use 4bit quantization to reduce memory usage. Can be False.
 
 model, tokenizer = FastLanguageModel.from_pretrained(

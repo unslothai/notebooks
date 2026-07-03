@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+# <a href="https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb" target="_parent">Open In AMD Dev Cloud</a>
 
 # # Goal: Make GPT-OSS play games with Reinforcement Learning
 # 
@@ -12,7 +12,7 @@
 # <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/2048_win.png/500px-2048_win.png" height=300 />
 
 # # Installation
-# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on GPT-OSS 20B. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster, which allows us to fit GPT-OSS RL in a free Google Colab instance.
+# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on GPT-OSS 20B. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster, which allows us to fit GPT-OSS RL in a free AMD Dev Cloud instance.
 
 # In[ ]:
 
@@ -28,9 +28,9 @@ get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.2
 
 
 # We'll load GPT-OSS 20B and set some parameters:
-# * `max_seq_length = 768` The maximum context length of the model. Increasing it will use more memory, and 768 was the maximum we found to fit on a free 15GB Tesla T4 machine
+# * `max_seq_length = 768` The maximum context length of the model. Increasing it will use more memory, and 768 was the maximum we found to fit on smaller GPU memory; AMD MI300X can use larger contexts
 # * `lora_rank = 4` The larger this number, the smarter the RL process, but the slower and more memory usage
-# * `load_in_4bit = True` Uses quantization to reduce memory usage by 75% without reducing accuracy that much. `load_in_16bit` will be faster but will need a 80GB GPU (H100, B200)
+# * `load_in_4bit = True` Uses quantization to reduce memory usage by 75% without reducing accuracy that much. `load_in_16bit` will be faster but will need a high-memory AMD GPU such as MI300X
 # * `offload_embedding = True` New Unsloth optimization which moves the embedding to CPU RAM, reducing VRAM by 1GB.
 
 # In[ ]:
@@ -41,9 +41,9 @@ import torch
 max_seq_length = 768 # Can increase for longer RL output
 lora_rank = 4        # Larger rank = smarter, but slower
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/gpt-oss-20b", # unsloth/gpt-oss-20b-BF16 for H100s
+    model_name = "unsloth/gpt-oss-20b", # unsloth/gpt-oss-20b-BF16 for high-memory AMD GPUs
     max_seq_length = max_seq_length,
-    load_in_4bit = True,      # False for LoRA 16bit. Choose False on H100s
+    load_in_4bit = True,      # False for LoRA 16bit. Choose False on high-memory AMD GPUs
     offload_embedding = True, # Reduces VRAM by 1GB
 )
 
@@ -658,7 +658,7 @@ def strategy_succeeds(completions, **kwargs):
     return scores
 
 
-# We'll now create the dataset which includes a replica of our prompt. Remember to add a reasoning effort of low! You can choose high reasoning mode, but this'll only work on more memory GPUs like H100s.
+# We'll now create the dataset which includes a replica of our prompt. Remember to add a reasoning effort of low! You can choose high reasoning mode, but this'll only work on high-memory AMD GPUs like MI300X.
 
 # In[ ]:
 
@@ -745,7 +745,7 @@ trainer = GRPOTrainer(
 
 # And let's train the model!
 # 
-# **NOTE** A T4 free GPU might take 5 minutes for one generation sadly since it's an old GPU - A100 or H100 will be much faster!
+# **NOTE** An AMD MI300X GPU should complete one generation much faster.
 
 # In[ ]:
 
@@ -803,9 +803,9 @@ if False: # Pushing to HF Hub
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
+# 1. Train your own reasoning model - Llama GRPO notebook [Free AMD Dev Cloud](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb)
+# 2. Saving finetunes to Ollama. [Free AMD Dev Cloud](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Ollama.ipynb)
+# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free AMD Dev Cloud](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb)
 # 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
