@@ -746,6 +746,7 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **Deepseek OCR** **(3B)** | Eval | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B)-Eval.py) |
 | **Deepseek OCR** **(3B)** | Evaluation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B)-Evaluation.py) |
 | **Deepseek OCR 2** **(3B)** | Fine Tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_2_(3B).py) |
+| **DiffusionGemma** **(26B A4B)** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/DiffusionGemma_(26B-A4B)-Sudoku.py) |
 | **ERNIE 4 5 21B A3B PT** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ERNIE_4_5_21B_A3B_PT-Conversational.py) |
 | **ERNIE 4 5 VL 28B A3B PT** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ERNIE_4_5_VL_28B_A3B_PT_Vision.py) |
 | **EmbeddingGemma** **(300M)** | Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/EmbeddingGemma_(300M).py) |
