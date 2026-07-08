@@ -341,7 +341,7 @@ def _(mo):
 @app.cell
 def _(dataset, max_seq_length, tokenizer):
     dataset["N"] = dataset["Messages"].apply(
-        lambda x: len(tokenizer.apply_chat_template(x)["input_ids"])
+        lambda x: len(tokenizer.apply_chat_template(x))
     )
     dataset_1 = dataset.loc[dataset["N"] <= max_seq_length / 2].copy()
     dataset_1.shape

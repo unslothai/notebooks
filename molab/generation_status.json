@@ -7,6 +7,7 @@
   "Deepseek_OCR_(3B)-Eval": "ok",
   "Deepseek_OCR_(3B)-Evaluation": "ok",
   "Deepseek_OCR_2_(3B)": "ok",
+  "DiffusionGemma_(26B-A4B)-Sudoku": "ok",
   "ERNIE_4_5_21B_A3B_PT-Conversational": "ok",
   "ERNIE_4_5_VL_28B_A3B_PT_Vision": "ok",
   "EmbeddingGemma_(300M)": "ok",
