@@ -303,9 +303,7 @@ def _(trainer):
     from unsloth.chat_templates import train_on_responses_only
 
     trainer_1 = train_on_responses_only(
-        trainer,
-        instruction_part="[gMASK]<sop><|user|>",  # Updated for GLM
-        response_part="<|assistant|><think>",
+        trainer, instruction_part="<|user|>", response_part="<|assistant|>"
     )  # Updated for GLM
     return (trainer_1,)
 
