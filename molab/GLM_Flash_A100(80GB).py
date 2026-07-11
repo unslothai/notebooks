@@ -304,7 +304,7 @@ def _(trainer):
 
     trainer_1 = train_on_responses_only(
         trainer, instruction_part="<|user|>", response_part="<|assistant|>"
-    )  # Updated for GLM
+    )
     return (trainer_1,)
 
 

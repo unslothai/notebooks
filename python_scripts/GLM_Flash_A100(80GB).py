@@ -194,7 +194,7 @@ trainer = SFTTrainer(
 from unsloth.chat_templates import train_on_responses_only
 trainer = train_on_responses_only(
     trainer,
-    instruction_part = "<|user|>", # Updated for GLM
+    instruction_part = "<|user|>",
     response_part = "<|assistant|>",
 )
 
