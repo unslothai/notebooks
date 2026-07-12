@@ -209,18 +209,14 @@ trainer = SFTTrainer(
 )
 
 
-# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs.
+# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. Unsloth now auto-detects the instruction and response parts from the tokenizer's chat template, so we don't need to pass `instruction_part` and `response_part` anymore. You can still pass them explicitly if you use a custom chat template.
 
 # In[ ]:
 
 
 from unsloth.chat_templates import train_on_responses_only
 
-trainer = train_on_responses_only(
-    trainer,
-    instruction_part = "<|im_start|>user<|im_sep|>",
-    response_part = "<|im_start|>assistant<|im_sep|>",
-)
+trainer = train_on_responses_only(trainer)
 
 
 # We verify masking is actually done:
