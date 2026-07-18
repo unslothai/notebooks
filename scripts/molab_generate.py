@@ -1213,7 +1213,7 @@ def _studio_codes() -> list[str]:
 
     Called when the generator detects ``nb.output.stem == "Unsloth_Studio"``.
     The cells replace the dead ``git clone unslothai/studio + exec(chat.py)``
-    cell with the real Studio web-app flow, in five cells (after ``import mo``):
+    cell with the real Unsloth web-app flow, in five cells (after ``import mo``):
 
     1. intro   — markdown header (run instructions, links, screenshot).
     2. install — clone ``unslothai/unsloth``; drop in a static Node (the
@@ -1226,7 +1226,7 @@ def _studio_codes() -> list[str]:
        blocked); start ``run_server`` (daemon thread — marimo forbids blocking
        cells); wait for ``/api/health``; open a cloudflared quick tunnel and
        parse its ``*.trycloudflare.com`` URL.
-    4. display — clickable URL + sign-in note + the embedded Studio iframe.
+    4. display — clickable URL + sign-in note + the embedded Unsloth iframe.
     5. footer  — markdown (kept from the original notebook).
 
     Cells are chained by data dependencies (repo -> studio_ready ->
@@ -1263,7 +1263,7 @@ def _studio_codes() -> list[str]:
 
         Train and run open models with [**Unsloth Studio**](https://unsloth.ai/docs/new/unsloth-studio/start). NEW! Installation should now only take 2 mins!
 
-        [Features](https://unsloth.ai/docs/new/unsloth-studio#features) • [Quickstart](https://unsloth.ai/docs/new/unsloth-studio/start) • [Data Recipes](https://unsloth.ai/docs/new/unsloth-studio/data-recipe) • [Studio Chat](https://unsloth.ai/docs/new/unsloth-studio/chat) • [Export](https://unsloth.ai/docs/new/unsloth-studio/export)
+        [Features](https://unsloth.ai/docs/new/unsloth-studio#features) • [Quickstart](https://unsloth.ai/docs/new/unsloth-studio/start) • [Data Recipes](https://unsloth.ai/docs/new/unsloth-studio/data-recipe) • [Unsloth Chat](https://unsloth.ai/docs/new/unsloth-studio/chat) • [Export](https://unsloth.ai/docs/new/unsloth-studio/export)
 
         <p align="left"><img src="https://github.com/unslothai/unsloth/raw/main/studio/frontend/public/studio%20github%20landscape%20colab%20display.png" width="600"></p>
         \"\"\")""")
@@ -1357,7 +1357,7 @@ def _studio_codes() -> list[str]:
             except Exception:
                 time.sleep(2)""")
 
-    # Display: clickable URL + sign-in info + embedded Studio (rendered output).
+    # Display: clickable URL + sign-in info + embedded Unsloth (rendered output).
     _display_cell = textwrap.dedent("""\
         mo.vstack([
             mo.md(
@@ -1426,7 +1426,7 @@ def generate_notebook_text(nb: molab_manifest.MolabNotebook) -> str:
         _studio_codes_list = _studio_codes()
         codes = ["import marimo as mo"] + _studio_codes_list
         names = ["_"] * len(codes)
-        # Render-only cells (intro/footer markdown, the live-Studio display)
+        # Render-only cells (intro/footer markdown, the live-Unsloth display)
         # hide their code so only the output shows; the install/launch code
         # cells stay visible.
         hide_flags = [c.lstrip().startswith("mo.") for c in codes]
