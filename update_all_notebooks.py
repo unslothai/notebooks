@@ -1196,7 +1196,7 @@ README_AMD_NAME_TYPE_OVERRIDES = {
     "Unsloth_Studio.ipynb": ("Unsloth Studio", "Chat UI"),
 }
 
-AMD_DEV_CLOUD_BASE_URL = "https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/"
+AMD_DEV_CLOUD_BASE_URL = "https://notebooks.amd.com/github/unslothai/notebooks/blob/main/"
 
 
 AMD_NOTEBOOK_BASENAME_OVERRIDES = {
@@ -1268,12 +1268,12 @@ def _amd_dev_cloud_url_from_colab_match(match):
     if github_path.startswith(prefix) and github_path.endswith(".ipynb"):
         basename = os.path.basename(github_path)
         github_path = prefix + _amd_dev_cloud_notebook_basename(basename)
-    return "https://amd-ai-academy.com/github/" + github_path
+    return "https://notebooks.amd.com/github/" + github_path
 
 
 def _amd_dev_cloud_notebook_url_from_match(match):
     return (
-        "https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/"
+        "https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/"
         + _amd_dev_cloud_notebook_basename(match.group("basename"))
     )
 
@@ -1282,11 +1282,11 @@ def rewrite_colab_links_for_amd_dev_cloud(text):
     text = _COLAB_GITHUB_URL_RE.sub(_amd_dev_cloud_url_from_colab_match, text)
     text = _AMD_DEV_CLOUD_NOTEBOOK_URL_RE.sub(_amd_dev_cloud_notebook_url_from_match, text)
     text = _COLAB_DRIVE_URL_RE.sub(
-        "https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Mistral_(7B)-Text_Completion.ipynb",
+        "https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Mistral_(7B)-Text_Completion.ipynb",
         text,
     )
     text = _COLAB_DATA_TABLE_LINK_RE.sub("data table notebook", text)
-    text = _COLAB_DATA_TABLE_URL_RE.sub("https://amd-ai-academy.com/", text)
+    text = _COLAB_DATA_TABLE_URL_RE.sub("https://notebooks.amd.com/", text)
     text = _COLAB_HTML_BADGE_RE.sub(
         lambda match: f'<a href="{match.group("link")}"{match.group("attrs")}>Open In AMD Dev Cloud</a>',
         text,
@@ -1303,7 +1303,7 @@ def rewrite_colab_links_for_amd_dev_cloud(text):
         ("Open In Free AMD Dev Cloud", "Open In AMD Dev Cloud"),
         ("Open In Colab", "Open In AMD Dev Cloud"),
         ("Open in Colab", "Open In AMD Dev Cloud"),
-        ("[Free notebook](https://amd-ai-academy.com/", "[Free AMD Dev Cloud](https://amd-ai-academy.com/"),
+        ("[Free notebook](https://notebooks.amd.com/", "[Free AMD Dev Cloud](https://notebooks.amd.com/"),
         ("Free Google Colab", "Free AMD Dev Cloud"),
         ("Free Colab", "Free AMD Dev Cloud"),
         ("Google Colab", "AMD Dev Cloud"),

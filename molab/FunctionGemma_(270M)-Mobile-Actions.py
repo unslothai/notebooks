@@ -315,11 +315,7 @@ def _(mo):
 def _(trainer):
     from unsloth.chat_templates import train_on_responses_only
 
-    trainer_1 = train_on_responses_only(
-        trainer,
-        instruction_part="<start_of_turn>user\n",
-        response_part="<start_of_turn>model\n",
-    )
+    trainer_1 = train_on_responses_only(trainer)
     return (trainer_1,)
 
 

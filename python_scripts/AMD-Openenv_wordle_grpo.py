@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Openenv_wordle_grpo.ipynb" target="_parent">Open In AMD Dev Cloud</a>
+# <a href="https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Openenv_wordle_grpo.ipynb" target="_parent">Open In AMD Dev Cloud</a>
 
 # # Goal: Make Qwen3-4B play games with Reinforcement Learning
 # 

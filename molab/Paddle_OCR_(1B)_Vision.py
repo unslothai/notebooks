@@ -370,7 +370,7 @@ def _(FastVisionModel, converted_dataset, model_1, processor, torch):
         ignore_index=-100,
         max_seq_length=2048,  # Choose any for long context!
         train_on_responses_only=True,
-        instruction_part="User: ",
+        instruction_part="User:",
         response_part="\nAssistant:",
         pad_to_multiple_of=8,
     )  # Enable for training!

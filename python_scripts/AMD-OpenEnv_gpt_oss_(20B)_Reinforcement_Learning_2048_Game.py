@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb" target="_parent">Open In AMD Dev Cloud</a>
+# <a href="https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb" target="_parent">Open In AMD Dev Cloud</a>
 
 # # Goal: Make gpt-oss play games with Reinforcement Learning
 # 

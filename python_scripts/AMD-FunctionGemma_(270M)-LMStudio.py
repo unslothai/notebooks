@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-LMStudio.ipynb" target="_parent">Open In AMD Dev Cloud</a>
+# <a href="https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-LMStudio.ipynb" target="_parent">Open In AMD Dev Cloud</a>
 
 # ## Unsloth + LM Studio
 # <img src="https://user-uploads.lmstudio.ai/umbrella-editor-assets/2025/12/22/5gwufx8h-image.png" width="400" />
@@ -555,17 +555,13 @@ trainer = SFTTrainer(
 )
 
 
-# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
+# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes! Unsloth now auto-detects the instruction and response parts from the tokenizer's chat template, so we don't need to pass `instruction_part` and `response_part` anymore. You can still pass them explicitly if you use a custom chat template.
 
 # In[14]:
 
 
 from unsloth.chat_templates import train_on_responses_only
-trainer = train_on_responses_only(
-    trainer,
-    instruction_part = "<start_of_turn>user\n",
-    response_part = "<start_of_turn>model\n",
-)
+trainer = train_on_responses_only(trainer)
 
 
 # Let's verify masking the instruction part is done! Let's print the 100th row again.
@@ -734,8 +730,8 @@ if False: # Change to True to upload GGUF
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free AMD Dev Cloud](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb)
-# 2. Llama 3.2 Vision finetuning - Radiography use case. [Free AMD Dev Cloud](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb)
+# 1. Train your own reasoning model - Llama GRPO notebook [Free AMD Dev Cloud](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb)
+# 2. Llama 3.2 Vision finetuning - Radiography use case. [Free AMD Dev Cloud](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb)
 # 3. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">

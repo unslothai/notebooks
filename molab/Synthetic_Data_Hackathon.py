@@ -383,11 +383,7 @@ def _(
         ),
     )
     # Setup trainer with ROCm-friendly settings and proper data handling
-    trainer = train_on_responses_only(
-        trainer,
-        instruction_part="<|start_header_id|>user<|end_header_id|>\n\n",
-        response_part="<|start_header_id|>assistant<|end_header_id|>\n\n",
-    )
+    trainer = train_on_responses_only(trainer)
     FastLanguageModel.for_training(model)
     trainer_stats = trainer.train()
     # Train only on responses

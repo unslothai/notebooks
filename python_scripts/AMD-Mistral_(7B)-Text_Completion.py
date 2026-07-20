@@ -14,7 +14,7 @@
 
 # ### News
 
-# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://amd-ai-academy.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://notebooks.amd.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
 # 
 # <table><tr>
 # <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
@@ -122,7 +122,7 @@ model = FastLanguageModel.get_peft_model(
 # ### Data Prep
 # We now use the Tiny Stories dataset from https://huggingface.co/datasets/roneneldan/TinyStories. We only sample the first 5000 rows to speed training up. We must add `EOS_TOKEN` or `tokenizer.eos_token` or else the model's generation will go on forever.
 # 
-# If you want to use the `llama-3` template for ShareGPT datasets, try our conversational [notebook](https://amd-ai-academy.com/github/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-Conversational.ipynb)
+# If you want to use the `llama-3` template for ShareGPT datasets, try our conversational [notebook](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Mistral_v0.3_(7B)-Conversational.ipynb)
 
 # In[ ]:
 
