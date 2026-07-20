@@ -194,11 +194,7 @@ trainer = SFTTrainer(
 
 
 from unsloth.chat_templates import train_on_responses_only
-trainer = train_on_responses_only(
-    trainer,
-    instruction_part = "<start_of_turn>user\n",
-    response_part = "<start_of_turn>model\n",
-)
+trainer = train_on_responses_only(trainer)
 
 
 # We print the full un-masked string:

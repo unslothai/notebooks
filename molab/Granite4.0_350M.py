@@ -361,7 +361,7 @@ def _(dataset_1, model_1, tokenizer):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
+    We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes! Unsloth now auto-detects the instruction and response parts from the tokenizer's chat template, so we don't need to pass `instruction_part` and `response_part` anymore. You can still pass them explicitly if you use a custom chat template.
     """)
     return
 
@@ -370,11 +370,7 @@ def _(mo):
 def _(trainer):
     from unsloth.chat_templates import train_on_responses_only
 
-    trainer_1 = train_on_responses_only(
-        trainer,
-        instruction_part="<|start_of_role|>user<|end_of_role|>",
-        response_part="<|start_of_role|>assistant<|end_of_role|>",
-    )
+    trainer_1 = train_on_responses_only(trainer)
     return (trainer_1,)
 
 

@@ -330,7 +330,7 @@ def _(trainer):
     trainer_1 = train_on_responses_only(
         trainer,
         instruction_part="<|im_start|>user\n",
-        response_part="<|im_start|>assistant\n<think>",
+        response_part="<|im_start|>assistant\n",
     )
     return (trainer_1,)
 
