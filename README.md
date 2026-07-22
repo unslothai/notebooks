@@ -854,6 +854,7 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **Qwen3 VL** **(8B)** | Vision Math (GRPO RL) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_VL_(8B)-Vision-GRPO.py) |
 | **Qwen 3 5 27B(80GB)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen_3_5_27B_A100(80GB).py) |
 | **Sesame CSM** **(1B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Sesame_CSM_(1B)-TTS.py) |
+| **SmolLM3** **(3B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/SmolLM3_(3B)-Conversational.py) |
 | **Spark TTS** **(0.5B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Spark_TTS_(0_5B).py) |
 | **Synthetic Data Hackathon** | Synthetic Data | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Synthetic_Data_Hackathon.py) |
 | **TinyLlama** **(1.1B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/TinyLlama_(1.1B)-Alpaca.py) |
