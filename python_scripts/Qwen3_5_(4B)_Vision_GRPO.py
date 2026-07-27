@@ -37,25 +37,6 @@
 get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    !uv pip install -qqq \\\n        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\n    !uv pip install -qqq --no-deps "torchcodec==0.7.0"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==0.22.2 unsloth unsloth_zoo\n!uv pip install transformers==5.2.0\n# causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!\n!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0\nimport torch\nif torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:\n    !uv pip install --no-deps "apache-tvm-ffi==0.1.9" "tilelang==0.1.8"\nelse:\n    os.environ["FLA_TILELANG"] = "0"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
 
 
-# #@title Colab Extra Install { display-mode: "form" }
-# %%capture
-# import os
-# !pip install --upgrade -qqq uv
-# if "COLAB_" not in "".join(os.environ.keys()):
-#     # If you're not in Colab, just use pip install!
-#     !pip install unsloth vllm
-# else:
-#     try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
-#     except: _numpy = "numpy"; _pil = "pillow"
-#     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-#     except: is_t4 = False
-#     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
-#     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
-#     !uv pip install -qqq {_triton}
-#     !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
-# !uv pip install transformers==4.56.2
-# !uv pip install --no-deps trl==0.22.2
-
 # We're also introducing how you can do `GSPO` inside of Unsloth as well!
 # 
 # The goal of this notebook is to make a vision language model solve maths problems via reinforcement learning given an image input like below:

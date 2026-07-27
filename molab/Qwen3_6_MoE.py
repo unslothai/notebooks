@@ -106,6 +106,7 @@ def _():
 
     py = f"cp{sys.version_info.major}{sys.version_info.minor}"
     tv = ".".join(torch.__version__.split("+")[0].split(".")[:2])
+    tv = {"2.11": "2.10", "2.12": "2.10"}.get(tv, tv)
     assert (cu := (torch.version.cuda or "").split(".")[0]), (
         "CUDA-enabled PyTorch required."
     )
@@ -135,13 +136,17 @@ def _():
             n.endswith(whl) and f"+cu{cu}torch{tv}" in n and f"cxx11abi{abi}" in n
         ),
     )
-    assert cc1d, (
-        f"No causal-conv1d wheel for torch {torch.__version__}/cu{cu}/{py}/abi{abi}"
-    )
+    if not cc1d:
+        # Not fatal: the install cell above already builds causal_conv1d from source,
+        # and the model still trains if that is unavailable too.
+        print(
+            f"No prebuilt causal-conv1d wheel for torch {torch.__version__}/cu{cu}/{py}/abi{abi}, skipping it."
+        )
     fla = (
         find("fla-org/flash-linear-attention", "v0.4.2", lambda n: n.endswith(whl))
         or "https://github.com/fla-org/flash-linear-attention/archive/refs/tags/v0.4.2.tar.gz"
     )
+    wheels = " ".join(f'"{w}"' for w in (cc1d, fla) if w)
     #! pip uninstall -y sentence-transformers torchcodec
     subprocess.call(["pip", "uninstall", "-y", "sentence-transformers", "torchcodec"])
     # torchcodec import broken on molab
