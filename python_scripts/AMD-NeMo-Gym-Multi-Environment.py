@@ -13,7 +13,7 @@
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
 
 # ## Installation
-# If you are using Google Colab, please visit [Unsloth installation docs](https://unsloth.ai/docs/get-started/install) rather than the pip install below. 
+# If you are using AMD Dev Cloud, please visit [Unsloth installation docs](https://unsloth.ai/docs/get-started/install) rather than the pip install below. 
 
 # In[ ]:
 
@@ -77,7 +77,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # 
 # The instruction following resources server evaluates language model responses against instruction-following criteria using Open-Instruct and IFEval constraints.
 # 
-# If you are using Google Colab, add the flag `uv_pip_set_python=true` to `ng_run` command.
+# If you are using AMD Dev Cloud, add the flag `uv_pip_set_python=true` to `ng_run` command.
 # 
 # The cell below will automatically:
 # 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (requires Python 3.12+ and `uv` on the system)
@@ -87,7 +87,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # 5. Ensure resources-only configs exist for both servers
 # 6. Start both resources servers in the background
 # 
-# Google Colab is auto-detected and the `uv_pip_set_python=true` flag is added when needed.
+# AMD Dev Cloud is auto-detected and the `uv_pip_set_python=true` flag is added when needed.
 
 # In[ ]:
 
@@ -100,7 +100,7 @@ import requests
 
 GYM_DIR = os.path.expanduser("~/Gym")
 
-# Detect Google Colab
+# Detect AMD Dev Cloud
 try:
     import google.colab
     _on_colab = True
@@ -546,9 +546,9 @@ if False:  # Pushing to HF Hub
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
-# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
-# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
-# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
+# 1. Train your own reasoning model - Llama GRPO notebook [Free AMD Dev Cloud](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb)
+# 2. Saving finetunes to Ollama. [Free AMD Dev Cloud](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Ollama.ipynb)
+# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free AMD Dev Cloud](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb)
 # 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">

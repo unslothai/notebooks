@@ -1191,8 +1191,129 @@ README_TYPE_OVERRIDES = {
 # section, keyed by the prefix-stripped basename. Colab/Kaggle keep the shared
 # overrides above and the filename-derived name/type.
 README_AMD_NAME_TYPE_OVERRIDES = {
+    "GLM_Flash_A100(80GB).ipynb": ("GLM Flash(192GB)", "Conversational"),
+    "Qwen_3_5_27B_A100(80GB).ipynb": ("Qwen 3 5 27B(192GB)", "Conversational"),
     "Unsloth_Studio.ipynb": ("Unsloth Studio", "Chat UI"),
 }
+
+AMD_DEV_CLOUD_BASE_URL = "https://notebooks.amd.com/github/unslothai/notebooks/blob/main/"
+
+
+AMD_NOTEBOOK_BASENAME_OVERRIDES = {
+    "gpt-oss-(20B)_A100-GRPO.ipynb": "gpt-oss-(20B)_MI300X-GRPO.ipynb",
+    "gpt-oss-(120B)_A100-Fine-tuning.ipynb": "gpt-oss-(120B)_MI300X-Fine-tuning.ipynb",
+    "Gemma3_(27B)_A100-Conversational.ipynb": "Gemma3_(27B)_MI300X-Conversational.ipynb",
+    "GLM_Flash_A100(80GB).ipynb": "GLM_Flash_MI300X(192GB).ipynb",
+    "Llama3.3_(70B)_A100-Conversational.ipynb": "Llama3.3_(70B)_MI300X-Conversational.ipynb",
+    "Nemotron-3-Nano-30B-A3B_A100.ipynb": "Nemotron-3-Nano-30B-A3B_MI300X.ipynb",
+    "Nemotron-Nano-3-30B-A3B_A100.ipynb": "Nemotron-Nano-3-30B-A3B_MI300X.ipynb",
+    "Qwen3_(32B)_A100-Reasoning-Conversational.ipynb": "Qwen3_(32B)_MI300X-Reasoning-Conversational.ipynb",
+    "Qwen_3_5_27B_A100(80GB).ipynb": "Qwen_3_5_27B_MI300X(192GB).ipynb",
+}
+AMD_NOTEBOOK_SOURCE_BY_OUTPUT = {
+    output: source for source, output in AMD_NOTEBOOK_BASENAME_OVERRIDES.items()
+}
+
+
+def _amd_output_basename_from_source(source_basename):
+    return AMD_NOTEBOOK_BASENAME_OVERRIDES.get(source_basename, source_basename)
+
+
+def _amd_source_basename_from_output(output_basename):
+    return AMD_NOTEBOOK_SOURCE_BY_OUTPUT.get(output_basename, output_basename)
+
+
+def _amd_output_basenames_from_source(source_basename):
+    output_basename = _amd_output_basename_from_source(source_basename)
+    if output_basename == source_basename:
+        return [source_basename]
+    # Keep the old A100-named AMD files as compatibility copies while also
+    # generating the AMD/MI300X-named files used by README links.
+    return [source_basename, output_basename]
+
+
+_COLAB_GITHUB_URL_RE = re.compile(r"https://colab\.research\.google\.com/github/(?P<path>[^\s\"'<>]*?\.ipynb)")
+_AMD_DEV_CLOUD_NOTEBOOK_URL_RE = re.compile(
+    r"https://amd-ai-academy\.com/github/unslothai/notebooks/blob/main/nb/(?P<basename>[^\s\"'<>]*?\.ipynb)"
+)
+_COLAB_DRIVE_URL_RE = re.compile(r"https://colab\.research\.google\.com/drive/[^\s\"'<>)]*")
+_COLAB_DATA_TABLE_LINK_RE = re.compile(
+    r'<a target="_blank" href=https://colab\.research\.google\.com/notebooks/data_table\.ipynb>'
+    r'data table notebook</a>'
+)
+_COLAB_DATA_TABLE_URL_RE = re.compile(r"https://colab\.research\.google\.com/notebooks/data_table\.ipynb")
+_COLAB_HTML_BADGE_RE = re.compile(
+    r'<a href="(?P<link>https://amd-ai-academy\.com/github/[^"]+)"(?P<attrs>[^>]*)>'
+    r'<img src="https://colab\.research\.google\.com/assets/colab-badge\.svg" '
+    r'alt="(?:Open In (?:Free |Google )?Colab|Open In (?:Free )?AMD Dev Cloud)"\s*/?></a>',
+    re.IGNORECASE,
+)
+_COLAB_MD_BADGE_RE = re.compile(
+    r'\[!\[Open in (?:Google )?Colab\]\(https://colab\.research\.google\.com/assets/colab-badge\.svg\)\]'
+    r'\((?P<link>https://amd-ai-academy\.com/github/[^\)]+)\)',
+    re.IGNORECASE,
+)
+
+
+def _amd_dev_cloud_notebook_basename(basename):
+    basename = os.path.basename(basename)
+    if basename.startswith("AMD-"):
+        return basename
+    return "AMD-" + _amd_output_basename_from_source(basename)
+
+
+def _amd_dev_cloud_url_from_colab_match(match):
+    github_path = match.group("path")
+    prefix = "unslothai/notebooks/blob/main/nb/"
+    if github_path.startswith(prefix) and github_path.endswith(".ipynb"):
+        basename = os.path.basename(github_path)
+        github_path = prefix + _amd_dev_cloud_notebook_basename(basename)
+    return "https://notebooks.amd.com/github/" + github_path
+
+
+def _amd_dev_cloud_notebook_url_from_match(match):
+    return (
+        "https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/"
+        + _amd_dev_cloud_notebook_basename(match.group("basename"))
+    )
+
+
+def rewrite_colab_links_for_amd_dev_cloud(text):
+    text = _COLAB_GITHUB_URL_RE.sub(_amd_dev_cloud_url_from_colab_match, text)
+    text = _AMD_DEV_CLOUD_NOTEBOOK_URL_RE.sub(_amd_dev_cloud_notebook_url_from_match, text)
+    text = _COLAB_DRIVE_URL_RE.sub(
+        "https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Mistral_(7B)-Text_Completion.ipynb",
+        text,
+    )
+    text = _COLAB_DATA_TABLE_LINK_RE.sub("data table notebook", text)
+    text = _COLAB_DATA_TABLE_URL_RE.sub("https://notebooks.amd.com/", text)
+    text = _COLAB_HTML_BADGE_RE.sub(
+        lambda match: f'<a href="{match.group("link")}"{match.group("attrs")}>Open In AMD Dev Cloud</a>',
+        text,
+    )
+    text = _COLAB_MD_BADGE_RE.sub(
+        lambda match: f'[Open In AMD Dev Cloud]({match.group("link")})',
+        text,
+    )
+    replacements = (
+        ("Open In Google Colab", "Open In AMD Dev Cloud"),
+        ("Open in Google Colab", "Open In AMD Dev Cloud"),
+        ("Open In Free Colab", "Open In AMD Dev Cloud"),
+        ("Open in Free Colab", "Open In AMD Dev Cloud"),
+        ("Open In Free AMD Dev Cloud", "Open In AMD Dev Cloud"),
+        ("Open In Colab", "Open In AMD Dev Cloud"),
+        ("Open in Colab", "Open In AMD Dev Cloud"),
+        ("[Free notebook](https://notebooks.amd.com/", "[Free AMD Dev Cloud](https://notebooks.amd.com/"),
+        ("Free Google Colab", "Free AMD Dev Cloud"),
+        ("Free Colab", "Free AMD Dev Cloud"),
+        ("Google Colab", "AMD Dev Cloud"),
+        ("Colab secrets", "AMD Dev Cloud secrets"),
+        ("Colab/other envs", "AMD Dev Cloud/other envs"),
+        ("Kaggle/Colab", "Kaggle/AMD Dev Cloud"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
 
 
 FIRST_MAPPING_NAME = {
@@ -1785,9 +1906,10 @@ def _validate_amd_install_package_parity(amd_notebook_path):
     basename = os.path.basename(amd_notebook_path)
     if not basename.startswith("AMD-"):
         return None
+    base_basename = _amd_source_basename_from_output(basename[len("AMD-"):])
     base_notebook_path = os.path.join(
         os.path.dirname(amd_notebook_path),
-        basename[len("AMD-"):],
+        base_basename,
     )
     if not os.path.exists(base_notebook_path):
         return {
@@ -3846,6 +3968,7 @@ def update_notebook_sections(
         gpu_type = notebook_content.get("metadata", {}).get("colab", {}).get("gpuType", "T4")
         if is_amd_notebook:
             general_announcement = general_announcement_content_amd
+            new_announcement = rewrite_colab_links_for_amd_dev_cloud(new_announcement)
         elif f"{hf_course_name}-" in notebook_path:
             full_model_name = os.path.basename(notebook_path).replace(".ipynb", "")
             full_model_name = full_model_name.split("-")
@@ -4389,8 +4512,12 @@ def update_notebook_sections(
         if "colab" not in notebook_content["metadata"]:
             notebook_content["metadata"]["colab"] = {"provenance": [], "gpuType" : "T4", "include_colab_link": True}
             updated = True
+        if is_amd_notebook:
+            notebook_content["metadata"]["colab"]["gpuType"] = "MI300X"
+            notebook_content["metadata"]["colab"]["include_colab_link"] = False
+            updated = True
         # Override gpuType for A100 notebooks (filename-based fallback)
-        if "A100" in notebook_path and notebook_content["metadata"]["colab"].get("gpuType", "T4") == "T4":
+        if not is_amd_notebook and "A100" in notebook_path and notebook_content["metadata"]["colab"].get("gpuType", "T4") == "T4":
             notebook_content["metadata"]["colab"]["gpuType"] = "A100"
             updated = True
         if "kernelspec" not in notebook_content["metadata"]:
@@ -4411,6 +4538,21 @@ def update_notebook_sections(
             if notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"].get("state") != {}:
                 notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"]["state"] = {}
                 updated = True
+
+        if is_amd_notebook:
+            for cell in notebook_content["cells"]:
+                source = cell.get("source")
+                if isinstance(source, list):
+                    source_text = "".join(source)
+                    rewritten = rewrite_colab_links_for_amd_dev_cloud(source_text)
+                    if rewritten != source_text:
+                        cell["source"] = _source_lines(rewritten)
+                        updated = True
+                elif isinstance(source, str):
+                    rewritten = rewrite_colab_links_for_amd_dev_cloud(source)
+                    if rewritten != source:
+                        cell["source"] = rewritten
+                        updated = True
 
         if updated:
             _write_notebook(notebook_path, notebook_content)
@@ -4865,8 +5007,15 @@ def update_readme(
             (p for p in ("Kaggle-", "AMD-") if notebook_name.startswith(p)), ""
         )
         bare_basename = notebook_name[len(platform_prefix):]
-        if bare_basename in FIRST_MAPPING_NAME:
-            notebook_name = FIRST_MAPPING_NAME[bare_basename]
+        if platform_prefix == "AMD-" and bare_basename in AMD_NOTEBOOK_BASENAME_OVERRIDES:
+            continue
+        canonical_bare_basename = (
+            _amd_source_basename_from_output(bare_basename)
+            if platform_prefix == "AMD-"
+            else bare_basename
+        )
+        if canonical_bare_basename in FIRST_MAPPING_NAME:
+            notebook_name = FIRST_MAPPING_NAME[canonical_bare_basename]
 
         std_notebook_name = notebook_name.replace("-", "_")
         is_kaggle = is_path_contains_any(path.lower(), ["kaggle"]) 
@@ -4885,8 +5034,8 @@ def update_readme(
         # Apply per-notebook display-name override (keyed by prefix-stripped
         # basename) so notebooks with very long auto-derived names can wrap onto
         # multiple lines in the rendered Markdown table.
-        if bare_basename in README_MODEL_NAME_OVERRIDES:
-            model_name = README_MODEL_NAME_OVERRIDES[bare_basename]
+        if canonical_bare_basename in README_MODEL_NAME_OVERRIDES:
+            model_name = README_MODEL_NAME_OVERRIDES[canonical_bare_basename]
         model_type = info['type'] if info and info['type'] else ""
         # Classify RL/GRPO notebooks by the task they actually train on
         # (GSM8K Math, DAPO Math, Vision Math, Wordle, Sudoku, 2048 Game,
@@ -4942,8 +5091,8 @@ def update_readme(
             model_type = (model_type or "GRPO") + " + vLLM"
         # Per-notebook Type override (after RL classification), keyed by the
         # prefix-stripped basename so it applies on Colab, Kaggle and AMD.
-        if bare_basename in README_TYPE_OVERRIDES:
-            model_type = README_TYPE_OVERRIDES[bare_basename]
+        if canonical_bare_basename in README_TYPE_OVERRIDES:
+            model_type = README_TYPE_OVERRIDES[canonical_bare_basename]
         architecture = info['architecture'] if info else None
         size = info['size']
         size = size.replace(r"_", " ") if size else None
@@ -5044,8 +5193,8 @@ def update_readme(
         is_amd_notebook = os.path.basename(path).startswith("AMD-")
 
         # AMD-only Model/Type override (Colab/Kaggle keep their own labels).
-        if is_amd_notebook and bare_basename in README_AMD_NAME_TYPE_OVERRIDES:
-            model_name, model_type = README_AMD_NAME_TYPE_OVERRIDES[bare_basename]
+        if is_amd_notebook and canonical_bare_basename in README_AMD_NAME_TYPE_OVERRIDES:
+            model_name, model_type = README_AMD_NAME_TYPE_OVERRIDES[canonical_bare_basename]
 
         notebook_data.append(
             {
@@ -5336,7 +5485,7 @@ def update_readme(
             for d in amd_entries:
                 base = os.path.basename(d["path"])
                 if base.startswith("AMD-"):
-                    amd_by_base[base[len("AMD-"):]] = d
+                    amd_by_base[_amd_source_basename_from_output(base[len("AMD-"):])] = d
 
             _AMD_POPULAR_COUNT = 6
             popular_amd = []
@@ -5552,7 +5701,7 @@ def copy_and_update_amd_notebooks(
         for path in glob(os.path.join(template_dir, "*.ipynb"))
     }
     amd_base_names = {
-        os.path.basename(path)[len("AMD-"):]
+        _amd_source_basename_from_output(os.path.basename(path)[len("AMD-"):])
         for path in glob(os.path.join(destination_dir, "AMD-*.ipynb"))
     }
     try:
@@ -5563,7 +5712,7 @@ def copy_and_update_amd_notebooks(
             timeout=30,
         )
         tracked_names = {
-            os.path.basename(path)[len("AMD-"):]
+            _amd_source_basename_from_output(os.path.basename(path)[len("AMD-"):])
             for path in tracked.stdout.splitlines()
             if os.path.basename(path).startswith("AMD-")
         }
@@ -5584,21 +5733,22 @@ def copy_and_update_amd_notebooks(
 
     amd_paths = []
     for notebook_name, template_notebook_path in sorted(source_notebooks.items()):
-        amd_notebook_name = "AMD-" + notebook_name
-        amd_destination_path = os.path.join(destination_dir, amd_notebook_name)
-        _cache_original_outputs(amd_destination_path)
-        shutil.copyfile(template_notebook_path, amd_destination_path)
-        _set_file_permissions(amd_destination_path)
-        _cache_notebook_format(amd_destination_path)
-        update_notebook_sections(
-            amd_destination_path,
-            general_announcement,
-            installation,
-            installation_kaggle,
-            new_announcement,
-        )
-        amd_paths.append(amd_destination_path)
-        print(f"Copied '{amd_notebook_name}' to '{destination_dir}'")
+        for amd_bare_name in _amd_output_basenames_from_source(notebook_name):
+            amd_notebook_name = "AMD-" + amd_bare_name
+            amd_destination_path = os.path.join(destination_dir, amd_notebook_name)
+            _cache_original_outputs(amd_destination_path)
+            shutil.copyfile(template_notebook_path, amd_destination_path)
+            _set_file_permissions(amd_destination_path)
+            _cache_notebook_format(amd_destination_path)
+            update_notebook_sections(
+                amd_destination_path,
+                general_announcement,
+                installation,
+                installation_kaggle,
+                new_announcement,
+            )
+            amd_paths.append(amd_destination_path)
+            print(f"Copied '{amd_notebook_name}' to '{destination_dir}'")
     return amd_paths
 
 

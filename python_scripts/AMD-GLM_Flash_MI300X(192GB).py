@@ -1,0 +1,408 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# To run this, press "*Run*" and press "*Run All*" on **AMD Dev Cloud**!
+# <div class="align-center">
+# <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+# <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# </div>
+# 
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# 
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
+
+# ### News
+
+# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://notebooks.amd.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# 
+# <table><tr>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
+# </tr></table>
+# 
+# Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
+# 
+# Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
+
+# # ### Installation
+# 
+# # In[1]:
+# 
+# 
+# get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-user-action=ignore\n\nROCM_TAG="$({ command -v amd-smi >/dev/null 2>&1 && amd-smi version 2>/dev/null | awk -F\'ROCm version: \' \'NF>1{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { [ -r /opt/rocm/.info/version ] && awk -F. \'{print "rocm"$1"."$2; exit}\' /opt/rocm/.info/version; } || { command -v hipconfig >/dev/null 2>&1 && hipconfig --version 2>/dev/null | awk -F\': *\' \'/HIP version/{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { command -v dpkg-query >/dev/null 2>&1 && ver="$(dpkg-query -W -f=\'${Version}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; } || { command -v rpm >/dev/null 2>&1 && ver="$(rpm -q --qf \'%{VERSION}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; })"\n[ -n "$ROCM_TAG" ] || { echo "Could not detect ROCm. Install ROCm first or set ROCM_TAG manually."; exit 1; }\ncase "$ROCM_TAG" in\n  rocm6.[0-4]|rocm7.[02]) T="$ROCM_TAG" ;;\n  rocm6.*) T="rocm6.4" ;;\n  *) T="rocm7.1" ;;\nesac\npip install bitsandbytes\nPYTORCH_INDEX_URL="https://download.pytorch.org/whl/${T}"\nuv pip install --system -U --force-reinstall \\\n    torch torchvision torchaudio triton-rocm \\\n    --index-url "$PYTORCH_INDEX_URL"\nuv pip install --system cut-cross-entropy torchao --no-deps\nuv pip install --system -U --no-deps "unsloth[amd]" "unsloth_zoo[amd]"\nuv pip install --system --no-deps -r "$(python -c \'import pathlib,site;print(next(p for r in [*site.getsitepackages(),site.getusersitepackages()] if (p:=pathlib.Path(r,"studio/backend/requirements/no-torch-runtime.txt")).exists()))\')" torchao\nuv pip install --system --no-deps -U "tokenizers>=0.22.0,<=0.23.0"\n')
+# 
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==5.3.0"')
+# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
+# 
+# 
+# # ### Unsloth
+
+# In[2]:
+
+
+from unsloth import FastLanguageModel
+import torch
+
+fourbit_models = [
+    "unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit", # Qwen 14B 2x faster
+    "unsloth/Qwen3-4B-Thinking-2507-unsloth-bnb-4bit",
+    "unsloth/Qwen3-8B-unsloth-bnb-4bit",
+    "unsloth/Qwen3-14B-unsloth-bnb-4bit",
+    "unsloth/Qwen3-32B-unsloth-bnb-4bit",
+
+    # 4bit dynamic quants for superior accuracy and low memory use
+    "unsloth/gemma-3-12b-it-unsloth-bnb-4bit",
+    "unsloth/Phi-4",
+    "unsloth/Llama-3.1-8B",
+    "unsloth/Llama-3.2-3B",
+    "unsloth/orpheus-3b-0.1-ft-unsloth-bnb-4bit" # [NEW] We support TTS models!
+] # More models at https://huggingface.co/unsloth
+
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = "unsloth/GLM-4.7-Flash",
+    max_seq_length = 2048, # Choose any for long context!
+    load_in_4bit = False,  # 4 bit quantization to reduce memory
+    load_in_8bit = False, # [NEW!] A bit more accurate, uses 2x memory
+    full_finetuning = False, # [NEW!] We have full finetuning now!
+    trust_remote_code = True,
+    unsloth_force_compile = False,
+)
+
+
+# We now add LoRA adapters so we only need to update a small amount of parameters!
+
+# In[3]:
+
+
+model = FastLanguageModel.get_peft_model(
+    model,
+    r = 8, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
+    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
+                      "gate_proj", "up_proj", "down_proj",
+                      "out_proj",],
+    lora_alpha = 16,
+    lora_dropout = 0, # Supports any, but = 0 is optimized
+    bias = "none",    # Supports any, but = "none" is optimized
+    # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
+    use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
+    random_state = 3407,
+    use_rslora = False,  # We support rank stabilized LoRA
+    loftq_config = None, # And LoftQ
+)
+
+
+# <a name="Data"></a>
+# ### Data Prep
+# We now use the `GLM Flash` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy. GLM 4.7 renders multi turn conversations like below:
+# 
+# ```
+# [gMASK]<sop><|system|>
+# You are a helpful math tutor.<|user|>
+# Hello, how are you?<|assistant|>
+# <think></think>
+# I am ready to help with math.<|user|>
+# What is 2+2?<|assistant|>
+# ```
+
+# In[4]:
+
+
+from datasets import load_dataset
+dataset = load_dataset("unsloth/OpenMathReasoning-mini", split = "cot")
+
+
+# We now convert the reasoning dataset into conversational format:
+
+# In[5]:
+
+
+def generate_conversation(examples):
+    problems  = examples["problem"]
+    solutions = examples["generated_solution"]
+    conversations = []
+    for problem, solution in zip(problems, solutions):
+        conversations.append([
+            {"role" : "user",      "content" : problem},
+            {"role" : "assistant", "content" : solution},
+        ])
+    return { "conversations": conversations, }
+
+dataset = dataset.map(generate_conversation, batched = True)
+
+
+# We now have to apply the chat template for `GLM 4.7` onto the conversations, and save it to `text`.
+
+# In[6]:
+
+
+def formatting_prompts_func(examples):
+   convos = examples["conversations"]
+   texts = [tokenizer.apply_chat_template(convo, tokenize = False, add_generation_prompt = False) for convo in convos]
+   return { "text" : texts, }
+
+dataset = dataset.map(formatting_prompts_func, batched = True)
+
+
+# Let's see how the chat template did!
+
+# In[7]:
+
+
+dataset[100]['text']
+
+
+# <a name="Train"></a>
+# ### Train the model
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
+
+# In[8]:
+
+
+# This step might take ~3m on this AMD MI300X notebook
+from trl import SFTTrainer, SFTConfig
+trainer = SFTTrainer(
+    model = model,
+    tokenizer = tokenizer,
+    train_dataset = dataset,
+    eval_dataset = None, # Can set up evaluation!
+    args = SFTConfig(
+        dataset_text_field = "text",
+        dataset_num_proc = 1, # Increasing "might" throw error on AMD Dev Cloud/other envs.
+        per_device_train_batch_size = 4,
+        gradient_accumulation_steps = 2, # Use GA to mimic batch size!
+        warmup_steps = 5,
+        # num_train_epochs = 1, # Set this for 1 full training run.
+        max_steps = 60,
+        learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
+        logging_steps = 1,
+        optim = "adamw_8bit",
+        weight_decay = 0.001,
+        lr_scheduler_type = "linear",
+        seed = 3407,
+        report_to = "none", # Use TrackIO/WandB etc
+    ),
+)
+
+
+# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
+
+# In[9]:
+
+
+from unsloth.chat_templates import train_on_responses_only
+trainer = train_on_responses_only(
+    trainer,
+    instruction_part = "[gMASK]<sop><|user|>", # Updated for GLM
+    response_part = "<|assistant|><think>",
+)
+
+
+# Let's verify masking the instruction part is done! Let's print the 100th row again.
+
+# In[10]:
+
+
+tokenizer.decode(trainer.train_dataset[100]["input_ids"])
+
+
+# Now let's print the masked out example - you should see only the answer is present:
+
+# In[11]:
+
+
+tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
+
+
+# In[12]:
+
+
+# @title Show current memory stats
+gpu_stats = torch.cuda.get_device_properties(0)
+start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
+print(f"{start_gpu_memory} GB of memory reserved.")
+
+
+# Let's train the model! To resume a training run, set `trainer.train(resume_from_checkpoint = True)`
+
+# In[13]:
+
+
+trainer_stats = trainer.train()
+
+
+# In[14]:
+
+
+# @title Show final memory and time stats
+used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+used_memory_for_lora = round(used_memory - start_gpu_memory, 3)
+used_percentage = round(used_memory / max_memory * 100, 3)
+lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
+print(f"{trainer_stats.metrics['train_runtime']} seconds used for training.")
+print(
+    f"{round(trainer_stats.metrics['train_runtime']/60, 2)} minutes used for training."
+)
+print(f"Peak reserved memory = {used_memory} GB.")
+print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
+print(f"Peak reserved memory % of max memory = {used_percentage} %.")
+print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
+
+
+# <a name="Inference"></a>
+# ### Inference
+# Let's run the model via Unsloth native inference!
+
+# In[15]:
+
+
+messages = [
+    {"role" : "user", "content" : "Continue the sequence: 1, 1, 2, 3, 5, 8,"}
+]
+text = tokenizer.apply_chat_template(
+    messages,
+    tokenize = False,
+    add_generation_prompt = True, # Must add for generation
+)
+
+from transformers import TextStreamer
+_ = model.generate(
+    **tokenizer(text, return_tensors = "pt").to("cuda"),
+    max_new_tokens = 512, # Increase for longer outputs!
+    temperature = 0.7, top_p = 0.8, top_k = 20,
+    use_cache = True,
+    streamer = TextStreamer(tokenizer, skip_prompt = True),
+)
+
+
+# <a name="Save"></a>
+# ### Saving, loading finetuned models
+# To save the final model as LoRA adapters, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
+# 
+# **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!
+
+# In[16]:
+
+
+model.save_pretrained("glm_flash_lora")  # Local saving
+tokenizer.save_pretrained("glm_flash_lora")
+# model.push_to_hub("your_name/glm_flash_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/glm_flash_lora", token = "YOUR_HF_TOKEN") # Online saving
+
+
+# Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
+
+# In[17]:
+
+
+if False:
+    from unsloth import FastLanguageModel
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name = "glm_flash_lora", # YOUR MODEL YOU USED FOR TRAINING
+        max_seq_length = 2048,
+        load_in_4bit = True,
+    )
+
+
+# ### Saving to float16 for VLLM
+# 
+# We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
+
+# In[18]:
+
+
+# Merge to 16bit
+if False:
+    model.save_pretrained_merged("glm_flash_finetune_16bit", tokenizer, save_method = "merged_16bit",)
+if False: # Pushing to HF Hub
+    model.push_to_hub_merged("HF_USERNAME/glm_flash_finetune_16bit", tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
+
+# Merge to 4bit
+if False:
+    model.save_pretrained_merged("glm_flash_finetune_4bit", tokenizer, save_method = "merged_4bit",)
+if False: # Pushing to HF Hub
+    model.push_to_hub_merged("HF_USERNAME/glm_flash_finetune_4bit", tokenizer, save_method = "merged_4bit", token = "YOUR_HF_TOKEN")
+
+# Just LoRA adapters
+if False:
+    model.save_pretrained("glm_flash_lora")
+    tokenizer.save_pretrained("glm_flash_lora")
+if False: # Pushing to HF Hub
+    model.push_to_hub("HF_USERNAME/glm_flash_lora", token = "YOUR_HF_TOKEN")
+    tokenizer.push_to_hub("HF_USERNAME/glm_flash_lora", token = "YOUR_HF_TOKEN")
+
+
+# ### GGUF / llama.cpp Conversion
+# To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
+# 
+# Some supported quant methods (full list on our [docs page](https://unsloth.ai/docs/basics/inference-and-deployment/saving-to-gguf)):
+# * `q8_0` - Fast conversion. High resource use, but generally acceptable.
+# * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
+# * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
+# 
+# [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Ollama.ipynb)
+
+# Likewise, if you want to instead push to GGUF to your Hugging Face account, set `if False` to `if True` and add your Hugging Face token and upload location!
+
+# In[19]:
+
+
+# Save to 8bit Q8_0
+if False:
+    model.save_pretrained_gguf("glm_flash_finetune", tokenizer,)
+# Remember to go to https://huggingface.co/settings/tokens for a token!
+# And change hf to your username!
+if False:
+    model.push_to_hub_gguf("HF_USERNAME/glm_flash_finetune", tokenizer, token = "YOUR_HF_TOKEN")
+
+# Save to 16bit GGUF
+if False:
+    model.save_pretrained_gguf("glm_flash_finetune", tokenizer, quantization_method = "f16")
+if False: # Pushing to HF Hub
+    model.push_to_hub_gguf("HF_USERNAME/glm_flash_finetune", tokenizer, quantization_method = "f16", token = "YOUR_HF_TOKEN")
+
+# Save to q4_k_m GGUF
+if False:
+    model.save_pretrained_gguf("glm_flash_finetune", tokenizer, quantization_method = "q4_k_m")
+if False: # Pushing to HF Hub
+    model.push_to_hub_gguf("HF_USERNAME/glm_flash_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
+
+# Save to multiple GGUF options - much faster if you want multiple!
+if False:
+    model.push_to_hub_gguf(
+        "HF_USERNAME/glm_flash_finetune", # Change hf to your username!
+        tokenizer,
+        quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
+        token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
+    )
+
+
+# Now, use the `glm_flash_finetune.Q8_0.gguf` file or `glm_flash_finetune.Q4_K_M.gguf` file in llama.cpp.
+# 
+# And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
+# 
+# Some other resources:
+# 1. Train your own reasoning model - Llama GRPO notebook [Free AMD Dev Cloud](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.1_(8B)-GRPO.ipynb)
+# 2. Saving finetunes to Ollama. [Free AMD Dev Cloud](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3_(8B)-Ollama.ipynb)
+# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free AMD Dev Cloud](https://notebooks.amd.com/github/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(11B)-Vision.ipynb)
+# 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
+# 
+# <div class="align-center">
+#   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+#   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+# 
+#   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
+# 
+#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# </div>
