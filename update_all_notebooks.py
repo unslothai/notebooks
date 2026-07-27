@@ -1636,6 +1636,32 @@ def _is_install_like_cell(cells, idx, source_text):
     return False
 
 
+def _owns_extra_grpo_install_cell(notebook_path, cells, idx):
+    """True when the GRPO extra install block may be written into ``cells[idx]``.
+
+    The GRPO branch used to assign into ``cells[i + 2]`` unconditionally, so it
+    stamped the block onto whatever happened to sit there. In
+    ``Qwen3_5_(4B)_Vision_GRPO.ipynb`` that was a markdown cell: the install code
+    could never run, and the transformers pin it carried contradicted the
+    Qwen3.5 install block selected further below. Two conditions now apply.
+
+    1. The target must be a code cell. Templates park a ``# Placeholder`` code
+       cell there for the generator to fill, so this keeps the existing
+       behaviour for every template-backed GRPO notebook while refusing to
+       overwrite prose.
+    2. The Qwen3.5 / Qwen3.6 family is excluded. Those notebooks use
+       ``installation_qwen3_5_content``, which pins transformers 5.x and needs no
+       separate vLLM install cell.
+    """
+    if is_path_contains_any(
+        notebook_path.lower(), ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6"]
+    ):
+        return False
+    if idx < 0 or idx >= len(cells):
+        return False
+    return cells[idx].get("cell_type") == "code"
+
+
 def _is_installation_heading(source_text, is_amd_notebook=False):
     stripped = source_text.strip()
     if stripped == "### Installation":
@@ -3965,7 +3991,10 @@ def update_notebook_sections(
                                 installation = installation_grpo_content
                                 # TODO: Remove after GRPO numpy bug fixed!
                                 # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                                notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
+                                if _owns_extra_grpo_install_cell(
+                                    notebook_path, notebook_content["cells"], i + 2
+                                ):
+                                    notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
 
                         # META INSTALLATION
                         elif is_path_contains_any(notebook_path.lower(), ["Meta"]):
