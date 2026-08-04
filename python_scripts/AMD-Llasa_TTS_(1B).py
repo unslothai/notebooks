@@ -40,6 +40,11 @@
 # # In[ ]:
 # 
 # 
+# # xcodec2 pulls in torchtune, which imports torchao.dtypes.nf4tensor, removed in
+# # torchao 0.18.0. The ROCm cell above owns the torchao version, so if inference
+# # fails with that ImportError, run:
+# #   uv pip install --system --no-deps "torchao>=0.16.0,<0.18.0"
+# 
 # get_ipython().run_line_magic('env', 'UNSLOTH_DISABLE_FAST_GENERATION = 1')
 # get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.1" omegaconf torchcodec')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.15.2" torchtune vector_quantize_pytorch torch_einops_utils einx tiktoken "xcodec2==0.1.5"')

@@ -629,6 +629,16 @@ installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace("Gemma 4 requires", "Gemma 4 12B requires")
 
+# The cap cannot be applied on AMD (see below), so at least say so where the
+# person who hits it will be reading. Comment-only: variant_extras pip lines go
+# through the ignore list, which is what blocks the cap in the first place.
+installation_amd_extras_llasa = """\
+# xcodec2 pulls in torchtune, which imports torchao.dtypes.nf4tensor, removed in
+# torchao 0.18.0. The ROCm cell above owns the torchao version, so if inference
+# fails with that ImportError, run:
+#   uv pip install --system --no-deps "torchao>=0.16.0,<0.18.0"
+"""
+
 # Llasa needs torchao capped below 0.18.0 on every platform (see the Colab
 # recipe below for why), but AMD is the one place that cap cannot be expressed:
 # torchao is in _AMD_INSTALL_PACKAGE_IGNORE, so the ROCm base cell owns the
@@ -2830,6 +2840,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
             variant_extras = installation_amd_extras_gemma4
     elif _is_amd_grpo_like_path(notebook_path) and "vllm" in source_install_blob:
         variant_extras = installation_amd_extras_grpo
+    elif is_path_contains_any(lowered, ["llasa"]):
+        variant_extras = installation_amd_extras_llasa
     else:
         variant_extras = installation_amd_extras_default
 
