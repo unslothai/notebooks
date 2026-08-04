@@ -292,20 +292,11 @@ if False:
     )
     FastLanguageModel.for_inference(model) # Enable native 2x faster inference
 
-# alpaca_prompt = You MUST copy from above!
+    inputs = tokenizer([example_problem], return_tensors = "pt").to("cuda")
 
-inputs = tokenizer(
-[
-    alpaca_prompt.format(
-        "What is a famous tall tower in Paris?", # instruction
-        "", # input
-        "", # output - leave this blank for generation!
-    )
-], return_tensors = "pt").to("cuda")
-
-from transformers import TextStreamer
-text_streamer = TextStreamer(tokenizer)
-_ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128)
+    from transformers import TextStreamer
+    text_streamer = TextStreamer(tokenizer)
+    _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128)
 
 
 # You can also use Hugging Face's `AutoPeftModelForCausalLM`. Only use this if you do not have `unsloth` installed. It can be hopelessly slow, since `4bit` model downloading is not supported, and Unsloth's **inference is 2x faster**.

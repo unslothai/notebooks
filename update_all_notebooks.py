@@ -414,7 +414,7 @@ installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', insta
 
 installation_llasa_content += """\
 
-!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
+!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_content = update_or_append_pip_install(
@@ -423,7 +423,7 @@ installation_llasa_content = update_or_append_pip_install(
     "!pip install transformers==4.56.1",
 )
 
-installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
+installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_kaggle_content = update_or_append_pip_install(
@@ -436,6 +436,21 @@ installation_llasa_kaggle_content = update_or_append_pip_install(
     "trl",
     "!pip install --no-deps trl==0.15.2",
 )
+
+# Llasa is the one family that also needs an UPPER bound on torchao, so the
+# shared "torchao>=0.16.0" inherited from installation_content is capped here
+# and nowhere else. torchao 0.18.0 (published 2026-08-03) moved
+# torchao/dtypes/nf4tensor.py to torchao/quantization/quantize_/workflows/nf4/;
+# torchtune still imports the old path and xcodec2 imports torchtune, so the
+# install cell succeeds and cell 1 dies on
+#   ModuleNotFoundError: No module named 'torchao.dtypes.nf4tensor'
+# Scoped to llasa deliberately: the other notebooks do not go through
+# torchtune and capping them would be unrelated churn.
+_LLASA_TORCHAO_CAP = (r'("torchao>=0\.16\.0)"', r'\1,<0.18.0"')
+installation_llasa_content = re.sub(
+    _LLASA_TORCHAO_CAP[0], _LLASA_TORCHAO_CAP[1], installation_llasa_content)
+installation_llasa_kaggle_content = re.sub(
+    _LLASA_TORCHAO_CAP[0], _LLASA_TORCHAO_CAP[1], installation_llasa_kaggle_content)
 
 installation_tool_calling_content = installation_content + """\n!pip install protobuf==3.20.3 # required
 !pip install --no-deps transformers-cfg"""
@@ -598,6 +613,16 @@ installation_amd_extras_gemma4 = """\
 installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace("Gemma 4 requires", "Gemma 4 12B requires")
+
+# Llasa needs torchao capped below 0.18.0 on every platform (see the Colab
+# recipe below for why), but AMD is the one place that cap cannot be expressed:
+# torchao is in _AMD_INSTALL_PACKAGE_IGNORE, so the ROCm base cell owns the
+# version and no variant extras line can override it. That rule is deliberate
+# -- torchao is built against the ROCm torch installed one line earlier -- and
+# was left alone rather than special-cased for one family on hardware this
+# harness cannot execute. AMD-Llasa therefore still installs whatever torchao
+# the base cell resolves. The torch_einops_utils half of the fix does reach
+# AMD, because it propagates from the shared Llasa install line.
 
 # Backwards-compatible aliases. Several places in the script (and external
 # callers) reference these names; keep them pointing at the shared template
