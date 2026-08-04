@@ -139,15 +139,36 @@ if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
         ["bash", "-c", "source .venv/bin/activate && uv sync"],
         cwd = GYM_DIR, check = True,
     )
-    subprocess.run(
-        ["bash", "-c", "source .venv/bin/activate && uv pip install reasoning-gym"],
-        cwd = GYM_DIR, check = True,
-    )
-# Ensure matplotlib is installed (required by reasoning-gym via cellpylib)
-subprocess.run(
-    ["bash", "-c", "source .venv/bin/activate && uv pip install matplotlib"],
-    cwd = GYM_DIR, check = True, stdout = subprocess.DEVNULL,
+# reasoning-gym and matplotlib, installed unconditionally and aimed at the
+# venv's interpreter by path rather than by `source activate`.
+#
+# Inside the `.venv` existence guard above, `uv pip install reasoning-gym` ran
+# and exited 0, and create_dataset.py then died on
+#   ModuleNotFoundError: No module named 'reasoning_gym'
+# so whatever `source activate` selected was not the environment the following
+# `python` resolves to. --python names it outright, and the import is checked
+# afterwards instead of assumed: a package manager reporting success is not
+# evidence the module is importable. matplotlib gets the same treatment since
+# reasoning-gym reaches it through cellpylib.
+_rg_install = subprocess.run(
+    ["bash", "-c",
+     "uv pip install --python .venv/bin/python reasoning-gym matplotlib"],
+    cwd = GYM_DIR, capture_output = True, text = True,
 )
+_rg_check = subprocess.run(
+    ["bash", "-c", ".venv/bin/python -c 'import reasoning_gym'"],
+    cwd = GYM_DIR, capture_output = True, text = True,
+)
+if _rg_check.returncode != 0:
+    print(_rg_install.stdout[-3000:])
+    print(_rg_install.stderr[-3000:])
+    print(_rg_check.stdout[-2000:])
+    print(_rg_check.stderr[-2000:])
+    raise RuntimeError(
+        "reasoning-gym is not importable from the NeMo Gym venv even after "
+        "installing it, so create_dataset.py cannot run. Install and import "
+        "output above."
+    )
 # Step 3: Create sudoku dataset
 sudoku_path = os.path.join(
     GYM_DIR, "resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl"
