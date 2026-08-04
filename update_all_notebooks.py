@@ -399,7 +399,15 @@ os.remove("/content/OuteTTS/outetts/__init__.py")
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
-# Llasa Need Unsloth==2025.4.1, Transformers==4.48 to running stable, and trl ==0.15.2
+# Llasa needs trl 0.15.2; the Colab recipe pairs it with transformers 4.56.1.
+# The Kaggle recipe below must use the SAME pair. It used to pin
+# transformers==4.48 while taking trl from the global PIN_TRL (0.22.2), and
+# that pair cannot work: trl 0.22.2 declares transformers>=4.55.0. Both are
+# installed with --no-deps, so pip never checks and the run gets all the way
+# to the trainer before dying with
+#   AttributeError: type object 'TrainingArguments' has no attribute
+#                   '_VALID_DICT_FIELDS'
+# which names neither pin. Seen live on Kaggle in rerun19.
 # installation_llasa_content = re.sub(r'\bunsloth\b(==[\d\.]*)?', 'unsloth==2025.4.1', installation_content)
 installation_llasa_content = installation_content
 installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', installation_llasa_content)
@@ -421,12 +429,12 @@ installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip inst
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
     "transformers",
-    "!pip install transformers==4.48",
+    "!pip install transformers==4.56.1",
 )
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
     "trl",
-    PIN_TRL,
+    "!pip install --no-deps trl==0.15.2",
 )
 
 installation_tool_calling_content = installation_content + """\n!pip install protobuf==3.20.3 # required
