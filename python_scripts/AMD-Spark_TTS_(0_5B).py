@@ -480,24 +480,6 @@ if __name__ == "__main__":
     else:
         print("Audio generation failed (no tokens found?).")
 
-if __name__ == "__main__":
-    print(f"Generating speech for: '{input_text}'")
-    text = f"{chosen_voice}: " + input_text if chosen_voice else input_text
-    generated_waveform = generate_speech_from_text(input_text)
-
-    if generated_waveform.size > 0:
-        import soundfile as sf
-        output_filename = "generated_speech_controllable.wav"
-        sample_rate = audio_tokenizer.config.get("sample_rate", 16000)
-        sf.write(output_filename, generated_waveform, sample_rate)
-        print(f"Audio saved to {output_filename}")
-
-        # Optional: Play in notebook
-        from IPython.display import Audio, display
-        display(Audio(generated_waveform, rate = sample_rate))
-    else:
-        print("Audio generation failed (no tokens found?).")
-
 
 # <a name="Save"></a>
 # ### Saving, loading finetuned models

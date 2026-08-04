@@ -429,6 +429,28 @@ def _ensure_subprocess_import(code: str) -> str:
     return "import subprocess\n" + code
 
 
+_RE_BANG_COMMENT = re.compile(r"^[ \t]*#!(.*)$", re.MULTILINE)
+
+
+def _original_bang_command(code: str, call_start: int, items: list[str]) -> str | None:
+    """The exact ``!`` line marimo turned into this argv, or ``None``.
+
+    marimo leaves the source line above the call as ``#! <command>`` and
+    splits it on whitespace alone, so ``line.split() == items`` is an exact
+    correspondence test: when it holds, the original text is recoverable
+    byte for byte and no quoting heuristic can get it wrong.  Anything
+    else (a hand-written argv, an edited comment) returns ``None`` so the
+    caller keeps its token join.
+    """
+    best = None
+    for match in _RE_BANG_COMMENT.finditer(code, 0, call_start):
+        best = match.group(1)
+    if best is None:
+        return None
+    original = best.strip()
+    return original if original.split() == items else None
+
+
 def _fix_shell_subprocess(code: str) -> str:
     """Convert broken ``subprocess.X([..., "|", ...])`` calls to ``shell=True``.
 
@@ -446,6 +468,14 @@ def _fix_shell_subprocess(code: str) -> str:
     round-trip; shell keywords and bare metachars pass through unquoted
     so control flow / redirection still parses on the shell side.
     Other ``subprocess.X([...])`` calls are left alone.
+
+    Rebuilding the command from tokens is lossy, though: only *whole*
+    metachar tokens are recognised, so syntax fused onto a word
+    (``>/dev/null``, ``(apt-get``, ``zstd)``) gets quoted into a literal
+    and the shell then runs a command that does not exist.  marimo keeps
+    the original ``!`` line above the call as a ``#!`` comment, so prefer
+    that verbatim whenever it round-trips (see
+    :func:`_original_bang_command`) and fall back to the join otherwise.
     """
 
     pattern = re.compile(
@@ -461,7 +491,9 @@ def _fix_shell_subprocess(code: str) -> str:
         items = [a or b for a, b in items]
         if not items or not any(_token_looks_shellish(t) for t in items):
             return match.group(0)
-        joined = " ".join(_shell_quote_if_needed(t) for t in items)
+        joined = _original_bang_command(code, match.start(), items)
+        if joined is None:
+            joined = " ".join(_shell_quote_if_needed(t) for t in items)
         return f"subprocess.{verb}({joined!r}, shell=True"
 
     return pattern.sub(_maybe_rewrite, code)

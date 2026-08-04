@@ -583,7 +583,7 @@ def _():
     # ollama's installer extracts a zstd archive and refuses to run without zstd, which molab does not ship
     #! command -v zstd >/dev/null 2>&1 || (apt-get -qq update && apt-get -qq install -y zstd) >/dev/null 2>&1
     subprocess.call(
-        "command -v zstd '>/dev/null' 2>&1 || '(apt-get' -qq update && apt-get -qq install -y 'zstd)' '>/dev/null' 2>&1",
+        "command -v zstd >/dev/null 2>&1 || (apt-get -qq update && apt-get -qq install -y zstd) >/dev/null 2>&1",
         shell=True,
     )
     #! curl -fsSL https://ollama.com/install.sh | sh

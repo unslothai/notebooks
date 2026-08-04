@@ -409,7 +409,6 @@ def _(
     FastModel,
     audio_tokenizer,
     chosen_voice,
-    display,
     input_text,
     model_1,
     np,
@@ -547,25 +546,9 @@ def _(
             sample_rate = audio_tokenizer.config.get("sample_rate", 16000)
             sf.write(output_filename, generated_waveform, sample_rate)
             print(f"Audio saved to {output_filename}")  # Stop token
-            from IPython.display import Audio  # Use models pad token id
+            from IPython.display import Audio, display  # Use models pad token id
 
             display(Audio(generated_waveform, rate=sample_rate))
-        else:
-            print("Audio generation failed (no tokens found?).")
-    if __name__ == "__main__":
-        print(f"Generating speech for: '{input_text}'")
-        text = f"{chosen_voice}: " + input_text if chosen_voice else input_text
-        generated_waveform = generate_speech_from_text(
-            input_text
-        )
-        if generated_waveform.size > 0:
-            output_filename = "generated_speech_controllable.wav"  # Extract semantic token IDs using regex
-            sample_rate = audio_tokenizer.config.get("sample_rate", 16000)
-            sf.write(output_filename, generated_waveform, sample_rate)
-            print(f"Audio saved to {output_filename}")
-            display(
-                Audio(generated_waveform, rate=sample_rate)
-            )  # Handle appropriately - perhaps return silence or raise error
         else:
             print(
                 "Audio generation failed (no tokens found?)."
