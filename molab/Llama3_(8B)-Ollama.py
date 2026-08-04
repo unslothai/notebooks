@@ -580,6 +580,12 @@ def _(mo):
 def _():
     import subprocess
 
+    # ollama's installer extracts a zstd archive and refuses to run without zstd, which molab does not ship
+    #! command -v zstd >/dev/null 2>&1 || (apt-get -qq update && apt-get -qq install -y zstd) >/dev/null 2>&1
+    subprocess.call(
+        "command -v zstd '>/dev/null' 2>&1 || '(apt-get' -qq update && apt-get -qq install -y 'zstd)' '>/dev/null' 2>&1",
+        shell=True,
+    )
     #! curl -fsSL https://ollama.com/install.sh | sh
     subprocess.call("curl -fsSL https://ollama.com/install.sh | sh", shell=True)
     return
@@ -659,11 +665,22 @@ def _(mo):
 @app.cell
 def _():
     import subprocess as _molab_subprocess
+    import time
+    import requests
 
     _molab_subprocess.Popen(["ollama", "serve"])
-    import time
-
-    time.sleep(3)
+    for _ in range(60):
+        try:
+            if requests.get("http://localhost:11434/api/tags", timeout=2).ok:
+                print("Ollama is ready!")
+                break
+        except requests.exceptions.RequestException:
+            pass
+        time.sleep(1)
+    else:
+        raise RuntimeError(
+            "Ollama did not become ready on http://localhost:11434 within 60s. Check the `ollama serve` output above."
+        )
     return
 
 

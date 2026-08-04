@@ -297,7 +297,7 @@ def _(FastLanguageModel, model_1, tokenizer):
     inputs = tokenizer([example_problem], return_tensors="pt").to("cuda")
     outputs = model_1.generate(**inputs, max_new_tokens=64, use_cache=True)
     tokenizer.batch_decode(outputs)  # Enable native 2x faster inference
-    return (inputs,)
+    return example_problem, inputs
 
 
 @app.cell(hide_code=True)
@@ -315,7 +315,7 @@ def _(FastLanguageModel, inputs, model_1, tokenizer):
 
     text_streamer = TextStreamer(tokenizer)
     _ = model_1.generate(**inputs, streamer=text_streamer, max_new_tokens=128)
-    return (TextStreamer,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -346,15 +346,7 @@ def _(mo):
 
 
 @app.cell
-def _(
-    TextStreamer,
-    alpaca_prompt,
-    dtype,
-    load_in_4bit,
-    max_seq_length,
-    model_1,
-    tokenizer,
-):
+def _(dtype, example_problem, load_in_4bit, max_seq_length):
     if False:
         from unsloth import FastLanguageModel as _FastLanguageModel
 
@@ -365,15 +357,11 @@ def _(
             load_in_4bit=load_in_4bit,  # Use 4bit quantization to reduce memory usage. Can be False.
         )
         _FastLanguageModel.for_inference(_model)
-    inputs_1 = tokenizer(
-        [alpaca_prompt.format("What is a famous tall tower in Paris?", "", "")],
-        return_tensors="pt",
-    ).to("cuda")
-    # alpaca_prompt = You MUST copy from above!
-    text_streamer_1 = TextStreamer(tokenizer)
-    _ = model_1.generate(
-        **inputs_1, streamer=text_streamer_1, max_new_tokens=128
-    )
+        _inputs = _tokenizer([example_problem], return_tensors="pt").to("cuda")
+        from transformers import TextStreamer as _TextStreamer
+
+        _text_streamer = _TextStreamer(_tokenizer)
+        _ = _model.generate(**_inputs, streamer=_text_streamer, max_new_tokens=128)
     return
 
 

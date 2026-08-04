@@ -323,10 +323,11 @@ def _(mo):
 
 
 @app.cell
-def _(AutoTokenizer):
+def _():
     # @title Function for Generation Constraint { display-mode: "form" }
 
     from functools import partial
+    from transformers import AutoTokenizer
     from transformers_cfg.grammar_utils import IncrementalGrammarConstraint
     from transformers_cfg.generation.logits_process import (
         GrammarConstrainedLogitsProcessor,
