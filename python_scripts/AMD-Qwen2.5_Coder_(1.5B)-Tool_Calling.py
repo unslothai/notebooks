@@ -247,6 +247,7 @@ print(tokenizer.decode(input_ids[0]))
 #@title Function for Generation Constraint { display-mode: "form" }
 
 from functools import partial
+from transformers import AutoTokenizer
 from transformers_cfg.grammar_utils import IncrementalGrammarConstraint
 from transformers_cfg.generation.logits_process import GrammarConstrainedLogitsProcessor
 
