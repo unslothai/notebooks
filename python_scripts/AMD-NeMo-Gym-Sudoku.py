@@ -130,14 +130,25 @@ if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
 # afterwards instead of assumed: a package manager reporting success is not
 # evidence the module is importable. matplotlib gets the same treatment since
 # reasoning-gym reaches it through cellpylib.
+# MPLBACKEND is inherited from the notebook kernel, and on Colab it is
+# `module://matplotlib_inline.backend_inline`. That backend lives in the
+# KERNEL's environment, not in this venv, so matplotlib raises
+#   ValueError: Key backend: 'module://matplotlib_inline.backend_inline' is
+#   not a valid value for backend
+# the moment anything here imports it -- and reasoning_gym does, through
+# game_of_life -> cellpylib -> matplotlib.pyplot. Every child below is
+# headless, so pin a backend that always exists rather than inheriting one
+# that only works inside the parent kernel.
+_gym_env = dict(os.environ, MPLBACKEND = "Agg")
+
 _rg_install = subprocess.run(
     ["bash", "-c",
      "uv pip install --python .venv/bin/python reasoning-gym matplotlib"],
-    cwd = GYM_DIR, capture_output = True, text = True,
+    cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
 )
 _rg_check = subprocess.run(
     ["bash", "-c", ".venv/bin/python -c 'import reasoning_gym'"],
-    cwd = GYM_DIR, capture_output = True, text = True,
+    cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
 )
 if _rg_check.returncode != 0:
     print(_rg_install.stdout[-3000:])
@@ -163,7 +174,7 @@ if not os.path.exists(_sudoku_ds):
             "--task mini_sudoku --size 2000 --seed 42 "
             f"--output {_sudoku_ds}",
         ],
-        cwd = GYM_DIR, capture_output = True, text = True,
+        cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
     )
     if _made.returncode != 0:
         # The child writes to the kernel's real stderr, which the notebook
@@ -191,6 +202,7 @@ except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         cwd = GYM_DIR,
         stdout = _ng_log,
         stderr = subprocess.STDOUT,
+        env = _gym_env,
     )
 
     def _cleanup_ng():
