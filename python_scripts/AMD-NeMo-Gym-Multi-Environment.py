@@ -138,7 +138,7 @@ sudoku_path = os.path.join(
 )
 if not os.path.exists(sudoku_path):
     print("Creating mini_sudoku dataset (2000 examples)...")
-    subprocess.run(
+    _made = subprocess.run(
         [
             "bash", "-c",
             "source .venv/bin/activate && python "
@@ -146,8 +146,16 @@ if not os.path.exists(sudoku_path):
             "--task mini_sudoku --size 2000 --seed 42 "
             f"--output {sudoku_path}",
         ],
-        cwd = GYM_DIR, check = True,
+        cwd = GYM_DIR, capture_output = True, text = True,
     )
+    if _made.returncode != 0:
+        # The child writes to the kernel's real stderr, which the notebook
+        # capture layer does not record. A bare check = True therefore
+        # raises with the command line and nothing else, and the reason
+        # this failed is simply gone.
+        print(_made.stdout[-4000:])
+        print(_made.stderr[-4000:])
+        _made.check_returncode()
 
 # Step 4: Download instruction_following dataset
 import shutil

@@ -148,7 +148,7 @@ _sudoku_ds = os.path.join(
 )
 if not os.path.exists(_sudoku_ds):
     print("Creating mini_sudoku dataset (2000 examples)...")
-    subprocess.run(
+    _made = subprocess.run(
         [
             "bash", "-c",
             "source .venv/bin/activate && python "
@@ -156,8 +156,16 @@ if not os.path.exists(_sudoku_ds):
             "--task mini_sudoku --size 2000 --seed 42 "
             f"--output {_sudoku_ds}",
         ],
-        cwd = GYM_DIR, check = True,
+        cwd = GYM_DIR, capture_output = True, text = True,
     )
+    if _made.returncode != 0:
+        # The child writes to the kernel's real stderr, which the notebook
+        # capture layer does not record. A bare check = True therefore
+        # raises with the command line and nothing else, and the reason
+        # this failed is simply gone.
+        print(_made.stdout[-4000:])
+        print(_made.stderr[-4000:])
+        _made.check_returncode()
 # Start NeMo Gym server if not already running
 try:
     requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2)
