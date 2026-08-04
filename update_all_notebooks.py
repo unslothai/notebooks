@@ -133,6 +133,20 @@ QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
 }
 QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.5.0"
 
+# fbgemm-gpu-genai depends on an unpinned numpy, so a force-reinstall fetches
+# the newest one while `import torch` above has already loaded the old one into
+# this kernel. Every QAT install must carry this pin, so it lives here rather
+# than in one of the two blocks that need it.
+QAT_NUMPY_PIN_BLOCK = """# fbgemm-gpu-genai depends on an unpinned numpy, so --force-reinstall fetches
+# the newest one while `import torch` above has already loaded the old one
+# into this kernel. Hold numpy where it is; otherwise the next import stops
+# with "numpy was upgraded mid-session ... but the kernel still has the old
+# version" and the notebook cannot continue without a restart.
+try:
+    import numpy; _qat_numpy = "numpy==" + numpy.__version__
+except Exception:
+    _qat_numpy = "numpy\""""
+
 
 def build_qat_native_install_block(
     torchao_by_torch_minor=None,
@@ -159,7 +173,8 @@ _qat_torchao_map = {torchao_mapping}
 _qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
-!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}}"""
+{QAT_NUMPY_PIN_BLOCK}
+!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}}"""
 
 
 def update_or_append_pip_install(base_content, package_name, new_install_line):
@@ -2739,7 +2754,21 @@ except Exception:
 _qat_torchao_map = {torchao_mapping}
 _qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{QAT_DEFAULT_TORCHAO_VERSION}")
 _qat_fbgemm_map = {fbgemm_mapping}
-_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")"""
+_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")
+{QAT_NUMPY_PIN_BLOCK}"""
+
+
+def _pin_qat_numpy_beside_fbgemm(merged_groups):
+    """Install the numpy pin in the same command that force-reinstalls fbgemm.
+
+    A later command is too late: pip has already resolved and installed a newer
+    numpy by then, and the kernel is holding the old one.
+    """
+    for specs in merged_groups.values():
+        if not any("fbgemm-gpu-genai" in spec for spec in specs):
+            continue
+        if "{_qat_numpy}" not in specs:
+            specs.append("{_qat_numpy}")
 
 
 def _is_amd_grpo_like_path(notebook_path):
@@ -2857,6 +2886,7 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     extra_blocks = []
     if any("{_qat_" in spec for specs in merged_groups.values() for spec in specs):
         extra_blocks.append(_build_qat_version_vars_block())
+        _pin_qat_numpy_beside_fbgemm(merged_groups)
     if setup_lines:
         extra_blocks.append("\n".join(setup_lines))
     for flags, specs in merged_groups.items():
