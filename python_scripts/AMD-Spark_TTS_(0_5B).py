@@ -370,62 +370,115 @@ def generate_speech_from_text(
 
     model_inputs = tokenizer([prompt], return_tensors = "pt").to(device)
 
-    print("Generating token sequence...")
-    generated_ids = model.generate(
-        **model_inputs,
-        max_new_tokens = max_new_audio_tokens, # Limit generation length
-        do_sample = True,
-        temperature = temperature,
-        top_k = top_k,
-        top_p = top_p,
-        eos_token_id = tokenizer.eos_token_id, # Stop token
-        pad_token_id = tokenizer.pad_token_id # Use models pad token id
+    # The codec's speaker projection is a fixed-size nn.Linear. SpeakerEncoder
+    # .detokenize does `x = zq.reshape(zq.shape[0], -1); self.project(x)`, so
+    # it needs exactly as many global tokens as the codec was built for, and
+    # generation here is sampled, so the count is not fixed. Sweep runs of this
+    # notebook found 32 (which works) and 31 (which does not) on the same
+    # environment, and one token short reads as
+    #   RuntimeError: mat1 and mat2 shapes cannot be multiplied
+    #                 (1x3968 and 4096x1024)
+    # which says nothing at all about tokens. 31 x 128 = 3968 is the whole
+    # story. So sample again instead of dying, and if it still will not line
+    # up, say what was actually wrong.
+    max_generation_attempts = 5
+    last_global_count = None
+
+    for attempt in range(1, max_generation_attempts + 1):
+        print(f"Generating token sequence (attempt {attempt}/{max_generation_attempts})...")
+        generated_ids = model.generate(
+            **model_inputs,
+            max_new_tokens = max_new_audio_tokens, # Limit generation length
+            do_sample = True,
+            temperature = temperature,
+            top_k = top_k,
+            top_p = top_p,
+            eos_token_id = tokenizer.eos_token_id, # Stop token
+            pad_token_id = tokenizer.pad_token_id # Use models pad token id
+        )
+        print("Token sequence generated.")
+
+        generated_ids_trimmed = generated_ids[:, model_inputs.input_ids.shape[1]:]
+
+        predicts_text = tokenizer.batch_decode(generated_ids_trimmed, skip_special_tokens = False)[0]
+        # print(f"\nGenerated Text (for parsing):\n{predicts_text}\n") # Debugging
+
+        # Extract semantic token IDs using regex
+        semantic_matches = re.findall(r"<\|bicodec_semantic_(\d+)\|>", predicts_text)
+        if not semantic_matches:
+            print("Warning: No semantic tokens found in the generated output.")
+            # Handle appropriately - perhaps return silence or raise error
+            return np.array([], dtype = np.float32)
+
+        pred_semantic_ids = torch.tensor([int(token) for token in semantic_matches]).long().unsqueeze(0) # Add batch dim
+
+        # Extract global token IDs using regex (assuming controllable mode also generates these)
+        global_matches = re.findall(r"<\|bicodec_global_(\d+)\|>", predicts_text)
+        if not global_matches:
+             print("Warning: No global tokens found in the generated output (controllable mode). Might use defaults or fail.")
+             pred_global_ids = torch.zeros((1, 1), dtype = torch.long)
+        else:
+             pred_global_ids = torch.tensor([int(token) for token in global_matches]).long().unsqueeze(0) # Add batch dim
+
+        pred_global_ids = pred_global_ids.unsqueeze(0) # Shape becomes (1, 1, N_global)
+
+        print(f"Found {pred_semantic_ids.shape[1]} semantic tokens.")
+        print(f"Found {pred_global_ids.shape[2]} global tokens.")
+
+        # 5. Detokenize using BiCodecTokenizer
+        print("Detokenizing audio tokens...")
+        # Ensure audio_tokenizer and its internal model are on the correct device
+        audio_tokenizer.device = device
+        audio_tokenizer.model.to(device)
+        try:
+            # Squeeze the extra dimension from global tokens as seen in SparkTTS example
+            wav_np = audio_tokenizer.detokenize(
+                pred_global_ids.to(device).squeeze(0), # Shape (1, N_global)
+                pred_semantic_ids.to(device)           # Shape (1, N_semantic)
+            )
+        except RuntimeError as detokenize_error:
+            # Matched narrowly: any other RuntimeError from the codec is a real
+            # failure and resampling would only hide it behind five identical
+            # tracebacks.
+            if "mat1 and mat2 shapes cannot be multiplied" not in str(detokenize_error):
+                raise
+            last_global_count = pred_global_ids.shape[2]
+            print(
+                f"  {last_global_count} global tokens do not fit the codec's "
+                f"speaker projection; sampling again."
+            )
+            continue
+
+        print("Detokenization complete.")
+
+        return wav_np
+
+    raise RuntimeError(
+        f"The model did not produce a usable number of global tokens in "
+        f"{max_generation_attempts} attempts (last: {last_global_count}). "
+        f"Spark-TTS's speaker encoder flattens the global tokens into a "
+        f"fixed-size Linear, so the count has to match exactly. A model that "
+        f"has only been fine-tuned for a handful of steps often stops the "
+        f"global block early; training for longer is the fix."
     )
-    print("Token sequence generated.")
 
+if __name__ == "__main__":
+    print(f"Generating speech for: '{input_text}'")
+    text = f"{chosen_voice}: " + input_text if chosen_voice else input_text
+    generated_waveform = generate_speech_from_text(input_text)
 
-    generated_ids_trimmed = generated_ids[:, model_inputs.input_ids.shape[1]:]
+    if generated_waveform.size > 0:
+        import soundfile as sf
+        output_filename = "generated_speech_controllable.wav"
+        sample_rate = audio_tokenizer.config.get("sample_rate", 16000)
+        sf.write(output_filename, generated_waveform, sample_rate)
+        print(f"Audio saved to {output_filename}")
 
-
-    predicts_text = tokenizer.batch_decode(generated_ids_trimmed, skip_special_tokens = False)[0]
-    # print(f"\nGenerated Text (for parsing):\n{predicts_text}\n") # Debugging
-
-    # Extract semantic token IDs using regex
-    semantic_matches = re.findall(r"<\|bicodec_semantic_(\d+)\|>", predicts_text)
-    if not semantic_matches:
-        print("Warning: No semantic tokens found in the generated output.")
-        # Handle appropriately - perhaps return silence or raise error
-        return np.array([], dtype = np.float32)
-
-    pred_semantic_ids = torch.tensor([int(token) for token in semantic_matches]).long().unsqueeze(0) # Add batch dim
-
-    # Extract global token IDs using regex (assuming controllable mode also generates these)
-    global_matches = re.findall(r"<\|bicodec_global_(\d+)\|>", predicts_text)
-    if not global_matches:
-         print("Warning: No global tokens found in the generated output (controllable mode). Might use defaults or fail.")
-         pred_global_ids = torch.zeros((1, 1), dtype = torch.long)
+        # Optional: Play in notebook
+        from IPython.display import Audio, display
+        display(Audio(generated_waveform, rate=sample_rate))
     else:
-         pred_global_ids = torch.tensor([int(token) for token in global_matches]).long().unsqueeze(0) # Add batch dim
-
-    pred_global_ids = pred_global_ids.unsqueeze(0) # Shape becomes (1, 1, N_global)
-
-    print(f"Found {pred_semantic_ids.shape[1]} semantic tokens.")
-    print(f"Found {pred_global_ids.shape[2]} global tokens.")
-
-
-    # 5. Detokenize using BiCodecTokenizer
-    print("Detokenizing audio tokens...")
-    # Ensure audio_tokenizer and its internal model are on the correct device
-    audio_tokenizer.device = device
-    audio_tokenizer.model.to(device)
-    # Squeeze the extra dimension from global tokens as seen in SparkTTS example
-    wav_np = audio_tokenizer.detokenize(
-        pred_global_ids.to(device).squeeze(0), # Shape (1, N_global)
-        pred_semantic_ids.to(device)           # Shape (1, N_semantic)
-    )
-    print("Detokenization complete.")
-
-    return wav_np
+        print("Audio generation failed (no tokens found?).")
 
 if __name__ == "__main__":
     print(f"Generating speech for: '{input_text}'")
