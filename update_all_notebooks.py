@@ -397,9 +397,9 @@ installation_gpt_oss_kaggle_content = installation_gpt_oss_content
 installation_oute_content = installation_content + """\n!pip install omegaconf einx
 !rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
 import os
-os.remove("/content/OuteTTS/outetts/models/gguf_model.py")
-os.remove("/content/OuteTTS/outetts/interface.py")
-os.remove("/content/OuteTTS/outetts/__init__.py")
+os.remove("OuteTTS/outetts/models/gguf_model.py")
+os.remove("OuteTTS/outetts/interface.py")
+os.remove("OuteTTS/outetts/__init__.py")
 !pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
@@ -407,9 +407,9 @@ os.remove("/content/OuteTTS/outetts/__init__.py")
 installation_oute_kaggle_content = installation_kaggle_content + """\n!pip install omegaconf einx
 !rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
 import os
-os.remove("/content/OuteTTS/outetts/models/gguf_model.py")
-os.remove("/content/OuteTTS/outetts/interface.py")
-os.remove("/content/OuteTTS/outetts/__init__.py")
+os.remove("OuteTTS/outetts/models/gguf_model.py")
+os.remove("OuteTTS/outetts/interface.py")
+os.remove("OuteTTS/outetts/__init__.py")
 !pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
@@ -896,6 +896,15 @@ _RE_SAVE_LORA = re.compile(
 )
 _RE_PUSH_LORA = re.compile(
     r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])"
+)
+# `safe_open("<dir>/adapter_model.safetensors", ...)` reads back the adapter
+# that a save_pretrained("<dir>") above wrote, so it has to follow the same
+# rename. Only for directories the rename actually moved: notebooks that write
+# the adapter with model.save_lora("grpo_saved_lora") are untouched by
+# _RE_SAVE_LORA, and rewriting their safe_open would point it at a directory
+# nothing ever writes.
+_RE_SAFE_OPEN_LORA = re.compile(
+    r"(safe_open\(\s*)([\"\'])([^\"\']*)(/adapter_model\.safetensors)([\"\'])"
 )
 _RE_LORA_LOAD = re.compile(
     r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
@@ -2128,6 +2137,21 @@ def update_old_unsloth(filename):
         base_16 = f"{base}_finetune_16bit"
         base_4 = f"{base}_finetune_4bit"
 
+    # Directories that the LoRA rename below moves to `base_lora`. Collected
+    # over the whole notebook up front because the save_pretrained() call and
+    # the safe_open() that reads the adapter back live in different cells, and
+    # the rewrite runs one cell at a time.
+    renamed_lora_dirs = set()
+    for _cell in notebook_content.get("cells", []):
+        if not isinstance(_cell.get("source"), list):
+            continue
+        if _cell.get("cell_type") != "code":
+            continue
+        for _match in _RE_SAVE_LORA.finditer("".join(_cell["source"])):
+            if "phone_model" in _match.group(3):
+                continue
+            renamed_lora_dirs.add(_match.group(3))
+
     def replace_hf_prefix(name, new_name):
         if "/" in name:
             prefix = name.split("/", 1)[0]
@@ -2309,6 +2333,16 @@ def update_old_unsloth(filename):
             return f"{match.group(1)}{match.group(2)}{base_lora}{match.group(4)}"
 
         text = _RE_SAVE_LORA.sub(_replace_save_lora, text)
+
+        def _replace_safe_open_lora(match):
+            if match.group(3) not in renamed_lora_dirs:
+                return match.group(0)
+            return (
+                f"{match.group(1)}{match.group(2)}{base_lora}"
+                f"{match.group(4)}{match.group(5)}"
+            )
+
+        text = _RE_SAFE_OPEN_LORA.sub(_replace_safe_open_lora, text)
 
         def _replace_push_lora(match):
             if "phone_model" in match.group(3):

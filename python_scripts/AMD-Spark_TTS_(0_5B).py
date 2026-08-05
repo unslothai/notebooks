@@ -476,7 +476,7 @@ if __name__ == "__main__":
 
         # Optional: Play in notebook
         from IPython.display import Audio, display
-        display(Audio(generated_waveform, rate=sample_rate))
+        display(Audio(generated_waveform, rate = sample_rate))
     else:
         print("Audio generation failed (no tokens found?).")
 
