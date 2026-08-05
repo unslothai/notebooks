@@ -133,6 +133,20 @@ QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
 }
 QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.5.0"
 
+# fbgemm-gpu-genai depends on an unpinned numpy, so a force-reinstall fetches
+# the newest one while `import torch` above has already loaded the old one into
+# this kernel. Every QAT install must carry this pin, so it lives here rather
+# than in one of the two blocks that need it.
+QAT_NUMPY_PIN_BLOCK = """# fbgemm-gpu-genai depends on an unpinned numpy, so --force-reinstall fetches
+# the newest one while `import torch` above has already loaded the old one
+# into this kernel. Hold numpy where it is; otherwise the next import stops
+# with "numpy was upgraded mid-session ... but the kernel still has the old
+# version" and the notebook cannot continue without a restart.
+try:
+    import numpy; _qat_numpy = "numpy==" + numpy.__version__
+except Exception:
+    _qat_numpy = "numpy\""""
+
 
 def build_qat_native_install_block(
     torchao_by_torch_minor=None,
@@ -159,7 +173,8 @@ _qat_torchao_map = {torchao_mapping}
 _qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
-!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}}"""
+{QAT_NUMPY_PIN_BLOCK}
+!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}}"""
 
 
 def update_or_append_pip_install(base_content, package_name, new_install_line):
@@ -382,9 +397,9 @@ installation_gpt_oss_kaggle_content = installation_gpt_oss_content
 installation_oute_content = installation_content + """\n!pip install omegaconf einx
 !rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
 import os
-os.remove("/content/OuteTTS/outetts/models/gguf_model.py")
-os.remove("/content/OuteTTS/outetts/interface.py")
-os.remove("/content/OuteTTS/outetts/__init__.py")
+os.remove("OuteTTS/outetts/models/gguf_model.py")
+os.remove("OuteTTS/outetts/interface.py")
+os.remove("OuteTTS/outetts/__init__.py")
 !pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
@@ -392,21 +407,29 @@ os.remove("/content/OuteTTS/outetts/__init__.py")
 installation_oute_kaggle_content = installation_kaggle_content + """\n!pip install omegaconf einx
 !rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
 import os
-os.remove("/content/OuteTTS/outetts/models/gguf_model.py")
-os.remove("/content/OuteTTS/outetts/interface.py")
-os.remove("/content/OuteTTS/outetts/__init__.py")
+os.remove("OuteTTS/outetts/models/gguf_model.py")
+os.remove("OuteTTS/outetts/interface.py")
+os.remove("OuteTTS/outetts/__init__.py")
 !pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
-# Llasa Need Unsloth==2025.4.1, Transformers==4.48 to running stable, and trl ==0.15.2
+# Llasa needs trl 0.15.2; the Colab recipe pairs it with transformers 4.56.1.
+# The Kaggle recipe below must use the SAME pair. It used to pin
+# transformers==4.48 while taking trl from the global PIN_TRL (0.22.2), and
+# that pair cannot work: trl 0.22.2 declares transformers>=4.55.0. Both are
+# installed with --no-deps, so pip never checks and the run gets all the way
+# to the trainer before dying with
+#   AttributeError: type object 'TrainingArguments' has no attribute
+#                   '_VALID_DICT_FIELDS'
+# which names neither pin. Seen live on Kaggle in rerun19.
 # installation_llasa_content = re.sub(r'\bunsloth\b(==[\d\.]*)?', 'unsloth==2025.4.1', installation_content)
 installation_llasa_content = installation_content
 installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', installation_llasa_content)
 
 installation_llasa_content += """\
 
-!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
+!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_content = update_or_append_pip_install(
@@ -415,19 +438,34 @@ installation_llasa_content = update_or_append_pip_install(
     "!pip install transformers==4.56.1",
 )
 
-installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
+installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
     "transformers",
-    "!pip install transformers==4.48",
+    "!pip install transformers==4.56.1",
 )
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
     "trl",
-    PIN_TRL,
+    "!pip install --no-deps trl==0.15.2",
 )
+
+# Llasa is the one family that also needs an UPPER bound on torchao, so the
+# shared "torchao>=0.16.0" inherited from installation_content is capped here
+# and nowhere else. torchao 0.18.0 (published 2026-08-03) moved
+# torchao/dtypes/nf4tensor.py to torchao/quantization/quantize_/workflows/nf4/;
+# torchtune still imports the old path and xcodec2 imports torchtune, so the
+# install cell succeeds and cell 1 dies on
+#   ModuleNotFoundError: No module named 'torchao.dtypes.nf4tensor'
+# Scoped to llasa deliberately: the other notebooks do not go through
+# torchtune and capping them would be unrelated churn.
+_LLASA_TORCHAO_CAP = (r'("torchao>=0\.16\.0)"', r'\1,<0.18.0"')
+installation_llasa_content = re.sub(
+    _LLASA_TORCHAO_CAP[0], _LLASA_TORCHAO_CAP[1], installation_llasa_content)
+installation_llasa_kaggle_content = re.sub(
+    _LLASA_TORCHAO_CAP[0], _LLASA_TORCHAO_CAP[1], installation_llasa_kaggle_content)
 
 installation_tool_calling_content = installation_content + """\n!pip install protobuf==3.20.3 # required
 !pip install --no-deps transformers-cfg"""
@@ -590,6 +628,26 @@ installation_amd_extras_gemma4 = """\
 installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace("Gemma 4 requires", "Gemma 4 12B requires")
+
+# The cap cannot be applied on AMD (see below), so at least say so where the
+# person who hits it will be reading. Comment-only: variant_extras pip lines go
+# through the ignore list, which is what blocks the cap in the first place.
+installation_amd_extras_llasa = """\
+# xcodec2 pulls in torchtune, which imports torchao.dtypes.nf4tensor, removed in
+# torchao 0.18.0. The ROCm cell above owns the torchao version, so if inference
+# fails with that ImportError, run:
+#   uv pip install --system --no-deps "torchao>=0.16.0,<0.18.0"
+"""
+
+# Llasa needs torchao capped below 0.18.0 on every platform (see the Colab
+# recipe below for why), but AMD is the one place that cap cannot be expressed:
+# torchao is in _AMD_INSTALL_PACKAGE_IGNORE, so the ROCm base cell owns the
+# version and no variant extras line can override it. That rule is deliberate
+# -- torchao is built against the ROCm torch installed one line earlier -- and
+# was left alone rather than special-cased for one family on hardware this
+# harness cannot execute. AMD-Llasa therefore still installs whatever torchao
+# the base cell resolves. The torch_einops_utils half of the fix does reach
+# AMD, because it propagates from the shared Llasa install line.
 
 # Backwards-compatible aliases. Several places in the script (and external
 # callers) reference these names; keep them pointing at the shared template
@@ -838,6 +896,15 @@ _RE_SAVE_LORA = re.compile(
 )
 _RE_PUSH_LORA = re.compile(
     r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])"
+)
+# `safe_open("<dir>/adapter_model.safetensors", ...)` reads back the adapter
+# that a save_pretrained("<dir>") above wrote, so it has to follow the same
+# rename. Only for directories the rename actually moved: notebooks that write
+# the adapter with model.save_lora("grpo_saved_lora") are untouched by
+# _RE_SAVE_LORA, and rewriting their safe_open would point it at a directory
+# nothing ever writes.
+_RE_SAFE_OPEN_LORA = re.compile(
+    r"(safe_open\(\s*)([\"\'])([^\"\']*)(/adapter_model\.safetensors)([\"\'])"
 )
 _RE_LORA_LOAD = re.compile(
     r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
@@ -2070,6 +2137,21 @@ def update_old_unsloth(filename):
         base_16 = f"{base}_finetune_16bit"
         base_4 = f"{base}_finetune_4bit"
 
+    # Directories that the LoRA rename below moves to `base_lora`. Collected
+    # over the whole notebook up front because the save_pretrained() call and
+    # the safe_open() that reads the adapter back live in different cells, and
+    # the rewrite runs one cell at a time.
+    renamed_lora_dirs = set()
+    for _cell in notebook_content.get("cells", []):
+        if not isinstance(_cell.get("source"), list):
+            continue
+        if _cell.get("cell_type") != "code":
+            continue
+        for _match in _RE_SAVE_LORA.finditer("".join(_cell["source"])):
+            if "phone_model" in _match.group(3):
+                continue
+            renamed_lora_dirs.add(_match.group(3))
+
     def replace_hf_prefix(name, new_name):
         if "/" in name:
             prefix = name.split("/", 1)[0]
@@ -2251,6 +2333,16 @@ def update_old_unsloth(filename):
             return f"{match.group(1)}{match.group(2)}{base_lora}{match.group(4)}"
 
         text = _RE_SAVE_LORA.sub(_replace_save_lora, text)
+
+        def _replace_safe_open_lora(match):
+            if match.group(3) not in renamed_lora_dirs:
+                return match.group(0)
+            return (
+                f"{match.group(1)}{match.group(2)}{base_lora}"
+                f"{match.group(4)}{match.group(5)}"
+            )
+
+        text = _RE_SAFE_OPEN_LORA.sub(_replace_safe_open_lora, text)
 
         def _replace_push_lora(match):
             if "phone_model" in match.group(3):
@@ -2706,7 +2798,21 @@ except Exception:
 _qat_torchao_map = {torchao_mapping}
 _qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{QAT_DEFAULT_TORCHAO_VERSION}")
 _qat_fbgemm_map = {fbgemm_mapping}
-_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")"""
+_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")
+{QAT_NUMPY_PIN_BLOCK}"""
+
+
+def _pin_qat_numpy_beside_fbgemm(merged_groups):
+    """Install the numpy pin in the same command that force-reinstalls fbgemm.
+
+    A later command is too late: pip has already resolved and installed a newer
+    numpy by then, and the kernel is holding the old one.
+    """
+    for specs in merged_groups.values():
+        if not any("fbgemm-gpu-genai" in spec for spec in specs):
+            continue
+        if "{_qat_numpy}" not in specs:
+            specs.append("{_qat_numpy}")
 
 
 def _is_amd_grpo_like_path(notebook_path):
@@ -2768,6 +2874,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
             variant_extras = installation_amd_extras_gemma4
     elif _is_amd_grpo_like_path(notebook_path) and "vllm" in source_install_blob:
         variant_extras = installation_amd_extras_grpo
+    elif is_path_contains_any(lowered, ["llasa"]):
+        variant_extras = installation_amd_extras_llasa
     else:
         variant_extras = installation_amd_extras_default
 
@@ -2824,6 +2932,7 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     extra_blocks = []
     if any("{_qat_" in spec for specs in merged_groups.values() for spec in specs):
         extra_blocks.append(_build_qat_version_vars_block())
+        _pin_qat_numpy_beside_fbgemm(merged_groups)
     if setup_lines:
         extra_blocks.append("\n".join(setup_lines))
     for flags, specs in merged_groups.items():

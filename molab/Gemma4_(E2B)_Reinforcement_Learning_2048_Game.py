@@ -1064,7 +1064,7 @@ def _():
     from safetensors import safe_open
 
     tensors = {}
-    with safe_open("grpo_saved_lora/adapter_model.safetensors", framework="pt") as f_2:
+    with safe_open("gemma_4_lora/adapter_model.safetensors", framework="pt") as f_2:
         for key in f_2.keys():
             tensor = f_2.get_tensor(key)  # Verify both A and B are non zero
             n_zeros = (tensor == 0).sum() / tensor.numel()

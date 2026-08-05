@@ -392,7 +392,7 @@ tokenizer.save_pretrained("qwen_lora")
 from safetensors import safe_open
 
 tensors = {}
-with safe_open("grpo_lora/adapter_model.safetensors", framework = "pt") as f:
+with safe_open("qwen_lora/adapter_model.safetensors", framework = "pt") as f:
     # Verify both A and B are non zero
     for key in f.keys():
         tensor = f.get_tensor(key)

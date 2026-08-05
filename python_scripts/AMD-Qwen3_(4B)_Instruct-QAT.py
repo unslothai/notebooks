@@ -49,9 +49,18 @@
 # _qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "0.16.0")
 # _qat_fbgemm_map = {"2.10":"1.5.0","2.8":"1.3.0","2.9":"1.4.2"}
 # _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "1.5.0")
+# # fbgemm-gpu-genai depends on an unpinned numpy, so --force-reinstall fetches
+# # the newest one while `import torch` above has already loaded the old one
+# # into this kernel. Hold numpy where it is; otherwise the next import stops
+# # with "numpy was upgraded mid-session ... but the kernel still has the old
+# # version" and the notebook cannot continue without a restart.
+# try:
+#     import numpy; _qat_numpy = "numpy==" + numpy.__version__
+# except Exception:
+#     _qat_numpy = "numpy"
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.55.4"')
-# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall fbgemm-gpu-genai=={_qat_fbgemm}')
+# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall fbgemm-gpu-genai=={_qat_fbgemm} {_qat_numpy}')
 # 
 # 
 # # ### Unsloth

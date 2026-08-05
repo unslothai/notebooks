@@ -123,22 +123,54 @@ if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
         ["bash", "-c", "source .venv/bin/activate && uv sync"],
         cwd = GYM_DIR, check = True,
     )
-    subprocess.run(
-        ["bash", "-c", "source .venv/bin/activate && uv pip install reasoning-gym"],
-        cwd = GYM_DIR, check = True,
-    )
-# Ensure matplotlib is installed (required by reasoning-gym via cellpylib)
-subprocess.run(
-    ["bash", "-c", "source .venv/bin/activate && uv pip install matplotlib"],
-    cwd = GYM_DIR, check = True, stdout = subprocess.DEVNULL,
+# reasoning-gym and matplotlib, installed unconditionally and aimed at the
+# venv's interpreter by path rather than by `source activate`.
+#
+# Inside the `.venv` existence guard above, `uv pip install reasoning-gym` ran
+# and exited 0, and create_dataset.py then died on
+#   ModuleNotFoundError: No module named 'reasoning_gym'
+# so whatever `source activate` selected was not the environment the following
+# `python` resolves to. --python names it outright, and the import is checked
+# afterwards instead of assumed: a package manager reporting success is not
+# evidence the module is importable. matplotlib gets the same treatment since
+# reasoning-gym reaches it through cellpylib.
+# MPLBACKEND is inherited from the notebook kernel, and on Colab it is
+# `module://matplotlib_inline.backend_inline`. That backend lives in the
+# KERNEL's environment, not in this venv, so matplotlib raises
+#   ValueError: Key backend: 'module://matplotlib_inline.backend_inline' is
+#   not a valid value for backend
+# the moment anything here imports it -- and reasoning_gym does, through
+# game_of_life -> cellpylib -> matplotlib.pyplot. Every child below is
+# headless, so pin a backend that always exists rather than inheriting one
+# that only works inside the parent kernel.
+_gym_env = dict(os.environ, MPLBACKEND = "Agg")
+
+_rg_install = subprocess.run(
+    ["bash", "-c",
+     "uv pip install --python .venv/bin/python reasoning-gym matplotlib"],
+    cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
 )
+_rg_check = subprocess.run(
+    ["bash", "-c", ".venv/bin/python -c 'import reasoning_gym'"],
+    cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
+)
+if _rg_check.returncode != 0:
+    print(_rg_install.stdout[-3000:])
+    print(_rg_install.stderr[-3000:])
+    print(_rg_check.stdout[-2000:])
+    print(_rg_check.stderr[-2000:])
+    raise RuntimeError(
+        "reasoning-gym is not importable from the NeMo Gym venv even after "
+        "installing it, so create_dataset.py cannot run. Install and import "
+        "output above."
+    )
 # Step 3: Create sudoku dataset
 sudoku_path = os.path.join(
     GYM_DIR, "resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl"
 )
 if not os.path.exists(sudoku_path):
     print("Creating mini_sudoku dataset (2000 examples)...")
-    subprocess.run(
+    _made = subprocess.run(
         [
             "bash", "-c",
             "source .venv/bin/activate && python "
@@ -146,8 +178,16 @@ if not os.path.exists(sudoku_path):
             "--task mini_sudoku --size 2000 --seed 42 "
             f"--output {sudoku_path}",
         ],
-        cwd = GYM_DIR, check = True,
+        cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
     )
+    if _made.returncode != 0:
+        # The child writes to the kernel's real stderr, which the notebook
+        # capture layer does not record. A bare check = True therefore
+        # raises with the command line and nothing else, and the reason
+        # this failed is simply gone.
+        print(_made.stdout[-4000:])
+        print(_made.stderr[-4000:])
+        _made.check_returncode()
 
 # Step 4: Download instruction_following dataset
 import shutil
@@ -198,6 +238,7 @@ except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         cwd = GYM_DIR,
         stdout = _ng_log,
         stderr = subprocess.STDOUT,
+        env = _gym_env,
     )
 
     def _cleanup_ng():

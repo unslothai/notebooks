@@ -409,6 +409,8 @@ if False:
 # In[ ]:
 
 
+# ollama's installer extracts a zstd archive and refuses to run without zstd, which Colab does not ship
+get_ipython().system('command -v zstd >/dev/null 2>&1 || (apt-get -qq update && apt-get -qq install -y zstd) >/dev/null 2>&1')
 get_ipython().system('curl -fsSL https://ollama.com/install.sh | sh')
 
 
@@ -456,11 +458,30 @@ if False:
 
 
 import subprocess
-
-subprocess.Popen(["ollama", "serve"])
 import time
 
-time.sleep(3)  # Wait for a few seconds for Ollama to load!
+import requests
+
+subprocess.Popen(["ollama", "serve"])
+
+# Wait until Ollama is actually answering, rather than guessing how long it
+# needs. A fixed sleep is a race: on a busy or cold VM the server is not up
+# yet, and every later call fails with
+#     curl: (7) Failed to connect to localhost port 11434: Connection refused
+# which looks like a broken notebook rather than an impatient one.
+for _ in range(60):
+    try:
+        if requests.get("http://localhost:11434/api/tags", timeout = 2).ok:
+            print("Ollama is ready!")
+            break
+    except requests.exceptions.RequestException:
+        pass
+    time.sleep(1)
+else:
+    raise RuntimeError(
+        "Ollama did not become ready on http://localhost:11434 within 60s. "
+        "Check the `ollama serve` output above."
+    )
 
 
 # `Ollama` needs a `Modelfile`, which specifies the model's prompt format. Let's print Unsloth's auto generated one:
