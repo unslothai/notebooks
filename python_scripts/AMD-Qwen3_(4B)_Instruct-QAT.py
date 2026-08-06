@@ -45,9 +45,10 @@
 #     import torch; _qat_torch_version = re.match(r"[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 # except Exception:
 #     _qat_torch_version = _qat_torch_minor = ""
-# # torchao below 0.17.0 loads its kernels only on the exact torch it was built against.
-# _qat_torchao_exact_map = {"2.10.0":"0.16.0","2.8.0":"0.13.0","2.9.0":"0.14.1","2.9.1":"0.15.0"}
-# _qat_torchao_map = {"2.10":"0.16.0","2.11":"0.18.0","2.8":"0.13.0","2.9":"0.15.0"}
+# # peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch
+# # 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
+# _qat_torchao_exact_map = {"2.10.0":"0.16.0","2.8.0":"0.16.0","2.9.0":"0.16.0","2.9.1":"0.16.0"}
+# _qat_torchao_map = {"2.10":"0.16.0","2.11":"0.18.0","2.8":"0.16.0","2.9":"0.16.0"}
 # _qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor, "0.18.0")
 # _qat_fbgemm_map = {"2.10":"1.5.0","2.11":"1.5.0","2.8":"1.3.0","2.9":"1.4.2"}
 # _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "1.5.0")

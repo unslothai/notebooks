@@ -125,22 +125,40 @@ XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.p
 # silently skips its cpp extensions. The authoritative gate is the one in that
 # release's own __init__.py, not a later release's table (0.15.0 lists 0.14.0
 # with torch 2.8.0, but 0.14.0 never runs 0.15.0's table). Below 0.17.0 that
-# gate matches the exact torch version, so 2.9.0 and 2.9.1 take different
-# releases; 0.17.0 and 0.18.0 want torch >= 2.11. 0.14.0 is absent on purpose:
-# its own gate accepts only torchao 0.13.0 with torch 2.8.0, so it skips its
-# extensions on every torch. 2.8 takes 0.13.0, which skips only from torch 2.9.
+# gate matches the exact torch version; 0.17.0 and 0.18.0 want torch >= 2.11.
+# 0.16.0 pairs torch 2.9.1 with 0.16.0.dev, not with the release, so the
+# release itself loads only on torch 2.10.0.
+#
+# Two hard bounds squeeze this, and both beat matching the torch exactly.
+#
+# From below, peft: 0.19 raised TORCHAO_MINIMUM_VERSION from 0.4.0 to 0.16.0
+# and raises ImportError under it, and `get_peft_model` reaches that check via
+# `resolve_quantization_backend`. These notebooks install peft unpinned, so a
+# lower pin stops the run before QAT. Measured on torch 2.8.0 with torchao
+# 0.13.0: extensions load, then get_peft_model raises.
+#
+# From above, torch: 0.18.0 imports `ScalingType` from `torch.nn.functional`,
+# which torch below 2.11 does not have, so `import torchao` itself fails.
+#
+# 0.16.0 is the only release that imports on every torch from 2.8 up and still
+# clears peft, so it takes every row below 2.11. It loads its extensions only
+# on torch 2.10.0; the older rows keep the skip warning, which is slower but
+# alive, where either bound would have been a dead run.
+QAT_PEFT_TORCHAO_FLOOR = "0.16.0"
+# Below this torch, torchao 0.17.0 and up cannot be imported at all.
+QAT_TORCHAO_NEWEST_TORCH = "2.11"
 QAT_TORCHAO_BY_TORCH_VERSION = {
-    "2.8.0": "0.13.0",
-    "2.9.0": "0.14.1",
-    "2.9.1": "0.15.0",
+    "2.8.0": "0.16.0",
+    "2.9.0": "0.16.0",
+    "2.9.1": "0.16.0",
     "2.10.0": "0.16.0",
 }
 # Fallback for a patch release the exact table has not seen yet.
 QAT_TORCHAO_BY_TORCH_MINOR = {
     "2.11": "0.18.0",
     "2.10": "0.16.0",
-    "2.9": "0.15.0",
-    "2.8": "0.13.0",
+    "2.9": "0.16.0",
+    "2.8": "0.16.0",
 }
 QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
 QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
@@ -193,7 +211,8 @@ def build_qat_native_install_block(
     import torch; _qat_torch_version = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 except Exception:
     _qat_torch_version = _qat_torch_minor = ""
-# torchao below 0.17.0 loads its kernels only on the exact torch it was built against.
+# peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch
+# 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
 _qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
 _qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
@@ -2824,7 +2843,8 @@ try:
     import torch; _qat_torch_version = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 except Exception:
     _qat_torch_version = _qat_torch_minor = ""
-# torchao below 0.17.0 loads its kernels only on the exact torch it was built against.
+# peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch
+# 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
 _qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
 _qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor, "{QAT_DEFAULT_TORCHAO_VERSION}")

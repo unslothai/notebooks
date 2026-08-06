@@ -133,6 +133,66 @@ def test_a_group_without_fbgemm_is_untouched():
     assert groups == {("--no-deps",): ["accelerate", "peft"]}
 
 
+# ---- the PEFT floor ------------------------------------------------------
+
+def _as_tuple(version):
+    return tuple(int(part) for part in version.split("."))
+
+
+@pytest.mark.parametrize("table", ["QAT_TORCHAO_BY_TORCH_VERSION",
+                                   "QAT_TORCHAO_BY_TORCH_MINOR"])
+def test_no_torchao_pin_falls_below_the_peft_floor(table):
+    """peft 0.19 raises ImportError from `is_torchao_available()` under 0.16.0,
+    and `get_peft_model` reaches it, so a lower pin kills the run outright.
+    Picking the torch-matched release is only worth doing above that line."""
+    floor = _as_tuple(_GEN.QAT_PEFT_TORCHAO_FLOOR)
+    for torch_version, torchao in getattr(_GEN, table).items():
+        assert _as_tuple(torchao) >= floor, f"{table}[{torch_version}] = {torchao}"
+
+
+@pytest.mark.parametrize("table", ["QAT_TORCHAO_BY_TORCH_VERSION",
+                                   "QAT_TORCHAO_BY_TORCH_MINOR"])
+def test_no_torch_below_2_11_is_pinned_to_an_unimportable_torchao(table):
+    """torchao 0.17.0 and up import `ScalingType` from `torch.nn.functional`,
+    which arrives in torch 2.11, so `import torchao` itself fails below that.
+    Measured: torch 2.8.0 and 2.9.1 with torchao 0.18.0 both raise ImportError.
+    The floor test alone would happily pick 0.18.0 and kill the notebook."""
+    newest = _as_tuple(_GEN.QAT_TORCHAO_NEWEST_TORCH + ".0")[:2]
+    for torch_version, torchao in getattr(_GEN, table).items():
+        parts = _as_tuple(torch_version + ".0" * (2 - torch_version.count(".")))
+        if parts[:2] >= newest:
+            continue
+        assert _as_tuple(torchao) < (0, 17, 0), \
+            f"{table}[{torch_version}] = {torchao} cannot be imported on that torch"
+
+
+def test_exactly_one_release_satisfies_both_bounds():
+    """0.16.0 is the whole answer below torch 2.11: the peft floor and the
+    torch ceiling leave no other choice, so every such row must be it."""
+    newest = _as_tuple(_GEN.QAT_TORCHAO_NEWEST_TORCH + ".0")[:2]
+    rows = [v for k, v in _GEN.QAT_TORCHAO_BY_TORCH_VERSION.items()
+            if _as_tuple(k)[:2] < newest]
+    assert rows and set(rows) == {_GEN.QAT_PEFT_TORCHAO_FLOOR}
+
+
+def test_the_default_pin_clears_the_floor_too():
+    """It is what every torch the tables have not seen gets."""
+    assert _as_tuple(_GEN.QAT_DEFAULT_TORCHAO_VERSION) >= \
+        _as_tuple(_GEN.QAT_PEFT_TORCHAO_FLOOR)
+
+
+def test_the_emitted_notebook_pins_clear_the_floor():
+    """The tables are interpolated into the cell as JSON, so a floor kept only
+    in the generator would not survive a hand edit of the emitted block."""
+    import re
+    block = _GEN.build_qat_native_install_block()
+    floor = _as_tuple(_GEN.QAT_PEFT_TORCHAO_FLOOR)
+    found = re.findall(r'"(\d+\.\d+\.\d+)"\s*:\s*"(\d+\.\d+\.\d+)"', block)
+    assert found, "no torchao mapping found in the emitted block"
+    for torch_version, torchao in found:
+        assert _as_tuple(torchao) >= floor, f"{torch_version} -> {torchao}"
+
+
 # ---- the committed notebooks --------------------------------------------
 
 @pytest.mark.parametrize("name", QAT_NOTEBOOKS)
