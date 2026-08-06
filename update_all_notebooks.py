@@ -123,15 +123,20 @@ XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.p
 # torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
 # step; each release hard-codes the torch it was built against and silently skips
 # its cpp extensions otherwise ("Skipping import of cpp extensions due to
-# incompatible torch version"). The pairings below are torchao's own table, from
-# `torchao_pytorch_compatible_versions` in torchao 0.16.0's __init__.py, plus the
-# `min_torch_version = 2.11.0` gate that 0.17.0 and 0.18.0 use instead:
-#   0.14.0 -> 2.8.0     0.14.1 -> 2.9.0     0.15.0 -> 2.9.1
-#   0.16.0 -> 2.10.0    0.17.0 / 0.18.0 -> torch >= 2.11.0
+# incompatible torch version"). Each release's gate is read from that release's
+# own __init__.py, not from a later one's table: 0.15.0 lists (0.14.0, 2.8.0) as
+# compatible, but 0.14.0 does not execute 0.15.0's table.
+#   0.13.0 -> any torch < 2.9   0.14.1 -> 2.9.0    0.15.0 -> 2.9.1
+#   0.16.0 -> 2.10.0 (also 2.9.1)   0.17.0 / 0.18.0 -> torch >= 2.11.0
 # Matching is on the exact torch version below 0.17.0, hence 2.9.0 and 2.9.1
 # taking different torchao releases.
+#
+# 0.14.0 is deliberately absent. Its own gate accepts only torchao 0.13.0 with
+# torch 2.8.0, so 0.14.0 skips its extensions on every torch, which the committed
+# output in nb/Qwen3_(4B)_Instruct-QAT.ipynb shows for 2.8.0+cu126. 2.8 takes
+# 0.13.0, whose gate skips only from torch 2.9 up.
 QAT_TORCHAO_BY_TORCH_VERSION = {
-    "2.8.0": "0.14.0",
+    "2.8.0": "0.13.0",
     "2.9.0": "0.14.1",
     "2.9.1": "0.15.0",
     "2.10.0": "0.16.0",
@@ -141,7 +146,7 @@ QAT_TORCHAO_BY_TORCH_MINOR = {
     "2.11": "0.18.0",
     "2.10": "0.16.0",
     "2.9": "0.15.0",
-    "2.8": "0.14.0",
+    "2.8": "0.13.0",
 }
 QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
 QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
