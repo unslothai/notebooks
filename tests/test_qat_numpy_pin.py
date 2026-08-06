@@ -104,15 +104,14 @@ def test_the_pin_lands_in_the_fbgemm_command():
 
 
 def test_the_torchao_pin_rides_along_when_amd_left_it_unpinned():
-    """The AMD variant seeds a bare `torchao` with lock = True, so the source's
-    pinned spec is dropped as Colab drift and AMD installs the newest release."""
+    """AMD seeds a bare `torchao` with lock = True, dropping the source's pin."""
     groups = {("--force-reinstall",): ["fbgemm-gpu-genai=={_qat_fbgemm}"]}
     _GEN._pin_qat_numpy_beside_fbgemm(groups)
     assert "torchao=={_qat_torchao}" in groups[("--force-reinstall",)]
 
 
 def test_a_torchao_the_variant_did_pin_is_left_alone():
-    """Only fill the gap. A deliberate AMD pin still outranks the computed one."""
+    """Only fill the gap; a deliberate AMD pin outranks the computed one."""
     groups = {("--force-reinstall",):
               ["fbgemm-gpu-genai=={_qat_fbgemm}", "torchao==0.14.0"]}
     _GEN._pin_qat_numpy_beside_fbgemm(groups)

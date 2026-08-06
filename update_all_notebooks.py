@@ -121,27 +121,21 @@ SPACES = " " * 4
 XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
 
 # torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
-# step; each release hard-codes the torch it was built against and silently skips
-# its cpp extensions otherwise ("Skipping import of cpp extensions due to
-# incompatible torch version"). Each release's gate is read from that release's
-# own __init__.py, not from a later one's table: 0.15.0 lists (0.14.0, 2.8.0) as
-# compatible, but 0.14.0 does not execute 0.15.0's table.
-#   0.13.0 -> any torch < 2.9   0.14.1 -> 2.9.0    0.15.0 -> 2.9.1
-#   0.16.0 -> 2.10.0 (also 2.9.1)   0.17.0 / 0.18.0 -> torch >= 2.11.0
-# Matching is on the exact torch version below 0.17.0, hence 2.9.0 and 2.9.1
-# taking different torchao releases.
-#
-# 0.14.0 is deliberately absent. Its own gate accepts only torchao 0.13.0 with
-# torch 2.8.0, so 0.14.0 skips its extensions on every torch, which the committed
-# output in nb/Qwen3_(4B)_Instruct-QAT.ipynb shows for 2.8.0+cu126. 2.8 takes
-# 0.13.0, whose gate skips only from torch 2.9 up.
+# step: each release hard-codes the torch it was built against and otherwise
+# silently skips its cpp extensions. The authoritative gate is the one in that
+# release's own __init__.py, not a later release's table (0.15.0 lists 0.14.0
+# with torch 2.8.0, but 0.14.0 never runs 0.15.0's table). Below 0.17.0 that
+# gate matches the exact torch version, so 2.9.0 and 2.9.1 take different
+# releases; 0.17.0 and 0.18.0 want torch >= 2.11. 0.14.0 is absent on purpose:
+# its own gate accepts only torchao 0.13.0 with torch 2.8.0, so it skips its
+# extensions on every torch. 2.8 takes 0.13.0, which skips only from torch 2.9.
 QAT_TORCHAO_BY_TORCH_VERSION = {
     "2.8.0": "0.13.0",
     "2.9.0": "0.14.1",
     "2.9.1": "0.15.0",
     "2.10.0": "0.16.0",
 }
-# Fallback by minor, for a patch release the table above has not seen yet.
+# Fallback for a patch release the exact table has not seen yet.
 QAT_TORCHAO_BY_TORCH_MINOR = {
     "2.11": "0.18.0",
     "2.10": "0.16.0",
@@ -2842,15 +2836,12 @@ _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_V
 def _pin_qat_numpy_beside_fbgemm(merged_groups):
     """Put the numpy and torchao pins in the command that force-reinstalls fbgemm.
 
-    numpy: a later command is too late, since pip has already resolved a newer
-    one by then and the kernel is holding the old one.
-
-    torchao: the AMD variant seeds a bare `torchao` with lock = True, so
-    `_merge_spec` drops the source's `torchao=={_qat_torchao}` as Colab pin
-    drift and AMD installs whatever release is newest, which is the mismatch
-    this whole block exists to prevent. Overriding the lock is right here
-    because the AMD config expresses no torchao version of its own, and the
-    pin is derived from the torch actually present at runtime.
+    A later command is too late for numpy: pip has already resolved a newer one
+    and the kernel is holding the old one. torchao belongs here because the AMD
+    variant seeds a bare `torchao` with lock = True, so `_merge_spec` drops the
+    source's `torchao=={_qat_torchao}` as Colab drift and AMD installs the
+    newest release, the mismatch this block exists to prevent. Overriding the
+    lock is safe: the AMD config names no torchao version of its own.
     """
     for specs in merged_groups.values():
         if not any("fbgemm-gpu-genai" in spec for spec in specs):
