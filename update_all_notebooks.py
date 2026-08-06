@@ -531,6 +531,14 @@ installation_gemma3n_content += gemma3n_extra_content
 installation_gemma3n_kaggle_content = installation_kaggle_content
 installation_gemma3n_kaggle_content += gemma3n_extra_content
 
+# The `--no-deps` on transformers 5.x is why huggingface_hub needs its own
+# line, outside the Colab branch. transformers 5.x requires hub >=1.5.0 while
+# 4.x requires <1.0, so the `huggingface_hub>=0.34.0` floor below is satisfied
+# by Colab's preinstalled 0.36.2 and nothing ever raises it -- the very next
+# import then dies with "found 0.36.2, needs >=1.5.0". Local installs have the
+# same hole: `pip install unsloth` pulls a 4.x-era hub, and the `--no-deps`
+# line swaps transformers out from under it.
+#
 # Gemma 4 needs transformers==5.5.0 (with --no-deps), torchcodec, and
 # torch._dynamo recompile_limit. Do NOT go through update_or_append_pip_install
 # here because Gemma 4 must not get the default transformers==4.56.2 pin or
@@ -549,6 +557,7 @@ else:
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"
+!pip install "huggingface_hub>=1.5.0,<2.0"
 !pip install torchcodec
 import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 
@@ -573,6 +582,7 @@ else:
     !pip install --no-deps --upgrade git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.11.0 "tokenizers>=0.22.0,<=0.23.0"
+!pip install "huggingface_hub>=1.5.0,<2.0"
 import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 
 installation_diffusiongemma_kaggle_content = installation_diffusiongemma_content

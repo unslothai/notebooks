@@ -5,7 +5,7 @@
 #     "bitsandbytes>=0.43.0",
 #     "datasets==4.3.0",
 #     "hf_transfer",
-#     "huggingface_hub>=0.34.0",
+#     "huggingface_hub>=1.5.0,<2.0",
 #     "marimo",
 #     "peft",
 #     "protobuf",
