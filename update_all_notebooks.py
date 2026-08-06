@@ -531,13 +531,11 @@ installation_gemma3n_content += gemma3n_extra_content
 installation_gemma3n_kaggle_content = installation_kaggle_content
 installation_gemma3n_kaggle_content += gemma3n_extra_content
 
-# The `--no-deps` on transformers 5.x is why huggingface_hub needs its own
-# line, outside the Colab branch. transformers 5.x requires hub >=1.5.0 while
-# 4.x requires <1.0, so the `huggingface_hub>=0.34.0` floor below is satisfied
-# by Colab's preinstalled 0.36.2 and nothing ever raises it -- the very next
-# import then dies with "found 0.36.2, needs >=1.5.0". Local installs have the
-# same hole: `pip install unsloth` pulls a 4.x-era hub, and the `--no-deps`
-# line swaps transformers out from under it.
+# transformers 5.x needs hub >=1.5.0, 4.x needs <1.0, and the `--no-deps` pin
+# below means pip never enforces it: the `huggingface_hub>=0.34.0` floor is
+# already satisfied by Colab's preinstalled 0.36.2, so the next import dies.
+# Its own line, outside the Colab branch, because a local `pip install unsloth`
+# pulls a 4.x-era hub and the same `--no-deps` swaps transformers out from it.
 #
 # Gemma 4 needs transformers==5.5.0 (with --no-deps), torchcodec, and
 # torch._dynamo recompile_limit. Do NOT go through update_or_append_pip_install

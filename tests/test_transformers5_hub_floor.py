@@ -19,14 +19,10 @@
 """A notebook installing transformers 5.x must raise huggingface_hub with it.
 
 transformers 5.x requires `huggingface-hub>=1.5.0,<2.0`; 4.x requires `<1.0`.
-The Gemma 4 install cells pin transformers with `--no-deps`, so pip never
-enforces that, and the `huggingface_hub>=0.34.0` line beside them is satisfied
-by Colab's preinstalled 0.36.2. The very next import then stopped with
-
-    found 0.36.2, needs >=1.5.0
-
-which is the whole notebook, at cell 6, before a single line of training. A
-lower bound that a stale environment already satisfies buys nothing.
+The Gemma 4 cells pin transformers with `--no-deps`, so pip never enforces it,
+and the `huggingface_hub>=0.34.0` beside them is already satisfied by Colab's
+preinstalled 0.36.2. The next import then stopped with "found 0.36.2, needs
+>=1.5.0" -- the whole notebook, at cell 6, before a line of training.
 """
 
 import json
@@ -38,9 +34,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NB_DIR = REPO_ROOT / "nb"
 
-# `--no-deps` on the same command is the whole point: without it pip intersects
-# transformers 5.x's own `huggingface-hub>=1.5.0` with whatever floor the line
-# asks for and installs something that works. With it, nothing does.
+# `--no-deps` is the whole point: without it pip intersects transformers' own
+# `huggingface-hub>=1.5.0` with the line's floor and installs something that
+# works. With it, nothing does.
 _NO_DEPS_TRANSFORMERS_5 = re.compile(
     r"^[^#\n]*--no-deps[^\n]*transformers\s*[=>]=\s*5\.", re.MULTILINE)
 _HUB_FLOOR = re.compile(r"huggingface[-_]hub\s*>=\s*1\.(?:[5-9]|\d\d)")
