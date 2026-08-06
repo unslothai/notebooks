@@ -2835,16 +2835,25 @@ _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_V
 
 
 def _pin_qat_numpy_beside_fbgemm(merged_groups):
-    """Install the numpy pin in the same command that force-reinstalls fbgemm.
+    """Put the numpy and torchao pins in the command that force-reinstalls fbgemm.
 
-    A later command is too late: pip has already resolved and installed a newer
-    numpy by then, and the kernel is holding the old one.
+    numpy: a later command is too late, since pip has already resolved a newer
+    one by then and the kernel is holding the old one.
+
+    torchao: the AMD variant seeds a bare `torchao` with lock = True, so
+    `_merge_spec` drops the source's `torchao=={_qat_torchao}` as Colab pin
+    drift and AMD installs whatever release is newest, which is the mismatch
+    this whole block exists to prevent. Overriding the lock is right here
+    because the AMD config expresses no torchao version of its own, and the
+    pin is derived from the torch actually present at runtime.
     """
     for specs in merged_groups.values():
         if not any("fbgemm-gpu-genai" in spec for spec in specs):
             continue
         if "{_qat_numpy}" not in specs:
             specs.append("{_qat_numpy}")
+        if not any("torchao" in spec for spec in specs):
+            specs.append("torchao=={_qat_torchao}")
 
 
 def _is_amd_grpo_like_path(notebook_path):

@@ -62,7 +62,7 @@
 #     _qat_numpy = "numpy"
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.55.4"')
-# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall fbgemm-gpu-genai=={_qat_fbgemm} {_qat_numpy}')
+# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall fbgemm-gpu-genai=={_qat_fbgemm} {_qat_numpy} torchao=={_qat_torchao}')
 # 
 # 
 # # ### Unsloth

@@ -99,7 +99,25 @@ def test_the_pin_lands_in_the_fbgemm_command():
               ["fbgemm-gpu-genai=={_qat_fbgemm}"]}
     _GEN._pin_qat_numpy_beside_fbgemm(groups)
     assert groups[("--upgrade", "--force-reinstall")] == [
-        "fbgemm-gpu-genai=={_qat_fbgemm}", "{_qat_numpy}"]
+        "fbgemm-gpu-genai=={_qat_fbgemm}", "{_qat_numpy}",
+        "torchao=={_qat_torchao}"]
+
+
+def test_the_torchao_pin_rides_along_when_amd_left_it_unpinned():
+    """The AMD variant seeds a bare `torchao` with lock = True, so the source's
+    pinned spec is dropped as Colab drift and AMD installs the newest release."""
+    groups = {("--force-reinstall",): ["fbgemm-gpu-genai=={_qat_fbgemm}"]}
+    _GEN._pin_qat_numpy_beside_fbgemm(groups)
+    assert "torchao=={_qat_torchao}" in groups[("--force-reinstall",)]
+
+
+def test_a_torchao_the_variant_did_pin_is_left_alone():
+    """Only fill the gap. A deliberate AMD pin still outranks the computed one."""
+    groups = {("--force-reinstall",):
+              ["fbgemm-gpu-genai=={_qat_fbgemm}", "torchao==0.14.0"]}
+    _GEN._pin_qat_numpy_beside_fbgemm(groups)
+    assert "torchao=={_qat_torchao}" not in groups[("--force-reinstall",)]
+    assert "torchao==0.14.0" in groups[("--force-reinstall",)]
 
 
 def test_pinning_twice_does_not_duplicate():
@@ -107,6 +125,7 @@ def test_pinning_twice_does_not_duplicate():
     _GEN._pin_qat_numpy_beside_fbgemm(groups)
     _GEN._pin_qat_numpy_beside_fbgemm(groups)
     assert groups[("--force-reinstall",)].count("{_qat_numpy}") == 1
+    assert groups[("--force-reinstall",)].count("torchao=={_qat_torchao}") == 1
 
 
 def test_a_group_without_fbgemm_is_untouched():
