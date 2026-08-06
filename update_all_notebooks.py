@@ -120,13 +120,32 @@ SPACES = " " * 4
 
 XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
 
+# torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
+# step; each release hard-codes the torch it was built against and silently skips
+# its cpp extensions otherwise ("Skipping import of cpp extensions due to
+# incompatible torch version"). The pairings below are torchao's own table, from
+# `torchao_pytorch_compatible_versions` in torchao 0.16.0's __init__.py, plus the
+# `min_torch_version = 2.11.0` gate that 0.17.0 and 0.18.0 use instead:
+#   0.14.0 -> 2.8.0     0.14.1 -> 2.9.0     0.15.0 -> 2.9.1
+#   0.16.0 -> 2.10.0    0.17.0 / 0.18.0 -> torch >= 2.11.0
+# Matching is on the exact torch version below 0.17.0, hence 2.9.0 and 2.9.1
+# taking different torchao releases.
+QAT_TORCHAO_BY_TORCH_VERSION = {
+    "2.8.0": "0.14.0",
+    "2.9.0": "0.14.1",
+    "2.9.1": "0.15.0",
+    "2.10.0": "0.16.0",
+}
+# Fallback by minor, for a patch release the table above has not seen yet.
 QAT_TORCHAO_BY_TORCH_MINOR = {
+    "2.11": "0.18.0",
     "2.10": "0.16.0",
     "2.9": "0.15.0",
-    "2.8": "0.14.1",
+    "2.8": "0.14.0",
 }
-QAT_DEFAULT_TORCHAO_VERSION = "0.16.0"
+QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
 QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
+    "2.11": "1.5.0",
     "2.10": "1.5.0",
     "2.9": "1.4.2",
     "2.8": "1.3.0",
@@ -153,12 +172,18 @@ def build_qat_native_install_block(
     default_torchao=QAT_DEFAULT_TORCHAO_VERSION,
     fbgemm_genai_by_torch_minor=None,
     default_fbgemm_genai=QAT_DEFAULT_FBGEMM_GENAI_VERSION,
+    torchao_by_torch_version=None,
 ):
     """Build runtime torchao/fbgemm native install block for QAT notebooks."""
     if torchao_by_torch_minor is None:
         torchao_by_torch_minor = QAT_TORCHAO_BY_TORCH_MINOR
     if fbgemm_genai_by_torch_minor is None:
         fbgemm_genai_by_torch_minor = QAT_FBGEMM_GENAI_BY_TORCH_MINOR
+    if torchao_by_torch_version is None:
+        torchao_by_torch_version = QAT_TORCHAO_BY_TORCH_VERSION
+    torchao_exact_mapping = json.dumps(
+        torchao_by_torch_version, sort_keys=True, separators=(",", ":")
+    )
     torchao_mapping = json.dumps(
         torchao_by_torch_minor, sort_keys=True, separators=(",", ":")
     )
@@ -166,11 +191,13 @@ def build_qat_native_install_block(
         fbgemm_genai_by_torch_minor, sort_keys=True, separators=(",", ":")
     )
     return f"""try:
-    import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
+    import torch; _qat_torch_version = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 except Exception:
-    _qat_torch_minor = ""
+    _qat_torch_version = _qat_torch_minor = ""
+# torchao below 0.17.0 loads its kernels only on the exact torch it was built against.
+_qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
-_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
+_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
 {QAT_NUMPY_PIN_BLOCK}
@@ -2784,6 +2811,9 @@ def _format_amd_pip_call(flags, specs):
 
 
 def _build_qat_version_vars_block():
+    torchao_exact_mapping = json.dumps(
+        QAT_TORCHAO_BY_TORCH_VERSION, sort_keys=True, separators=(",", ":")
+    )
     torchao_mapping = json.dumps(
         QAT_TORCHAO_BY_TORCH_MINOR, sort_keys=True, separators=(",", ":")
     )
@@ -2792,11 +2822,13 @@ def _build_qat_version_vars_block():
     )
     return f"""import re
 try:
-    import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
+    import torch; _qat_torch_version = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 except Exception:
-    _qat_torch_minor = ""
+    _qat_torch_version = _qat_torch_minor = ""
+# torchao below 0.17.0 loads its kernels only on the exact torch it was built against.
+_qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
-_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{QAT_DEFAULT_TORCHAO_VERSION}")
+_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor, "{QAT_DEFAULT_TORCHAO_VERSION}")
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")
 {QAT_NUMPY_PIN_BLOCK}"""
