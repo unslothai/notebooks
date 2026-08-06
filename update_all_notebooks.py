@@ -161,6 +161,28 @@ QAT_TORCHAO_BY_TORCH_MINOR = {
     "2.8": "0.16.0",
 }
 QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
+
+
+def _qat_torchao_fallback_snippet(default_torchao=None):
+    """Resolve an unlisted torch to a torchao that can actually import.
+
+    The tables cover 2.8-2.11. Anything else fell through to the newest pin,
+    so a local torch 2.7 was handed torchao 0.18.0, which reads
+    `torch.nn.functional.ScalingType` -- added in 2.11 -- and dies on import.
+    Below the ceiling the floor is the only pin that both imports and clears
+    peft's minimum, so pick on the detected version rather than assuming any
+    unrecognised torch is a newer one.
+
+    An undetectable torch keeps the old default: we know nothing, and the
+    tables' own range is the wrong thing to guess from.
+    """
+    default_torchao = default_torchao or QAT_DEFAULT_TORCHAO_VERSION
+    return f'''if not _qat_torchao:
+    try:
+        _qat_below = tuple(int(_p) for _p in _qat_torch_minor.split(".")) < tuple(int(_p) for _p in "{QAT_TORCHAO_NEWEST_TORCH}".split("."))
+    except Exception:
+        _qat_below = False
+    _qat_torchao = "{QAT_PEFT_TORCHAO_FLOOR}" if _qat_below else "{default_torchao}"'''
 QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
     "2.11": "1.5.0",
     "2.10": "1.5.0",
@@ -215,7 +237,8 @@ except Exception:
 # 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
 _qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
-_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
+_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor)
+{_qat_torchao_fallback_snippet(default_torchao)}
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
 {QAT_NUMPY_PIN_BLOCK}
@@ -2847,7 +2870,8 @@ except Exception:
 # 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
 _qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
-_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor, "{QAT_DEFAULT_TORCHAO_VERSION}")
+_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor)
+{_qat_torchao_fallback_snippet()}
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")
 {QAT_NUMPY_PIN_BLOCK}"""

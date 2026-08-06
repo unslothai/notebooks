@@ -181,6 +181,52 @@ def test_the_default_pin_clears_the_floor_too():
         _as_tuple(_GEN.QAT_PEFT_TORCHAO_FLOOR)
 
 
+def _resolve_emitted(torch_version):
+    """Run the emitted resolution exactly as a notebook kernel would.
+
+    The tables are only half the logic; the fallback decides what an unlisted
+    torch gets, and that is reachable only by executing the block.
+    """
+    block = _GEN.build_qat_native_install_block()
+    body = block.split("_qat_fbgemm_map")[0]
+    # Drop the torch-detection preamble and inject the version under test.
+    body = "\n".join(
+        line for line in body.splitlines()
+        if not line.startswith(("try:", "    import torch;", "except Exception:",
+                                "    _qat_torch_version"))
+    )
+    minor = torch_version.rsplit(".", 1)[0] if torch_version else ""
+    ns = {"_qat_torch_version": torch_version, "_qat_torch_minor": minor}
+    exec(body, ns)
+    return ns["_qat_torchao"]
+
+
+@pytest.mark.parametrize("torch_version", ["2.4.0", "2.5.1", "2.6.0", "2.7.0"])
+def test_an_unlisted_older_torch_gets_an_importable_torchao(torch_version):
+    """The tables cover 2.8-2.11. Anything older fell through to the newest
+    pin, so a local torch 2.7 was handed torchao 0.18.0, which reads
+    `torch.nn.functional.ScalingType` -- added in 2.11 -- and dies on import.
+    The failure lands at `import torchao`, long after pip has reported success."""
+    assert _as_tuple(_resolve_emitted(torch_version)) < (0, 17, 0), \
+        f"torch {torch_version} would get an unimportable torchao"
+
+
+@pytest.mark.parametrize("torch_version", ["2.11.0", "2.12.0", "2.13.0"])
+def test_an_unlisted_newer_torch_still_gets_the_newest_pin(torch_version):
+    """The fix must not drag future torches down to the floor."""
+    assert _resolve_emitted(torch_version) == _GEN.QAT_DEFAULT_TORCHAO_VERSION
+
+
+def test_a_listed_torch_still_comes_from_the_table():
+    for torch_version, expected in _GEN.QAT_TORCHAO_BY_TORCH_VERSION.items():
+        assert _resolve_emitted(torch_version) == expected
+
+
+def test_an_undetectable_torch_keeps_the_old_default():
+    """Nothing was learned, so nothing is assumed."""
+    assert _resolve_emitted("") == _GEN.QAT_DEFAULT_TORCHAO_VERSION
+
+
 def test_the_emitted_notebook_pins_clear_the_floor():
     """The tables are interpolated into the cell as JSON, so a floor kept only
     in the generator would not survive a hand edit of the emitted block."""
