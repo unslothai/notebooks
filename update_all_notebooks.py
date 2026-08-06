@@ -121,29 +121,20 @@ SPACES = " " * 4
 XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
 
 # torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
-# step: each release hard-codes the torch it was built against and otherwise
-# silently skips its cpp extensions. The authoritative gate is the one in that
-# release's own __init__.py, not a later release's table (0.15.0 lists 0.14.0
-# with torch 2.8.0, but 0.14.0 never runs 0.15.0's table). Below 0.17.0 that
-# gate matches the exact torch version; 0.17.0 and 0.18.0 want torch >= 2.11.
-# 0.16.0 pairs torch 2.9.1 with 0.16.0.dev, not with the release, so the
-# release itself loads only on torch 2.10.0.
+# step: each release hard-codes the torch it was built against, in its own
+# __init__.py, and silently skips its cpp extensions otherwise. Below 0.17.0
+# that gate wants the exact torch version; 0.17.0 and up want torch >= 2.11.
 #
-# Two hard bounds squeeze this, and both beat matching the torch exactly.
-#
-# From below, peft: 0.19 raised TORCHAO_MINIMUM_VERSION from 0.4.0 to 0.16.0
-# and raises ImportError under it, and `get_peft_model` reaches that check via
-# `resolve_quantization_backend`. These notebooks install peft unpinned, so a
-# lower pin stops the run before QAT. Measured on torch 2.8.0 with torchao
-# 0.13.0: extensions load, then get_peft_model raises.
-#
-# From above, torch: 0.18.0 imports `ScalingType` from `torch.nn.functional`,
-# which torch below 2.11 does not have, so `import torchao` itself fails.
+# Two bounds squeeze the choice, and both beat matching torch exactly. From
+# below, peft 0.19 raised TORCHAO_MINIMUM_VERSION to 0.16.0 and raises
+# ImportError under it, which `get_peft_model` reaches; these notebooks install
+# peft unpinned. From above, torchao 0.18.0 imports `ScalingType` from
+# `torch.nn.functional`, added in torch 2.11, so `import torchao` itself fails.
 #
 # 0.16.0 is the only release that imports on every torch from 2.8 up and still
-# clears peft, so it takes every row below 2.11. It loads its extensions only
-# on torch 2.10.0; the older rows keep the skip warning, which is slower but
-# alive, where either bound would have been a dead run.
+# clears peft, so it takes every row below 2.11. Its extensions load only on
+# torch 2.10.0; the older rows keep the skip warning, slower but alive, where
+# either bound would have been a dead run.
 QAT_PEFT_TORCHAO_FLOOR = "0.16.0"
 # Below this torch, torchao 0.17.0 and up cannot be imported at all.
 QAT_TORCHAO_NEWEST_TORCH = "2.11"
@@ -166,15 +157,10 @@ QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
 def _qat_torchao_fallback_snippet(default_torchao=None):
     """Resolve an unlisted torch to a torchao that can actually import.
 
-    The tables cover 2.8-2.11. Anything else fell through to the newest pin,
-    so a local torch 2.7 was handed torchao 0.18.0, which reads
-    `torch.nn.functional.ScalingType` -- added in 2.11 -- and dies on import.
-    Below the ceiling the floor is the only pin that both imports and clears
-    peft's minimum, so pick on the detected version rather than assuming any
-    unrecognised torch is a newer one.
-
-    An undetectable torch keeps the old default: we know nothing, and the
-    tables' own range is the wrong thing to guess from.
+    The tables cover 2.8-2.11. Anything else fell through to the newest pin, so
+    a local torch 2.7 got torchao 0.18.0 and died importing `ScalingType`. Pick
+    on the detected version instead; below the ceiling the floor is the only pin
+    that imports and clears peft. An undetectable torch keeps the old default.
     """
     default_torchao = default_torchao or QAT_DEFAULT_TORCHAO_VERSION
     return f'''if not _qat_torchao:
