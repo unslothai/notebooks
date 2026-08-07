@@ -786,13 +786,34 @@ installation_ernie_4_5_vl_kaggle_content = installation_kaggle_content
 installation_ernie_4_5_vl_kaggle_content += """\n!pip install decord"""
 
 installation_nemotron_nano_content = """%%capture
-import os, importlib.util
+import os, importlib.util, subprocess
 !pip install --upgrade -qqq uv
+# torch 2.7.1 is the one mamba_ssm 2.2.5 and causal_conv1d 1.5.2 publish wheels
+# for, so keep it wherever it runs: without a wheel those build from source and
+# the cell takes half an hour. Its default wheel stops at sm_90 though, so on
+# Blackwell it fails outright with "no kernel image is available for execution
+# on the device". There, keep the runtime's own torch and the newer pair, and
+# pay the build. The cut is at 10, not 12: an RTX PRO 6000 reports 12.0 but a
+# B200 reports 10.0, and neither has kernels in that wheel. T4 (7.5), A100
+# (8.0) and L4 (8.9) all stay pinned, which is where the fast path is proven.
+# Asked of nvidia-smi rather than torch: importing torch here and then
+# replacing it under the live kernel leaves torchvision's extension bound to
+# the old one ("operator torchvision::nms does not exist"). Nothing to read
+# means no NVIDIA GPU, which is the pinned path anyway.
+try: _cc = int(subprocess.run(["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"], capture_output=True, text=True).stdout.split()[0].split(".")[0])
+except: _cc = 0
+if _cc >= 10:
+    # Safe to import now: this branch pins torch to the version already loaded.
+    try: import torch as _t; _torch = f"torch=={_t.__version__.split('+')[0]}"
+    except: _torch = "torch"
+    _mamba, _conv = "mamba_ssm==2.3.2.post1", "causal_conv1d==1.6.2.post1"
+else:
+    _torch, _mamba, _conv = "torch==2.7.1", "mamba_ssm==2.2.5", "causal_conv1d==1.5.2"
 if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
-        "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
+        {_torch} "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
     !uv pip install -qqq --no-deps "torchcodec==0.5"
@@ -800,8 +821,9 @@ elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps transformers==4.56.2 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 
-# Mamba is supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes!
-!uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2
+# Prebuilt on the pinned torch above. On Blackwell there is no wheel, so this
+# builds from source: that is the wait, not a failure.
+!uv pip install --no-build-isolation {_mamba} {_conv}
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
