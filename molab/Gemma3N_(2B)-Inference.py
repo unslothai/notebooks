@@ -105,22 +105,35 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess
-    import subprocess
+    # Load and run the model using sglang.
+    #
+    # Started with Popen rather than `!... &`. IPython's `system_piped`, which
+    # every Jupyter kernel except molab's uses, refuses a command ending in `&`:
+    #   OSError: Background processes not supported.
+    # so on Kaggle, plain Jupyter or papermill this cell could never run at all.
+    import subprocess, sys
+    from sglang.utils import wait_for_server
 
-    # Load and run the model using sglang
-    #! nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it --attention-backend fa3 --port 8000 > sglang.log &
-    subprocess.call(
-        "nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it --attention-backend fa3 --port 8000 > sglang.log &",
-        shell=True,
+    server = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "sglang.launch_server",
+            "--model-path",
+            "unsloth/gemma-3n-E2B-it",
+            "--attention-backend",
+            "fa3",
+            "--port",
+            "8000",
+        ],
+        stdout=open("sglang.log", "w"),
+        stderr=subprocess.STDOUT,
     )
 
-    # tail vllm logs. Check server has been started correctly
-    #! while ! grep -q "The server is fired up and ready to roll" sglang.log; do tail -n 1 sglang.log; sleep 5; done
-    subprocess.call(
-        "while ! grep -q 'The server is fired up and ready to roll' sglang.log; do tail -n 1 sglang.log; sleep 5; done",
-        shell=True,
-    )
+    # sglang's own wait, which gives up eventually. The shell loop this replaces
+    # grepped the log with no timeout, so a server that failed to start hung the
+    # notebook forever instead of reporting anything.
+    wait_for_server("http://localhost:8000")
     return
 
 
@@ -219,7 +232,7 @@ def _(mo):
 
 @app.cell
 def _(image, process_image, requests):
-    from sglang.utils import wait_for_server, print_highlight, terminate_process
+    from sglang.utils import print_highlight, terminate_process
 
     processed_image = process_image(image)
     url = f"http://localhost:8000/v1/chat/completions"

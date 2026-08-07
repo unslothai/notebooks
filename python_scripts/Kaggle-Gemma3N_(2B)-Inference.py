@@ -44,11 +44,26 @@
 # In[2]:
 
 
-# Load and run the model using sglang
-get_ipython().system('nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it --attention-backend fa3 --port 8000 > sglang.log &')
+# Load and run the model using sglang.
+#
+# Started with Popen rather than `!... &`. IPython's `system_piped`, which
+# every Jupyter kernel except Colab's uses, refuses a command ending in `&`:
+#   OSError: Background processes not supported.
+# so on Kaggle, plain Jupyter or papermill this cell could never run at all.
+import subprocess, sys
+from sglang.utils import wait_for_server
 
-# tail vllm logs. Check server has been started correctly
-get_ipython().system('while ! grep -q "The server is fired up and ready to roll" sglang.log; do tail -n 1 sglang.log; sleep 5; done')
+server = subprocess.Popen(
+    [sys.executable, "-m", "sglang.launch_server",
+     "--model-path", "unsloth/gemma-3n-E2B-it",
+     "--attention-backend", "fa3", "--port", "8000"],
+    stdout = open("sglang.log", "w"), stderr = subprocess.STDOUT,
+)
+
+# sglang's own wait, which gives up eventually. The shell loop this replaces
+# grepped the log with no timeout, so a server that failed to start hung the
+# notebook forever instead of reporting anything.
+wait_for_server("http://localhost:8000")
 
 
 # ### Image helper functions
