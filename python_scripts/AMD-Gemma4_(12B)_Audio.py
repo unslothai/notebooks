@@ -10,7 +10,7 @@
 # 
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
-# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
 
 # ### News
 
@@ -43,7 +43,7 @@
 # # Gemma 4 12B requires transformers >= 5.5.0 / trl >= 0.28.0
 # 
 # import torch; torch._dynamo.config.recompile_limit = 64;
-# get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "transformers>=5.10.1" "huggingface_hub>=1.5.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" timm')
+# get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "transformers>=5.10.1" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" timm')
 # get_ipython().system('uv pip install --system -qqq torchcodec')
 # 
 # 

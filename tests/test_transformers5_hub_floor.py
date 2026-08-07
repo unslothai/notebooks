@@ -39,7 +39,10 @@ NB_DIR = REPO_ROOT / "nb"
 # works. With it, nothing does.
 _NO_DEPS_TRANSFORMERS_5 = re.compile(
     r"^[^#\n]*--no-deps[^\n]*transformers\s*[=>]=\s*5\.", re.MULTILINE)
-_HUB_FLOOR = re.compile(r"huggingface[-_]hub\s*>=\s*1\.(?:[5-9]|\d\d)")
+# Both bounds. transformers 5.x asks for `>=1.5.0,<2.0`, and under `--no-deps`
+# an open-ended floor resolves whatever is newest, so hub 2.x would install the
+# day it ships and transformers would reject it. A floor alone is half a pin.
+_HUB_FLOOR = re.compile(r"huggingface[-_]hub\s*>=\s*1\.(?:[5-9]|\d\d)[^\"']*<\s*2")
 
 
 def _install_text(path):
@@ -68,7 +71,8 @@ def test_some_notebook_installs_transformers_5_without_deps():
                          ids = lambda v: v if isinstance(v, str) and len(v) < 80 else "")
 def test_transformers_5_notebooks_raise_the_hub_floor(name, text):
     assert _HUB_FLOOR.search(text), (
-        f"{name} installs transformers 5.x with --no-deps and never raises "
-        "huggingface_hub to 1.5.0; Colab's preinstalled 0.36.2 satisfies a "
-        ">=0.34.0 floor and the next import fails"
+        f"{name} installs transformers 5.x with --no-deps without pinning "
+        "huggingface_hub to >=1.5.0,<2.0. Below the floor, Colab's preinstalled "
+        "0.36.2 satisfies a >=0.34.0 bound and the next import fails; above the "
+        "cap, hub 2.x resolves and transformers 5.x rejects it"
     )
