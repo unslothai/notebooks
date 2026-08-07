@@ -99,7 +99,24 @@ def test_the_pin_lands_in_the_fbgemm_command():
               ["fbgemm-gpu-genai=={_qat_fbgemm}"]}
     _GEN._pin_qat_numpy_beside_fbgemm(groups)
     assert groups[("--upgrade", "--force-reinstall")] == [
-        "fbgemm-gpu-genai=={_qat_fbgemm}", "{_qat_numpy}"]
+        "fbgemm-gpu-genai=={_qat_fbgemm}", "{_qat_numpy}",
+        "torchao=={_qat_torchao}"]
+
+
+def test_the_torchao_pin_rides_along_when_amd_left_it_unpinned():
+    """AMD seeds a bare `torchao` with lock = True, dropping the source's pin."""
+    groups = {("--force-reinstall",): ["fbgemm-gpu-genai=={_qat_fbgemm}"]}
+    _GEN._pin_qat_numpy_beside_fbgemm(groups)
+    assert "torchao=={_qat_torchao}" in groups[("--force-reinstall",)]
+
+
+def test_a_torchao_the_variant_did_pin_is_left_alone():
+    """Only fill the gap; a deliberate AMD pin outranks the computed one."""
+    groups = {("--force-reinstall",):
+              ["fbgemm-gpu-genai=={_qat_fbgemm}", "torchao==0.14.0"]}
+    _GEN._pin_qat_numpy_beside_fbgemm(groups)
+    assert "torchao=={_qat_torchao}" not in groups[("--force-reinstall",)]
+    assert "torchao==0.14.0" in groups[("--force-reinstall",)]
 
 
 def test_pinning_twice_does_not_duplicate():
@@ -107,12 +124,119 @@ def test_pinning_twice_does_not_duplicate():
     _GEN._pin_qat_numpy_beside_fbgemm(groups)
     _GEN._pin_qat_numpy_beside_fbgemm(groups)
     assert groups[("--force-reinstall",)].count("{_qat_numpy}") == 1
+    assert groups[("--force-reinstall",)].count("torchao=={_qat_torchao}") == 1
 
 
 def test_a_group_without_fbgemm_is_untouched():
     groups = {("--no-deps",): ["accelerate", "peft"]}
     _GEN._pin_qat_numpy_beside_fbgemm(groups)
     assert groups == {("--no-deps",): ["accelerate", "peft"]}
+
+
+# ---- the PEFT floor ------------------------------------------------------
+
+def _as_tuple(version):
+    return tuple(int(part) for part in version.split("."))
+
+
+@pytest.mark.parametrize("table", ["QAT_TORCHAO_BY_TORCH_VERSION",
+                                   "QAT_TORCHAO_BY_TORCH_MINOR"])
+def test_no_torchao_pin_falls_below_the_peft_floor(table):
+    """peft 0.19 raises ImportError from `is_torchao_available()` under 0.16.0,
+    and `get_peft_model` reaches it, so a lower pin kills the run outright.
+    Picking the torch-matched release is only worth doing above that line."""
+    floor = _as_tuple(_GEN.QAT_PEFT_TORCHAO_FLOOR)
+    for torch_version, torchao in getattr(_GEN, table).items():
+        assert _as_tuple(torchao) >= floor, f"{table}[{torch_version}] = {torchao}"
+
+
+@pytest.mark.parametrize("table", ["QAT_TORCHAO_BY_TORCH_VERSION",
+                                   "QAT_TORCHAO_BY_TORCH_MINOR"])
+def test_no_torch_below_2_11_is_pinned_to_an_unimportable_torchao(table):
+    """torchao 0.17.0 and up import `ScalingType` from `torch.nn.functional`,
+    which arrives in torch 2.11, so `import torchao` itself fails below that.
+    Measured: torch 2.8.0 and 2.9.1 with torchao 0.18.0 both raise ImportError.
+    The floor test alone would happily pick 0.18.0 and kill the notebook."""
+    newest = _as_tuple(_GEN.QAT_TORCHAO_NEWEST_TORCH + ".0")[:2]
+    for torch_version, torchao in getattr(_GEN, table).items():
+        parts = _as_tuple(torch_version + ".0" * (2 - torch_version.count(".")))
+        if parts[:2] >= newest:
+            continue
+        assert _as_tuple(torchao) < (0, 17, 0), \
+            f"{table}[{torch_version}] = {torchao} cannot be imported on that torch"
+
+
+def test_exactly_one_release_satisfies_both_bounds():
+    """0.16.0 is the whole answer below torch 2.11: the peft floor and the
+    torch ceiling leave no other choice, so every such row must be it."""
+    newest = _as_tuple(_GEN.QAT_TORCHAO_NEWEST_TORCH + ".0")[:2]
+    rows = [v for k, v in _GEN.QAT_TORCHAO_BY_TORCH_VERSION.items()
+            if _as_tuple(k)[:2] < newest]
+    assert rows and set(rows) == {_GEN.QAT_PEFT_TORCHAO_FLOOR}
+
+
+def test_the_default_pin_clears_the_floor_too():
+    """It is what every torch the tables have not seen gets."""
+    assert _as_tuple(_GEN.QAT_DEFAULT_TORCHAO_VERSION) >= \
+        _as_tuple(_GEN.QAT_PEFT_TORCHAO_FLOOR)
+
+
+def _resolve_emitted(torch_version):
+    """Run the emitted resolution exactly as a notebook kernel would.
+
+    The tables are only half the logic; the fallback decides what an unlisted
+    torch gets, and that is reachable only by executing the block.
+    """
+    block = _GEN.build_qat_native_install_block()
+    body = block.split("_qat_fbgemm_map")[0]
+    # Drop the torch-detection preamble and inject the version under test.
+    body = "\n".join(
+        line for line in body.splitlines()
+        if not line.startswith(("try:", "    import torch;", "except Exception:",
+                                "    _qat_torch_version"))
+    )
+    minor = torch_version.rsplit(".", 1)[0] if torch_version else ""
+    ns = {"_qat_torch_version": torch_version, "_qat_torch_minor": minor}
+    exec(body, ns)
+    return ns["_qat_torchao"]
+
+
+@pytest.mark.parametrize("torch_version", ["2.4.0", "2.5.1", "2.6.0", "2.7.0"])
+def test_an_unlisted_older_torch_gets_an_importable_torchao(torch_version):
+    """The tables cover 2.8-2.11. Anything older fell through to the newest
+    pin, so a local torch 2.7 was handed torchao 0.18.0, which reads
+    `torch.nn.functional.ScalingType` -- added in 2.11 -- and dies on import.
+    The failure lands at `import torchao`, long after pip has reported success."""
+    assert _as_tuple(_resolve_emitted(torch_version)) < (0, 17, 0), \
+        f"torch {torch_version} would get an unimportable torchao"
+
+
+@pytest.mark.parametrize("torch_version", ["2.11.0", "2.12.0", "2.13.0"])
+def test_an_unlisted_newer_torch_still_gets_the_newest_pin(torch_version):
+    """The fix must not drag future torches down to the floor."""
+    assert _resolve_emitted(torch_version) == _GEN.QAT_DEFAULT_TORCHAO_VERSION
+
+
+def test_a_listed_torch_still_comes_from_the_table():
+    for torch_version, expected in _GEN.QAT_TORCHAO_BY_TORCH_VERSION.items():
+        assert _resolve_emitted(torch_version) == expected
+
+
+def test_an_undetectable_torch_keeps_the_old_default():
+    """Nothing was learned, so nothing is assumed."""
+    assert _resolve_emitted("") == _GEN.QAT_DEFAULT_TORCHAO_VERSION
+
+
+def test_the_emitted_notebook_pins_clear_the_floor():
+    """The tables are interpolated into the cell as JSON, so a floor kept only
+    in the generator would not survive a hand edit of the emitted block."""
+    import re
+    block = _GEN.build_qat_native_install_block()
+    floor = _as_tuple(_GEN.QAT_PEFT_TORCHAO_FLOOR)
+    found = re.findall(r'"(\d+\.\d+\.\d+)"\s*:\s*"(\d+\.\d+\.\d+)"', block)
+    assert found, "no torchao mapping found in the emitted block"
+    for torch_version, torchao in found:
+        assert _as_tuple(torchao) >= floor, f"{torch_version} -> {torchao}"
 
 
 # ---- the committed notebooks --------------------------------------------

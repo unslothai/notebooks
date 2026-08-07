@@ -42,12 +42,21 @@
 # 
 # import re
 # try:
-#     import torch; _qat_torch_minor = re.match(r"[0-9]{1,}\.[0-9]{1,}", str(torch.__version__)).group(0)
+#     import torch; _qat_torch_version = re.match(r"[0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 # except Exception:
-#     _qat_torch_minor = ""
-# _qat_torchao_map = {"2.10":"0.16.0","2.8":"0.14.1","2.9":"0.15.0"}
-# _qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "0.16.0")
-# _qat_fbgemm_map = {"2.10":"1.5.0","2.8":"1.3.0","2.9":"1.4.2"}
+#     _qat_torch_version = _qat_torch_minor = ""
+# # peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch
+# # 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
+# _qat_torchao_exact_map = {"2.10.0":"0.16.0","2.8.0":"0.16.0","2.9.0":"0.16.0","2.9.1":"0.16.0"}
+# _qat_torchao_map = {"2.10":"0.16.0","2.11":"0.18.0","2.8":"0.16.0","2.9":"0.16.0"}
+# _qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor)
+# if not _qat_torchao:
+#     try:
+#         _qat_below = tuple(int(_p) for _p in _qat_torch_minor.split(".")) < tuple(int(_p) for _p in "2.11".split("."))
+#     except Exception:
+#         _qat_below = False
+#     _qat_torchao = "0.16.0" if _qat_below else "0.18.0"
+# _qat_fbgemm_map = {"2.10":"1.5.0","2.11":"1.5.0","2.8":"1.3.0","2.9":"1.4.2"}
 # _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "1.5.0")
 # # fbgemm-gpu-genai depends on an unpinned numpy, so --force-reinstall fetches
 # # the newest one while `import torch` above has already loaded the old one
@@ -60,7 +69,7 @@
 #     _qat_numpy = "numpy"
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.55.4"')
-# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall fbgemm-gpu-genai=={_qat_fbgemm} {_qat_numpy}')
+# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall fbgemm-gpu-genai=={_qat_fbgemm} {_qat_numpy} torchao=={_qat_torchao}')
 # 
 # 
 # # ### Unsloth

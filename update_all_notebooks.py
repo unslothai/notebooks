@@ -120,13 +120,57 @@ SPACES = " " * 4
 
 XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
 
-QAT_TORCHAO_BY_TORCH_MINOR = {
-    "2.10": "0.16.0",
-    "2.9": "0.15.0",
-    "2.8": "0.14.1",
+# torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
+# step: each release hard-codes the torch it was built against, in its own
+# __init__.py, and silently skips its cpp extensions otherwise. Below 0.17.0
+# that gate wants the exact torch version; 0.17.0 and up want torch >= 2.11.
+#
+# Two bounds squeeze the choice, and both beat matching torch exactly. From
+# below, peft 0.19 raised TORCHAO_MINIMUM_VERSION to 0.16.0 and raises
+# ImportError under it, which `get_peft_model` reaches; these notebooks install
+# peft unpinned. From above, torchao 0.18.0 imports `ScalingType` from
+# `torch.nn.functional`, added in torch 2.11, so `import torchao` itself fails.
+#
+# 0.16.0 is the only release that imports on every torch from 2.8 up and still
+# clears peft, so it takes every row below 2.11. Its extensions load only on
+# torch 2.10.0; the older rows keep the skip warning, slower but alive, where
+# either bound would have been a dead run.
+QAT_PEFT_TORCHAO_FLOOR = "0.16.0"
+# Below this torch, torchao 0.17.0 and up cannot be imported at all.
+QAT_TORCHAO_NEWEST_TORCH = "2.11"
+QAT_TORCHAO_BY_TORCH_VERSION = {
+    "2.8.0": "0.16.0",
+    "2.9.0": "0.16.0",
+    "2.9.1": "0.16.0",
+    "2.10.0": "0.16.0",
 }
-QAT_DEFAULT_TORCHAO_VERSION = "0.16.0"
+# Fallback for a patch release the exact table has not seen yet.
+QAT_TORCHAO_BY_TORCH_MINOR = {
+    "2.11": "0.18.0",
+    "2.10": "0.16.0",
+    "2.9": "0.16.0",
+    "2.8": "0.16.0",
+}
+QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
+
+
+def _qat_torchao_fallback_snippet(default_torchao=None):
+    """Resolve an unlisted torch to a torchao that can actually import.
+
+    The tables cover 2.8-2.11. Anything else fell through to the newest pin, so
+    a local torch 2.7 got torchao 0.18.0 and died importing `ScalingType`. Pick
+    on the detected version instead; below the ceiling the floor is the only pin
+    that imports and clears peft. An undetectable torch keeps the old default.
+    """
+    default_torchao = default_torchao or QAT_DEFAULT_TORCHAO_VERSION
+    return f'''if not _qat_torchao:
+    try:
+        _qat_below = tuple(int(_p) for _p in _qat_torch_minor.split(".")) < tuple(int(_p) for _p in "{QAT_TORCHAO_NEWEST_TORCH}".split("."))
+    except Exception:
+        _qat_below = False
+    _qat_torchao = "{QAT_PEFT_TORCHAO_FLOOR}" if _qat_below else "{default_torchao}"'''
 QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
+    "2.11": "1.5.0",
     "2.10": "1.5.0",
     "2.9": "1.4.2",
     "2.8": "1.3.0",
@@ -153,12 +197,18 @@ def build_qat_native_install_block(
     default_torchao=QAT_DEFAULT_TORCHAO_VERSION,
     fbgemm_genai_by_torch_minor=None,
     default_fbgemm_genai=QAT_DEFAULT_FBGEMM_GENAI_VERSION,
+    torchao_by_torch_version=None,
 ):
     """Build runtime torchao/fbgemm native install block for QAT notebooks."""
     if torchao_by_torch_minor is None:
         torchao_by_torch_minor = QAT_TORCHAO_BY_TORCH_MINOR
     if fbgemm_genai_by_torch_minor is None:
         fbgemm_genai_by_torch_minor = QAT_FBGEMM_GENAI_BY_TORCH_MINOR
+    if torchao_by_torch_version is None:
+        torchao_by_torch_version = QAT_TORCHAO_BY_TORCH_VERSION
+    torchao_exact_mapping = json.dumps(
+        torchao_by_torch_version, sort_keys=True, separators=(",", ":")
+    )
     torchao_mapping = json.dumps(
         torchao_by_torch_minor, sort_keys=True, separators=(",", ":")
     )
@@ -166,11 +216,15 @@ def build_qat_native_install_block(
         fbgemm_genai_by_torch_minor, sort_keys=True, separators=(",", ":")
     )
     return f"""try:
-    import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
+    import torch; _qat_torch_version = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 except Exception:
-    _qat_torch_minor = ""
+    _qat_torch_version = _qat_torch_minor = ""
+# peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch
+# 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
+_qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
-_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
+_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor)
+{_qat_torchao_fallback_snippet(default_torchao)}
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
 {QAT_NUMPY_PIN_BLOCK}
@@ -2784,6 +2838,9 @@ def _format_amd_pip_call(flags, specs):
 
 
 def _build_qat_version_vars_block():
+    torchao_exact_mapping = json.dumps(
+        QAT_TORCHAO_BY_TORCH_VERSION, sort_keys=True, separators=(",", ":")
+    )
     torchao_mapping = json.dumps(
         QAT_TORCHAO_BY_TORCH_MINOR, sort_keys=True, separators=(",", ":")
     )
@@ -2792,27 +2849,37 @@ def _build_qat_version_vars_block():
     )
     return f"""import re
 try:
-    import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
+    import torch; _qat_torch_version = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 except Exception:
-    _qat_torch_minor = ""
+    _qat_torch_version = _qat_torch_minor = ""
+# peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch
+# 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
+_qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
-_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{QAT_DEFAULT_TORCHAO_VERSION}")
+_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor)
+{_qat_torchao_fallback_snippet()}
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")
 {QAT_NUMPY_PIN_BLOCK}"""
 
 
 def _pin_qat_numpy_beside_fbgemm(merged_groups):
-    """Install the numpy pin in the same command that force-reinstalls fbgemm.
+    """Put the numpy and torchao pins in the command that force-reinstalls fbgemm.
 
-    A later command is too late: pip has already resolved and installed a newer
-    numpy by then, and the kernel is holding the old one.
+    A later command is too late for numpy: pip has already resolved a newer one
+    and the kernel is holding the old one. torchao belongs here because the AMD
+    variant seeds a bare `torchao` with lock = True, so `_merge_spec` drops the
+    source's `torchao=={_qat_torchao}` as Colab drift and AMD installs the
+    newest release, the mismatch this block exists to prevent. Overriding the
+    lock is safe: the AMD config names no torchao version of its own.
     """
     for specs in merged_groups.values():
         if not any("fbgemm-gpu-genai" in spec for spec in specs):
             continue
         if "{_qat_numpy}" not in specs:
             specs.append("{_qat_numpy}")
+        if not any("torchao" in spec for spec in specs):
+            specs.append("torchao=={_qat_torchao}")
 
 
 def _is_amd_grpo_like_path(notebook_path):
