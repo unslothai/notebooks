@@ -46,13 +46,11 @@
 
 # Load and run the model using sglang.
 #
-# Started with Popen rather than `!... &`. IPython's `system_piped`, which
-# every Jupyter kernel except Colab's uses, refuses a command ending in `&`:
-#   OSError: Background processes not supported.
-# so on Kaggle, plain Jupyter or papermill this cell could never run at all.
-# Attention backend left to sglang: `fa3` is Hopper (sm90) only, so it fails on
-# the T4 / L4 / A100 a Colab or Kaggle session actually hands out. sglang picks
-# flashinfer on Ampere and Ada, and fa3 itself on Hopper.
+# Popen, not `!... &`: IPython's `system_piped`, which every kernel except
+# Colab's uses, raises OSError on a trailing `&`, so on Kaggle, plain Jupyter
+# or papermill this cell could never run.
+# Backend left to sglang: `fa3` is Hopper (sm90) only, so it fails on the
+# T4 / L4 / A100 a session actually hands out.
 import subprocess, sys
 from sglang.utils import wait_for_server
 
@@ -63,9 +61,8 @@ server = subprocess.Popen(
     stdout = open("sglang.log", "w"), stderr = subprocess.STDOUT,
 )
 
-# sglang's own wait, which gives up eventually. The shell loop this replaces
-# grepped the log with no timeout, so a server that failed to start hung the
-# notebook forever instead of reporting anything.
+# sglang's own wait, which gives up. The shell loop this replaces grepped the
+# log with no timeout, so a failed start hung the notebook forever.
 wait_for_server("http://localhost:8000")
 
 

@@ -763,10 +763,11 @@ else:
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
 # A wheel, not a source build of `main`. Every sglang release pins ONE exact
-# transformers AND one exact torch, so cloning main and then forcing
-# transformers==4.53.0 -- what 0.4.9 wanted, when this was written -- left the
-# two disagreeing. 0.5.16 wants torch 2.11.0, which is what Colab already has,
-# so the install adds sglang instead of replacing torch under the live kernel.
+# transformers, so cloning main and then forcing transformers==4.53.0, what
+# 0.4.9 wanted when this was written, left the two disagreeing. Note this does
+# not make the notebook run on Colab: sglang also pins one exact torch, and a
+# `torch==` pin resolves to PyPI's default CUDA build, not Colab's cu128 one,
+# so the install still rebuilds the torch stack under the running kernel.
 installation_sglang_content = """%%capture
 !pip install "sglang[all]==0.5.16\""""
 installation_sglang_kaggle_content = installation_sglang_content
@@ -4345,12 +4346,11 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma3n_content
 
-                        # SGLANG INSTALLATION. Keyed off the sglang import, not the
-                        # filename: the one notebook that serves through sglang is
-                        # named Gemma3N_(2B)-Inference, so a "sglang" filename match
-                        # never fired and Gemma3N above then overwrote it with the
-                        # plain install. The notebook shipped importing sglang with
-                        # nothing installing it. Must stay after Gemma3N.
+                        # SGLANG INSTALLATION, keyed off the import rather than the
+                        # filename: the only notebook serving through sglang is named
+                        # Gemma3N_(2B)-Inference, so a "sglang" filename match never
+                        # fired and Gemma3N above overwrote it with the plain install.
+                        # Must stay after Gemma3N.
                         if _notebook_imports_sglang(notebook_content):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_sglang_kaggle_content
