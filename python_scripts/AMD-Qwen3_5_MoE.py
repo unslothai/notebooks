@@ -31,7 +31,7 @@
 
 # # ### Installation
 # 
-# # In[ ]:
+# # In[1]:
 # 
 # 
 # get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-user-action=ignore\n\nROCM_TAG="$({ command -v amd-smi >/dev/null 2>&1 && amd-smi version 2>/dev/null | awk -F\'ROCm version: \' \'NF>1{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { [ -r /opt/rocm/.info/version ] && awk -F. \'{print "rocm"$1"."$2; exit}\' /opt/rocm/.info/version; } || { command -v hipconfig >/dev/null 2>&1 && hipconfig --version 2>/dev/null | awk -F\': *\' \'/HIP version/{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { command -v dpkg-query >/dev/null 2>&1 && ver="$(dpkg-query -W -f=\'${Version}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; } || { command -v rpm >/dev/null 2>&1 && ver="$(rpm -q --qf \'%{VERSION}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; })"\n[ -n "$ROCM_TAG" ] || { echo "Could not detect ROCm. Install ROCm first or set ROCM_TAG manually."; exit 1; }\ncase "$ROCM_TAG" in\n  rocm6.[0-4]|rocm7.[02]) T="$ROCM_TAG" ;;\n  rocm6.*) T="rocm6.4" ;;\n  *) T="rocm7.1" ;;\nesac\npip install bitsandbytes\nPYTORCH_INDEX_URL="https://download.pytorch.org/whl/${T}"\nuv pip install --system -U --force-reinstall \\\n    torch torchvision torchaudio triton-rocm \\\n    --index-url "$PYTORCH_INDEX_URL"\nuv pip install --system cut-cross-entropy torchao --no-deps\nuv pip install --system -U --no-deps "unsloth[amd]" "unsloth_zoo[amd]"\nuv pip install --system --no-deps -r "$(python -c \'import pathlib,site;print(next(p for r in [*site.getsitepackages(),site.getusersitepackages()] if (p:=pathlib.Path(r,"studio/backend/requirements/no-torch-runtime.txt")).exists()))\')" torchao\nuv pip install --system --no-deps -U "tokenizers>=0.22.0,<=0.23.0"\n')
@@ -42,7 +42,6 @@
 # 
 # import os
 # os.environ["FLA_TILELANG"] = "0"
-# os.environ['UNSLOTH_MOE_DISABLE_AUTOTUNE'] = '1'
 # get_ipython().system('uv pip install --system -qqq --no-deps "torchcodec==0.7.0"')
 # get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 # get_ipython().system('uv pip install --system -qqq "transformers==5.2.0"')
@@ -51,14 +50,14 @@
 # 
 # # ### Unsloth
 
-# In[ ]:
+# In[3]:
 
 
 from unsloth import FastLanguageModel
 import torch
 
 max_seq_length = 2048 # Can increase for longer reasoning traces
-lora_rank = 16 # Larger rank = smarter, but slower
+lora_rank = 8 # Larger rank = smarter, but slower
 
 model, processor = FastLanguageModel.from_pretrained(
     "unsloth/Qwen3.5-35B-A3B", # This is a very big model, might take a while for downloading
@@ -69,7 +68,7 @@ model, processor = FastLanguageModel.from_pretrained(
 tokenizer = processor.tokenizer # To tokenize text
 
 
-# In[7]:
+# In[4]:
 
 
 model = FastLanguageModel.get_peft_model(
@@ -88,9 +87,9 @@ model = FastLanguageModel.get_peft_model(
 
 # <a name="Data"></a>
 # ### Data Prep
-# We now use the `Qwen 3.5` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy. 
+# We now use the `Qwen 3.5` format for conversation style finetunes. We use the [Open Math Reasoning](https://huggingface.co/datasets/unsloth/OpenMathReasoning-mini) dataset which was used to win the [AIMO](https://www.kaggle.com/competitions/ai-mathematical-olympiad-progress-prize-2/leaderboard) (AI Mathematical Olympiad - Progress Prize 2) challenge! We sample 10% of verifiable reasoning traces that used DeepSeek R1, and which got > 95% accuracy.
 
-# In[ ]:
+# In[5]:
 
 
 from datasets import load_dataset
@@ -99,7 +98,7 @@ dataset = load_dataset("unsloth/OpenMathReasoning-mini", split = "cot")
 
 # We now convert the reasoning dataset into conversational format:
 
-# In[ ]:
+# In[6]:
 
 
 def generate_conversation(examples):
@@ -118,7 +117,7 @@ dataset = dataset.map(generate_conversation, batched = True)
 
 # We now have to apply the chat template for `Qwen 3.5` onto the conversations, and save it to `text`.
 
-# In[ ]:
+# In[7]:
 
 
 def formatting_prompts_func(examples):
@@ -131,7 +130,7 @@ dataset = dataset.map(formatting_prompts_func, batched = True)
 
 # Let's see how the chat template did!
 
-# In[ ]:
+# In[8]:
 
 
 dataset[100]['text']
@@ -141,43 +140,7 @@ dataset[100]['text']
 # ### Train the model
 # Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
 
-# In[16]:
-
-
-from trl import SFTTrainer, SFTConfig
-trainer = SFTTrainer(
-    model = model,
-    tokenizer = tokenizer,
-    train_dataset = dataset,
-    args = SFTConfig(
-        dataset_text_field = "text",
-        per_device_train_batch_size = 1,
-        gradient_accumulation_steps = 1, # Use GA to mimic batch size!
-        warmup_steps = 5,
-        # num_train_epochs = 1, # Set this for 1 full training run.
-        max_steps = 50,
-        learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
-        logging_steps = 5,
-        optim = "adamw_8bit",
-        weight_decay = 0.001,
-        lr_scheduler_type = "linear",
-        seed = 3407,
-        report_to = "none", # Use TrackIO/WandB etc
-    ),
-)
-
-
-# In[ ]:
-
-
-dataset[100]['text']
-
-
-# <a name="Train"></a>
-# ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
-
-# In[ ]:
+# In[9]:
 
 
 from trl import SFTTrainer, SFTConfig
@@ -205,7 +168,7 @@ trainer = SFTTrainer(
 
 # We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
 
-# In[ ]:
+# In[10]:
 
 
 from unsloth.chat_templates import train_on_responses_only
@@ -218,7 +181,7 @@ trainer = train_on_responses_only(
 
 # Let's verify masking the instruction part is done! Let's print the 100th row again.
 
-# In[ ]:
+# In[11]:
 
 
 tokenizer.decode(trainer.train_dataset[100]["input_ids"])
@@ -226,13 +189,13 @@ tokenizer.decode(trainer.train_dataset[100]["input_ids"])
 
 # Now let's print the masked out example - you should see only the answer is present:
 
-# In[ ]:
+# In[12]:
 
 
 tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[100]["labels"]]).replace(tokenizer.pad_token, " ")
 
 
-# In[ ]:
+# In[13]:
 
 
 # Compilation can take 2-3 minutes of time, so please be patient :)
@@ -241,7 +204,7 @@ trainer.train()
 
 # Let's check if the model has learnt to follow the custom format:
 
-# In[ ]:
+# In[14]:
 
 
 messages = [
@@ -262,9 +225,7 @@ _ = model.generate(
 )
 
 
-# Yes it did follow the formatting! Great! Let's remove some items before the GRPO step
-
-# In[19]:
+# In[15]:
 
 
 del dataset
@@ -278,7 +239,7 @@ gc.collect()
 # 
 # We also support saving to `float16` directly. Select `merged_16bit` for float16 or `merged_4bit` for int4. We also allow `lora` adapters as a fallback. Use `push_to_hub_merged` to upload to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens. See [our docs](https://unsloth.ai/docs/basics/inference-and-deployment) for more deployment options.
 
-# In[20]:
+# In[16]:
 
 
 # Merge to 16bit
@@ -308,7 +269,7 @@ if False:
 # 
 # [**NEW**] To finetune and auto export to Ollama, try our [Ollama notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
 
-# In[ ]:
+# In[17]:
 
 
 # Save to 8bit Q8_0

@@ -1807,15 +1807,38 @@ def _is_installation_heading(source_text, is_amd_notebook=False):
 
 
 def _adjacent_install_like_code_cells(cells, first_code_idx):
+    """Install cells following `first_code_idx`, stepping over their headings.
+
+    A second install cell often gets its own markdown heading, and stopping at
+    the first non-code cell missed it: Qwen3_5_MoE and Qwen3_6_MoE put a
+    CUDA-wheel resolver behind "### Install flash-linear-attention and
+    causal-conv-1d", so it was never collected, survived into the AMD variant,
+    and `_assert_amd_install_runtime` then refused the whole `--amd` run. The
+    heading is returned with it, or it would be left pointing at nothing.
+    """
     install_cells = []
     idx = first_code_idx + 1
+    pending_headings = []
     while idx < len(cells):
         cell = cells[idx]
+        if cell.get("cell_type") == "markdown":
+            # Only a heading, and only right before an install cell. Anything
+            # longer is prose that belongs to the notebook, not to the install.
+            text = _cell_source_text(cell).strip()
+            if not text.startswith("#") or len(text.splitlines()) > 1:
+                break
+            # `None` marks a heading: it is deleted with the cell but must not
+            # reach the install text the AMD recipe is built from.
+            pending_headings.append((idx, None))
+            idx += 1
+            continue
         if cell.get("cell_type") != "code":
             break
         source_text = _cell_source_text(cell)
         if not _is_install_like_cell(cells, idx, source_text):
             break
+        install_cells.extend(pending_headings)
+        pending_headings = []
         install_cells.append((idx, source_text))
         idx += 1
     return install_cells
@@ -4147,7 +4170,9 @@ def update_notebook_sections(
                                 notebook_content["cells"], i + 1
                             )
                             source_install_texts.extend(
-                                source_text for _idx, source_text in amd_followup_install_cells
+                                source_text
+                                for _idx, source_text in amd_followup_install_cells
+                                if source_text is not None
                             )
                         elif (
                             i + 2 < len(notebook_content["cells"])
