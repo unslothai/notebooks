@@ -34,7 +34,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
+# get_ipython().run_cell_magic('capture', '', '!pip install "sglang[all]==0.5.16"\n')
 # 
 # 
 # # ### Unsloth
@@ -50,13 +50,16 @@
 # every Jupyter kernel except Colab's uses, refuses a command ending in `&`:
 #   OSError: Background processes not supported.
 # so on Kaggle, plain Jupyter or papermill this cell could never run at all.
+# Attention backend left to sglang: `fa3` is Hopper (sm90) only, so it fails on
+# the T4 / L4 / A100 a Colab or Kaggle session actually hands out. sglang picks
+# flashinfer on Ampere and Ada, and fa3 itself on Hopper.
 import subprocess, sys
 from sglang.utils import wait_for_server
 
 server = subprocess.Popen(
     [sys.executable, "-m", "sglang.launch_server",
      "--model-path", "unsloth/gemma-3n-E2B-it",
-     "--attention-backend", "fa3", "--port", "8000"],
+     "--port", "8000"],
     stdout = open("sglang.log", "w"), stderr = subprocess.STDOUT,
 )
 

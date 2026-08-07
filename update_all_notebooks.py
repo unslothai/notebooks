@@ -762,13 +762,13 @@ else:
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
+# A wheel, not a source build of `main`. Every sglang release pins ONE exact
+# transformers AND one exact torch, so cloning main and then forcing
+# transformers==4.53.0 -- what 0.4.9 wanted, when this was written -- left the
+# two disagreeing. 0.5.16 wants torch 2.11.0, which is what Colab already has,
+# so the install adds sglang instead of replacing torch under the live kernel.
 installation_sglang_content = """%%capture
-import sys
-import os
-!git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e "python[all]"
-!pip install -U transformers==4.53.0
-sys.path.append(f'{os.getcwd()}/sglang/')
-sys.path.append(f'{os.getcwd()}/sglang/python')"""
+!pip install "sglang[all]==0.5.16\""""
 installation_sglang_kaggle_content = installation_sglang_content
 
 installation_deepseek_ocr_content = installation_content
@@ -1804,6 +1804,17 @@ def _owns_extra_grpo_install_cell(notebook_path, cells, idx):
     if idx < 0 or idx >= len(cells):
         return False
     return cells[idx].get("cell_type") == "code"
+
+
+def _notebook_imports_sglang(notebook_content):
+    """Whether any code cell imports sglang, which is what needs it installed."""
+    for cell in notebook_content.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        source = _cell_source_text(cell)
+        if re.search(r"^\s*(?:import\s+sglang|from\s+sglang)", source, re.MULTILINE):
+            return True
+    return False
 
 
 def _is_installation_heading(source_text, is_amd_notebook=False):
@@ -4306,13 +4317,6 @@ def update_notebook_sections(
                             else:
                                 installation = installation_sesame_csm_content
 
-                        # SGLANG INSTALLATION
-                        if is_path_contains_any(notebook_path.lower(), ["sglang"]):
-                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
-                                installation = installation_sglang_kaggle_content
-                            else:
-                                installation = installation_sglang_content
-
                         # QAT INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qat"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -4340,6 +4344,18 @@ def update_notebook_sections(
                                 installation = installation_gemma3n_kaggle_content
                             else:
                                 installation = installation_gemma3n_content
+
+                        # SGLANG INSTALLATION. Keyed off the sglang import, not the
+                        # filename: the one notebook that serves through sglang is
+                        # named Gemma3N_(2B)-Inference, so a "sglang" filename match
+                        # never fired and Gemma3N above then overwrote it with the
+                        # plain install. The notebook shipped importing sglang with
+                        # nothing installing it. Must stay after Gemma3N.
+                        if _notebook_imports_sglang(notebook_content):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_sglang_kaggle_content
+                            else:
+                                installation = installation_sglang_content
 
                         # Gemma4 INSTALLATION: preserve the custom
                         # transformers==5.5.0 --no-deps + torchcodec block.

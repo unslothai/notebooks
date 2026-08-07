@@ -1,22 +1,8 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
-#     "accelerate",
-#     "bitsandbytes>=0.43.0",
-#     "datasets==4.3.0",
-#     "hf_transfer",
-#     "huggingface_hub>=0.34.0",
 #     "marimo",
-#     "peft",
-#     "protobuf",
-#     "sentencepiece",
-#     "torchao>=0.16.0",
-#     "torchcodec",
-#     "transformers==4.56.2",
-#     "triton>=3.2.0",
-#     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
+#     "sglang[all]==0.5.16",
 # ]
 #
 # [tool.uv]
@@ -111,6 +97,9 @@ def _():
     # every Jupyter kernel except molab's uses, refuses a command ending in `&`:
     #   OSError: Background processes not supported.
     # so on Kaggle, plain Jupyter or papermill this cell could never run at all.
+    # Attention backend left to sglang: `fa3` is Hopper (sm90) only, so it fails on
+    # the T4 / L4 / A100 a molab or Kaggle session actually hands out. sglang picks
+    # flashinfer on Ampere and Ada, and fa3 itself on Hopper.
     import subprocess, sys
     from sglang.utils import wait_for_server
 
@@ -121,8 +110,6 @@ def _():
             "sglang.launch_server",
             "--model-path",
             "unsloth/gemma-3n-E2B-it",
-            "--attention-backend",
-            "fa3",
             "--port",
             "8000",
         ],

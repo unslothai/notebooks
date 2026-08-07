@@ -10,7 +10,7 @@
 # 
 # To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 # 
-# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & [how to save it](#Save)
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
 
 # ### News
 
@@ -46,7 +46,7 @@
 # get_ipython().system('git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e "python[all]"')
 # sys.path.append(f'{os.getcwd()}/sglang/')
 # sys.path.append(f'{os.getcwd()}/sglang/python')
-# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" torchcodec')
+# get_ipython().system('uv pip install --system -qqq "sglang[all]==0.5.16" sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" torchcodec')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # 
 # 
@@ -123,7 +123,6 @@ def process_image(image: ImageFile) -> str:
 
 
 # ## Gemma3n Inference using sglang (source model: https://huggingface.co/unsloth/gemma-3n-E2B-it)
-# 
 
 # ## Inference 1
 # Image source file "https://raw.githubusercontent.com/sgl-project/sglang/refs/heads/main/test/lang/example_image.png"
