@@ -585,6 +585,12 @@ installation_gemma3n_content += gemma3n_extra_content
 installation_gemma3n_kaggle_content = installation_kaggle_content
 installation_gemma3n_kaggle_content += gemma3n_extra_content
 
+# transformers 5.x needs hub >=1.5.0, 4.x needs <1.0, and the `--no-deps` pin
+# below means pip never enforces it: the `huggingface_hub>=0.34.0` floor is
+# already satisfied by Colab's preinstalled 0.36.2, so the next import dies.
+# Its own line, outside the Colab branch, because a local `pip install unsloth`
+# pulls a 4.x-era hub and the same `--no-deps` swaps transformers out from it.
+#
 # Gemma 4 needs transformers==5.5.0 (with --no-deps), torchcodec, and
 # torch._dynamo recompile_limit. Do NOT go through update_or_append_pip_install
 # here because Gemma 4 must not get the default transformers==4.56.2 pin or
@@ -603,6 +609,7 @@ else:
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"
+!pip install "huggingface_hub>=1.5.0,<2.0"
 !pip install torchcodec
 import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 
@@ -627,6 +634,7 @@ else:
     !pip install --no-deps --upgrade git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.11.0 "tokenizers>=0.22.0,<=0.23.0"
+!pip install "huggingface_hub>=1.5.0,<2.0"
 import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 
 installation_diffusiongemma_kaggle_content = installation_diffusiongemma_content
@@ -675,7 +683,7 @@ import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 
 installation_amd_extras_gemma4 = """\
 # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
-!uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
+!uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
 """
 
 # Gemma 4 12B needs transformers >= 5.10.1 (newer than the other Gemma 4 sizes).

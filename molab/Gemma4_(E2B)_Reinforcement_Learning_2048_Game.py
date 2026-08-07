@@ -2,6 +2,7 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
+#     "huggingface_hub>=1.5.0,<2.0",
 #     "marimo",
 #     "timm",
 #     "tokenizers>=0.22.0,<=0.23.0",
