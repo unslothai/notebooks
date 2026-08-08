@@ -45,11 +45,18 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 NB_DIR = REPO_ROOT / "nb"
 
 # Known offenders, with the PR that fixes each and the exact command allowed.
-# The command matters: skipping the whole notebook on a name match would hide a
-# second backgrounded command added to that same notebook. A new one must fail
+# The command matters, and it is compared whole rather than by a substring:
+# skipping on a name match would hide a second backgrounded command added to
+# that same notebook, and skipping on a marker like `sglang.launch_server`
+# would hide a second backgrounded *sglang* command just as thoroughly, plus
+# it would keep passing if this command itself were edited. A new one must fail
 # rather than be added here; this list only exists so the check can land before
 # the other fix does, and it should be emptied when that PR merges.
-_SGLANG = ("unslothai/notebooks#317", "sglang.launch_server")
+_SGLANG = (
+    "unslothai/notebooks#317",
+    "!nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it"
+    " --attention-backend fa3 --port 8000 > sglang.log &",
+)
 KNOWN = {
     "Gemma3N_(2B)-Inference.ipynb": _SGLANG,
     "Kaggle-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
@@ -86,8 +93,16 @@ def _backgrounded(path):
         for command in _shell_commands("".join(cell.get("source", []))):
             # `[^&]&` so `a && b`, which is not backgrounding, does not match.
             if re.search(r"[^&]&\s*$", command):
-                found.append(command[:120])
+                # Whole, not truncated: KNOWN compares the command exactly, and
+                # the sglang line is 125 characters, so a 120-character clip
+                # would never equal its entry.
+                found.append(command)
     return found
+
+
+def _for_message(commands):
+    """Shortened only for the failure text, never for comparison."""
+    return [c if len(c) <= 120 else c[:117] + "..." for c in commands]
 
 
 _NOTEBOOKS = sorted(NB_DIR.glob("*.ipynb")) if NB_DIR.is_dir() else []
@@ -99,12 +114,12 @@ def test_no_notebook_backgrounds_a_shell_command(path):
     if path.name in KNOWN:
         # Only the one command already accounted for. Anything else in this
         # notebook is a new regression and still has to fail here.
-        pr, marker = KNOWN[path.name]
-        found = [command for command in found if marker not in command]
+        pr, allowed = KNOWN[path.name]
+        found = [command for command in found if command != allowed]
         if not found:
             pytest.skip(f"known, fixed by {pr}")
     assert not found, (
-        f"{path.name} ends a `!` command with `&`: {found}. "
+        f"{path.name} ends a `!` command with `&`: {_for_message(found)}. "
         f"ipykernel raises OSError on that, so the cell cannot run outside "
         f"Colab. Use subprocess.Popen"
     )
@@ -113,18 +128,46 @@ def test_no_notebook_backgrounds_a_shell_command(path):
 def test_the_known_list_still_describes_reality():
     """A name that no longer offends must leave the list, or it hides the next
     regression in that notebook."""
-    stale = [name for name, (_pr, marker) in KNOWN.items()
+    stale = [name for name, (_pr, allowed) in KNOWN.items()
              if (NB_DIR / name).is_file()
-             and not [c for c in _backgrounded(NB_DIR / name) if marker in c]]
-    assert not stale, f"fixed, so remove from KNOWN: {stale}"
+             and allowed not in _backgrounded(NB_DIR / name)]
+    assert not stale, f"fixed or edited, so update KNOWN: {stale}"
 
 
 def test_a_second_offender_in_a_known_notebook_is_not_hidden():
     """The name match used to skip the whole notebook, so another backgrounded
     command added beside the sglang one would never be reported."""
-    name, (_pr, marker) = next(iter(KNOWN.items()))
+    name, (_pr, allowed) = next(iter(KNOWN.items()))
     commands = _backgrounded(NB_DIR / name) + ["!python other_server.py &"]
-    assert [c for c in commands if marker not in c] == ["!python other_server.py &"]
+    assert [c for c in commands if c != allowed] == ["!python other_server.py &"]
+
+
+def test_a_second_sglang_command_is_not_hidden():
+    """A substring marker like `sglang.launch_server` would filter this one out
+    too, and the notebook would go on skipping instead of reporting it."""
+    name, (_pr, allowed) = next(iter(KNOWN.items()))
+    second = "!nohup python -m sglang.launch_server --port 8001 > two.log &"
+    commands = _backgrounded(NB_DIR / name) + [second]
+    assert [c for c in commands if c != allowed] == [second]
+
+
+def test_editing_the_grandfathered_command_is_reported():
+    """The entry pins one command, so changing it, even by a flag, has to fail
+    rather than stay silently grandfathered."""
+    _name, (_pr, allowed) = next(iter(KNOWN.items()))
+    edited = allowed.replace("--port 8000", "--port 8001")
+    assert edited != allowed
+    assert [c for c in [edited] if c != allowed] == [edited]
+
+
+def test_the_known_command_survives_extraction_whole():
+    """It is 125 characters. The scan used to clip at 120, which would have made
+    every exact comparison here fail open into a hard error or a false report."""
+    _name, (_pr, allowed) = next(iter(KNOWN.items()))
+    assert len(allowed) > 120
+    for name in KNOWN:
+        if (NB_DIR / name).is_file():
+            assert allowed in _backgrounded(NB_DIR / name)
 
 
 def test_a_double_ampersand_is_not_backgrounding():
