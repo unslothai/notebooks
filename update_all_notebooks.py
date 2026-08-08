@@ -5871,12 +5871,18 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
     return sorted(list(only_in_nb))
 
 
-def remove_unwanted_section(script_content):
-    start_marker = "# ### Installation"
-    end_marker = "# ### Unsloth"
+# Any heading depth. A template exports `# ### Installation`, but a hand-maintained
+# `nb/` source exports `# # Installation`, and that one word of difference left the
+# install cells live in the .py, where `get_ipython()` is not defined.
+_RE_SCRIPT_INSTALL_HEADING = re.compile(r"^# #+ Installation\b", re.MULTILINE)
+_RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 
-    start_index = script_content.find(start_marker)
-    end_index = script_content.find(end_marker)
+
+def remove_unwanted_section(script_content):
+    start_match = _RE_SCRIPT_INSTALL_HEADING.search(script_content)
+    start_index = -1 if start_match is None else start_match.start()
+    end_match = _RE_SCRIPT_UNSLOTH_HEADING.search(script_content)
+    end_index = -1 if end_match is None else end_match.start()
 
     if start_index != -1 and end_index != -1 and start_index < end_index:
         before_section = script_content[:start_index]

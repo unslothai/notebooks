@@ -185,3 +185,53 @@ def test_the_first_cell_still_uses_the_wider_test(gen):
 
 def _cell_text(cell):
     return "".join(cell["source"])
+
+
+# --- the exported script's install block, at whatever heading depth ----------
+
+
+_SCRIPT_BODY = (
+    "#!/usr/bin/env python\n"
+    "# coding: utf-8\n"
+    "\n"
+    "{heading}\n"
+    "# We'll be using Unsloth to do RL.\n"
+    "\n"
+    "# In[ ]:\n"
+    "\n"
+    "\n"
+    "get_ipython().system('uv pip install --system -qqq unsloth')\n"
+    "\n"
+    "\n"
+    "# ### Unsloth\n"
+    "\n"
+    "from unsloth import FastLanguageModel\n"
+)
+
+
+@pytest.mark.parametrize(
+    "heading",
+    ["# ### Installation", "# ## Installation", "# # Installation"],
+)
+def test_the_install_block_is_commented_at_any_heading_depth(gen, heading):
+    """A template exports `# ### Installation`; a hand-maintained `nb/` source
+    exports `# # Installation`. Only the first was matched, so the AMD script kept
+    live `get_ipython()` calls that raise NameError under plain python, before the
+    model setup the script exists to run."""
+    out = gen.remove_unwanted_section(_SCRIPT_BODY.format(heading = heading))
+    live = [line for line in out.splitlines() if line.startswith("get_ipython")]
+    assert live == [], f"install calls still executable under {heading!r}: {live}"
+    assert "# get_ipython().system(" in out, "the call was dropped rather than commented"
+
+
+def test_the_code_after_the_unsloth_heading_is_untouched(gen):
+    """Only the install section is commented. Commenting past the end marker would
+    silently disable the script."""
+    out = gen.remove_unwanted_section(_SCRIPT_BODY.format(heading = "# # Installation"))
+    assert "\nfrom unsloth import FastLanguageModel\n" in out
+
+
+def test_a_script_with_no_install_section_is_returned_unchanged(gen):
+    """No markers, nothing to comment. It must not comment the whole file."""
+    body = "#!/usr/bin/env python\nfrom unsloth import FastLanguageModel\n"
+    assert gen.remove_unwanted_section(body) == body
