@@ -416,42 +416,21 @@ _MOLAB_PER_NOTEBOOK_RELAX: dict[str, dict[str, str]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Runtime-templated install specs
-# ---------------------------------------------------------------------------
-# Some install cells pick their pins at runtime and hand them to pip through an
-# IPython ``{var}`` expansion instead of a literal spec.  The Granite 4.0 /
-# Nemotron Nano cells are the current example::
+# Runtime-templated install specs.
 #
-#     if _cc >= 10:   # Blackwell
-#         _torch = f"torch=={_t.__version__.split('+')[0]}"
-#         _mamba, _conv = "mamba_ssm==2.3.2.post1", "causal_conv1d==1.6.2.post1"
-#     else:
-#         _torch, _mamba, _conv = "torch==2.7.1", "mamba_ssm==2.2.5", "causal_conv1d==1.5.2"
-#     !uv pip install -qqq {_torch} ...
-#     !uv pip install --no-build-isolation {_mamba} {_conv}
-#
-# A PEP 723 header is static and cannot carry that branch, so molab has to
-# resolve each variable to exactly ONE arm.  The two tables below are that
-# decision, written out per variable:
-#
-#   ``_TEMPLATE_STATIC_SPECS``    variable -> the PEP 508 spec molab pins it to.
-#   ``_TEMPLATE_NO_STATIC_SPEC``  variable -> why it has no static resolution
-#                                 and is dropped from the header instead.
-#
-# Every ``{var}`` used by a pip line in a molab-targeted install cell MUST be
-# listed in exactly one of the two.  ``tests/test_molab_templated_pins.py``
-# fails on any variable that is in neither, so a new runtime-computed pin can
-# never silently disappear from a generated header the way torch 2.7.1 /
-# mamba_ssm / causal_conv1d did.
+# An install cell can compute a pin at runtime and pass it to pip as an IPython
+# ``{var}`` expansion (Granite 4.0 / Nemotron Nano branch on compute capability
+# to set {_torch}, {_mamba}, {_conv}).  A PEP 723 header is static, so molab
+# must resolve each variable to exactly one arm: _TEMPLATE_STATIC_SPECS gives
+# the spec to pin, _TEMPLATE_NO_STATIC_SPEC the reason for dropping it instead.
+# Every {var} must be in exactly one table; test_molab_templated_pins.py fails
+# on any that is in neither, so a new pin cannot silently vanish from a header
+# the way torch 2.7.1 / mamba_ssm / causal_conv1d did.
 _TEMPLATE_STATIC_SPECS: dict[str, str] = {
-    # Granite 4.0 and Nemotron Nano are Mamba hybrids: without mamba_ssm and
-    # causal_conv1d, or with those kernels built against an unpinned torch,
-    # the model does not run.  The cell's Blackwell arm exists only to avoid a
-    # ~30 minute source build on sm_100 / sm_120, where the torch 2.7.1 wheels
-    # have no kernels; every other GPU class takes the prebuilt fast path.
-    # molab resolves to that non-Blackwell arm, which is also exactly what the
-    # generated headers carried before the branch was introduced.
+    # Granite 4.0 and Nemotron Nano are Mamba hybrids and need mamba_ssm plus
+    # causal_conv1d built against a pinned torch.  The cell's Blackwell arm
+    # only avoids a ~30 minute source build on sm_100 / sm_120; molab takes the
+    # prebuilt non-Blackwell arm, which is what the headers carried all along.
     "_torch": "torch==2.7.1",
     "_mamba": "mamba_ssm==2.2.5",
     "_conv": "causal_conv1d==1.5.2",
@@ -491,33 +470,26 @@ _TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
     ),
 }
 
-# A whole pip token that is nothing but one ``{var}`` expansion, e.g.
-# ``{_torch}``.  Surrounding shell quotes are already stripped by
-# ``_split_args``; ``strip('"\'')`` is belt-and-braces for hand-written cells.
+# A pip token that is nothing but one expansion, e.g. ``{_torch}``. Quotes are
+# already stripped by ``_split_args``; the strip() is for hand-written cells.
 _RE_WHOLE_TEMPLATE_TOKEN = re.compile(r"^\{([A-Za-z_]\w*)\}$")
 
-# Any ``{var}`` expansion anywhere inside a pip token — also matches the
-# embedded form ``torchao=={_qat_torchao}``.
+# Any expansion inside a token, including the embedded ``torchao=={_qat_torchao}``.
 _RE_TEMPLATE_VAR = re.compile(r"\{([A-Za-z_]\w*)\}")
 
 
 def template_var_names(token: str) -> list[str]:
-    """Return the ``{var}`` names an install-cell pip token expands.
-
-    ``"{_torch}"`` -> ``["_torch"]``; ``"torchao=={_qat_torchao}"`` ->
-    ``["_qat_torchao"]``; a token with no expansion -> ``[]``.
-    """
+    """``"torchao=={_qat_torchao}"`` -> ``["_qat_torchao"]``; no expansion -> ``[]``."""
     return _RE_TEMPLATE_VAR.findall(token)
 
 
 def resolve_template_spec(token: str) -> Optional[str]:
     """Static PEP 508 spec for a whole-token ``{var}`` expansion, or ``None``.
 
-    Only a token that is *entirely* one expansion resolves: the mapping is
-    variable -> full spec, so substituting it into a partially-literal token
-    like ``torchao=={_qat_torchao}`` would produce nonsense.  Those (and every
-    variable in ``_TEMPLATE_NO_STATIC_SPEC``) return ``None`` and are dropped
-    with a reason by the caller.
+    Only a token that is *entirely* one expansion resolves, since the mapping is
+    variable -> full spec. A partially-literal token like
+    ``torchao=={_qat_torchao}``, and every variable in
+    ``_TEMPLATE_NO_STATIC_SPEC``, returns ``None`` and is dropped with a reason.
     """
     m = _RE_WHOLE_TEMPLATE_TOKEN.match(token.strip().strip("\"'"))
     if m is None:
@@ -528,9 +500,8 @@ def resolve_template_spec(token: str) -> Optional[str]:
 def template_drop_reason(token: str) -> Optional[str]:
     """The registered reason a templated ``token`` carries no static spec.
 
-    Returns ``None`` when no variable in the token is registered in
-    ``_TEMPLATE_NO_STATIC_SPEC`` — i.e. the token is unknown to the planner
-    and the templated-pin test should fail on it.
+    ``None`` means no variable in it is in ``_TEMPLATE_NO_STATIC_SPEC``: the
+    token is unknown to the planner and the templated-pin test fails on it.
     """
     for name in template_var_names(token):
         reason = _TEMPLATE_NO_STATIC_SPEC.get(name)
@@ -542,9 +513,8 @@ def template_drop_reason(token: str) -> Optional[str]:
 def iter_templated_tokens(nb_path: Path) -> list[str]:
     """Every ``{var}``-bearing pip token in ``nb_path``'s install cells.
 
-    Tokens come back in source order, duplicates included, exactly as
-    :func:`plan_dependencies` sees them.  Public so the templated-pin test can
-    enumerate them through the real tokenizer instead of re-implementing it.
+    Source order, duplicates included, exactly as :func:`plan_dependencies`
+    sees them. Public so the templated-pin test uses the real tokenizer.
     """
     tokens: list[str] = []
     for cell_src in extract_install_cells(nb_path):
@@ -605,9 +575,8 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                 ))
                 continue
 
-            # A templated spec resolves through _TEMPLATE_STATIC_SPECS and is
-            # then treated like a literal, or is dropped with its registered
-            # _TEMPLATE_NO_STATIC_SPEC reason.  See both tables above.
+            # Resolve through _TEMPLATE_STATIC_SPECS and treat as a literal, or
+            # drop with the registered _TEMPLATE_NO_STATIC_SPEC reason.
             for tok in parsed.templated:
                 static_spec = resolve_template_spec(tok)
                 if static_spec is not None:

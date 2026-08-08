@@ -18,14 +18,12 @@
 
 """The AMD composer must resolve the runtime-templated kernel pins.
 
-The Colab install cell picks mamba_ssm / causal_conv1d at runtime from the
-GPU's compute capability, so what the AMD composer receives is `{_mamba}` and
-`{_conv}`, not a spec. `_package_key_from_install_token` refuses any token
-starting with `{`, so an unresolved variable keys to nothing and
-`_extract_install_package_groups` drops it: the whole
-`--no-build-isolation` group disappears and the AMD notebook ships with no
-mamba_ssm at all. `_AMD_VARIABLE_PACKAGE_FALLBACKS` is where that resolution
-lives.
+The Colab cell picks mamba_ssm / causal_conv1d from the GPU's compute
+capability, so the composer receives `{_mamba}` / `{_conv}`, not a spec.
+`_package_key_from_install_token` refuses any token starting with `{`, so an
+unresolved variable keys to nothing, `_extract_install_package_groups` drops
+the whole `--no-build-isolation` group, and the AMD notebook ships without
+mamba_ssm. `_AMD_VARIABLE_PACKAGE_FALLBACKS` holds that resolution.
 """
 
 from __future__ import annotations

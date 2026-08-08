@@ -2610,16 +2610,15 @@ _AMD_VARIABLE_PACKAGE_FALLBACKS = {
     "{_numpy}": "numpy",
     "{_pil}": "pillow",
     "{xformers}": "xformers",
-    # The Nemotron/Granite cell picks these at runtime from the compute
-    # capability, so what reaches the AMD composer is the variable, not a spec.
-    # Unresolved it keys to nothing and the whole --no-build-isolation group is
-    # dropped, which leaves the AMD notebook with no mamba_ssm at all. ROCm
-    # never gets the torch 2.7.1 CUDA wheel the 2.2.5/1.5.2 pair is built for,
-    # so the AMD recipe resolves to the newer pair unconditionally.
+    # The Nemotron/Granite cell picks these at runtime, so the AMD composer
+    # sees the variable, not a spec; unresolved it keys to nothing and the
+    # whole --no-build-isolation group goes, leaving no mamba_ssm at all. ROCm
+    # never gets the torch 2.7.1 CUDA wheel 2.2.5/1.5.2 is built for, so AMD
+    # takes the newer pair unconditionally.
     "{_mamba}": "mamba_ssm==2.3.2.post1",
     "{_conv}": "causal_conv1d==1.6.2.post1",
-    # torch itself is owned by the ROCm bootstrap and is already ignored; name
-    # it anyway so the variable is never emitted literally into a %%bash cell.
+    # torch is owned by the ROCm bootstrap and already ignored; named anyway so
+    # the variable is never emitted literally into a %%bash cell.
     "{_torch}": "torch",
 }
 

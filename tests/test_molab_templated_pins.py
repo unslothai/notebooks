@@ -13,24 +13,19 @@
 
 """Runtime-templated install-pin gate.
 
-A ``nb/*.ipynb`` install cell may compute a pin at runtime and hand it to pip
-through an IPython ``{var}`` expansion instead of a literal spec — for example
-the Granite 4.0 / Nemotron Nano cells, which pick ``torch==2.7.1`` +
-``mamba_ssm==2.2.5`` + ``causal_conv1d==1.5.2`` on everything up to sm_90 and a
-newer trio on Blackwell.  ``scripts/molab_generate.py`` drops the install cell
-entirely and rebuilds the PEP 723 header from
-``molab_dependencies.plan_dependencies``, so any ``{var}`` the planner does not
-know about vanishes from the generated header with no diagnostic.  That is how
-those three pins were silently lost from four molab notebooks.
+An install cell may compute a pin at runtime and pass it to pip as an IPython
+``{var}`` expansion (Granite 4.0 / Nemotron Nano branch on compute capability).
+``scripts/molab_generate.py`` drops the install cell and rebuilds the PEP 723
+header from ``molab_dependencies.plan_dependencies``, so a ``{var}`` the planner
+does not know vanishes with no diagnostic -- that is how torch 2.7.1,
+mamba_ssm and causal_conv1d were lost from four molab notebooks.
 
-This module is the gate against a repeat.  Two obligations:
+Two obligations:
 
 1. Every ``{var}`` a molab-targeted install cell feeds to pip is registered in
-   ``molab_dependencies`` — either with a static PEP 508 spec
-   (``_TEMPLATE_STATIC_SPECS``) or with an explicit reason for having none
-   (``_TEMPLATE_NO_STATIC_SPEC``).  A new unregistered variable fails here.
-2. A variable that IS registered with a static spec actually reaches
-   ``plan.dependencies``.
+   ``molab_dependencies``, with a static spec (``_TEMPLATE_STATIC_SPECS``) or a
+   reason for having none (``_TEMPLATE_NO_STATIC_SPEC``).
+2. A variable registered with a static spec reaches ``plan.dependencies``.
 
 Static only: no torch, no GPU, no marimo.
 """
