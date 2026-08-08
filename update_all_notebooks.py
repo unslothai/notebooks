@@ -5810,8 +5810,6 @@ def _restore_news_section(amd_path, template_path, new_announcement):
     the announcement that the template path produces. News is generator-owned
     boilerplate, not hand-tuned content, so it still comes from the template.
     """
-    if not os.path.isfile(template_path):
-        return False
     try:
         with open(template_path, "r", encoding="utf-8", newline="") as f:
             template_cells = json.load(f)["cells"]
