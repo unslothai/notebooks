@@ -681,6 +681,14 @@ installation_amd_extras_grpo = """\
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 """
 
+# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off, so
+# unsloth.kernels.moe.autotune_cache returns its heuristic configs instead of
+# searching per device capability. The CUDA sources they are minted from have
+# never carried it, so it has to live here or a regeneration drops it.
+installation_amd_extras_qwen3_moe = """\
+import os; os.environ["UNSLOTH_MOE_DISABLE_AUTOTUNE"] = "1"
+"""
+
 installation_amd_extras_gemma4 = """\
 # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
 !uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
@@ -2980,6 +2988,14 @@ def _extract_variant_header(variant_extras):
     return out
 
 
+def _is_qwen3_moe_path(notebook_path):
+    """The Qwen3.5/3.6 MoE pair, not the Qwen3.5 Vision notebooks beside them."""
+    lowered = os.path.basename(notebook_path).lower()
+    return "moe" in lowered and is_path_contains_any(
+        lowered, ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6"]
+    )
+
+
 def _compose_amd_installation(notebook_path, source_install_texts):
     """Build the AMD install cell(s) while preserving notebook-specific packages.
 
@@ -3006,6 +3022,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
             variant_extras = installation_amd_extras_gemma4_12b
         else:
             variant_extras = installation_amd_extras_gemma4
+    elif _is_qwen3_moe_path(notebook_path):
+        variant_extras = installation_amd_extras_qwen3_moe
     elif _is_amd_grpo_like_path(notebook_path) and "vllm" in source_install_blob:
         variant_extras = installation_amd_extras_grpo
     elif is_path_contains_any(lowered, ["llasa"]):
@@ -5782,6 +5800,59 @@ def copy_and_update_notebooks(
     _rmtree_robust(temp_location)
 
 
+def _has_news_section(cells):
+    return any(
+        cell.get("cell_type") == "markdown" and _cell_source_text(cell).strip() == "### News"
+        for cell in cells
+    )
+
+
+def _news_insert_index(cells):
+    """Where the template path keeps News: above Installation, below the intro."""
+    for index, cell in enumerate(cells):
+        if cell.get("cell_type") != "markdown":
+            continue
+        if _is_installation_heading(_cell_source_text(cell), True):
+            return index
+    for index, cell in enumerate(cells):
+        if cell.get("cell_type") == "markdown":
+            return index + 1
+    return len(cells)
+
+
+def _restore_news_section(amd_path, template_path, new_announcement):
+    """Give an nb/-sourced AMD notebook the News section its template carries.
+
+    Hand-maintained `nb/` notebooks have no News cells -- only `original_template/`
+    does -- so minting the AMD variant from `nb/` dropped the `### News` heading and
+    the announcement that the template path produces. News is generator-owned
+    boilerplate, not hand-tuned content, so it still comes from the template.
+    """
+    try:
+        with open(template_path, "r", encoding="utf-8", newline="") as f:
+            template_cells = json.load(f)["cells"]
+        with open(amd_path, "r", encoding="utf-8", newline="") as f:
+            notebook_content = json.load(f)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError):
+        return False
+
+    cells = notebook_content.get("cells", [])
+    if not _has_news_section(template_cells) or _has_news_section(cells):
+        return False
+
+    index = _news_insert_index(cells)
+    cells[index:index] = [
+        {"cell_type": "markdown", "metadata": {}, "source": _source_lines("### News")},
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": _source_lines(new_announcement.strip()),
+        },
+    ]
+    _write_notebook(amd_path, notebook_content)
+    return True
+
+
 def copy_and_update_amd_notebooks(
     template_dir,
     destination_dir,
@@ -5845,6 +5916,15 @@ def copy_and_update_amd_notebooks(
         shutil.copyfile(template_notebook_path, amd_destination_path)
         _set_file_permissions(amd_destination_path)
         _cache_notebook_format(amd_destination_path)
+        sourced_from_template = os.path.normpath(
+            os.path.dirname(template_notebook_path)
+        ) == os.path.normpath(template_dir)
+        if not sourced_from_template:
+            _restore_news_section(
+                amd_destination_path,
+                os.path.join(template_dir, notebook_name),
+                new_announcement,
+            )
         update_notebook_sections(
             amd_destination_path,
             general_announcement,
@@ -5871,12 +5951,26 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
     return sorted(list(only_in_nb))
 
 
-def remove_unwanted_section(script_content):
-    start_marker = "# ### Installation"
-    end_marker = "# ### Unsloth"
+# Any heading depth. A template exports `# ### Installation`, but a hand-maintained
+# `nb/` source exports `# # Installation`, and that one word of difference left the
+# install cells live in the .py, where `get_ipython()` is not defined.
+_RE_SCRIPT_INSTALL_HEADING = re.compile(r"^# #+ Installation\b", re.MULTILINE)
+_RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 
-    start_index = script_content.find(start_marker)
-    end_index = script_content.find(end_marker)
+
+def remove_unwanted_section(script_content):
+    start_match = _RE_SCRIPT_INSTALL_HEADING.search(script_content)
+    start_index = -1 if start_match is None else start_match.start()
+    # From the Installation heading onwards, never from the top. Several
+    # notebooks open on an intro `# Unsloth` heading -- `Falcon_H1_(0.5B)-Alpaca`
+    # has one at offset 39 -- and matching that as the terminator puts the end
+    # before the start, which discards the range and leaves the install cells
+    # live. The old three-hash literal missed the intro by accident.
+    end_match = (
+        None if start_match is None
+        else _RE_SCRIPT_UNSLOTH_HEADING.search(script_content, start_match.end())
+    )
+    end_index = -1 if end_match is None else end_match.start()
 
     if start_index != -1 and end_index != -1 and start_index < end_index:
         before_section = script_content[:start_index]
