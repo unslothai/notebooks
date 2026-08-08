@@ -262,3 +262,45 @@ def test_both_the_create_and_the_rebuild_requests_are_seen():
         'subprocess.run(["uv", "venv", "--python", _GYM_PYTHON, "--clear"])\n'
     )
     assert _python_requests(source) == [">=3.13.14", ">=3.13.14"]
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_uv_is_refreshed_before_the_interpreter_is_requested(path):
+    """Colab ships a uv whose embedded download list predates every 3.13.14
+    build, so `>=3.13.14` matches nothing and the venv step dies with
+
+        error: No interpreter found for Python 3.13.14 in managed installations
+        or search path
+
+    Observed on a real Colab L4 after the specifier landed. uv's own hint says
+    to update it, so the notebook does that first."""
+    source = _setup_source(path)
+    assert "_refresh_uv()" in source, f"{path.name} never refreshes uv"
+    before, _, after = source.partition("_refresh_uv()\n")
+    # The call must precede every `uv venv`, or the stale uv is what answers.
+    assert '"uv", "venv"' not in before, (
+        f"{path.name} asks for an interpreter before refreshing uv"
+    )
+    assert '"uv", "venv"' in after, f"{path.name} never creates the venv"
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_the_uv_refresh_has_a_pip_fallback(path):
+    """`uv self update` is refused by a pip-installed uv, which is how some
+    images ship it. One path alone leaves those images unrepaired."""
+    source = _setup_source(path)
+    assert '"self", "update"' in source, f"{path.name}: no standalone update path"
+    assert "pip" in source.split("_refresh_uv", 1)[1][:800], (
+        f"{path.name}: no pip fallback beside the self update"
+    )
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_the_refresh_cannot_abort_the_cell(path):
+    """A refresh that raises would break images where uv is already current and
+    `self update` legitimately fails. The venv step reports the real problem."""
+    source = _setup_source(path)
+    body = source.split("def _refresh_uv():", 1)[1].split("_refresh_uv()", 1)[0]
+    assert "check = True" not in body and "check=True" not in body, (
+        f"{path.name}: the uv refresh can abort the cell"
+    )

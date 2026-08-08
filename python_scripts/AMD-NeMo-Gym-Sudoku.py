@@ -89,6 +89,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 
 
 import subprocess
+import sys
 import os
 import time
 import atexit
@@ -119,6 +120,29 @@ if not os.path.exists(GYM_DIR):
 # whatever they declare next. `--python 3.13` is NOT enough: uv resolves it to
 # the newest 3.13 it has, which was 3.13.8 here, still under the floor.
 _GYM_PYTHON = ">=3.13.14"
+
+# Refresh uv before asking it for that interpreter. Colab ships a uv whose
+# embedded download list predates every 3.13.14 build, so the request matches
+# nothing at all and the rebuild below fails with uv saying so itself:
+#   error: No interpreter found for Python 3.13.14 in managed installations
+#   or search path
+#   hint: uv embeds available Python downloads and may require an update to
+#   install new versions.
+# A standalone uv takes `self update`; a pip-installed one refuses that and
+# needs pip. Neither is fatal on its own, because the venv step reports the
+# real problem if uv is still too old afterwards.
+def _refresh_uv():
+    updated = subprocess.run(
+        ["uv", "self", "update"], capture_output = True, text = True,
+    )
+    if updated.returncode == 0:
+        return
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "--upgrade", "-qqq", "uv"],
+        capture_output = True, text = True,
+    )
+
+_refresh_uv()
 
 def _uv_sync():
     return subprocess.run(
