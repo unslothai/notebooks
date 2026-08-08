@@ -142,6 +142,12 @@ jobs:
         run: |
           python -m pytest tests/test_molab_templated_pins.py -q --tb=short
 
+      - name: tests/test_amd_templated_kernel_pins.py
+        # The same {var} expansion reaching the AMD composer, which refuses any
+        # token starting with `{` and so drops the whole install group.
+        run: |
+          python -m pytest tests/test_amd_templated_kernel_pins.py -q --tb=short
+
       - name: tests/test_molab_marimo_validity.py
         run: |
           python -m pytest tests/test_molab_marimo_validity.py -q --tb=short
