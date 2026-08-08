@@ -101,6 +101,7 @@ def _():
     import subprocess, sys
     from sglang.utils import wait_for_server
 
+    log = open("sglang.log", "w")
     server = subprocess.Popen(
         [
             sys.executable,
@@ -111,7 +112,7 @@ def _():
             "--port",
             "8000",
         ],
-        stdout=open("sglang.log", "w"),
+        stdout=log,
         stderr=subprocess.STDOUT,
     )
 
@@ -122,6 +123,15 @@ def _():
     try:
         wait_for_server("http://localhost:8000", timeout=900, process=server)
     except Exception:
+        # On the timeout path the server is still alive, and the kernel outlives the
+        # cell, so re-raising alone would leave it holding the GPU and port 8000 and
+        # the retry would fail on address-in-use rather than on the real problem.
+        server.terminate()
+        try:
+            server.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            server.kill()
+        log.close()
         # The server's own log is the only thing that says why it did not start.
         print(open("sglang.log").read()[-4000:])
         raise
