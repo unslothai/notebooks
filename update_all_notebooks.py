@@ -1220,6 +1220,22 @@ DONT_UPDATE_EXCEPTIONS = [
     "Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb",       # Custom Sudoku RL environment
 ]
 
+# Notebooks that get no AMD counterpart at all.
+#
+# `Gemma3N_(2B)-Inference` serves through sglang and does nothing else: every
+# code cell after the install imports sglang. sglang publishes no ROCm wheel.
+# 0.5.16 has `torch==2.11.0` and `sglang-kernel==0.4.5` in its base
+# dependencies, both CUDA-13 builds, so the Colab install line would drop a
+# CUDA torch on top of the ROCm one the bootstrap cell just installed. The
+# documented AMD path is a prebuilt `lmsysorg/sglang:v0.5.16-rocm*` image, or a
+# from-source `setup_rocm.py` compile of sgl-kernel for gfx942/gfx950 followed
+# by `pip install -e "python[all_hip]"` against a pyproject that is not the one
+# on PyPI. None of that is a pip line an install cell can carry, and with no
+# sglang there is nothing left in the notebook to run.
+AMD_SKIP_NOTEBOOKS = [
+    "Gemma3N_(2B)-Inference.ipynb",
+]
+
 # Notebooks that live ONLY under nb/ (not original_template/) but for which we
 # still want to mint AMD counterparts. They remain in DONT_UPDATE_EXCEPTIONS so
 # normal generation skips them; the AMD generator below explicitly sources them
@@ -2652,19 +2668,6 @@ def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
             f"Add a dedicated installation_* entry in the script."
         )
 
-# Packages whose Colab install must NOT be carried into the AMD recipe.
-#
-# sglang pins `torch==2.11.0` exactly. The ROCm bootstrap above installs torch
-# unpinned from download.pytorch.org/whl/<rocm tag>, and no tag this notebook
-# selects supplies that version: rocm6.0 tops out at 2.4.1, rocm6.1 at 2.6.0,
-# rocm6.2 at 2.5.1, rocm6.3 and rocm6.4 at 2.9.1, rocm7.0 at 2.10.0, rocm7.1
-# and rocm7.2 at 2.13.0. So pip satisfies the pin from default PyPI and the
-# CUDA build lands on top of the ROCm one, which is worse than not installing
-# sglang at all. A ROCm sglang recipe is a real question and wants ROCm
-# hardware to answer; it is not something to guess at here.
-_AMD_EXCLUDED_SOURCE_PACKAGES = {"sglang"}
-
-
 _AMD_INSTALL_PACKAGE_IGNORE = frozenset({
     "unsloth", "unsloth_zoo", "bitsandbytes", "cut_cross_entropy",
     "triton", "triton_rocm", "xformers", "torch", "torchvision", "torchaudio",
@@ -2676,9 +2679,7 @@ _AMD_INSTALL_PACKAGE_IGNORE = frozenset({
     # NVIDIA/Hopper TileLang backend deps; do not auto-propagate into ROCm
     # AMD notebooks. AMD users get a separate ROCm install path or skip.
     "apache_tvm_ffi", "apache-tvm-ffi", "tilelang", "torch_c_dlpack_ext",
-# Unioned rather than listed twice: a package the AMD recipe deliberately
-# leaves out must not then be reported as one it dropped by accident.
-}) | frozenset(_AMD_EXCLUDED_SOURCE_PACKAGES)
+})
 
 _AMD_VARIABLE_PACKAGE_FALLBACKS = {
     "{_vllm}": "vllm",
@@ -3053,10 +3054,6 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     def _merge_spec(flags, spec, *, lock=False):
         key = _package_key_from_install_token(spec)
         if not key:
-            return
-        # `lock` marks a variant-curated spec; only source-extracted ones are
-        # filtered, so an AMD variant can still ask for a package by name.
-        if not lock and key in _AMD_EXCLUDED_SOURCE_PACKAGES:
             return
         # Variant-seeded specs are sticky: source-extracted overrides never
         # replace them, even if the source spec parses to a higher tier under
@@ -5877,6 +5874,9 @@ def copy_and_update_amd_notebooks(
         nb_path = os.path.join(destination_dir, basename)
         if os.path.isfile(nb_path):
             source_notebooks[basename] = nb_path
+    # Last, so it overrides every seeding path above.
+    for basename in AMD_SKIP_NOTEBOOKS:
+        source_notebooks.pop(basename, None)
 
     amd_paths = []
     for notebook_name, template_notebook_path in sorted(source_notebooks.items()):

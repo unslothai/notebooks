@@ -664,7 +664,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **FunctionGemma** **(270M)** | Mobile Actions | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-Mobile-Actions.ipynb) |
 | **Gemma3N** **(4B)** | Multimodal | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Conversational.ipynb) |
 | **Gemma3N** **(4B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Audio.ipynb) |
-| **Gemma3N** **(2B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(2B)-Inference.ipynb) |
 | **LFM2.5** **(1.2B)** | DAPO Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-GRPO.ipynb) |
 | **LFM2.5** **(1.2B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Conversational.ipynb) |
 | **Gemma4** **(E2B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Text.ipynb) |
