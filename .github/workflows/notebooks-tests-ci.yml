@@ -6,8 +6,8 @@
 #   1. notebook-lint (HARD GATE, every PR, ~2-3 min, no torch installed)
 #      tests/test_notebook_json_validity.py
 #      tests/test_notebook_pin_consistency.py
-#      tests/test_notebook_amd_install_parity.py
 #      tests/test_nemo_gym_python_floor.py
+#      tests/test_notebook_amd_install_parity.py
 #      tests/test_python_scripts_regen_parity.py  (live nbconvert)
 #
 #   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
