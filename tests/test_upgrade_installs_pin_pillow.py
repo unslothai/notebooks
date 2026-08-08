@@ -99,7 +99,10 @@ def _pins_pillow(command, source):
     the upgrade resolves a fresh Pillow exactly as before.
 
     The pin is usually interpolated, so a placeholder counts only when the
-    notebook assigns that name something naming pillow.
+    notebook assigns that name an EXACT pin. `get_pil = "pillow"` is what these
+    notebooks fall back to when PIL is not importable, and passing that to an
+    `--upgrade` install resolves a fresh Pillow -- the failure itself, not a pin
+    of it. A range such as `pillow>=11` is no better.
     """
     if re.search(r"pillow\s*==", command, re.I):
         return True
@@ -113,7 +116,7 @@ def _pins_pillow(command, source):
         # catch. Caught by sabotage: dropping `{get_pil}` from the real notebook
         # left the suite green.
         assignment = re.search(
-            rf"\b{re.escape(name)}\s*=\s*[^\n;]*pillow", source, re.I
+            rf"\b{re.escape(name)}\s*=\s*[^\n;]*pillow\s*==", source, re.I
         )
         if assignment:
             return True
@@ -201,6 +204,40 @@ def test_a_placeholder_naming_something_else_does_not_count():
     command = "!uv pip install --upgrade {get_numpy} torchvision"
     source = 'get_numpy = f"numpy=={numpy.__version__}"\n' + command
     assert not _pins_pillow(command, source)
+
+
+@pytest.mark.parametrize(
+    "definition",
+    ['get_pil = "pillow"', "get_pil = 'pillow>=11.3.0'", 'get_pil = "Pillow"'],
+    ids=["unversioned", "range", "unversioned-capitalised"],
+)
+def test_a_placeholder_that_is_not_an_exact_pin_does_not_count(definition):
+    """`{get_pil}` in the command is only half of it. These notebooks already
+    carry `except: get_pil = "pillow"` for the case where PIL is not importable,
+    so the unversioned spelling is one deleted line away -- and passing it to an
+    `--upgrade` install beside torchvision resolves a newer Pillow, which is the
+    failure this gate exists to stop rather than a pin against it."""
+    command = "!uv pip install --upgrade {get_pil} torchvision"
+    assert not _pins_pillow(command, definition + "\n" + command)
+
+
+def test_the_real_fallback_line_does_not_hide_the_pinned_one():
+    """The notebook defines the name twice, pinned then unversioned:
+
+        try: import PIL; get_pil = f'pillow=={PIL.__version__}'
+        except: get_pil = "pillow"
+
+    The pinned assignment is what runs when PIL is loaded, which is exactly when
+    the mismatch can happen, so this must still count. Requiring the FIRST
+    assignment to be the pinned one would be a coin flip on source order."""
+    command = "!uv pip install --upgrade {get_pil} torchvision"
+    source = (
+        'except: get_pil = "pillow"\n'
+        + _DEFINES_PIL
+        + "\n"
+        + command
+    )
+    assert _pins_pillow(command, source)
 
 
 def test_one_unpinned_command_is_caught_beside_a_pinned_one():
