@@ -1739,10 +1739,9 @@ def validate_notebook_syntax(notebook_path):
 
 _RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
 _RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
-# A markdown heading that introduces a dependency install, e.g.
-# "### Install flash-linear-attention and causal-conv-1d". Deliberately not
-# `_RE_INSTALL_SECTION_MD`: that also matches "setup" and any position in the
-# line, which is how "### Setup the model" would qualify.
+# A heading introducing a dependency install, e.g. "### Install
+# flash-linear-attention". Not `_RE_INSTALL_SECTION_MD`, which also matches
+# "setup" anywhere in the line and so accepts "### Setup the model".
 _RE_DEPENDENCY_HEADING = re.compile(r"^#+\s*(?:\d+[.)]\s*)?install", re.IGNORECASE)
 
 
@@ -1824,12 +1823,12 @@ def _is_installation_heading(source_text, is_amd_notebook=False):
 def _adjacent_install_like_code_cells(cells, first_code_idx):
     """Install cells following `first_code_idx`, stepping over their headings.
 
-    A second install cell often gets its own markdown heading, and stopping at
-    the first non-code cell missed it: Qwen3_5_MoE and Qwen3_6_MoE put a
-    CUDA-wheel resolver behind "### Install flash-linear-attention and
-    causal-conv-1d", so it was never collected, survived into the AMD variant,
-    and `_assert_amd_install_runtime` then refused the whole `--amd` run. The
-    heading is returned with it, or it would be left pointing at nothing.
+    Stopping at the first non-code cell missed a second install cell behind its
+    own heading: Qwen3_5_MoE / Qwen3_6_MoE hid a CUDA-wheel resolver behind
+    "### Install flash-linear-attention and causal-conv-1d", which then
+    survived into the AMD variant and made `_assert_amd_install_runtime` refuse
+    the whole `--amd` run. The heading comes back too, or it would be left
+    pointing at nothing.
     """
     install_cells = []
     idx = first_code_idx + 1
@@ -1837,11 +1836,10 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
     while idx < len(cells):
         cell = cells[idx]
         if cell.get("cell_type") == "markdown":
-            # Only a dependency-install heading, and only right before an
-            # install cell. Any heading used to qualify, and the cell behind it
-            # then passed `_is_install_like_cell` on the strength of that
-            # heading alone: `### Start Unsloth Studio` collected the Studio
-            # launch code, which the caller deletes.
+            # Only a dependency-install heading. When any heading qualified,
+            # the cell behind it passed `_is_install_like_cell` on that alone,
+            # so `### Start Unsloth Studio` collected the Studio launch code,
+            # which the caller deletes.
             text = _cell_source_text(cell).strip()
             if len(text.splitlines()) > 1 or not _RE_DEPENDENCY_HEADING.match(text):
                 break
@@ -1853,10 +1851,10 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
         if cell.get("cell_type") != "code":
             break
         source_text = _cell_source_text(cell)
-        # After a heading, the cell must look like an install on its own
-        # content. `_is_install_like_cell` also answers yes on the strength of
-        # the preceding markdown, so a heading like "### Install the trainer"
-        # over ordinary code would qualify it, and the caller deletes both.
+        # Past the first cell, judge on the cell's own content:
+        # `_is_install_like_cell` also says yes for the preceding markdown, so
+        # "### Install the trainer" over ordinary code would qualify it and the
+        # caller would delete both.
         if pending_headings or install_cells:
             if not _is_install_code(source_text):
                 break
@@ -1893,9 +1891,8 @@ def _is_stale_amd_announcement(source_text):
     ):
         return True
     # A bare "Open in Colab" badge, which is how some hand-maintained notebooks
-    # open. It carries no "to run this, press", so the test above walked past it
-    # and the AMD variant kept a button pointing at the CUDA notebook, with no
-    # Dev Cloud header and no News section above it.
+    # open. With no "to run this, press" the test above walked past it and the
+    # AMD variant kept a button pointing at the CUDA notebook.
     stripped = source_text.strip()
     return (
         stripped.startswith("<a href=")
@@ -5827,9 +5824,9 @@ def copy_and_update_amd_notebooks(
             continue
         source_notebooks.setdefault(basename, path)
     # For DONT_UPDATE_EXCEPTIONS, nb/ is the source of truth and the template
-    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` sits at
-    # weight_decay 0.1 under nb/ and 0.001 under original_template/. Sourcing
-    # from the template gave the AMD variant hyperparameters nobody chose.
+    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` is weight_decay 0.1
+    # under nb/ and 0.001 under original_template/, so sourcing from the
+    # template gave the AMD variant hyperparameters nobody chose.
     for basename in DONT_UPDATE_EXCEPTIONS:
         if basename not in amd_base_names:
             continue

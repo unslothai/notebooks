@@ -19,16 +19,14 @@
 """A name live code reads must be bound by live code, not only by `if False:`.
 
 `Gemma4_(12B)_Audio` loaded with `model, tokenizer = FastModel.from_pretrained`
-and then called `processor` everywhere: the inference helper, the trainer's
-`processing_class` and collator, the save and reload cells. `processor` was
-bound in exactly one place, inside the `if False:` reload block, so the trainer
-cell could only ever raise `NameError: name 'processor' is not defined`. Its two
+then called `processor` everywhere -- inference helper, `processing_class`,
+collator, save and reload cells -- while binding it in exactly one place, the
+`if False:` reload block. Every use could only raise `NameError`. Its two
 sibling audio notebooks bind `model, processor`; that one was the odd one out.
 
-A bound-nowhere check cannot see this, which is why it survived: the name IS
-bound, just unreachably. The rule here is deliberately narrow -- flag only a
-name that is bound SOMEWHERE and never in live code. That the author wrote the
-binding is what makes the placement a mistake rather than a missing import.
+A bound-nowhere check misses it: the name IS bound, just unreachably. So the
+rule is narrow, flagging only a name bound SOMEWHERE and never in live code --
+the author writing the binding is what makes it a placement mistake.
 """
 
 import ast
@@ -78,8 +76,8 @@ def _scope_body(node):
 
     A comprehension is one too in Python 3: its target does not escape, so
     `[processor for processor in items]` must not answer a later
-    `use(processor)`. Its outermost iterable is the exception, evaluated in the
-    enclosing scope, so the caller pushes that there instead.
+    `use(processor)`. Its outermost iterable is evaluated in the enclosing
+    scope, so the caller pushes that there instead.
     """
     if isinstance(node, _COMPREHENSIONS):
         parts = [node.key, node.value] if isinstance(node, ast.DictComp) else [node.elt]
@@ -95,20 +93,20 @@ def _scope_body(node):
 def _analyse_scope(node, dead):
     """(live_binds, dead_binds, free_loads, offenders, escaping_binds) for one scope.
 
-    Nested bodies are recursed into as their own scopes rather than unioned in.
-    One flat set let an unrelated local -- a helper's `processor` parameter,
-    say -- stand in for the module-level binding, hiding the exact break this
-    file exists to catch. A load only reaches the enclosing scope when its own
-    scope does not bind the name.
+    Nested bodies recurse as their own scopes rather than being unioned in.
+    One flat set let an unrelated local -- a helper's `processor` parameter --
+    stand in for the module-level binding and hide the break this file exists
+    to catch. A load reaches the enclosing scope only when its own scope does
+    not bind the name.
 
-    A scope that binds a name only under `if False:` and reads it live is
-    reported here: the correct scope walk filters it out of what escapes, which
+    A scope binding a name only under `if False:` and reading it live is
+    reported here, since the scope walk filters it out of what escapes and
     would otherwise hide `def train(): if False: p = load(); return p`.
 
     `escaping_binds` is the one thing a scope binds for its PARENT: a `:=` in a
     comprehension, which PEP 572 binds in the containing scope. Treating it as
-    comprehension-local made a later live read look unanswered and reported a
-    false offender -- on a construct sixty comprehensions in nb/ really use.
+    comprehension-local reported a false offender on a construct sixty
+    comprehensions in nb/ really use.
     """
     live_binds, dead_binds, loads, nested = set(), set(), set(), []
     offenders = set()
