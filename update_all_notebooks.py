@@ -736,6 +736,22 @@ installation_qwen3_vl_kaggle_content  = update_or_append_pip_install(
     "!pip install transformers==4.57.1",
 )
 
+# LFM2.5-VL is an `lfm2_vl` checkpoint, and that architecture landed in
+# transformers 4.57.0, so the canonical 4.56.2 cannot load it: the notebook
+# stopped at "`LiquidAI/LFM2.5-VL-1.6B` is not supported yet in
+# `transformers==4.56.2`". The text LFM2.5 notebooks are `lfm2`, which 4.56.2
+# does have, so only the vision one moves.
+installation_lfm2_vl_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==4.57.1",
+)
+installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.57.1",
+)
+
 installation_qwen3_5_content = """%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
@@ -4309,6 +4325,13 @@ def update_notebook_sections(
                             else:
                                 installation = installation_deepseek_ocr_content
                                 
+                        # LFM2.5-VL INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["lfm2.5_vl"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_lfm2_vl_kaggle_content
+                            else:
+                                installation = installation_lfm2_vl_content
+
                         # Qwen3VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qwen3"]) and is_vision:
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
