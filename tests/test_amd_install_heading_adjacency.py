@@ -80,7 +80,7 @@ def test_the_heading_is_marked_so_it_never_reaches_the_install_text(gen):
     cells = [
         _md("### Installation"),
         _code("%%capture\n!pip install unsloth\n"),
-        _md("### Extra wheels"),
+        _md("### Install extra wheels"),
         _code(CUDA_INSTALL),
     ]
     found = dict(gen._adjacent_install_like_code_cells(cells, 1))
@@ -122,3 +122,38 @@ def test_back_to_back_install_cells_still_work(gen):
     ]
     found = gen._adjacent_install_like_code_cells(cells, 1)
     assert [index for index, _text in found] == [2]
+
+
+@pytest.mark.parametrize("heading", [
+    "### Setup the model",
+    "### Start Unsloth Studio",
+    "## Setup",
+])
+def test_a_non_install_heading_stops_the_scan(gen, heading):
+    """Stepping over any heading let the cell behind it qualify as an install
+    on the strength of that heading alone, and the caller deletes what this
+    returns. `### Start Unsloth Studio` collected the Studio launch code."""
+    cells = [
+        _md("### Installation"),
+        _code("%%capture\n!pip install unsloth\n"),
+        _md(heading),
+        _code('import sys\nsys.path.insert(0, "/content/unsloth")\n'
+              'from colab import launch_unsloth_studio\n'),
+    ]
+    assert gen._adjacent_install_like_code_cells(cells, 1) == []
+
+
+@pytest.mark.parametrize("heading", [
+    "### Install flash-linear-attention and causal-conv-1d",
+    "### Installation",
+    "## 2. Install dependencies",
+    "#### install extras",
+])
+def test_a_dependency_heading_is_still_stepped_over(gen, heading):
+    cells = [
+        _md("### Installation"),
+        _code("%%capture\n!pip install unsloth\n"),
+        _md(heading),
+        _code(CUDA_INSTALL),
+    ]
+    assert [i for i, _t in gen._adjacent_install_like_code_cells(cells, 1)] == [2, 3]

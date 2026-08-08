@@ -1739,6 +1739,11 @@ def validate_notebook_syntax(notebook_path):
 
 _RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
 _RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
+# A markdown heading that introduces a dependency install, e.g.
+# "### Install flash-linear-attention and causal-conv-1d". Deliberately not
+# `_RE_INSTALL_SECTION_MD`: that also matches "setup" and any position in the
+# line, which is how "### Setup the model" would qualify.
+_RE_DEPENDENCY_HEADING = re.compile(r"^#+\s*(?:\d+[.)]\s*)?install", re.IGNORECASE)
 
 
 def _cell_source_text(cell):
@@ -1822,10 +1827,13 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
     while idx < len(cells):
         cell = cells[idx]
         if cell.get("cell_type") == "markdown":
-            # Only a heading, and only right before an install cell. Anything
-            # longer is prose that belongs to the notebook, not to the install.
+            # Only a dependency-install heading, and only right before an
+            # install cell. Any heading used to qualify, and the cell behind it
+            # then passed `_is_install_like_cell` on the strength of that
+            # heading alone: `### Start Unsloth Studio` collected the Studio
+            # launch code, which the caller deletes.
             text = _cell_source_text(cell).strip()
-            if not text.startswith("#") or len(text.splitlines()) > 1:
+            if len(text.splitlines()) > 1 or not _RE_DEPENDENCY_HEADING.match(text):
                 break
             # `None` marks a heading: it is deleted with the cell but must not
             # reach the install text the AMD recipe is built from.
@@ -5790,6 +5798,16 @@ def copy_and_update_amd_notebooks(
         if basename not in amd_base_names:
             continue
         source_notebooks.setdefault(basename, path)
+    # For DONT_UPDATE_EXCEPTIONS, nb/ is the source of truth and the template
+    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` sits at
+    # weight_decay 0.1 under nb/ and 0.001 under original_template/. Sourcing
+    # from the template gave the AMD variant hyperparameters nobody chose.
+    for basename in DONT_UPDATE_EXCEPTIONS:
+        if basename not in amd_base_names:
+            continue
+        nb_path = os.path.join(destination_dir, basename)
+        if os.path.isfile(nb_path):
+            source_notebooks[basename] = nb_path
 
     amd_paths = []
     for notebook_name, template_notebook_path in sorted(source_notebooks.items()):
