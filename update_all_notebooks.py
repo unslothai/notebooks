@@ -2652,6 +2652,19 @@ def _warn_dropped_packages(notebook_path, old_cell_text, new_cell_text):
             f"Add a dedicated installation_* entry in the script."
         )
 
+# Packages whose Colab install must NOT be carried into the AMD recipe.
+#
+# sglang pins `torch==2.11.0` exactly. The ROCm bootstrap above installs torch
+# unpinned from download.pytorch.org/whl/<rocm tag>, and no tag this notebook
+# selects supplies that version: rocm6.0 tops out at 2.4.1, rocm6.1 at 2.6.0,
+# rocm6.2 at 2.5.1, rocm6.3 and rocm6.4 at 2.9.1, rocm7.0 at 2.10.0, rocm7.1
+# and rocm7.2 at 2.13.0. So pip satisfies the pin from default PyPI and the
+# CUDA build lands on top of the ROCm one, which is worse than not installing
+# sglang at all. A ROCm sglang recipe is a real question and wants ROCm
+# hardware to answer; it is not something to guess at here.
+_AMD_EXCLUDED_SOURCE_PACKAGES = {"sglang"}
+
+
 _AMD_INSTALL_PACKAGE_IGNORE = frozenset({
     "unsloth", "unsloth_zoo", "bitsandbytes", "cut_cross_entropy",
     "triton", "triton_rocm", "xformers", "torch", "torchvision", "torchaudio",
@@ -2663,7 +2676,9 @@ _AMD_INSTALL_PACKAGE_IGNORE = frozenset({
     # NVIDIA/Hopper TileLang backend deps; do not auto-propagate into ROCm
     # AMD notebooks. AMD users get a separate ROCm install path or skip.
     "apache_tvm_ffi", "apache-tvm-ffi", "tilelang", "torch_c_dlpack_ext",
-})
+# Unioned rather than listed twice: a package the AMD recipe deliberately
+# leaves out must not then be reported as one it dropped by accident.
+}) | frozenset(_AMD_EXCLUDED_SOURCE_PACKAGES)
 
 _AMD_VARIABLE_PACKAGE_FALLBACKS = {
     "{_vllm}": "vllm",
@@ -3038,6 +3053,10 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     def _merge_spec(flags, spec, *, lock=False):
         key = _package_key_from_install_token(spec)
         if not key:
+            return
+        # `lock` marks a variant-curated spec; only source-extracted ones are
+        # filtered, so an AMD variant can still ask for a package by name.
+        if not lock and key in _AMD_EXCLUDED_SOURCE_PACKAGES:
             return
         # Variant-seeded specs are sticky: source-extracted overrides never
         # replace them, even if the source spec parses to a higher tier under
