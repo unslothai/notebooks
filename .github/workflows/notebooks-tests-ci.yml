@@ -110,6 +110,25 @@ jobs:
         run: |
           python -m pytest tests/test_notebook_amd_install_parity.py -q --tb=short
 
+      - name: tests/test_amd_install_heading_adjacency.py
+        # The parity test above reads the COMMITTED nb/AMD-*.ipynb, which stay
+        # valid while stale. This one drives the collector directly, so it sees
+        # what a regeneration would produce.
+        run: |
+          python -m pytest tests/test_amd_install_heading_adjacency.py -q --tb=short
+
+      - name: tests/test_amd_source_is_nb_for_hand_maintained.py
+        run: |
+          python -m pytest tests/test_amd_source_is_nb_for_hand_maintained.py -q --tb=short
+
+      - name: tests/test_transformers5_hub_floor.py
+        run: |
+          python -m pytest tests/test_transformers5_hub_floor.py -q --tb=short
+
+      - name: tests/test_every_test_runs_in_ci.py
+        run: |
+          python -m pytest tests/test_every_test_runs_in_ci.py -q --tb=short
+
       - name: tests/test_qat_numpy_pin.py
         run: |
           python -m pytest tests/test_qat_numpy_pin.py -q --tb=short

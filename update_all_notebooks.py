@@ -1755,6 +1755,16 @@ def _cell_source_text(cell):
     return str(source)
 
 
+def _is_install_code(source_text):
+    """Install evidence in the cell itself, ignoring what sits above it."""
+    lower = source_text.lower()
+    return (
+        "pip install" in lower
+        or "uv pip install" in lower
+        or "pip3_autoremove" in lower
+    )
+
+
 def _is_install_like_cell(cells, idx, source_text):
     lower = source_text.lower()
     if "pip install" in lower or "uv pip install" in lower or "pip3_autoremove" in lower:
@@ -1843,7 +1853,14 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
         if cell.get("cell_type") != "code":
             break
         source_text = _cell_source_text(cell)
-        if not _is_install_like_cell(cells, idx, source_text):
+        # After a heading, the cell must look like an install on its own
+        # content. `_is_install_like_cell` also answers yes on the strength of
+        # the preceding markdown, so a heading like "### Install the trainer"
+        # over ordinary code would qualify it, and the caller deletes both.
+        if pending_headings or install_cells:
+            if not _is_install_code(source_text):
+                break
+        elif not _is_install_like_cell(cells, idx, source_text):
             break
         install_cells.extend(pending_headings)
         pending_headings = []
@@ -1870,9 +1887,20 @@ def _is_residual_non_amd_install_cell(cells, idx, source_text):
 
 def _is_stale_amd_announcement(source_text):
     lower = source_text.lower()
-    return "to run this, press" in lower and any(
+    if "to run this, press" in lower and any(
         marker in lower
         for marker in ("google colab", "open in colab", "tesla t4", "runtime")
+    ):
+        return True
+    # A bare "Open in Colab" badge, which is how some hand-maintained notebooks
+    # open. It carries no "to run this, press", so the test above walked past it
+    # and the AMD variant kept a button pointing at the CUDA notebook, with no
+    # Dev Cloud header and no News section above it.
+    stripped = source_text.strip()
+    return (
+        stripped.startswith("<a href=")
+        and "colab.research.google.com" in lower
+        and "\n\n" not in stripped
     )
 
 

@@ -157,3 +157,31 @@ def test_a_dependency_heading_is_still_stepped_over(gen, heading):
         _code(CUDA_INSTALL),
     ]
     assert [i for i, _t in gen._adjacent_install_like_code_cells(cells, 1)] == [2, 3]
+
+
+def test_a_heading_cannot_make_ordinary_code_an_install(gen):
+    """`_is_install_like_cell` answers yes on the strength of the markdown
+    above a cell, so an install-shaped heading over ordinary code qualified it
+    and the caller deletes both. After a heading the cell has to carry the
+    evidence itself."""
+    cells = [
+        _md("### Installation"),
+        _code("%%capture\n!pip install unsloth\n"),
+        _md("### Install the trainer"),
+        _code("trainer = SFTTrainer(model = model, args = config)\n"),
+    ]
+    assert gen._adjacent_install_like_code_cells(cells, 1) == []
+
+
+def test_the_first_cell_still_uses_the_wider_test(gen):
+    """Nothing was stepped over yet, so the section heading above the canonical
+    install block is exactly the signal that identifies it."""
+    cells = [
+        _md("### Installation"),
+        _code("%%capture\nimport os\nfrom setup import bootstrap\n"),
+    ]
+    assert gen._is_install_like_cell(cells, 1, _cell_text(cells[1]))
+
+
+def _cell_text(cell):
+    return "".join(cell["source"])
