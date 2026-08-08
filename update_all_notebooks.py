@@ -764,17 +764,18 @@ installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
 # A wheel, not a source build of `main`. Every sglang release pins ONE exact
 # transformers, so cloning main and then forcing transformers==4.53.0, what
-# 0.4.9 wanted when this was written, left the two disagreeing. Note this does
-# not make the notebook run on Colab: sglang also pins one exact torch, and a
-# `torch==` pin resolves to PyPI's default CUDA build, not Colab's cu128 one,
-# so the install still rebuilds the torch stack under the running kernel.
+# 0.4.9 wanted when this was written, left the two disagreeing.
+#
+# This installs sglang; it does not make the notebook run on Colab. sglang pins
+# torch==2.11.0, a `torch==` pin resolves to PyPI's default CUDA build, and
+# Colab ships its own, so the first import reports "PyTorch has CUDA
+# Version=13.0 and torchvision has CUDA Version=12.8". Naming a matching
+# torchvision cannot fix that: PEP 440 ignores a local version label, so
+# `torchvision==0.26.0` is ALREADY satisfied by Colab's 0.26.0+cu128 and pip
+# leaves it in place. The remedy is a runtime restart between this cell and the
+# rest of the notebook, which is a decision about how the notebook is run.
 installation_sglang_content = """%%capture
-# torchvision is named so pip replaces it WITH torch. sglang pins torch==2.11.0,
-# which resolves to PyPI's default CUDA build, and requires torchvision
-# unpinned, which Colab's cu128 build already satisfies -- so pip swapped torch
-# and left torchvision, and the first import said "PyTorch has CUDA Version=13.0
-# and torchvision has CUDA Version=12.8".
-!pip install "sglang[all]==0.5.16" "torchvision==0.26.0\""""
+!pip install "sglang[all]==0.5.16\""""
 installation_sglang_kaggle_content = installation_sglang_content
 
 installation_deepseek_ocr_content = installation_content

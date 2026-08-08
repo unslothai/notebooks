@@ -3,7 +3,6 @@
 # dependencies = [
 #     "marimo",
 #     "sglang[all]==0.5.16",
-#     "torchvision==0.26.0",
 # ]
 #
 # [tool.uv]
@@ -74,17 +73,6 @@ def _(mo):
     return
 
 
-@app.cell
-def _():
-    # torchvision is named so pip replaces it WITH torch. sglang pins torch==2.11.0,
-    # which resolves to PyPI's default CUDA build, and requires torchvision
-    # unpinned, which molab's cu128 build already satisfies -- so pip swapped torch
-    # and left torchvision, and the first import said "PyTorch has CUDA Version=13.0
-    # and torchvision has CUDA Version=12.8".
-
-    return
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -127,9 +115,16 @@ def _():
         stderr=subprocess.STDOUT,
     )
 
-    # sglang's own wait, which gives up. The shell loop this replaces grepped the
-    # log with no timeout, so a failed start hung the notebook forever.
-    wait_for_server("http://localhost:8000")
+    # Both arguments matter. `wait_for_server` defaults to timeout = None, which is
+    # wait forever, so without one this is the same unbounded hang as the shell
+    # `while ! grep -q` loop it replaces. `process` makes it poll the subprocess and
+    # raise as soon as a failed launch exits, instead of waiting out the timeout.
+    try:
+        wait_for_server("http://localhost:8000", timeout=900, process=server)
+    except Exception:
+        # The server's own log is the only thing that says why it did not start.
+        print(open("sglang.log").read()[-4000:])
+        raise
     return
 
 
