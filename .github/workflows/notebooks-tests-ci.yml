@@ -125,6 +125,14 @@ jobs:
         run: |
           python -m pytest tests/test_transformers5_hub_floor.py -q --tb=short
 
+      - name: tests/test_no_backgrounded_shell_launch.py
+        # nbclient + ipykernel so the live-kernel case actually runs. Without
+        # them it importorskips, and the point of that case is to measure
+        # `system_piped` on the runner rather than read it off the source.
+        run: |
+          pip install nbclient ipykernel
+          python -m pytest tests/test_no_backgrounded_shell_launch.py -q --tb=short
+
       - name: tests/test_every_test_runs_in_ci.py
         run: |
           python -m pytest tests/test_every_test_runs_in_ci.py -q --tb=short
