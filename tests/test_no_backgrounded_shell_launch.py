@@ -33,11 +33,6 @@ Kaggle, plain Jupyter, papermill -- could not run the cell at all.
 what lets the wait be bounded: sglang's `wait_for_server` takes `timeout` and
 `process`, and with neither it waits forever, exactly like the
 `while ! grep -q ... ; do sleep 5; done` loop that shape replaces.
-
-Two tests, deliberately different in kind. The first is a static guard over
-every generated notebook, and is what would have caught the original break. The
-second executes a real kernel, so the claim about `system_piped` is measured on
-the platform CI is running on rather than asserted from the IPython source.
 """
 
 import json

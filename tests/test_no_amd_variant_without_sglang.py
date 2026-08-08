@@ -18,21 +18,13 @@
 
 """An AMD notebook may not import a package the ROCm recipe cannot install.
 
-sglang is the concrete case. It publishes no ROCm wheel: 0.5.16 carries
-`torch==2.11.0` and `sglang-kernel==0.4.5` in its base dependencies, both
-CUDA-13 builds, so putting the Colab install line in the ROCm cell drops a CUDA
-torch on top of the ROCm one the bootstrap just installed. Leaving it out
-instead is what produced the shape this file guards: `AMD-Gemma3N_(2B)-
-Inference` shipped with no sglang anywhere and a first code cell reading
-`from sglang.utils import wait_for_server`, so Run All stopped on
-ModuleNotFoundError before reaching any inference.
-
-The answer is not to mint that AMD variant at all, which is what
-`AMD_SKIP_NOTEBOOKS` expresses.
-
-All three tests are behavioural: they import the generator and call its real
-functions rather than grepping its source, so an explanatory comment mentioning
-`sglang` cannot satisfy them.
+sglang is the concrete case: it publishes no ROCm wheel (see
+`AMD_SKIP_NOTEBOOKS` in update_all_notebooks.py), and leaving its install out
+of the ROCm cell is what produced the shape this file guards.
+`AMD-Gemma3N_(2B)-Inference` shipped with no sglang anywhere and a first code
+cell reading `from sglang.utils import wait_for_server`, so Run All stopped on
+ModuleNotFoundError before reaching any inference. The answer is not to mint
+that AMD variant at all.
 """
 
 from __future__ import annotations

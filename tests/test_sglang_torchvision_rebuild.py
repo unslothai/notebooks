@@ -25,9 +25,6 @@ sees the requirement as already satisfied and leaves the old build alone;
 `import torchvision` then fails with a CUDA version mismatch before the
 notebook reaches its first inference. Only `--force-reinstall` replaces an
 already-satisfied requirement.
-
-The test reads the shipped notebooks rather than the generator's source, so a
-comment about torchvision cannot satisfy it.
 """
 
 from __future__ import annotations
