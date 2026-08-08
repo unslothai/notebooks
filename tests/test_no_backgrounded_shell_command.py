@@ -134,13 +134,45 @@ def test_no_notebook_backgrounds_a_shell_command(path):
     )
 
 
+def _stale(known, nb_dir):
+    """Entries the repo has outgrown: the notebook stopped offending, or it is
+    gone entirely.
+
+    The missing-file arm matters because #317 does not fix
+    `AMD-Gemma3N_(2B)-Inference` so much as delete it, along with its
+    `python_scripts` mirror. An `is_file()` guard on its own reads a deleted
+    notebook as "nothing to check" and keeps the entry forever, which is the
+    stale grandfathering this whole test exists to prevent, just arrived at by
+    deletion rather than by a fix.
+    """
+    stale = []
+    for name, (_pr, allowed) in known.items():
+        path = nb_dir / name
+        if not path.is_file():
+            stale.append(name)
+        elif allowed not in _backgrounded(path):
+            stale.append(name)
+    return stale
+
+
 def test_the_known_list_still_describes_reality():
-    """A name that no longer offends must leave the list, or it hides the next
-    regression in that notebook."""
-    stale = [name for name, (_pr, allowed) in KNOWN.items()
-             if (NB_DIR / name).is_file()
-             and allowed not in _backgrounded(NB_DIR / name)]
-    assert not stale, f"fixed or edited, so update KNOWN: {stale}"
+    """A name that no longer offends, or no longer exists, must leave the list,
+    or it hides the next regression in that notebook."""
+    stale = _stale(KNOWN, NB_DIR)
+    assert not stale, f"fixed, edited or deleted, so update KNOWN: {stale}"
+
+
+def test_a_deleted_notebook_does_not_stay_grandfathered(tmp_path):
+    """The discriminating case for the arm above. Point an entry at a notebook
+    that is not there and it has to be reported, not quietly skipped."""
+    assert _stale(KNOWN, tmp_path) == list(KNOWN)
+
+
+def test_a_present_and_still_offending_notebook_is_not_reported():
+    """The other side of it, so the check cannot pass by calling everything
+    stale."""
+    name = next(iter(KNOWN))
+    assert name not in _stale({name: KNOWN[name]}, NB_DIR)
 
 
 def test_a_second_offender_in_a_known_notebook_is_not_hidden():
