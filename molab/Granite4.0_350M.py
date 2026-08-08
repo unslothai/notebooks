@@ -6,6 +6,7 @@
 #     "mamba_ssm==2.2.5",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
+#     "torch==2.7.1",
 #     "torchao>=0.16.0",
 #     "torchcodec==0.5",
 #     "torchvision",

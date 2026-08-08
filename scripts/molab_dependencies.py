@@ -416,6 +416,160 @@ _MOLAB_PER_NOTEBOOK_RELAX: dict[str, dict[str, str]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Runtime-templated install specs
+# ---------------------------------------------------------------------------
+# Some install cells pick their pins at runtime and hand them to pip through an
+# IPython ``{var}`` expansion instead of a literal spec.  The Granite 4.0 /
+# Nemotron Nano cells are the current example::
+#
+#     if _cc >= 10:   # Blackwell
+#         _torch = f"torch=={_t.__version__.split('+')[0]}"
+#         _mamba, _conv = "mamba_ssm==2.3.2.post1", "causal_conv1d==1.6.2.post1"
+#     else:
+#         _torch, _mamba, _conv = "torch==2.7.1", "mamba_ssm==2.2.5", "causal_conv1d==1.5.2"
+#     !uv pip install -qqq {_torch} ...
+#     !uv pip install --no-build-isolation {_mamba} {_conv}
+#
+# A PEP 723 header is static and cannot carry that branch, so molab has to
+# resolve each variable to exactly ONE arm.  The two tables below are that
+# decision, written out per variable:
+#
+#   ``_TEMPLATE_STATIC_SPECS``    variable -> the PEP 508 spec molab pins it to.
+#   ``_TEMPLATE_NO_STATIC_SPEC``  variable -> why it has no static resolution
+#                                 and is dropped from the header instead.
+#
+# Every ``{var}`` used by a pip line in a molab-targeted install cell MUST be
+# listed in exactly one of the two.  ``tests/test_molab_templated_pins.py``
+# fails on any variable that is in neither, so a new runtime-computed pin can
+# never silently disappear from a generated header the way torch 2.7.1 /
+# mamba_ssm / causal_conv1d did.
+_TEMPLATE_STATIC_SPECS: dict[str, str] = {
+    # Granite 4.0 and Nemotron Nano are Mamba hybrids: without mamba_ssm and
+    # causal_conv1d, or with those kernels built against an unpinned torch,
+    # the model does not run.  The cell's Blackwell arm exists only to avoid a
+    # ~30 minute source build on sm_100 / sm_120, where the torch 2.7.1 wheels
+    # have no kernels; every other GPU class takes the prebuilt fast path.
+    # molab resolves to that non-Blackwell arm, which is also exactly what the
+    # generated headers carried before the branch was introduced.
+    "_torch": "torch==2.7.1",
+    "_mamba": "mamba_ssm==2.2.5",
+    "_conv": "causal_conv1d==1.5.2",
+}
+
+_TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
+    # ``xformers = 'xformers==' + {...}.get(torch_minor, "0.0.34")`` — the
+    # version is looked up from the live torch build.  unsloth pulls a
+    # compatible xformers transitively, so no static pin is needed.
+    "xformers": (
+        "version is looked up from the live torch build; unsloth pulls a "
+        "compatible xformers transitively"
+    ),
+    # ``_numpy`` / ``_pil`` / ``get_numpy`` / ``_qat_numpy`` all pin numpy or
+    # pillow to the copy ALREADY imported in the hosted kernel, so a
+    # reinstall cannot swap it under a running session.  molab installs into
+    # a fresh uv venv before anything is imported, so there is no incumbent
+    # version to preserve and the resolver should pick freely.
+    "_numpy": (
+        "pins numpy to the version already imported in the hosted kernel; "
+        "molab builds a fresh venv, so there is nothing to hold in place"
+    ),
+    "_pil": (
+        "pins pillow to the version already imported in the hosted kernel; "
+        "molab builds a fresh venv, so there is nothing to hold in place"
+    ),
+    "get_numpy": (
+        "pins numpy to the version already imported in the hosted kernel; "
+        "molab builds a fresh venv, so there is nothing to hold in place"
+    ),
+    "_qat_numpy": (
+        "pins numpy to the version already imported in the hosted kernel; "
+        "molab builds a fresh venv, so there is nothing to hold in place"
+    ),
+    # The QAT cell maps the live torch version to a torchao / fbgemm-gpu-genai
+    # version.  molab does not fix torch for that notebook, so there is no
+    # single correct arm to freeze; leave both to the resolver.
+    "_qat_torchao": (
+        "torchao version is chosen from the live torch version; molab does "
+        "not pin torch for this notebook, so no arm is statically correct"
+    ),
+    "_qat_fbgemm": (
+        "fbgemm-gpu-genai version is chosen from the live torch version; "
+        "molab does not pin torch for this notebook, so no arm is "
+        "statically correct"
+    ),
+}
+
+# A whole pip token that is nothing but one ``{var}`` expansion, e.g.
+# ``{_torch}``.  Surrounding shell quotes are already stripped by
+# ``_split_args``; ``strip('"\'')`` is belt-and-braces for hand-written cells.
+_RE_WHOLE_TEMPLATE_TOKEN = re.compile(r"^\{([A-Za-z_]\w*)\}$")
+
+# Any ``{var}`` expansion anywhere inside a pip token — also matches the
+# embedded form ``torchao=={_qat_torchao}``.
+_RE_TEMPLATE_VAR = re.compile(r"\{([A-Za-z_]\w*)\}")
+
+
+def template_var_names(token: str) -> list[str]:
+    """Return the ``{var}`` names an install-cell pip token expands.
+
+    ``"{_torch}"`` -> ``["_torch"]``; ``"torchao=={_qat_torchao}"`` ->
+    ``["_qat_torchao"]``; a token with no expansion -> ``[]``.
+
+    Public so the templated-pin test can enumerate the variables a notebook
+    uses without re-implementing the tokenizer.
+    """
+    return _RE_TEMPLATE_VAR.findall(token)
+
+
+def resolve_template_spec(token: str) -> Optional[str]:
+    """Static PEP 508 spec for a whole-token ``{var}`` expansion, or ``None``.
+
+    Only a token that is *entirely* one expansion resolves: the mapping is
+    variable -> full spec, so substituting it into a partially-literal token
+    like ``torchao=={_qat_torchao}`` would produce nonsense.  Those (and every
+    variable in ``_TEMPLATE_NO_STATIC_SPEC``) return ``None`` and are dropped
+    with a reason by the caller.
+    """
+    m = _RE_WHOLE_TEMPLATE_TOKEN.match(token.strip().strip("\"'"))
+    if m is None:
+        return None
+    return _TEMPLATE_STATIC_SPECS.get(m.group(1))
+
+
+def template_drop_reason(token: str) -> Optional[str]:
+    """The registered reason a templated ``token`` carries no static spec.
+
+    Returns ``None`` when no variable in the token is registered in
+    ``_TEMPLATE_NO_STATIC_SPEC`` — i.e. the token is unknown to the planner
+    and the templated-pin test should fail on it.
+    """
+    for name in template_var_names(token):
+        reason = _TEMPLATE_NO_STATIC_SPEC.get(name)
+        if reason is not None:
+            return reason
+    return None
+
+
+def iter_templated_tokens(nb_path: Path) -> list[str]:
+    """Every ``{var}``-bearing pip token in ``nb_path``'s install cells.
+
+    Tokens come back in source order, duplicates included, exactly as
+    :func:`plan_dependencies` sees them.  Public so
+    ``tests/test_molab_templated_pins.py`` can enumerate the runtime-templated
+    specs a notebook relies on through the real install-cell tokenizer instead
+    of re-implementing it (or, worse, grepping the notebook text).
+    """
+    tokens: list[str] = []
+    for cell_src in extract_install_cells(nb_path):
+        for line in _logical_lines(cell_src):
+            parsed = _parse_pip_line(line)
+            if parsed is None:
+                continue
+            tokens.extend(parsed.templated)
+    return tokens
+
+
 def plan_dependencies(nb_path: Path) -> DependencyPlan:
     """Build a :class:`DependencyPlan` from a post-injection ``nb/*.ipynb``.
 
@@ -465,18 +619,38 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                 ))
                 continue
 
-            # Record templated specs (e.g. {xformers}) as intentional drops:
-            # the version is resolved at runtime from the torch build, which a
-            # static PEP 723 header cannot reproduce.  unsloth pulls a
-            # compatible xformers transitively, so dropping the explicit pin
-            # is safe.
+            # A templated spec (``{_torch}``, ``{xformers}``) is one of two
+            # things.  Either the install cell branches at runtime over pins a
+            # PEP 723 header cannot express, in which case molab resolves the
+            # variable to the single arm registered in
+            # ``_TEMPLATE_STATIC_SPECS`` and treats it like a literal spec —
+            # or there is deliberately no static answer, in which case it is
+            # dropped with the reason registered in
+            # ``_TEMPLATE_NO_STATIC_SPEC``.
             for tok in parsed.templated:
+                static_spec = resolve_template_spec(tok)
+                if static_spec is not None:
+                    key = _normalise_pkg(
+                        _RE_PKG_NAME.match(static_spec).group(1)
+                    )
+                    static_spec = _normalise_molab_spec(key, static_spec)
+                    existing = chosen.get(key)
+                    if (
+                        existing is None
+                        or _spec_rank(static_spec) > _spec_rank(existing)
+                    ):
+                        chosen[key] = static_spec
+                    continue
                 plan.dropped.append(DroppedItem(
                     text=tok,
                     reason="runtime-templated: spec uses an IPython {var} "
-                           "expansion resolved from the live torch version; "
-                           "not statically expressible in PEP 723 — resolved "
-                           "transitively via the unsloth dependency",
+                           "expansion with no static PEP 723 equivalent — "
+                           + (
+                               template_drop_reason(tok)
+                               or "no registered reason; add the variable to "
+                                  "molab_dependencies._TEMPLATE_STATIC_SPECS "
+                                  "or _TEMPLATE_NO_STATIC_SPEC"
+                           ),
                 ))
 
             for spec in parsed.specs:

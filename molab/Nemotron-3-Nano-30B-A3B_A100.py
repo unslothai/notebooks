@@ -2,8 +2,11 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
+#     "causal_conv1d==1.5.2",
+#     "mamba_ssm==2.2.5",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
+#     "torch==2.7.1",
 #     "torchao>=0.16.0",
 #     "torchcodec==0.5",
 #     "torchvision",
