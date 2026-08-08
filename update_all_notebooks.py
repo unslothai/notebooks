@@ -1755,6 +1755,16 @@ def _cell_source_text(cell):
     return str(source)
 
 
+def _is_install_code(source_text):
+    """Install evidence in the cell itself, ignoring what sits above it."""
+    lower = source_text.lower()
+    return (
+        "pip install" in lower
+        or "uv pip install" in lower
+        or "pip3_autoremove" in lower
+    )
+
+
 def _is_install_like_cell(cells, idx, source_text):
     lower = source_text.lower()
     if "pip install" in lower or "uv pip install" in lower or "pip3_autoremove" in lower:
@@ -1843,7 +1853,14 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
         if cell.get("cell_type") != "code":
             break
         source_text = _cell_source_text(cell)
-        if not _is_install_like_cell(cells, idx, source_text):
+        # After a heading, the cell must look like an install on its own
+        # content. `_is_install_like_cell` also answers yes on the strength of
+        # the preceding markdown, so a heading like "### Install the trainer"
+        # over ordinary code would qualify it, and the caller deletes both.
+        if pending_headings or install_cells:
+            if not _is_install_code(source_text):
+                break
+        elif not _is_install_like_cell(cells, idx, source_text):
             break
         install_cells.extend(pending_headings)
         pending_headings = []
