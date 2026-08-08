@@ -628,6 +628,7 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **CodeForces CoT Reasoning** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
 | **Llama3.3** **(70B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.3_(70B)_A100-Conversational.ipynb) |
 | **Synthetic Data Hackathon** | Synthetic Data | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Synthetic_Data_Hackathon.ipynb) |
+| **DiffusionGemma** **(26B A4B)** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-DiffusionGemma_(26B-A4B)-Sudoku.ipynb) |
 | **Gemma3** **(4B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B).ipynb) |
 | **Gemma3** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B)-Vision-GRPO.ipynb) |
 | **Phi 4** **(14B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_4_(14B)-GRPO.ipynb) |
