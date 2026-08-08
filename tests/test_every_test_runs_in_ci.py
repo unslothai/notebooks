@@ -53,13 +53,54 @@ def _run_commands(node):
             yield from _run_commands(item)
 
 
+# `#` only starts a comment at the start of a word, so a fragment in a URL
+# (`...#subdirectory=x`) is left alone.
+_COMMENT = re.compile(r"(?<!\S)#.*$")
+# `;`, `&&` and `||` separate commands; a pytest call must not vouch for what
+# runs beside it.
+_SEPARATORS = re.compile(r";|&&|\|\|")
+
+
+def _shell_commands(block):
+    """The individual commands in one `run:` block.
+
+    Comments stripped and backslash continuations folded, so a filename can
+    only be collected from a line that actually executes it.
+    """
+    folded, pending = [], ""
+    for raw in block.splitlines():
+        line = _COMMENT.sub("", raw).rstrip()
+        if not line.strip():
+            continue
+        if line.endswith("\\"):
+            pending += " " + line[:-1].strip()
+            continue
+        pending += " " + line.strip()
+        folded.append(pending.strip())
+        pending = ""
+    if pending.strip():
+        folded.append(pending.strip())
+    return [part.strip() for line in folded
+            for part in _SEPARATORS.split(line) if part.strip()]
+
+
 def _named_in_workflow():
+    """Test files a `pytest` command in the workflow actually runs.
+
+    Asking whether the whole `run:` block contains "pytest" and then harvesting
+    every filename in it is not enough, and that is not hypothetical: a block
+    holding one real pytest call plus a comment naming another test reads that
+    comment as coverage, so the named test can be absent from CI while this
+    gate passes. That is the same failure one level up from the `name:`-only
+    step this file was written for, so the check runs per command.
+    """
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     named = set()
-    for command in _run_commands(workflow):
-        if "pytest" not in command:
-            continue
-        named.update(_TEST_FILE.findall(command))
+    for block in _run_commands(workflow):
+        for command in _shell_commands(block):
+            if "pytest" not in command:
+                continue
+            named.update(_TEST_FILE.findall(command))
     return named
 
 
@@ -93,3 +134,63 @@ def test_a_label_without_a_command_does_not_count(tmp_path, monkeypatch):
     )
     monkeypatch.setattr("tests.test_every_test_runs_in_ci.WORKFLOW", workflow)
     assert _named_in_workflow() == {"test_real.py"}
+
+
+def _named_in(text):
+    """The gate's collection rule applied to one `run:` block."""
+    named = set()
+    for command in _shell_commands(text):
+        if "pytest" not in command:
+            continue
+        named.update(_TEST_FILE.findall(command))
+    return named
+
+
+def test_a_comment_beside_a_real_pytest_call_is_not_coverage():
+    """The discriminating case. Asking whether the block contains "pytest" and
+    then harvesting every filename in it counts the commented one."""
+    block = (
+        "set -euxo pipefail\n"
+        "# tests/test_ghost.py is coming in a follow-up\n"
+        "python -m pytest tests/test_real.py -q\n"
+    )
+    assert _named_in(block) == {"test_real.py"}
+
+
+def test_a_non_pytest_command_beside_a_pytest_one_is_not_coverage():
+    """`echo` and `ls` name files too. Splitting on the separators keeps a
+    pytest call from vouching for its neighbours."""
+    block = (
+        "echo tests/test_echoed.py\n"
+        "python -m pytest tests/test_real.py -q\n"
+        "ls tests/test_listed.py && cat tests/test_catted.py\n"
+    )
+    assert _named_in(block) == {"test_real.py"}
+
+
+def test_a_pytest_call_split_over_a_continuation_still_counts():
+    """Folding has to happen, or a wrapped command stops being recognised and
+    the gate reports a covered test as missing."""
+    block = (
+        "python -m pytest \\\n"
+        "    tests/test_wrapped.py \\\n"
+        "    -q --tb=short\n"
+    )
+    assert _named_in(block) == {"test_wrapped.py"}
+
+
+def test_a_url_fragment_is_not_read_as_a_comment():
+    """`#subdirectory=` in a pip URL must survive comment stripping, or the
+    command is truncated and its filenames lost."""
+    block = (
+        "pip install 'x @ git+https://example.com/x.git@abc#subdirectory=y'\n"
+        "python -m pytest tests/test_after_url.py -q\n"
+    )
+    assert _named_in(block) == {"test_after_url.py"}
+    assert any("subdirectory=y" in c for c in _shell_commands(block))
+
+
+def test_the_real_workflow_still_reports_its_pytest_files():
+    """Guard the guard: a fold or split that silently stopped matching would
+    leave the parametrised gate asserting against an empty set."""
+    assert len(_named_in_workflow()) >= 10
