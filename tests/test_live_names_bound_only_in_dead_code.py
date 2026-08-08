@@ -93,7 +93,7 @@ def _scope_body(node):
 
 
 def _analyse_scope(node, dead):
-    """(live_binds, dead_binds, free_loads, offenders) for one scope.
+    """(live_binds, dead_binds, free_loads, offenders, escaping_binds) for one scope.
 
     Nested bodies are recursed into as their own scopes rather than unioned in.
     One flat set let any unrelated local -- a `processor` parameter on a helper,
@@ -106,9 +106,17 @@ def _analyse_scope(node, dead):
     an offender in its own right, and has to be reported here: filtering it out
     of what escapes is what a correct scope walk does, and it would otherwise
     hide `def train(): if False: p = load(); return p` from the module.
+
+    `escaping_binds` is the one thing a scope binds for its PARENT: a `:=` inside
+    a comprehension. PEP 572 binds that in the containing scope, so treating it
+    as comprehension-local made a later live read look unanswered, and with the
+    name also bound under `if False:` the check reported an offender that is not
+    one. Sixty comprehensions in nb/ use `:=`, so that false positive is on a
+    construct the catalogue really contains.
     """
     live_binds, dead_binds, loads, nested = set(), set(), set(), []
     offenders = set()
+    walrus_live, walrus_dead = set(), set()
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
         args = node.args
         for arg in args.posonlyargs + args.args + args.kwonlyargs:
@@ -136,6 +144,10 @@ def _analyse_scope(node, dead):
             if isinstance(current, _COMPREHENSIONS) and current.generators:
                 stack.append(current.generators[0].iter)
             continue
+        if isinstance(current, ast.NamedExpr):
+            # Recorded as well as, not instead of, the ordinary Store below:
+            # the name is usable in this scope too, it just also escapes.
+            (walrus_dead if is_dead else walrus_live).add(current.target.id)
         if isinstance(current, ast.Name):
             if isinstance(current.ctx, ast.Store):
                 (dead_binds if is_dead else live_binds).add(current.id)
@@ -149,19 +161,25 @@ def _analyse_scope(node, dead):
         stack.extend(ast.iter_child_nodes(current))
 
     for child in nested:
-        _child_live, _child_dead, child_free, child_offenders = _analyse_scope(child, dead)
+        (_child_live, _child_dead, child_free, child_offenders,
+         child_escaping) = _analyse_scope(child, dead)
         loads |= child_free
         offenders |= child_offenders
+        live_binds |= child_escaping[0]
+        dead_binds |= child_escaping[1]
+    escaping = ((walrus_live, walrus_dead) if isinstance(node, _COMPREHENSIONS)
+                else (set(), set()))
     if isinstance(node, ast.Module):
         # Module-level detection stays in `_offenders`, which sees every cell.
-        return live_binds, dead_binds, loads, offenders
+        return live_binds, dead_binds, loads, offenders, escaping
     offenders |= (loads & dead_binds) - live_binds
     # Bindings here are local, so neither they nor what they satisfy escape.
-    return live_binds, dead_binds, loads - live_binds - dead_binds, offenders
+    return (live_binds, dead_binds, loads - live_binds - dead_binds, offenders,
+            escaping)
 
 
 def _scan(source):
-    """(live_binds, dead_binds, live_loads, nested_offenders), or None."""
+    """(live_binds, dead_binds, live_loads, nested_offenders, _), or None."""
     try:
         tree = ast.parse(_strip_magics(source))
     except SyntaxError:
@@ -324,3 +342,26 @@ def test_a_comprehension_reading_its_own_target_is_not_a_free_load():
         "if False:\n    p = load()\n",
         "values = [p.name for p in items]\n",
     ]) == []
+
+def test_a_walrus_in_a_comprehension_binds_in_the_enclosing_scope():
+    """PEP 572: `:=` inside a comprehension binds outside it, not inside.
+
+    Treating it as comprehension-local made the read in the third cell look
+    unanswered, and with `processor` also bound under `if False:` the check
+    reported an offender that is not one -- a false positive in a gate that
+    runs over the whole catalogue.
+    """
+    assert _offenders_of([
+        "if False:\n    processor = None\n",
+        "values = [(processor := item) for item in items]\n",
+        "use(processor)\n",
+    ]) == []
+
+
+def test_a_comprehension_target_still_does_not_escape():
+    """The narrowing must not take the ordinary loop target with it."""
+    assert _offenders_of([
+        "if False:\n    processor = None\n",
+        "values = [processor for processor in items]\n",
+        "use(processor)\n",
+    ]) == ["processor"]
