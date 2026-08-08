@@ -40,7 +40,11 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().system('pip install -qU llama-index llama-index-packs-raft-dataset')
+# # llama-index-core 0.14.21 deleted `llama_index.core.llama_pack`, and
+# # llama-index-packs-raft-dataset still imports it, so an unpinned install
+# # stops at `No module named 'llama_index.core.llama_pack'`. The pack allows
+# # core <0.15, so pip resolves the version that broke it.
+# get_ipython().system('pip install -qU "llama-index<0.14.21" "llama-index-core>=0.14.0,<0.14.21" llama-index-packs-raft-dataset')
 # 
 # 
 # # ### Unsloth
