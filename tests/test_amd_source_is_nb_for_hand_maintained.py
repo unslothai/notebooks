@@ -83,3 +83,39 @@ def test_an_amd_variant_follows_nb_not_the_template(gen):
         f"AMD variants carry cells that exist only in the abandoned template: "
         f"{mismatched}"
     )
+
+
+_COLAB_BADGE = (
+    '<a href="https://colab.research.google.com/github/unslothai/notebooks/'
+    'blob/main/nb/X.ipynb" target="_parent">'
+    '<img src="https://colab.research.google.com/assets/colab-badge.svg"/></a>'
+)
+
+
+def test_a_bare_colab_badge_counts_as_a_stale_announcement(gen):
+    """It carries no "to run this, press", so it walked past the check and the
+    AMD variant kept a button pointing at the CUDA notebook."""
+    assert gen._is_stale_amd_announcement(_COLAB_BADGE)
+
+
+@pytest.mark.parametrize("text", [
+    '<a href="https://unsloth.ai/"><img src="logo.png"/></a>',
+    '<a href="https://colab.research.google.com/x">run it</a>\n\nThen train.',
+    "# Goal: solve Sudoku with reinforcement learning",
+])
+def test_real_content_is_not_mistaken_for_a_badge(gen, text):
+    assert not gen._is_stale_amd_announcement(text)
+
+
+@pytest.mark.parametrize("path", sorted(NB_DIR.glob("AMD-*.ipynb")), ids=lambda p: p.name)
+def test_every_amd_notebook_opens_on_dev_cloud(path):
+    """Not one may open with a Colab button, whatever its source."""
+    notebook = json.loads(path.read_text(encoding="utf-8"))
+    first = next((c for c in notebook.get("cells", [])
+                  if c.get("cell_type") == "markdown"), None)
+    if first is None:
+        pytest.skip("no markdown cell")
+    text = "".join(first.get("source", []))
+    assert "colab.research.google.com/github" not in text, (
+        f"{path.name} opens with a Colab badge pointing at the CUDA notebook"
+    )

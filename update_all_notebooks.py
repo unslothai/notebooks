@@ -1870,9 +1870,20 @@ def _is_residual_non_amd_install_cell(cells, idx, source_text):
 
 def _is_stale_amd_announcement(source_text):
     lower = source_text.lower()
-    return "to run this, press" in lower and any(
+    if "to run this, press" in lower and any(
         marker in lower
         for marker in ("google colab", "open in colab", "tesla t4", "runtime")
+    ):
+        return True
+    # A bare "Open in Colab" badge, which is how some hand-maintained notebooks
+    # open. It carries no "to run this, press", so the test above walked past it
+    # and the AMD variant kept a button pointing at the CUDA notebook, with no
+    # Dev Cloud header and no News section above it.
+    stripped = source_text.strip()
+    return (
+        stripped.startswith("<a href=")
+        and "colab.research.google.com" in lower
+        and "\n\n" not in stripped
     )
 
 
