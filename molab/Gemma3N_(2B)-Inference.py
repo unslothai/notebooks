@@ -3,6 +3,7 @@
 # dependencies = [
 #     "marimo",
 #     "sglang[all]==0.5.16",
+#     "torchvision==0.26.0",
 # ]
 #
 # [tool.uv]
@@ -70,6 +71,17 @@ def _(mo):
 
     Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
     """)
+    return
+
+
+@app.cell
+def _():
+    # torchvision is named so pip replaces it WITH torch. sglang pins torch==2.11.0,
+    # which resolves to PyPI's default CUDA build, and requires torchvision
+    # unpinned, which molab's cu128 build already satisfies -- so pip swapped torch
+    # and left torchvision, and the first import said "PyTorch has CUDA Version=13.0
+    # and torchvision has CUDA Version=12.8".
+
     return
 
 

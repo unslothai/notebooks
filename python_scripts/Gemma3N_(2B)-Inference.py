@@ -34,7 +34,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', '!pip install "sglang[all]==0.5.16"\n')
+# get_ipython().run_cell_magic('capture', '', '# torchvision is named so pip replaces it WITH torch. sglang pins torch==2.11.0,\n# which resolves to PyPI\'s default CUDA build, and requires torchvision\n# unpinned, which Colab\'s cu128 build already satisfies -- so pip swapped torch\n# and left torchvision, and the first import said "PyTorch has CUDA Version=13.0\n# and torchvision has CUDA Version=12.8".\n!pip install "sglang[all]==0.5.16" "torchvision==0.26.0"\n')
 # 
 # 
 # # ### Unsloth

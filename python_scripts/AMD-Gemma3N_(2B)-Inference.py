@@ -40,14 +40,7 @@
 # # In[ ]:
 # 
 # 
-# import os
-# import sys
-# import torch; torch._dynamo.config.recompile_limit = 64;
-# get_ipython().system('git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e "python[all]"')
-# sys.path.append(f'{os.getcwd()}/sglang/')
-# sys.path.append(f'{os.getcwd()}/sglang/python')
-# get_ipython().system('uv pip install --system -qqq "sglang[all]==0.5.16" sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" torchcodec')
-# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
+# get_ipython().system('uv pip install --system -qqq "sglang[all]==0.5.16"')
 # 
 # 
 # # ### Unsloth
@@ -59,23 +52,23 @@
 
 # Load and run the model using sglang.
 #
-# Started with Popen rather than `!... &`. IPython's `system_piped`, which
-# every Jupyter kernel except Colab's uses, refuses a command ending in `&`:
-#   OSError: Background processes not supported.
-# so on Kaggle, plain Jupyter or papermill this cell could never run at all.
+# Popen, not `!... &`: IPython's `system_piped`, which every kernel except
+# Colab's uses, raises OSError on a trailing `&`, so on Kaggle, plain Jupyter
+# or papermill this cell could never run.
+# Backend left to sglang: `fa3` is Hopper (sm90) only, so it fails on the
+# T4 / L4 / A100 a session actually hands out.
 import subprocess, sys
 from sglang.utils import wait_for_server
 
 server = subprocess.Popen(
     [sys.executable, "-m", "sglang.launch_server",
      "--model-path", "unsloth/gemma-3n-E2B-it",
-     "--attention-backend", "fa3", "--port", "8000"],
+     "--port", "8000"],
     stdout = open("sglang.log", "w"), stderr = subprocess.STDOUT,
 )
 
-# sglang's own wait, which gives up eventually. The shell loop this replaces
-# grepped the log with no timeout, so a server that failed to start hung the
-# notebook forever instead of reporting anything.
+# sglang's own wait, which gives up. The shell loop this replaces grepped the
+# log with no timeout, so a failed start hung the notebook forever.
 wait_for_server("http://localhost:8000")
 
 

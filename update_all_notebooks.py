@@ -769,7 +769,12 @@ installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 # `torch==` pin resolves to PyPI's default CUDA build, not Colab's cu128 one,
 # so the install still rebuilds the torch stack under the running kernel.
 installation_sglang_content = """%%capture
-!pip install "sglang[all]==0.5.16\""""
+# torchvision is named so pip replaces it WITH torch. sglang pins torch==2.11.0,
+# which resolves to PyPI's default CUDA build, and requires torchvision
+# unpinned, which Colab's cu128 build already satisfies -- so pip swapped torch
+# and left torchvision, and the first import said "PyTorch has CUDA Version=13.0
+# and torchvision has CUDA Version=12.8".
+!pip install "sglang[all]==0.5.16" "torchvision==0.26.0\""""
 installation_sglang_kaggle_content = installation_sglang_content
 
 installation_deepseek_ocr_content = installation_content
