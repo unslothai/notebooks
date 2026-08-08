@@ -95,6 +95,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 import subprocess
 import sys
 import os
+import re
 import time
 import atexit
 import requests
@@ -171,9 +172,28 @@ if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
 # interpreter -- an index outage, a resolution conflict, a dropped download --
 # and clearing the venv there destroys a working environment and then retries
 # the same losing command, leaving nothing behind. So ask the venv's own
-# interpreter whether it satisfies _GYM_PYTHON and rebuild only when it does
-# not. Asking the interpreter beats matching uv's error text, which is free to
+# interpreter whether it satisfies that requirement and rebuild only when it
+# does not. Asking the interpreter beats matching uv's error text, which is free to
 # be reworded.
+# The floor to measure the venv against is the one the CHECKED-OUT Gym
+# declares, not _GYM_PYTHON. Step 1 clones only when ~/Gym is missing, so a
+# checkout made before upstream raised its floor keeps the old requirement and
+# its Python 3.12 venv is still valid for it. Measured against the notebook's
+# newer constant that venv looks stale, and then any unrelated sync failure --
+# an index outage, a dropped download -- deletes a working environment, which
+# is the outcome this guard exists to prevent. _GYM_PYTHON remains the
+# fallback when the checkout cannot be read, and remains what a venv is built
+# with, since a fresh clone is what a new venv is for.
+def _gym_requires_python():
+    try:
+        with open(os.path.join(GYM_DIR, "pyproject.toml"), encoding = "utf-8") as file:
+            declared = re.search(
+                r"^\s*requires-python\s*=\s*[\"']([^\"']+)[\"']", file.read(), re.M,
+            )
+    except OSError:
+        declared = None
+    return declared.group(1) if declared else _GYM_PYTHON
+
 def _venv_python_satisfies_floor():
     python = os.path.join(GYM_DIR, ".venv", "bin", "python")
     if not os.path.exists(python): return False
@@ -182,7 +202,11 @@ def _venv_python_satisfies_floor():
         capture_output = True, text = True,
     )
     if probe.returncode != 0: return False
-    floor = tuple(int(p) for p in _GYM_PYTHON.lstrip("><=!~ ").split(".") if p.isdigit())
+    lower_bound = re.search(r">=\s*([0-9]+(?:\.[0-9]+)*)", _gym_requires_python())
+    # A requirement with no lower bound at all leaves nothing to fail: keep the
+    # venv rather than clear it over a specifier that was not understood.
+    if lower_bound is None: return True
+    floor = tuple(int(p) for p in lower_bound.group(1).split("."))
     found = tuple(int(p) for p in probe.stdout.strip().split(".") if p.isdigit())
     return bool(found) and found >= floor
 

@@ -240,6 +240,7 @@ def test_a_rejected_venv_is_rebuilt_with_clear(path):
 # against the floor, because uv's error text is free to be reworded.
 
 _FLOOR_CHECK = "_venv_python_satisfies_floor"
+_PROJECT_FLOOR = "_gym_requires_python"
 
 
 def _rebuild_guard(source):
@@ -253,28 +254,46 @@ def _rebuild_guard(source):
     return None
 
 
-def _run_floor_check(source, reported, exists=True, returncode=0):
-    """Run the notebook's own interpreter check against a stubbed venv."""
-    tree = ast.parse(source)
+def _function_source(source, name):
     function = next(
         (
-            node for node in ast.walk(tree)
-            if isinstance(node, ast.FunctionDef) and node.name == _FLOOR_CHECK
+            node for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.FunctionDef) and node.name == name
         ),
         None,
     )
-    assert function is not None, f"{_FLOOR_CHECK} is gone"
+    assert function is not None, f"{name} is gone"
+    return ast.get_source_segment(source, function)
+
+
+def _run_floor_check(source, reported, exists=True, returncode=0, gym_dir="/gym"):
+    """Run the notebook's own interpreter check against a stubbed venv.
+
+    `gym_dir` is a real directory, so the check reads whatever
+    `pyproject.toml` it holds -- that file is the floor being tested.
+    """
     probe = types.SimpleNamespace(returncode=returncode, stdout=reported + "\n")
     namespace = {
         "os": types.SimpleNamespace(
             path=types.SimpleNamespace(join=os.path.join, exists=lambda p: exists),
         ),
+        "re": re,
         "subprocess": types.SimpleNamespace(run=lambda *a, **k: probe),
-        "GYM_DIR": "/gym",
+        "GYM_DIR": gym_dir,
         "_GYM_PYTHON": _python_requests(source)[0],
     }
-    exec(ast.get_source_segment(source, function), namespace)
+    exec(_function_source(source, _PROJECT_FLOOR), namespace)
+    exec(_function_source(source, _FLOOR_CHECK), namespace)
     return namespace[_FLOOR_CHECK]()
+
+
+def _checkout(tmp_path, requires_python):
+    """A Gym checkout on disk declaring `requires-python`."""
+    (tmp_path / "pyproject.toml").write_text(
+        f'[project]\nname = "nemo-gym"\nrequires-python = "{requires_python}"\n',
+        encoding="utf-8",
+    )
+    return str(tmp_path)
 
 
 @pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
@@ -325,6 +344,53 @@ def test_an_unreadable_venv_counts_as_not_satisfying_the_floor(path):
     source = _setup_source(path)
     assert _run_floor_check(source, "3.14.3", exists=False) is False
     assert _run_floor_check(source, "", returncode=1) is False
+
+
+# Which floor the venv is measured against matters as much as the comparison.
+# Step 1 clones only when ~/Gym is absent and never updates an existing
+# checkout, so one made before 2026-08-04 still declares `>=3.12` and its 3.12
+# venv is correct for it. Held to the notebook's own newer constant instead,
+# that venv reads as stale, and the first unrelated sync failure deletes it --
+# the exact loss the gate above was added to prevent.
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_a_venv_valid_for_the_checkout_survives_an_unrelated_sync_failure(path, tmp_path):
+    gym = _checkout(tmp_path, ">=3.12")
+    assert _run_floor_check(_setup_source(path), "3.12.11", gym_dir=gym) is True
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_a_venv_below_the_checkouts_own_floor_is_still_rebuilt(path, tmp_path):
+    """The repair this whole guard exists for must keep working: a fresh
+    checkout declares 3.13.14 and a leftover 3.12 venv has to go."""
+    gym = _checkout(tmp_path, ">=3.13.14")
+    assert _run_floor_check(_setup_source(path), "3.12.11", gym_dir=gym) is False
+    assert _run_floor_check(_setup_source(path), "3.13.14", gym_dir=gym) is True
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_an_unreadable_checkout_falls_back_to_the_notebook_floor(path, tmp_path):
+    """No pyproject to read. The notebook's constant is the only floor left,
+    and it must still condemn the 3.12 venv the original failure leaves."""
+    assert _run_floor_check(_setup_source(path), "3.12.11", gym_dir=str(tmp_path)) is False
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_a_requirement_with_no_lower_bound_keeps_the_venv(path, tmp_path):
+    """`<4` bounds nothing from below, so no interpreter can be called stale
+    against it. Clearing there is the destructive default all over again."""
+    gym = _checkout(tmp_path, "<4")
+    assert _run_floor_check(_setup_source(path), "3.9.1", gym_dir=gym) is True
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_a_compound_requirement_reads_only_its_lower_bound(path, tmp_path):
+    """`>=3.13.14,<3.15` means 3.13.14. Stripping the operators off the front
+    and splitting on "." reads it as 3.15 and condemns a valid 3.13 venv."""
+    gym = _checkout(tmp_path, ">=3.13.14,<3.15")
+    assert _run_floor_check(_setup_source(path), "3.13.14", gym_dir=gym) is True
+    assert _run_floor_check(_setup_source(path), "3.13.8", gym_dir=gym) is False
 
 
 @pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
