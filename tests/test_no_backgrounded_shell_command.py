@@ -108,16 +108,25 @@ def _for_message(commands):
 _NOTEBOOKS = sorted(NB_DIR.glob("*.ipynb")) if NB_DIR.is_dir() else []
 
 
+def _unaccounted(name, commands):
+    """The commands KNOWN does not already account for, so anything else in a
+    grandfathered notebook is a new regression and still has to fail.
+
+    One function, called by the check below and by every test that claims to
+    guard it. Spelling the filter out again inside those tests left them green
+    against any rewrite of it, including one that dropped every command.
+    """
+    if name not in KNOWN:
+        return list(commands)
+    _pr, allowed = KNOWN[name]
+    return [command for command in commands if command != allowed]
+
+
 @pytest.mark.parametrize("path", _NOTEBOOKS, ids=lambda p: p.name)
 def test_no_notebook_backgrounds_a_shell_command(path):
-    found = _backgrounded(path)
-    if path.name in KNOWN:
-        # Only the one command already accounted for. Anything else in this
-        # notebook is a new regression and still has to fail here.
-        pr, allowed = KNOWN[path.name]
-        found = [command for command in found if command != allowed]
-        if not found:
-            pytest.skip(f"known, fixed by {pr}")
+    found = _unaccounted(path.name, _backgrounded(path))
+    if path.name in KNOWN and not found:
+        pytest.skip(f"known, fixed by {KNOWN[path.name][0]}")
     assert not found, (
         f"{path.name} ends a `!` command with `&`: {_for_message(found)}. "
         f"ipykernel raises OSError on that, so the cell cannot run outside "
@@ -137,27 +146,27 @@ def test_the_known_list_still_describes_reality():
 def test_a_second_offender_in_a_known_notebook_is_not_hidden():
     """The name match used to skip the whole notebook, so another backgrounded
     command added beside the sglang one would never be reported."""
-    name, (_pr, allowed) = next(iter(KNOWN.items()))
+    name, (_pr, _allowed) = next(iter(KNOWN.items()))
     commands = _backgrounded(NB_DIR / name) + ["!python other_server.py &"]
-    assert [c for c in commands if c != allowed] == ["!python other_server.py &"]
+    assert _unaccounted(name, commands) == ["!python other_server.py &"]
 
 
 def test_a_second_sglang_command_is_not_hidden():
     """A substring marker like `sglang.launch_server` would filter this one out
     too, and the notebook would go on skipping instead of reporting it."""
-    name, (_pr, allowed) = next(iter(KNOWN.items()))
+    name, (_pr, _allowed) = next(iter(KNOWN.items()))
     second = "!nohup python -m sglang.launch_server --port 8001 > two.log &"
     commands = _backgrounded(NB_DIR / name) + [second]
-    assert [c for c in commands if c != allowed] == [second]
+    assert _unaccounted(name, commands) == [second]
 
 
 def test_editing_the_grandfathered_command_is_reported():
     """The entry pins one command, so changing it, even by a flag, has to fail
     rather than stay silently grandfathered."""
-    _name, (_pr, allowed) = next(iter(KNOWN.items()))
+    name, (_pr, allowed) = next(iter(KNOWN.items()))
     edited = allowed.replace("--port 8000", "--port 8001")
     assert edited != allowed
-    assert [c for c in [edited] if c != allowed] == [edited]
+    assert _unaccounted(name, [edited]) == [edited]
 
 
 def test_the_known_command_survives_extraction_whole():
