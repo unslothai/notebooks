@@ -66,7 +66,7 @@ gemma4_models = [
     "unsloth/gemma-4-26B-A4B",
 ] # More models at https://huggingface.co/unsloth
 
-model, tokenizer = FastModel.from_pretrained(
+model, processor = FastModel.from_pretrained(
     model_name = "unsloth/gemma-4-12b-it",
     dtype = None, # None for auto detection
     max_seq_length = 2048, # Choose any for long context!

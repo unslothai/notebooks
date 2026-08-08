@@ -123,7 +123,7 @@ def _():
         "unsloth/gemma-4-26B-A4B",
     ]  # More models at https://huggingface.co/unsloth
 
-    model, tokenizer = FastModel.from_pretrained(
+    model, processor = FastModel.from_pretrained(
         model_name="unsloth/gemma-4-12b-it",  # YOUR MODEL YOU USED FOR TRAINING
         dtype=None,  # None for auto detection
         max_seq_length=2048,  # Choose any for long context!
@@ -131,7 +131,7 @@ def _():
         full_finetuning=False,  # [NEW!] We have full finetuning now!
         # token = "YOUR_HF_TOKEN", # HF Token for gated models
     )
-    return FastModel, model, torch
+    return FastModel, model, processor, torch
 
 
 @app.cell(hide_code=True)
