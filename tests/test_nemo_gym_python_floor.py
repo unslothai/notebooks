@@ -42,8 +42,11 @@ Deliberately no upper bound on the accepted specifier: pinning one here would
 recreate the same staleness in the test.
 """
 
+import ast
 import json
+import os
 import re
+import types
 from pathlib import Path
 
 import pytest
@@ -227,6 +230,101 @@ def test_a_rejected_venv_is_rebuilt_with_clear(path):
     assert "_GYM_PYTHON" in rebuild or ">=" in rebuild, (
         f"{path.name} rebuilds without asking for a satisfying interpreter"
     )
+
+
+# The rebuild is destructive, so it belongs behind the failure it repairs. A
+# sync also fails for reasons that have nothing to do with the interpreter -- an
+# index outage, a resolution conflict, a dropped download -- and clearing the
+# venv there discards a working environment and retries the same losing command,
+# leaving the user with neither. The condition is the venv's own interpreter
+# against the floor, because uv's error text is free to be reworded.
+
+_FLOOR_CHECK = "_venv_python_satisfies_floor"
+
+
+def _rebuild_guard(source):
+    """The `if` statement that guards the `uv venv --clear` rebuild."""
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.If):
+            continue
+        body = ast.dump(ast.Module(body=node.body, type_ignores=[]))
+        if "'--clear'" in body:
+            return node
+    return None
+
+
+def _run_floor_check(source, reported, exists=True, returncode=0):
+    """Run the notebook's own interpreter check against a stubbed venv."""
+    tree = ast.parse(source)
+    function = next(
+        (
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == _FLOOR_CHECK
+        ),
+        None,
+    )
+    assert function is not None, f"{_FLOOR_CHECK} is gone"
+    probe = types.SimpleNamespace(returncode=returncode, stdout=reported + "\n")
+    namespace = {
+        "os": types.SimpleNamespace(
+            path=types.SimpleNamespace(join=os.path.join, exists=lambda p: exists),
+        ),
+        "subprocess": types.SimpleNamespace(run=lambda *a, **k: probe),
+        "GYM_DIR": "/gym",
+        "_GYM_PYTHON": _python_requests(source)[0],
+    }
+    exec(ast.get_source_segment(source, function), namespace)
+    return namespace[_FLOOR_CHECK]()
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_the_rebuild_is_gated_on_the_interpreter_being_below_the_floor(path):
+    """Without the gate, any failed sync -- a PyPI outage, a dropped download --
+    deletes a working venv and then retries the command that just failed."""
+    source = _setup_source(path)
+    guard = _rebuild_guard(source)
+    assert guard is not None, f"{path.name}: no `if` guards the --clear rebuild"
+    negated = [
+        node.operand.func.id
+        for node in ast.walk(guard.test)
+        if isinstance(node, ast.UnaryOp)
+        and isinstance(node.op, ast.Not)
+        and isinstance(node.operand, ast.Call)
+        and isinstance(node.operand.func, ast.Name)
+    ]
+    assert _FLOOR_CHECK in negated, (
+        f"{path.name} clears the venv on any failed sync. Rebuild only when "
+        f"`not {_FLOOR_CHECK}()`, or an unrelated failure costs the user a "
+        f"working environment."
+    )
+    assert "returncode" in ast.dump(guard.test), (
+        f"{path.name} no longer keys the rebuild on the sync having failed"
+    )
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    "reported, satisfied",
+    [
+        ("3.12.11", False),   # what the original failure leaves behind
+        ("3.13.8", False),    # what a bare `--python 3.13` resolved to
+        ("3.13.14", True),    # exactly the floor
+        ("3.14.3", True),     # what the rebuild produced here
+    ],
+)
+def test_the_interpreter_check_answers_the_floor_correctly(path, reported, satisfied):
+    """Run the check itself, not a spelling of it: a comparison the wrong way
+    round would either never repair the 3.12 venv or clear a healthy one."""
+    assert _run_floor_check(_setup_source(path), reported) is satisfied
+
+
+@pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)
+def test_an_unreadable_venv_counts_as_not_satisfying_the_floor(path):
+    """A missing or broken interpreter must fall through to the rebuild rather
+    than raise, which is the state a half-finished setup leaves behind."""
+    source = _setup_source(path)
+    assert _run_floor_check(source, "3.14.3", exists=False) is False
+    assert _run_floor_check(source, "", returncode=1) is False
 
 
 @pytest.mark.parametrize("path", _GYM, ids=lambda p: p.name)

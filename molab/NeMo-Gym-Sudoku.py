@@ -227,9 +227,37 @@ def _():
     if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
         print("Setting up NeMo Gym environment (this may take a few minutes)...")
         subprocess.run(["uv", "venv", "--python", _GYM_PYTHON], cwd=GYM_DIR, check=True)
+    #
+    # The rebuild throws the environment away, so it is reserved for the failure it
+    # repairs. A sync also fails for reasons that have nothing to do with the
+    # interpreter -- an index outage, a resolution conflict, a dropped download --
+    # and clearing the venv there destroys a working environment and then retries
+    # the same losing command, leaving nothing behind. So ask the venv's own
+    # interpreter whether it satisfies _GYM_PYTHON and rebuild only when it does
+    # not. Asking the interpreter beats matching uv's error text, which is free to
+    # be reworded.
+    def _venv_python_satisfies_floor():
+        python = os.path.join(GYM_DIR, ".venv", "bin", "python")
+        if not os.path.exists(python):
+            return False
+        probe = subprocess.run(
+            [python, "-c", "import sys; print('%d.%d.%d' % sys.version_info[:3])"],
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode != 0:
+            return False
+        floor = tuple(
+            int(p) for p in _GYM_PYTHON.lstrip("><=!~ ").split(".") if p.isdigit()
+        )
+        found = tuple(int(p) for p in probe.stdout.strip().split(".") if p.isdigit())
+        return bool(found) and found >= floor
+
     _sync = _uv_sync()
-    if _sync.returncode != 0:
-        print("Rebuilding the NeMo Gym venv: uv sync rejected the existing one.")
+    if _sync.returncode != 0 and not _venv_python_satisfies_floor():
+        print(
+            "Rebuilding the NeMo Gym venv: its Python is below the floor NeMo Gym requires."
+        )
         subprocess.run(
             ["uv", "venv", "--python", _GYM_PYTHON, "--clear"],
             cwd=GYM_DIR,
