@@ -681,6 +681,14 @@ installation_amd_extras_grpo = """\
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 """
 
+# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off, so
+# unsloth.kernels.moe.autotune_cache returns its heuristic configs instead of
+# searching per device capability. The CUDA sources they are minted from have
+# never carried it, so it has to live here or a regeneration drops it.
+installation_amd_extras_qwen3_moe = """\
+import os; os.environ["UNSLOTH_MOE_DISABLE_AUTOTUNE"] = "1"
+"""
+
 installation_amd_extras_gemma4 = """\
 # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
 !uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
@@ -2980,6 +2988,14 @@ def _extract_variant_header(variant_extras):
     return out
 
 
+def _is_qwen3_moe_path(notebook_path):
+    """The Qwen3.5/3.6 MoE pair, not the Qwen3.5 Vision notebooks beside them."""
+    lowered = os.path.basename(notebook_path).lower()
+    return "moe" in lowered and is_path_contains_any(
+        lowered, ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6"]
+    )
+
+
 def _compose_amd_installation(notebook_path, source_install_texts):
     """Build the AMD install cell(s) while preserving notebook-specific packages.
 
@@ -3006,6 +3022,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
             variant_extras = installation_amd_extras_gemma4_12b
         else:
             variant_extras = installation_amd_extras_gemma4
+    elif _is_qwen3_moe_path(notebook_path):
+        variant_extras = installation_amd_extras_qwen3_moe
     elif _is_amd_grpo_like_path(notebook_path) and "vllm" in source_install_blob:
         variant_extras = installation_amd_extras_grpo
     elif is_path_contains_any(lowered, ["llasa"]):
