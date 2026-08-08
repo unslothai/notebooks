@@ -38,23 +38,29 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import notebook_inventory as ni  # noqa: E402
 
 
-# `_vllm, _triton = (...) if is_t4 else (...)` / the older `get_vllm, get_triton` spelling.
-_SELECTOR_RE = re.compile(
-    r"^\s*(?:_vllm|get_vllm)\s*,\s*(?:_triton|get_triton)\s*=\s*(?P<rhs>.+)$",
-    re.MULTILINE,
+# A quoted pip requirement for vLLM: 'vllm', "vllm==0.15.1", 'vllm[audio]==0.15.1'.
+# Strict on purpose. "everything up to the closing quote" also swallows
+# "vllm.entrypoints.openai.api_server", "vllm_requirements.txt" and
+# f"vllm server is running.", which are not requirements and cannot be pinned.
+_VLLM_SPEC_RE = re.compile(
+    r"""['"](vllm(?:\[[^\[\]'"]*\])?\s*(?:[=<>!~]=?[^'"]*)?)['"]"""
 )
-# A vLLM requirement inside that line: "vllm" or "vllm==0.15.1", quotes included.
-_VLLM_SPEC_RE = re.compile(r"""['"](vllm(?:\[[^'"]*\])?[^'"]*)['"]""")
 
 
 def _selector_lines():
-    """(notebook, line, spec) for every vLLM requirement in a selector line."""
+    """(notebook, line, spec) for every quoted vLLM requirement in a code cell.
+
+    Keyed on the requirement itself, not on the names the install cell unpacks
+    it into. Matching `_vllm, _triton = ...` / `get_vllm, get_triton = ...`
+    literally meant a rename to any other valid spelling dropped those
+    notebooks from the gate silently, while the count guard below still
+    passed, so an unpinned vLLM could reach CI green.
+    """
     for path in ni.iter_notebooks():
         for _index, source in ni.iter_code_cells(path):
-            for match in _SELECTOR_RE.finditer(source):
-                line = match.group(0).strip()
-                for spec in _VLLM_SPEC_RE.findall(match.group("rhs")):
-                    yield path, line, spec
+            for line in source.splitlines():
+                for spec in _VLLM_SPEC_RE.findall(line):
+                    yield path, line.strip(), spec
 
 
 _CASES = list(_selector_lines())
@@ -81,3 +87,34 @@ def test_vllm_is_pinned_in_install_selector(path, line, spec):
         f"wheel is built for CUDA 13 and cannot load against Colab's CUDA 12 "
         f"torch. Pin the same version the generator uses."
     )
+
+
+def test_the_requirement_is_found_whatever_the_selector_is_called():
+    """Discriminating case for the detection above, held here so it keeps
+    meaning something no matter how the notebooks spell the assignment. The
+    names are not part of the contract; the quoted requirement is."""
+    for line in (
+        "    _vllm, _triton = ('vllm', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')",
+        "    get_vllm, get_triton = ('vllm', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')",
+        "    vllm_spec, triton_spec = ('vllm', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')",
+        "    _vllm = 'vllm' if is_t4 else 'vllm==0.15.1'",
+    ):
+        assert _VLLM_SPEC_RE.findall(line) == ["vllm", "vllm==0.15.1"]
+
+
+def test_a_vllm_string_that_is_not_a_requirement_is_left_alone():
+    """These all appear in the notebooks. Treating them as requirements would
+    fail the gate on lines that install nothing."""
+    for line in (
+        '!pkill -f "vllm.entrypoints.openai.api_server"',
+        'with open("vllm_requirements.txt", "wb") as file:',
+        'print(f"vllm server is running.")',
+    ):
+        assert _VLLM_SPEC_RE.findall(line) == []
+
+
+def test_extras_and_other_operators_still_read_as_requirements():
+    assert _VLLM_SPEC_RE.findall("('vllm[audio]==0.15.1',)") == ["vllm[audio]==0.15.1"]
+    assert _VLLM_SPEC_RE.findall('("vllm>=0.15.1",)') == ["vllm>=0.15.1"]
+    # An unpinned extra is still unpinned, and must reach the assertion above.
+    assert "==" not in _VLLM_SPEC_RE.findall("('vllm[audio]',)")[0]
