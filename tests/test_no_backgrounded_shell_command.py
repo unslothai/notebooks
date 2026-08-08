@@ -44,13 +44,16 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NB_DIR = REPO_ROOT / "nb"
 
-# Known offenders, with the PR that fixes each. A new one must fail rather
-# than be added here; this list only exists so the check can land before the
-# other fix does, and it should be emptied when that PR merges.
+# Known offenders, with the PR that fixes each and the exact command allowed.
+# The command matters: skipping the whole notebook on a name match would hide a
+# second backgrounded command added to that same notebook. A new one must fail
+# rather than be added here; this list only exists so the check can land before
+# the other fix does, and it should be emptied when that PR merges.
+_SGLANG = ("unslothai/notebooks#317", "sglang.launch_server")
 KNOWN = {
-    "Gemma3N_(2B)-Inference.ipynb": "unslothai/notebooks#317",
-    "Kaggle-Gemma3N_(2B)-Inference.ipynb": "unslothai/notebooks#317",
-    "AMD-Gemma3N_(2B)-Inference.ipynb": "unslothai/notebooks#317",
+    "Gemma3N_(2B)-Inference.ipynb": _SGLANG,
+    "Kaggle-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
+    "AMD-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
 }
 
 
@@ -94,7 +97,12 @@ _NOTEBOOKS = sorted(NB_DIR.glob("*.ipynb")) if NB_DIR.is_dir() else []
 def test_no_notebook_backgrounds_a_shell_command(path):
     found = _backgrounded(path)
     if path.name in KNOWN:
-        pytest.skip(f"known, fixed by {KNOWN[path.name]}")
+        # Only the one command already accounted for. Anything else in this
+        # notebook is a new regression and still has to fail here.
+        pr, marker = KNOWN[path.name]
+        found = [command for command in found if marker not in command]
+        if not found:
+            pytest.skip(f"known, fixed by {pr}")
     assert not found, (
         f"{path.name} ends a `!` command with `&`: {found}. "
         f"ipykernel raises OSError on that, so the cell cannot run outside "
@@ -105,9 +113,18 @@ def test_no_notebook_backgrounds_a_shell_command(path):
 def test_the_known_list_still_describes_reality():
     """A name that no longer offends must leave the list, or it hides the next
     regression in that notebook."""
-    stale = [name for name in KNOWN
-             if (NB_DIR / name).is_file() and not _backgrounded(NB_DIR / name)]
+    stale = [name for name, (_pr, marker) in KNOWN.items()
+             if (NB_DIR / name).is_file()
+             and not [c for c in _backgrounded(NB_DIR / name) if marker in c]]
     assert not stale, f"fixed, so remove from KNOWN: {stale}"
+
+
+def test_a_second_offender_in_a_known_notebook_is_not_hidden():
+    """The name match used to skip the whole notebook, so another backgrounded
+    command added beside the sglang one would never be reported."""
+    name, (_pr, marker) = next(iter(KNOWN.items()))
+    commands = _backgrounded(NB_DIR / name) + ["!python other_server.py &"]
+    assert [c for c in commands if marker not in c] == ["!python other_server.py &"]
 
 
 def test_a_double_ampersand_is_not_backgrounding():

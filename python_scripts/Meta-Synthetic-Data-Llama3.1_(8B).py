@@ -109,6 +109,11 @@ while time.time() < deadline:
     except Exception:
         time.sleep(5)
 else:
+    # Reap it, or it keeps the GPU and port 8000 and the next launch attempt
+    # either fails to bind or talks to the orphan.
+    server.terminate()
+    try: server.wait(timeout = 30)
+    except subprocess.TimeoutExpired: server.kill(); server.wait()
     raise TimeoutError("vllm was not ready in 900s. See vllm.log")
 print("vllm server ready")
 
