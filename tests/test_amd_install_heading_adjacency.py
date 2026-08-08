@@ -185,3 +185,88 @@ def test_the_first_cell_still_uses_the_wider_test(gen):
 
 def _cell_text(cell):
     return "".join(cell["source"])
+
+
+# --- the exported script's install block, at whatever heading depth ----------
+
+
+_SCRIPT_BODY = (
+    "#!/usr/bin/env python\n"
+    "# coding: utf-8\n"
+    "\n"
+    "{heading}\n"
+    "# We'll be using Unsloth to do RL.\n"
+    "\n"
+    "# In[ ]:\n"
+    "\n"
+    "\n"
+    "get_ipython().system('uv pip install --system -qqq unsloth')\n"
+    "\n"
+    "\n"
+    "# ### Unsloth\n"
+    "\n"
+    "from unsloth import FastLanguageModel\n"
+)
+
+
+@pytest.mark.parametrize(
+    "heading",
+    ["# ### Installation", "# ## Installation", "# # Installation"],
+)
+def test_the_install_block_is_commented_at_any_heading_depth(gen, heading):
+    """A template exports `# ### Installation`; a hand-maintained `nb/` source
+    exports `# # Installation`. Only the first was matched, so the AMD script kept
+    live `get_ipython()` calls that raise NameError under plain python, before the
+    model setup the script exists to run."""
+    out = gen.remove_unwanted_section(_SCRIPT_BODY.format(heading = heading))
+    live = [line for line in out.splitlines() if line.startswith("get_ipython")]
+    assert live == [], f"install calls still executable under {heading!r}: {live}"
+    assert "# get_ipython().system(" in out, "the call was dropped rather than commented"
+
+
+def test_the_code_after_the_unsloth_heading_is_untouched(gen):
+    """Only the install section is commented. Commenting past the end marker would
+    silently disable the script."""
+    out = gen.remove_unwanted_section(_SCRIPT_BODY.format(heading = "# # Installation"))
+    assert "\nfrom unsloth import FastLanguageModel\n" in out
+
+
+def test_a_script_with_no_install_section_is_returned_unchanged(gen):
+    """No markers, nothing to comment. It must not comment the whole file."""
+    body = "#!/usr/bin/env python\nfrom unsloth import FastLanguageModel\n"
+    assert gen.remove_unwanted_section(body) == body
+
+
+# An intro heading, exactly as `Falcon_H1_(0.5B)-Alpaca` opens: a level-1
+# `# Unsloth` title well above the install block.
+_SCRIPT_WITH_INTRO = (
+    "# # Unsloth\n"
+    "#\n"
+    "# Visit our docs for model uploads and notebooks.\n"
+    "\n"
+) + _SCRIPT_BODY
+
+
+def test_an_intro_unsloth_heading_is_not_mistaken_for_the_end_marker(gen):
+    """The end marker is searched from the Installation heading onwards. Taken
+    from the top it lands on the intro title, which is before the start, so the
+    range is discarded and every install call stays live -- the exact failure the
+    old three-hash literal avoided only by accident."""
+    out = gen.remove_unwanted_section(_SCRIPT_WITH_INTRO.format(heading = "# ### Installation"))
+    live = [line for line in out.splitlines() if line.startswith("get_ipython")]
+    assert live == [], f"intro heading swallowed the section: {live}"
+    assert out.startswith("# # Unsloth\n"), "the intro itself must not be commented"
+
+
+def test_the_intro_case_holds_at_every_heading_depth(gen):
+    for heading in ["# ### Installation", "# ## Installation", "# # Installation"]:
+        out = gen.remove_unwanted_section(_SCRIPT_WITH_INTRO.format(heading = heading))
+        live = [line for line in out.splitlines() if line.startswith("get_ipython")]
+        assert live == [], f"{heading!r} left live calls beneath an intro heading: {live}"
+
+
+def test_a_later_unsloth_heading_is_still_the_end_marker(gen):
+    """Searching forward must not skip past the real terminator."""
+    out = gen.remove_unwanted_section(_SCRIPT_WITH_INTRO.format(heading = "# # Installation"))
+    assert "\nfrom unsloth import FastLanguageModel\n" in out
+    assert out.count("# ### Unsloth") == 1, "the end marker was commented or duplicated"
