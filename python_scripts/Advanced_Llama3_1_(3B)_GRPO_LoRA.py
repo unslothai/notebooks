@@ -52,7 +52,7 @@
 #     except: get_numpy = "numpy"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
-#     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
+#     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm==0.15.1", "triton")
 #     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers')
 #     get_ipython().system('uv pip install -qqq {get_triton}')
 #     get_ipython().system('uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"')
