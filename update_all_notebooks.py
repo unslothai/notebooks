@@ -772,10 +772,13 @@ installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 # Version=13.0 and torchvision has CUDA Version=12.8". Naming a matching
 # torchvision cannot fix that: PEP 440 ignores a local version label, so
 # `torchvision==0.26.0` is ALREADY satisfied by Colab's 0.26.0+cu128 and pip
-# leaves it in place. The remedy is a runtime restart between this cell and the
-# rest of the notebook, which is a decision about how the notebook is run.
+# leaves it in place. So the same-version wheel is force-reinstalled below,
+# which pulls it from the index the new torch came from and makes the two
+# agree. torchvision 0.26.0 is the right version for torch 2.11.0: its own
+# metadata requires `torch==2.11.0` exactly.
 installation_sglang_content = """%%capture
-!pip install "sglang[all]==0.5.16\""""
+!pip install "sglang[all]==0.5.16"
+!pip install --force-reinstall --no-deps "torchvision==0.26.0\""""
 installation_sglang_kaggle_content = installation_sglang_content
 
 installation_deepseek_ocr_content = installation_content

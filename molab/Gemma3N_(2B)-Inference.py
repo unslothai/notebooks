@@ -3,6 +3,7 @@
 # dependencies = [
 #     "marimo",
 #     "sglang[all]==0.5.16",
+#     "torchvision==0.26.0",
 # ]
 #
 # [tool.uv]

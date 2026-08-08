@@ -34,7 +34,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', '!pip install "sglang[all]==0.5.16"\n')
+# get_ipython().run_cell_magic('capture', '', '!pip install "sglang[all]==0.5.16"\n!pip install --force-reinstall --no-deps "torchvision==0.26.0"\n')
 # 
 # 
 # # ### Unsloth
