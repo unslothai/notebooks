@@ -5881,7 +5881,15 @@ _RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 def remove_unwanted_section(script_content):
     start_match = _RE_SCRIPT_INSTALL_HEADING.search(script_content)
     start_index = -1 if start_match is None else start_match.start()
-    end_match = _RE_SCRIPT_UNSLOTH_HEADING.search(script_content)
+    # From the Installation heading onwards, never from the top. Several
+    # notebooks open on an intro `# Unsloth` heading -- `Falcon_H1_(0.5B)-Alpaca`
+    # has one at offset 39 -- and matching that as the terminator puts the end
+    # before the start, which discards the range and leaves the install cells
+    # live. The old three-hash literal missed the intro by accident.
+    end_match = (
+        None if start_match is None
+        else _RE_SCRIPT_UNSLOTH_HEADING.search(script_content, start_match.end())
+    )
     end_index = -1 if end_match is None else end_match.start()
 
     if start_index != -1 and end_index != -1 and start_index < end_index:
