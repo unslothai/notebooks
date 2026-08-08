@@ -181,14 +181,38 @@ def _():
         )
 
     # Step 2: Create venv and install dependencies
+    #
+    # `>=3.13.14`, not a fixed version: NeMo Gym raised its own floor to that on
+    # 2026-08-04 (upstream ea4c6c6), and pinning 3.12 made `uv sync` exit 2 with
+    # "incompatible with the project's Python requirement". A specifier tracks
+    # whatever they declare next. `--python 3.13` is NOT enough: uv resolves it to
+    # the newest 3.13 it has, which was 3.13.8 here, still under the floor.
+    _GYM_PYTHON = ">=3.13.14"
+
+    def _uv_sync():
+        return subprocess.run(
+            ["bash", "-c", "source .venv/bin/activate && uv sync"],
+            cwd=GYM_DIR,
+            capture_output=True,
+            text=True,
+        )
+
     if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
         print("Setting up NeMo Gym environment (this may take a few minutes)...")
-        subprocess.run(["uv", "venv", "--python", ">=3.13.14"], cwd=GYM_DIR, check=True)
+        subprocess.run(["uv", "venv", "--python", _GYM_PYTHON], cwd=GYM_DIR, check=True)
+    _sync = _uv_sync()
+    if _sync.returncode != 0:
+        print("Rebuilding the NeMo Gym venv: uv sync rejected the existing one.")
         subprocess.run(
-            ["bash", "-c", "source .venv/bin/activate && uv sync"],
+            ["uv", "venv", "--python", _GYM_PYTHON, "--clear"],
             cwd=GYM_DIR,
             check=True,
         )
+        _sync = _uv_sync()
+    if _sync.returncode != 0:
+        print(_sync.stdout[-3000:])
+        print(_sync.stderr[-3000:])
+        _sync.check_returncode()
     #
     # Inside the `.venv` existence guard above, `uv pip install reasoning-gym` ran
     # and exited 0, and create_dataset.py then died on
