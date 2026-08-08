@@ -13,11 +13,11 @@
 
 """An nb/-sourced AMD variant still gets the News section.
 
-News lives in `original_template/` only, so once the AMD generator started
-minting hand-maintained notebooks from `nb/`, `AMD-Ministral_3_(3B)_
-Reinforcement_Learning_Sudoku_Game` lost the `### News` heading and the
-announcement it had carried. `_is_stale_amd_announcement` never put it back:
-it only rewrites the opening Colab announcements.
+News lives in `original_template/` only, so once the AMD generator minted
+hand-maintained notebooks from `nb/`, `AMD-Ministral_3_(3B)_
+Reinforcement_Learning_Sudoku_Game` lost the `### News` heading and its
+announcement. `_is_stale_amd_announcement` only rewrites the opening Colab
+announcements, so it never put them back.
 """
 from __future__ import annotations
 

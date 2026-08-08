@@ -14,11 +14,11 @@
 """The AMD MoE notebooks turn MoE autotuning off, and regeneration keeps it.
 
 `UNSLOTH_MOE_DISABLE_AUTOTUNE=1` makes `unsloth.kernels.moe.autotune_cache`
-hand back its heuristic configs instead of searching per device capability.
-It was set by hand on `AMD-Qwen3_5_MoE` and `AMD-Qwen3_6_MoE` and appears in
-no CUDA source, so once the AMD generator started rewriting the follow-up
-install cell the setting was composed away. It now comes from the generator's
-own variant extras, which is the only place a regeneration cannot lose it.
+hand back heuristic configs instead of searching per device capability. Set by
+hand on `AMD-Qwen3_5_MoE` / `AMD-Qwen3_6_MoE` and absent from every CUDA
+source, it was composed away once the generator started rewriting the
+follow-up install cell. It now comes from the generator's own variant extras,
+the only place a regeneration cannot lose it.
 """
 from __future__ import annotations
 

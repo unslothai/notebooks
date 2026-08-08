@@ -14,10 +14,10 @@
 """An AMD variant must not be minted from an abandoned template.
 
 For `DONT_UPDATE_EXCEPTIONS`, `nb/` is the source of truth and the
-`original_template/` copy is left behind. `Advanced_Llama3_1_(3B)_GRPO_LoRA`
-had drifted to `weight_decay = 0.1` under `nb/` while the template still said
-`0.001`, so the AMD reader was handed hyperparameters nobody chose. Three of
-the eleven exceptions have both a stale template and an AMD variant.
+`original_template/` copy is left behind: `Advanced_Llama3_1_(3B)_GRPO_LoRA`
+had drifted to `weight_decay = 0.1` under `nb/` against `0.001` in the
+template, so the AMD reader got hyperparameters nobody chose. Three of the
+eleven exceptions have both a stale template and an AMD variant.
 """
 from __future__ import annotations
 
