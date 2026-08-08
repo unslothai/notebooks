@@ -20,21 +20,47 @@ Three had already drifted off the list: the two AMD generator tests here and
 
 This is the cheapest possible check, and it fails on the file you just wrote
 rather than months later when the regression it was meant to catch ships.
+
+It reads the `run:` commands rather than the file text. Every step names its
+test twice, once in `name:` and once in the command, and the header comment
+names four more, so a text scan stayed green when a step's command was
+replaced but its label left behind.
 """
 
 import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "notebooks-tests-ci.yml"
 TESTS = REPO_ROOT / "tests"
 
+_TEST_FILE = re.compile(r"tests/([A-Za-z0-9_]+\.py)")
+
+
+def _run_commands(node):
+    """Every `run:` string in the workflow, at any nesting depth."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "run" and isinstance(value, str):
+                yield value
+            else:
+                yield from _run_commands(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _run_commands(item)
+
 
 def _named_in_workflow():
-    text = WORKFLOW.read_text(encoding="utf-8")
-    return set(re.findall(r"tests/([A-Za-z0-9_]+\.py)", text))
+    workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    named = set()
+    for command in _run_commands(workflow):
+        if "pytest" not in command:
+            continue
+        named.update(_TEST_FILE.findall(command))
+    return named
 
 
 def test_the_workflow_is_where_we_think_it_is():
@@ -48,3 +74,22 @@ def test_every_test_file_has_a_ci_step(path):
         f"{path.name} is never run by notebooks-tests-ci.yml. Add a step for "
         f"it, or the tests in it are decoration."
     )
+
+
+def test_a_label_without_a_command_does_not_count(tmp_path, monkeypatch):
+    """The failure this file exists to catch: a step keeps its `name:` while
+    its command is replaced, so the test stops running and nothing says so."""
+    workflow = tmp_path / "ci.yml"
+    workflow.write_text(
+        "# tests/test_ghost.py is mentioned here too\n"
+        "jobs:\n"
+        "  lint:\n"
+        "    steps:\n"
+        "      - name: tests/test_ghost.py\n"
+        "        run: echo skipped\n"
+        "      - name: tests/test_real.py\n"
+        "        run: python -m pytest tests/test_real.py -q\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("tests.test_every_test_runs_in_ci.WORKFLOW", workflow)
+    assert _named_in_workflow() == {"test_real.py"}
