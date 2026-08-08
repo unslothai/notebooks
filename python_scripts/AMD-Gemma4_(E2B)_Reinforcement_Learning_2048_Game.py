@@ -35,6 +35,7 @@
 # # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
 # 
 # import torch; torch._dynamo.config.recompile_limit = 64;
+# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 # get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" timm')
 # get_ipython().system('uv pip install --system -qqq torchcodec')
 # 
