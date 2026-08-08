@@ -57,16 +57,48 @@
 # In[3]:
 
 
-# Load and run the model using vllm
-# we prepend "nohup" and postpend "&" to make the Colab cell run in background
-get_ipython().system(' nohup python -m vllm.entrypoints.openai.api_server                    --model unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit                    --trust-remote-code                    --dtype half                    --quantization bitsandbytes                    --max-model-len 10000                    --tensor-parallel-size 1                    --gpu-memory-utilization 0.7                    --enable-chunked-prefill                    --port 8000                    > vllm.log &')
+# Popen, not `!... &`: IPython's `system_piped`, which every kernel except
+# Colab's uses, raises OSError on a trailing `&`, so on Kaggle, plain Jupyter
+# or papermill this cell could never run.
+import subprocess, sys
+
+server = subprocess.Popen(
+    [sys.executable, "-m", "vllm.entrypoints.openai.api_server",
+     "--model", "unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit",
+     "--trust-remote-code",
+     "--dtype", "half",
+     "--quantization", "bitsandbytes",
+     "--max-model-len", "10000",
+     "--tensor-parallel-size", "1",
+     "--gpu-memory-utilization", "0.7",
+     "--enable-chunked-prefill",
+     "--port", "8000"],
+    stdout = open("vllm.log", "w"), stderr = subprocess.STDOUT,
+)
 
 
 # In[4]:
 
 
-# tail vllm logs. Check server has been started correctly
-get_ipython().system('while ! grep -q "Application startup complete" vllm.log; do tail -n 1 vllm.log; sleep 5; done')
+# Bounded, and it notices a server that died. The old shell loop grepped
+# vllm.log with no timeout, so a start that failed hung the notebook instead
+# of reporting anything.
+import time, urllib.request
+
+deadline = time.time() + 900
+while time.time() < deadline:
+    if server.poll() is not None:
+        raise RuntimeError(
+            f"vllm exited with {server.returncode}. Last of vllm.log:\n"
+            + open("vllm.log").read()[-2000:])
+    try:
+        urllib.request.urlopen("http://localhost:8000/v1/models", timeout = 5)
+        break
+    except Exception:
+        time.sleep(5)
+else:
+    raise TimeoutError("vllm was not ready in 900s. See vllm.log")
+print("vllm server ready")
 
 
 # Optional: Function to check if vllm server is running. Change False to True and run cell
