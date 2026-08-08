@@ -5782,6 +5782,61 @@ def copy_and_update_notebooks(
     _rmtree_robust(temp_location)
 
 
+def _has_news_section(cells):
+    return any(
+        cell.get("cell_type") == "markdown" and _cell_source_text(cell).strip() == "### News"
+        for cell in cells
+    )
+
+
+def _news_insert_index(cells):
+    """Where the template path keeps News: above Installation, below the intro."""
+    for index, cell in enumerate(cells):
+        if cell.get("cell_type") != "markdown":
+            continue
+        if _is_installation_heading(_cell_source_text(cell), True):
+            return index
+    for index, cell in enumerate(cells):
+        if cell.get("cell_type") == "markdown":
+            return index + 1
+    return len(cells)
+
+
+def _restore_news_section(amd_path, template_path, new_announcement):
+    """Give an nb/-sourced AMD notebook the News section its template carries.
+
+    Hand-maintained `nb/` notebooks have no News cells -- only `original_template/`
+    does -- so minting the AMD variant from `nb/` dropped the `### News` heading and
+    the announcement that the template path produces. News is generator-owned
+    boilerplate, not hand-tuned content, so it still comes from the template.
+    """
+    if not os.path.isfile(template_path):
+        return False
+    try:
+        with open(template_path, "r", encoding="utf-8", newline="") as f:
+            template_cells = json.load(f)["cells"]
+        with open(amd_path, "r", encoding="utf-8", newline="") as f:
+            notebook_content = json.load(f)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError):
+        return False
+
+    cells = notebook_content.get("cells", [])
+    if not _has_news_section(template_cells) or _has_news_section(cells):
+        return False
+
+    index = _news_insert_index(cells)
+    cells[index:index] = [
+        {"cell_type": "markdown", "metadata": {}, "source": _source_lines("### News")},
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": _source_lines(new_announcement.strip()),
+        },
+    ]
+    _write_notebook(amd_path, notebook_content)
+    return True
+
+
 def copy_and_update_amd_notebooks(
     template_dir,
     destination_dir,
@@ -5845,6 +5900,15 @@ def copy_and_update_amd_notebooks(
         shutil.copyfile(template_notebook_path, amd_destination_path)
         _set_file_permissions(amd_destination_path)
         _cache_notebook_format(amd_destination_path)
+        sourced_from_template = os.path.normpath(
+            os.path.dirname(template_notebook_path)
+        ) == os.path.normpath(template_dir)
+        if not sourced_from_template:
+            _restore_news_section(
+                amd_destination_path,
+                os.path.join(template_dir, notebook_name),
+                new_announcement,
+            )
         update_notebook_sections(
             amd_destination_path,
             general_announcement,

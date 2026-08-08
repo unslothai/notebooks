@@ -121,6 +121,12 @@ jobs:
         run: |
           python -m pytest tests/test_amd_source_is_nb_for_hand_maintained.py -q --tb=short
 
+      - name: tests/test_amd_news_section.py
+        # News lives only in original_template/, so an AMD variant minted from a
+        # hand-maintained nb/ source has to be handed it back.
+        run: |
+          python -m pytest tests/test_amd_news_section.py -q --tb=short
+
       - name: tests/test_transformers5_hub_floor.py
         run: |
           python -m pytest tests/test_transformers5_hub_floor.py -q --tb=short
