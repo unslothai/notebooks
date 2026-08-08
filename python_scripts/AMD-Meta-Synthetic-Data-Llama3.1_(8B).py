@@ -60,7 +60,17 @@
 # Popen, not `!... &`: IPython's `system_piped`, which every kernel except
 # Colab's uses, raises OSError on a trailing `&`, so on Kaggle, plain Jupyter
 # or papermill this cell could never run.
-import subprocess, sys
+import socket, subprocess, sys
+
+# Refuse an occupied port. Otherwise the readiness probe below is answered by
+# whoever already holds 8000 -- a rerun of this cell, or another vllm with a
+# different model -- while the server we just spawned quietly dies of
+# "address already in use" and we generate against the wrong one.
+with socket.socket() as probe:
+    if probe.connect_ex(("127.0.0.1", 8000)) == 0:
+        raise RuntimeError(
+            "Something is already serving localhost:8000. Stop it first: this "
+            "cell cannot tell its replies apart from the server it starts.")
 
 server = subprocess.Popen(
     [sys.executable, "-m", "vllm.entrypoints.openai.api_server",
