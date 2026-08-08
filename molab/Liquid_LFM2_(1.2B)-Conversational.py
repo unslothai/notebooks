@@ -6,13 +6,13 @@
 #     "causal-conv1d==1.5.0.post8",
 #     "datasets==4.3.0",
 #     "hf_transfer",
-#     "huggingface_hub>=0.34.0",
+#     "huggingface_hub>=1.5.0,<2.0",
 #     "marimo",
 #     "peft",
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers==4.56.2",
+#     "transformers @ git+https://github.com/huggingface/transformers.git",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
@@ -90,6 +90,9 @@ def _(mo):
 @app.cell
 def _():
     # Need main branch for Liquid LFM2 models
+    # --no-deps above means pip never enforces what transformers main needs, and
+    # it needs hub >= 1.5.0 while molab and Kaggle ship 0.36.2. Without this the
+    # next import raises "found 0.36.2" before a line of training.
     # Install Mamba kernels
     return
 

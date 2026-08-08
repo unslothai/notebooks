@@ -687,9 +687,20 @@ def _spec_rank(spec: str) -> tuple[int, int]:
     """Rank a package spec so a pinned/constrained spec beats a bare name.
 
     Returns ``(tier, length)``; higher is preferred.  Mirrors the tie-break
-    intent of ``update_all_notebooks._install_spec_preference`` without its
-    AMD-specific git-URL handling (P0 molab notebooks have no git specs).
+    intent of ``update_all_notebooks._install_spec_preference``.
+
+    A PEP 508 direct reference outranks everything: it names an exact source,
+    so it is tighter than any ``==``.  This used to be ranked bottom, on the
+    assumption that molab notebooks carry no git specs, and the Liquid LFM2
+    pair broke it -- they install ``transformers`` from git main *and* carry
+    the canonical ``transformers==4.56.2``, so the pin won and molab asked
+    the resolver for 4.56.2 beside ``huggingface_hub>=1.5.0``, which
+    transformers 4.x forbids.  Nothing resolved, and unlike the notebook's
+    sequential ``--no-deps`` installs the PEP 723 header is resolved as one
+    set, so it failed before any cell ran.
     """
+    if "@ git+" in spec or spec.startswith("git+"):
+        return (4, len(spec))
     if "==" in spec:
         return (3, len(spec))
     if any(op in spec for op in (">=", "<=", "~=", ">", "<", "!=")):

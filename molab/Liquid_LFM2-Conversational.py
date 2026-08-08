@@ -7,7 +7,7 @@
 #     "cut_cross_entropy",
 #     "datasets>=3.4.1,<4.0.0",
 #     "hf_transfer",
-#     "huggingface_hub>=0.34.0",
+#     "huggingface_hub>=1.5.0,<2.0",
 #     "marimo",
 #     "peft",
 #     "protobuf",
@@ -92,6 +92,9 @@ def _(mo):
 @app.cell
 def _():
     # Need main branch for Liquid LFM2 models
+    # --no-deps above means pip never enforces what transformers main needs, and
+    # it needs hub >= 1.5.0 while molab and Kaggle ship 0.36.2. Without this the
+    # next import raises "found 0.36.2" before a line of training.
     # Install Mamba kernels
     return
 
