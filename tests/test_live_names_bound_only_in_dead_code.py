@@ -96,23 +96,19 @@ def _analyse_scope(node, dead):
     """(live_binds, dead_binds, free_loads, offenders, escaping_binds) for one scope.
 
     Nested bodies are recursed into as their own scopes rather than unioned in.
-    One flat set let any unrelated local -- a `processor` parameter on a helper,
-    say -- stand in for the module-level binding, so a top-level
-    `use(processor)` with no top-level binding read clean: the exact break this
+    One flat set let an unrelated local -- a helper's `processor` parameter,
+    say -- stand in for the module-level binding, hiding the exact break this
     file exists to catch. A load only reaches the enclosing scope when its own
     scope does not bind the name.
 
-    A scope that both binds a name only under `if False:` and reads it live is
-    an offender in its own right, and has to be reported here: filtering it out
-    of what escapes is what a correct scope walk does, and it would otherwise
-    hide `def train(): if False: p = load(); return p` from the module.
+    A scope that binds a name only under `if False:` and reads it live is
+    reported here: the correct scope walk filters it out of what escapes, which
+    would otherwise hide `def train(): if False: p = load(); return p`.
 
-    `escaping_binds` is the one thing a scope binds for its PARENT: a `:=` inside
-    a comprehension. PEP 572 binds that in the containing scope, so treating it
-    as comprehension-local made a later live read look unanswered, and with the
-    name also bound under `if False:` the check reported an offender that is not
-    one. Sixty comprehensions in nb/ use `:=`, so that false positive is on a
-    construct the catalogue really contains.
+    `escaping_binds` is the one thing a scope binds for its PARENT: a `:=` in a
+    comprehension, which PEP 572 binds in the containing scope. Treating it as
+    comprehension-local made a later live read look unanswered and reported a
+    false offender -- on a construct sixty comprehensions in nb/ really use.
     """
     live_binds, dead_binds, loads, nested = set(), set(), set(), []
     offenders = set()
@@ -298,8 +294,7 @@ def test_a_name_bound_live_and_again_in_dead_code_is_not_flagged():
 
 
 def test_a_dead_only_binding_inside_a_helper_is_reported():
-    """`train()` raises UnboundLocalError. Filtering the name out of what
-    escapes is right; dropping it without a word is not."""
+    """`train()` raises UnboundLocalError, so the helper is an offender itself."""
     assert _offenders_of([
         "def train():\n    if False:\n        processor = load()\n    return processor\n",
     ]) == ["processor"]
@@ -344,13 +339,7 @@ def test_a_comprehension_reading_its_own_target_is_not_a_free_load():
     ]) == []
 
 def test_a_walrus_in_a_comprehension_binds_in_the_enclosing_scope():
-    """PEP 572: `:=` inside a comprehension binds outside it, not inside.
-
-    Treating it as comprehension-local made the read in the third cell look
-    unanswered, and with `processor` also bound under `if False:` the check
-    reported an offender that is not one -- a false positive in a gate that
-    runs over the whole catalogue.
-    """
+    """PEP 572: `:=` inside a comprehension binds outside it, not inside."""
     assert _offenders_of([
         "if False:\n    processor = None\n",
         "values = [(processor := item) for item in items]\n",
