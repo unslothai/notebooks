@@ -40,6 +40,7 @@
 # # In[ ]:
 # 
 # 
+# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 # get_ipython().system('uv pip install --system -qqq git+https://github.com/huggingface/transformers')
 # get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 # 

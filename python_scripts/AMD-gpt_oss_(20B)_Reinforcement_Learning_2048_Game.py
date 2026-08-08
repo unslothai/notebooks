@@ -32,6 +32,7 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 # In[ ]:
 
 
+get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 get_ipython().system('uv pip install --system -qqq "transformers==4.56.2"')
 get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 

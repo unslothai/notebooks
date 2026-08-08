@@ -2884,6 +2884,64 @@ def _extract_preserved_setup_lines(text):
     return preserved
 
 
+# unsloth / unsloth_zoo sit in _AMD_INSTALL_PACKAGE_IGNORE because the ROCm
+# base cell owns their versions, and the parity validator subtracts that same
+# set, so the drop is invisible. But a source notebook installing them from git
+# main does it for a feature no release carries yet (FastDiffusionModel is the
+# current example, see installation_diffusiongemma_content). Losing that leaves
+# the AMD variant on the PyPI build and FastModel.from_pretrained fails, so the
+# git specs are re-emitted in the extras cell.
+_AMD_GIT_MAIN_PROJECTS = frozenset({"unsloth", "unsloth_zoo"})
+
+
+def _iter_install_tokens(text):
+    """Yield install tokens from both `!pip install ...` lines and `_pip(...)` blocks."""
+    for arg_string in _iter_pip_install_arg_strings(text):
+        yield from _split_pip_args(arg_string)
+    in_pip_call = False
+    pip_call_lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not in_pip_call and not line.startswith("_pip("):
+            continue
+        in_pip_call = True
+        pip_call_lines.append(line)
+        if ")" not in line:
+            continue
+        block = "\n".join(pip_call_lines)
+        for match in re.findall(r"\"([^\"]+)\"|'([^']+)'", block):
+            yield match[0] or match[1]
+        in_pip_call = False
+        pip_call_lines = []
+
+
+def _extract_git_main_unsloth_specs(source_install_texts):
+    """Return git URLs for unsloth / unsloth_zoo installed from main by the source.
+
+    Both the bare ``git+https://...`` form and the PEP 508 direct reference
+    ``unsloth[base] @ git+https://...`` are recognised; only the URL half is
+    kept, since the AMD re-install runs with ``--no-deps`` and an extra is then
+    a no-op anyway (the base cell's own ``unsloth[amd]`` is ``--no-deps`` too).
+    """
+    specs = []
+    seen = set()
+    for text in source_install_texts:
+        if not text:
+            continue
+        for token in _iter_install_tokens(text):
+            spec = _clean_install_spec(token)
+            if " @ " in spec:
+                spec = spec.split(" @ ", 1)[1].strip()
+            if not spec.startswith("git+"):
+                continue
+            if _package_key_from_install_token(spec) not in _AMD_GIT_MAIN_PROJECTS:
+                continue
+            if spec not in seen:
+                seen.add(spec)
+                specs.append(spec)
+    return specs
+
+
 _AMD_SHELL_BARE_RE = re.compile(r'^[A-Za-z0-9_\-./+:@]+$')
 
 
@@ -3084,6 +3142,17 @@ def _compose_amd_installation(notebook_path, source_install_texts):
         _pin_qat_numpy_beside_fbgemm(merged_groups)
     if setup_lines:
         extra_blocks.append("\n".join(setup_lines))
+    git_main_specs = _extract_git_main_unsloth_specs(source_install_texts)
+    if git_main_specs:
+        # --no-deps keeps the ROCm torch/bitsandbytes stack the base cell just
+        # installed; the base cell's own "unsloth[amd]" is --no-deps too, so the
+        # extras it names were never resolved and nothing is lost by overwriting
+        # that install with main.
+        extra_blocks.append(
+            _format_amd_pip_call(
+                ("--upgrade", "--force-reinstall", "--no-deps"), git_main_specs
+            )
+        )
     for flags, specs in merged_groups.items():
         if specs:
             extra_blocks.append(_format_amd_pip_call(flags, specs))

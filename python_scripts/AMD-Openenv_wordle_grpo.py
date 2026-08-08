@@ -32,6 +32,7 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 
+get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 get_ipython().system('uv pip install --system -qqq vllm "transformers==4.56.2" trackio')
 get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.29.1"')
 
