@@ -457,19 +457,13 @@ _TEMPLATE_STATIC_SPECS: dict[str, str] = {
     "_conv": "causal_conv1d==1.5.2",
 }
 
+# Each reason is the message the drop is reported with, so it is written to be
+# read on its own; nothing below repeats it.
 _TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
-    # ``xformers = 'xformers==' + {...}.get(torch_minor, "0.0.34")`` — the
-    # version is looked up from the live torch build.  unsloth pulls a
-    # compatible xformers transitively, so no static pin is needed.
     "xformers": (
         "version is looked up from the live torch build; unsloth pulls a "
         "compatible xformers transitively"
     ),
-    # ``_numpy`` / ``_pil`` / ``get_numpy`` / ``_qat_numpy`` all pin numpy or
-    # pillow to the copy ALREADY imported in the hosted kernel, so a
-    # reinstall cannot swap it under a running session.  molab installs into
-    # a fresh uv venv before anything is imported, so there is no incumbent
-    # version to preserve and the resolver should pick freely.
     "_numpy": (
         "pins numpy to the version already imported in the hosted kernel; "
         "molab builds a fresh venv, so there is nothing to hold in place"
@@ -486,9 +480,6 @@ _TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
         "pins numpy to the version already imported in the hosted kernel; "
         "molab builds a fresh venv, so there is nothing to hold in place"
     ),
-    # The QAT cell maps the live torch version to a torchao / fbgemm-gpu-genai
-    # version.  molab does not fix torch for that notebook, so there is no
-    # single correct arm to freeze; leave both to the resolver.
     "_qat_torchao": (
         "torchao version is chosen from the live torch version; molab does "
         "not pin torch for this notebook, so no arm is statically correct"
@@ -515,9 +506,6 @@ def template_var_names(token: str) -> list[str]:
 
     ``"{_torch}"`` -> ``["_torch"]``; ``"torchao=={_qat_torchao}"`` ->
     ``["_qat_torchao"]``; a token with no expansion -> ``[]``.
-
-    Public so the templated-pin test can enumerate the variables a notebook
-    uses without re-implementing the tokenizer.
     """
     return _RE_TEMPLATE_VAR.findall(token)
 
@@ -555,10 +543,8 @@ def iter_templated_tokens(nb_path: Path) -> list[str]:
     """Every ``{var}``-bearing pip token in ``nb_path``'s install cells.
 
     Tokens come back in source order, duplicates included, exactly as
-    :func:`plan_dependencies` sees them.  Public so
-    ``tests/test_molab_templated_pins.py`` can enumerate the runtime-templated
-    specs a notebook relies on through the real install-cell tokenizer instead
-    of re-implementing it (or, worse, grepping the notebook text).
+    :func:`plan_dependencies` sees them.  Public so the templated-pin test can
+    enumerate them through the real tokenizer instead of re-implementing it.
     """
     tokens: list[str] = []
     for cell_src in extract_install_cells(nb_path):
@@ -619,14 +605,9 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                 ))
                 continue
 
-            # A templated spec (``{_torch}``, ``{xformers}``) is one of two
-            # things.  Either the install cell branches at runtime over pins a
-            # PEP 723 header cannot express, in which case molab resolves the
-            # variable to the single arm registered in
-            # ``_TEMPLATE_STATIC_SPECS`` and treats it like a literal spec —
-            # or there is deliberately no static answer, in which case it is
-            # dropped with the reason registered in
-            # ``_TEMPLATE_NO_STATIC_SPEC``.
+            # A templated spec resolves through _TEMPLATE_STATIC_SPECS and is
+            # then treated like a literal, or is dropped with its registered
+            # _TEMPLATE_NO_STATIC_SPEC reason.  See both tables above.
             for tok in parsed.templated:
                 static_spec = resolve_template_spec(tok)
                 if static_spec is not None:

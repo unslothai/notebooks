@@ -26,10 +26,6 @@ starting with `{`, so an unresolved variable keys to nothing and
 `--no-build-isolation` group disappears and the AMD notebook ships with no
 mamba_ssm at all. `_AMD_VARIABLE_PACKAGE_FALLBACKS` is where that resolution
 lives.
-
-Both tests are behavioural. They feed `_compose_amd_installation` the install
-cell of the real committed Colab notebook and read what it produces, so an
-explanatory comment naming the pins cannot satisfy them.
 """
 
 from __future__ import annotations

@@ -32,13 +32,7 @@ This module is the gate against a repeat.  Two obligations:
 2. A variable that IS registered with a static spec actually reaches
    ``plan.dependencies``.
 
-Both checks are BEHAVIOURAL: they import ``scripts/molab_dependencies.py`` and
-call ``plan_dependencies`` / ``iter_templated_tokens`` on real notebooks, then
-assert on the returned objects.  Nothing here greps source text, so deleting
-the resolution code cannot be masked by a comment that happens to mention the
-pins.
-
-Static only — no torch, no GPU, no marimo.
+Static only: no torch, no GPU, no marimo.
 """
 from __future__ import annotations
 
