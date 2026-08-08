@@ -132,6 +132,16 @@ jobs:
         run: |
           python -m pytest tests/test_molab_generation_parity.py -q --tb=short
 
+      - name: tests/test_molab_templated_pins.py
+        # An install cell that computes a pin at runtime hands it to pip as
+        # an IPython {var} expansion. The molab generator drops the install
+        # cell, so any {var} scripts/molab_dependencies.py has no resolution
+        # for disappears from the PEP 723 header with no diagnostic. This
+        # gate fails on an unregistered {var}, and on a registered static
+        # pin that does not reach plan_dependencies().
+        run: |
+          python -m pytest tests/test_molab_templated_pins.py -q --tb=short
+
       - name: tests/test_molab_marimo_validity.py
         run: |
           python -m pytest tests/test_molab_marimo_validity.py -q --tb=short
@@ -147,16 +157,6 @@ jobs:
       - name: tests/test_molab_no_colab_markers.py
         run: |
           python -m pytest tests/test_molab_no_colab_markers.py -q --tb=short
-
-      - name: tests/test_molab_templated_pins.py
-        # An install cell that computes a pin at runtime hands it to pip as
-        # an IPython {var} expansion. The molab generator drops the install
-        # cell, so any {var} scripts/molab_dependencies.py has no resolution
-        # for disappears from the PEP 723 header with no diagnostic. This
-        # gate fails on an unregistered {var}, and on a registered static
-        # pin that does not reach plan_dependencies().
-        run: |
-          python -m pytest tests/test_molab_templated_pins.py -q --tb=short
 
   api-drift:
     # The flagship matrix: assert every classmethod / kwarg the
