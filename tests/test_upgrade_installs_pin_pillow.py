@@ -87,10 +87,37 @@ def _upgrades_torchvision(source):
     ]
 
 
-def _pins_pillow(source):
-    """Either an explicit `pillow==` or the `PIL.__version__` idiom the other
-    45 notebooks use, which pins whatever the image already shipped."""
-    return bool(re.search(r"pillow\s*==", source, re.I)) or "PIL.__version__" in source
+_RE_PLACEHOLDER = re.compile(r"\{(\w+)\}")
+
+
+def _pins_pillow(command, source):
+    """Whether THIS command pins Pillow, not whether the notebook mentions it.
+
+    Asking the whole notebook is the failure this gate exists to prevent, one
+    level up: drop `{get_pil}` from the install but leave `get_pil = ...`
+    defined a few lines above, and a whole-notebook search still says yes while
+    the upgrade resolves a fresh Pillow exactly as before.
+
+    The pin is usually interpolated, so a placeholder counts only when the
+    notebook assigns that name something naming pillow.
+    """
+    if re.search(r"pillow\s*==", command, re.I):
+        return True
+    for name in _RE_PLACEHOLDER.findall(command):
+        # `[^\n;]`, so the match cannot run past the end of the statement. These
+        # notebooks put both pins on one line:
+        #   try: import numpy, PIL; get_numpy = f'numpy=={numpy.__version__}'; get_pil = f'pillow=={PIL.__version__}'
+        # and allowing `;` lets `get_numpy` match the `pillow` belonging to
+        # `get_pil`. Every unpinned command then looks pinned through
+        # `{get_numpy}`, which is the whole bug this function was rewritten to
+        # catch. Caught by sabotage: dropping `{get_pil}` from the real notebook
+        # left the suite green.
+        assignment = re.search(
+            rf"\b{re.escape(name)}\s*=\s*[^\n;]*pillow", source, re.I
+        )
+        if assignment:
+            return True
+    return False
 
 
 _NOTEBOOKS = sorted(NB_DIR.glob("*.ipynb")) if NB_DIR.is_dir() else []
@@ -102,12 +129,14 @@ def test_an_upgrade_install_naming_torchvision_pins_pillow(path):
     upgrades = _upgrades_torchvision(source)
     if not upgrades:
         pytest.skip("no --upgrade install names torchvision")
-    assert _pins_pillow(source), (
-        f"{path.name} runs {upgrades[0][:160]!r} without pinning Pillow first. "
-        f"That resolves a newer Pillow, leaves `_imaging` behind, and the next "
-        f"`from unsloth import ...` dies on a PIL/torchvision mismatch. Pin it "
-        f"the way the other notebooks do: "
-        f"`try: import PIL; get_pil = f'pillow=={{PIL.__version__}}'`"
+    unpinned = [c for c in upgrades if not _pins_pillow(c, source)]
+    assert not unpinned, (
+        f"{path.name} runs {unpinned[0][:160]!r} without pinning Pillow in that "
+        f"command. That resolves a newer Pillow, leaves `_imaging` behind, and "
+        f"the next `from unsloth import ...` dies on a PIL/torchvision mismatch. "
+        f"Pin it the way the other notebooks do: "
+        f"`try: import PIL; get_pil = f'pillow=={{PIL.__version__}}'`, then pass "
+        f"`{{get_pil}}` to this install."
     )
 
 
@@ -136,17 +165,53 @@ def test_a_pinned_torchvision_install_without_upgrade_is_not_flagged():
     assert not _upgrades_torchvision('!uv pip install -qqq "torchvision==0.24.0"')
 
 
-@pytest.mark.parametrize(
-    "pin",
-    ["pillow==11.3.0", "Pillow==11.3.0", "f'pillow=={PIL.__version__}'"],
-)
-def test_both_pinning_spellings_count(pin):
-    assert _pins_pillow(f"!uv pip install --upgrade {pin} torchvision")
+_DEFINES_PIL = "try: import PIL; get_pil = f'pillow=={PIL.__version__}'"
 
 
-def test_an_unpinned_source_is_reported():
+@pytest.mark.parametrize("pin", ["pillow==11.3.0", "Pillow==11.3.0"])
+def test_a_literal_pin_in_the_command_counts(pin):
+    command = f"!uv pip install --upgrade {pin} torchvision"
+    assert _pins_pillow(command, command)
+
+
+def test_an_interpolated_pin_counts_when_the_notebook_defines_it():
+    command = "!uv pip install --upgrade {get_pil} torchvision"
+    assert _pins_pillow(command, _DEFINES_PIL + "\n" + command)
+
+
+def test_an_unpinned_command_is_reported():
     """The discriminating case: without this the whole check is vacuous."""
-    assert not _pins_pillow("!uv pip install -qqq --upgrade unsloth torchvision")
+    command = "!uv pip install -qqq --upgrade unsloth torchvision"
+    assert not _pins_pillow(command, command)
+
+
+def test_a_definition_elsewhere_does_not_excuse_an_unpinned_command():
+    """The exact regression this gate exists for. Someone drops `{get_pil}` from
+    the install and leaves the assignment above it; a whole-notebook search says
+    Pillow is pinned while the upgrade resolves a fresh one just as before."""
+    command = "!uv pip install -qqq --upgrade unsloth torchvision"
+    source = _DEFINES_PIL + "\n" + command
+    assert re.search(r"pillow\s*==", source, re.I), "the decoy must look convincing"
+    assert not _pins_pillow(command, source)
+
+
+def test_a_placeholder_naming_something_else_does_not_count():
+    """`{get_numpy}` is interpolated into the same command and must not be read
+    as a Pillow pin."""
+    command = "!uv pip install --upgrade {get_numpy} torchvision"
+    source = 'get_numpy = f"numpy=={numpy.__version__}"\n' + command
+    assert not _pins_pillow(command, source)
+
+
+def test_one_unpinned_command_is_caught_beside_a_pinned_one():
+    """A notebook may run several upgrades. Checking only the first would let a
+    later unpinned one through."""
+    pinned = "!uv pip install --upgrade {get_pil} torchvision"
+    unpinned = "!uv pip install --upgrade torchvision"
+    source = _DEFINES_PIL + "\n" + pinned + "\n" + unpinned
+    commands = _upgrades_torchvision(source)
+    assert len(commands) == 2
+    assert [c for c in commands if not _pins_pillow(c, source)] == [unpinned]
 
 
 def test_at_least_one_notebook_actually_exercises_the_check():
@@ -157,3 +222,22 @@ def test_at_least_one_notebook_actually_exercises_the_check():
         f"only {len(exercised)} notebooks reached the assertion; the scan is "
         f"probably broken rather than the repo suddenly clean"
     )
+
+
+def test_a_sibling_pin_on_the_same_line_does_not_count():
+    """These notebooks define both pins in one statement chain:
+
+        try: import numpy, PIL; get_numpy = f'numpy=={numpy.__version__}'; get_pil = f'pillow=={PIL.__version__}'
+
+    so a pattern that runs to end of LINE lets `{get_numpy}` borrow the `pillow`
+    that belongs to `get_pil`, and every unpinned command reads as pinned."""
+    definition = (
+        "try: import numpy, PIL; "
+        "get_numpy = f'numpy=={numpy.__version__}'; "
+        "get_pil = f'pillow=={PIL.__version__}'"
+    )
+    unpinned = "!uv pip install --upgrade unsloth {get_numpy} torchvision"
+    source = definition + "\n" + unpinned
+    assert not _pins_pillow(unpinned, source)
+    pinned = "!uv pip install --upgrade unsloth {get_numpy} {get_pil} torchvision"
+    assert _pins_pillow(pinned, definition + "\n" + pinned)
