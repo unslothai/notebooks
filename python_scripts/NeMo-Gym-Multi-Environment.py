@@ -96,7 +96,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # If you are using Google Colab, add the flag `uv_pip_set_python=true` to `ng_run` command.
 # 
 # The cell below will automatically:
-# 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (requires Python 3.12+ and `uv` on the system)
+# 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (needs `uv` on the system; `uv` provisions the Python that NeMo Gym's own `requires-python` asks for)
 # 2. Set up the virtual environment and install dependencies
 # 3. Create the mini sudoku training dataset
 # 4. Download the instruction following dataset
@@ -134,7 +134,12 @@ if not os.path.exists(GYM_DIR):
 # Step 2: Create venv and install dependencies
 if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
     print("Setting up NeMo Gym environment (this may take a few minutes)...")
-    subprocess.run(["uv", "venv", "--python", "3.12"], cwd = GYM_DIR, check = True)
+    # `>=3.13.14`, not a fixed version: NeMo Gym raised its own floor to that on
+    # 2026-08-04 (upstream ea4c6c6), and pinning 3.12 made `uv sync` exit 2 with
+    # "incompatible with the project's Python requirement". A specifier tracks
+    # whatever they declare next. `--python 3.13` is NOT enough: uv resolves it to
+    # the newest 3.13 it has, which was 3.13.8 here, still under the floor.
+    subprocess.run(["uv", "venv", "--python", ">=3.13.14"], cwd = GYM_DIR, check = True)
     subprocess.run(
         ["bash", "-c", "source .venv/bin/activate && uv sync"],
         cwd = GYM_DIR, check = True,
