@@ -18,13 +18,11 @@
 
 """Installing sglang replaces torch, so torchvision has to be replaced with it.
 
-sglang pins one exact torch (`torch==2.11.0` for 0.5.16) and that pin resolves
-to the default PyPI wheel, which is a different CUDA build from the one the
-session shipped with. torchvision is version-compatible either way, so pip
-sees the requirement as already satisfied and leaves the old build alone;
-`import torchvision` then fails with a CUDA version mismatch before the
-notebook reaches its first inference. Only `--force-reinstall` replaces an
-already-satisfied requirement.
+sglang pins one exact torch (`torch==2.11.0` for 0.5.16), which resolves to
+the default PyPI wheel, a different CUDA build from the session's. torchvision
+is version-compatible either way, so pip sees the requirement as satisfied and
+leaves the old build in place; `import torchvision` then fails on a CUDA
+mismatch. Only `--force-reinstall` replaces an already-satisfied requirement.
 """
 
 from __future__ import annotations

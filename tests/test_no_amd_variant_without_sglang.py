@@ -18,13 +18,11 @@
 
 """An AMD notebook may not import a package the ROCm recipe cannot install.
 
-sglang is the concrete case: it publishes no ROCm wheel (see
-`AMD_SKIP_NOTEBOOKS` in update_all_notebooks.py), and leaving its install out
-of the ROCm cell is what produced the shape this file guards.
-`AMD-Gemma3N_(2B)-Inference` shipped with no sglang anywhere and a first code
-cell reading `from sglang.utils import wait_for_server`, so Run All stopped on
-ModuleNotFoundError before reaching any inference. The answer is not to mint
-that AMD variant at all.
+sglang is the case: it publishes no ROCm wheel (see `AMD_SKIP_NOTEBOOKS` in
+update_all_notebooks.py), so `AMD-Gemma3N_(2B)-Inference` shipped with no
+sglang and a first cell reading `from sglang.utils import wait_for_server`,
+and Run All stopped on ModuleNotFoundError. The answer is not to mint that AMD
+variant at all.
 """
 
 from __future__ import annotations

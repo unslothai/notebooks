@@ -22,17 +22,15 @@
 
     !nohup python -m sglang.launch_server ... > sglang.log &
 
-IPython refuses that. `InteractiveShell.system_piped` raises
+IPython refuses that: `InteractiveShell.system_piped` raises
 `OSError("Background processes not supported.")` for any command whose
 stripped form ends in `&`, and `ipykernel.zmqshell.ZMQInteractiveShell` binds
-`system = system_piped`. Colab is the exception: it replaces `ip.system` with
-`system_raw`, which is why this never showed there. Every other kernel --
-Kaggle, plain Jupyter, papermill -- could not run the cell at all.
+`system = system_piped`. Only Colab survives it, by swapping in `system_raw`;
+Kaggle, plain Jupyter and papermill could not run the cell at all.
 
-`subprocess.Popen` works on every kernel and hands back a handle, which is also
-what lets the wait be bounded: sglang's `wait_for_server` takes `timeout` and
-`process`, and with neither it waits forever, exactly like the
-`while ! grep -q ... ; do sleep 5; done` loop that shape replaces.
+`subprocess.Popen` works everywhere and hands back a handle, which also bounds
+the wait: sglang's `wait_for_server` takes `timeout` and `process`, and with
+neither it waits forever, like the `while ! grep -q ...` loop it replaces.
 """
 
 import json
@@ -45,8 +43,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 NB_DIR = REPO_ROOT / "nb"
 TEMPLATE_DIR = REPO_ROOT / "original_template"
 
-# A `!`-escaped shell command left in the background. `&&` is a conjunction, not
-# backgrounding, so it is excluded; `system_piped` only inspects the very last
+# A `!` shell command left in the background. `&&` is a conjunction, not
+# backgrounding, so it is excluded; `system_piped` inspects only the last
 # character of the stripped command.
 _BACKGROUNDED = re.compile(r"^\s*!.*(?<!&)&\s*$")
 

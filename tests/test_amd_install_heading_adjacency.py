@@ -14,15 +14,14 @@
 """A second install cell behind its own heading must still be AMD-stripped.
 
 `_adjacent_install_like_code_cells` stopped at the first non-code cell, so an
-install cell introduced by its own markdown heading was invisible to it.
-Qwen3_5_MoE and Qwen3_6_MoE put a CUDA-wheel resolver behind "### Install
-flash-linear-attention and causal-conv-1d", so it survived into the AMD variant
-and `_assert_amd_install_runtime` then refused the entire `--amd` run -- which
-blocked regenerating all 153 AMD notebooks, not just those two.
+install cell behind its own markdown heading was invisible: Qwen3_5_MoE and
+Qwen3_6_MoE hid a CUDA-wheel resolver behind "### Install
+flash-linear-attention and causal-conv-1d", which survived into the AMD variant
+and made `_assert_amd_install_runtime` refuse the whole `--amd` run, blocking
+all 153 AMD notebooks.
 
-The existing gate in test_notebook_amd_install_parity.py could not catch this:
-it reads the committed `nb/AMD-*.ipynb`, which were stale but valid. The bad
-content only appears when the generator actually regenerates them.
+test_notebook_amd_install_parity.py cannot catch it: it reads the committed
+`nb/AMD-*.ipynb`, stale but valid. The bad content only appears on regeneration.
 """
 from __future__ import annotations
 

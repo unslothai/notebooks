@@ -762,20 +762,17 @@ else:
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
-# A wheel, not a source build of `main`. Every sglang release pins ONE exact
-# transformers, so cloning main and then forcing transformers==4.53.0, what
-# 0.4.9 wanted when this was written, left the two disagreeing.
+# A wheel, not a source build of `main`: every sglang release pins ONE exact
+# transformers, so cloning main and then forcing transformers==4.53.0 left the
+# two disagreeing.
 #
-# This installs sglang; it does not make the notebook run on Colab. sglang pins
-# torch==2.11.0, a `torch==` pin resolves to PyPI's default CUDA build, and
-# Colab ships its own, so the first import reports "PyTorch has CUDA
-# Version=13.0 and torchvision has CUDA Version=12.8". Naming a matching
-# torchvision cannot fix that: PEP 440 ignores a local version label, so
-# `torchvision==0.26.0` is ALREADY satisfied by Colab's 0.26.0+cu128 and pip
-# leaves it in place. So the same-version wheel is force-reinstalled below,
-# which pulls it from the index the new torch came from and makes the two
-# agree. torchvision 0.26.0 is the right version for torch 2.11.0: its own
-# metadata requires `torch==2.11.0` exactly.
+# sglang pins torch==2.11.0, which resolves to PyPI's default CUDA build and
+# disagrees with Colab's torchvision ("PyTorch has CUDA Version=13.0 and
+# torchvision has CUDA Version=12.8"). Naming the version cannot fix it: PEP
+# 440 ignores a local label, so `torchvision==0.26.0` is already satisfied by
+# Colab's 0.26.0+cu128. Force-reinstalling the same version pulls it from the
+# index the new torch came from. 0.26.0 is correct for torch 2.11.0, whose
+# metadata it requires exactly.
 installation_sglang_content = """%%capture
 !pip install "sglang[all]==0.5.16"
 !pip install --force-reinstall --no-deps "torchvision==0.26.0\""""
@@ -1225,16 +1222,13 @@ DONT_UPDATE_EXCEPTIONS = [
 
 # Notebooks that get no AMD counterpart at all.
 #
-# `Gemma3N_(2B)-Inference` serves through sglang and does nothing else: every
-# code cell after the install imports sglang. sglang publishes no ROCm wheel.
-# 0.5.16 has `torch==2.11.0` and `sglang-kernel==0.4.5` in its base
-# dependencies, both CUDA-13 builds, so the Colab install line would drop a
-# CUDA torch on top of the ROCm one the bootstrap cell just installed. The
-# documented AMD path is a prebuilt `lmsysorg/sglang:v0.5.16-rocm*` image, or a
-# from-source `setup_rocm.py` compile of sgl-kernel for gfx942/gfx950 followed
-# by `pip install -e "python[all_hip]"` against a pyproject that is not the one
-# on PyPI. None of that is a pip line an install cell can carry, and with no
-# sglang there is nothing left in the notebook to run.
+# `Gemma3N_(2B)-Inference` does nothing but serve through sglang, which
+# publishes no ROCm wheel: 0.5.16 depends on CUDA-13 builds of torch==2.11.0
+# and sglang-kernel==0.4.5, so the Colab line would drop a CUDA torch on top of
+# the ROCm one. The documented AMD path is a prebuilt
+# `lmsysorg/sglang:v0.5.16-rocm*` image or a from-source `setup_rocm.py`
+# compile, neither of which fits in an install cell -- and with no sglang there
+# is nothing left to run.
 AMD_SKIP_NOTEBOOKS = [
     "Gemma3N_(2B)-Inference.ipynb",
 ]
@@ -1765,10 +1759,9 @@ def validate_notebook_syntax(notebook_path):
 
 _RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
 _RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
-# A markdown heading that introduces a dependency install, e.g.
-# "### Install flash-linear-attention and causal-conv-1d". Deliberately not
-# `_RE_INSTALL_SECTION_MD`: that also matches "setup" and any position in the
-# line, which is how "### Setup the model" would qualify.
+# A heading introducing a dependency install, e.g. "### Install
+# flash-linear-attention". Not `_RE_INSTALL_SECTION_MD`, which also matches
+# "setup" anywhere in the line and so accepts "### Setup the model".
 _RE_DEPENDENCY_HEADING = re.compile(r"^#+\s*(?:\d+[.)]\s*)?install", re.IGNORECASE)
 
 
@@ -1861,12 +1854,12 @@ def _is_installation_heading(source_text, is_amd_notebook=False):
 def _adjacent_install_like_code_cells(cells, first_code_idx):
     """Install cells following `first_code_idx`, stepping over their headings.
 
-    A second install cell often gets its own markdown heading, and stopping at
-    the first non-code cell missed it: Qwen3_5_MoE and Qwen3_6_MoE put a
-    CUDA-wheel resolver behind "### Install flash-linear-attention and
-    causal-conv-1d", so it was never collected, survived into the AMD variant,
-    and `_assert_amd_install_runtime` then refused the whole `--amd` run. The
-    heading is returned with it, or it would be left pointing at nothing.
+    Stopping at the first non-code cell missed a second install cell behind its
+    own heading: Qwen3_5_MoE / Qwen3_6_MoE hid a CUDA-wheel resolver behind
+    "### Install flash-linear-attention and causal-conv-1d", which then
+    survived into the AMD variant and made `_assert_amd_install_runtime` refuse
+    the whole `--amd` run. The heading comes back too, or it would be left
+    pointing at nothing.
     """
     install_cells = []
     idx = first_code_idx + 1
@@ -1874,11 +1867,10 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
     while idx < len(cells):
         cell = cells[idx]
         if cell.get("cell_type") == "markdown":
-            # Only a dependency-install heading, and only right before an
-            # install cell. Any heading used to qualify, and the cell behind it
-            # then passed `_is_install_like_cell` on the strength of that
-            # heading alone: `### Start Unsloth Studio` collected the Studio
-            # launch code, which the caller deletes.
+            # Only a dependency-install heading. When any heading qualified,
+            # the cell behind it passed `_is_install_like_cell` on that alone,
+            # so `### Start Unsloth Studio` collected the Studio launch code,
+            # which the caller deletes.
             text = _cell_source_text(cell).strip()
             if len(text.splitlines()) > 1 or not _RE_DEPENDENCY_HEADING.match(text):
                 break
@@ -1890,10 +1882,10 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
         if cell.get("cell_type") != "code":
             break
         source_text = _cell_source_text(cell)
-        # After a heading, the cell must look like an install on its own
-        # content. `_is_install_like_cell` also answers yes on the strength of
-        # the preceding markdown, so a heading like "### Install the trainer"
-        # over ordinary code would qualify it, and the caller deletes both.
+        # Past the first cell, judge on the cell's own content:
+        # `_is_install_like_cell` also says yes for the preceding markdown, so
+        # "### Install the trainer" over ordinary code would qualify it and the
+        # caller would delete both.
         if pending_headings or install_cells:
             if not _is_install_code(source_text):
                 break
@@ -1930,9 +1922,8 @@ def _is_stale_amd_announcement(source_text):
     ):
         return True
     # A bare "Open in Colab" badge, which is how some hand-maintained notebooks
-    # open. It carries no "to run this, press", so the test above walked past it
-    # and the AMD variant kept a button pointing at the CUDA notebook, with no
-    # Dev Cloud header and no News section above it.
+    # open. With no "to run this, press" the test above walked past it and the
+    # AMD variant kept a button pointing at the CUDA notebook.
     stripped = source_text.strip()
     return (
         stripped.startswith("<a href=")
@@ -4371,11 +4362,9 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma3n_content
 
-                        # SGLANG INSTALLATION, keyed off the import rather than the
-                        # filename: the only notebook serving through sglang is named
-                        # Gemma3N_(2B)-Inference, so a "sglang" filename match never
-                        # fired and Gemma3N above overwrote it with the plain install.
-                        # Must stay after Gemma3N.
+                        # SGLANG INSTALLATION, keyed off the import: the only sglang
+                        # notebook is named Gemma3N_(2B)-Inference, so a filename match
+                        # never fired and Gemma3N overwrote it. Must stay after Gemma3N.
                         if _notebook_imports_sglang(notebook_content):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_sglang_kaggle_content
@@ -5868,9 +5857,9 @@ def copy_and_update_amd_notebooks(
             continue
         source_notebooks.setdefault(basename, path)
     # For DONT_UPDATE_EXCEPTIONS, nb/ is the source of truth and the template
-    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` sits at
-    # weight_decay 0.1 under nb/ and 0.001 under original_template/. Sourcing
-    # from the template gave the AMD variant hyperparameters nobody chose.
+    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` is weight_decay 0.1
+    # under nb/ and 0.001 under original_template/, so sourcing from the
+    # template gave the AMD variant hyperparameters nobody chose.
     for basename in DONT_UPDATE_EXCEPTIONS:
         if basename not in amd_base_names:
             continue
