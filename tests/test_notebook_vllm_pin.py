@@ -82,18 +82,32 @@ _ASSIGNMENT_RE = re.compile(
 )
 
 
+def _result_tuples(value):
+    """The tuples an unpacked right-hand side can evaluate to.
+
+    Every selector in the tree is a ternary, so pairing only a plain
+    `ast.Tuple` pairs nothing at all: both branches have to be walked.
+    """
+    if isinstance(value, ast.IfExp):
+        return [value.body, value.orelse]
+    return [value]
+
+
 def _bound_name(line):
     """The name that actually holds the vLLM spec on an assignment line.
 
     Taking the first target is wrong once vLLM is not the first value:
-    `_triton, _vllm = ("triton", "vllm==0.15.1")` records `_triton`, so a
-    command interpolating only `{_triton}` satisfies the binding check while
-    the pin is never installed. Today's notebooks all put vLLM first, so it is
-    a hole rather than a live break, but a future edit falls into it.
+    `_triton, _vllm = ("triton", "vllm==0.15.1") if is_t4 else (...)` records
+    `_triton`, so a command interpolating only `{_triton}` satisfies the
+    binding check while the pin is never installed. Every notebook puts vLLM
+    first today, so it is a hole rather than a live break, but a future edit
+    falls into it and all 48 selectors are written in the shape it applies to.
 
-    Parsed rather than pattern-matched, so target and value pair by position.
-    Falls back to the first target when the line does not parse on its own (a
-    `{...}` placeholder, an f-string, a ternary), keeping prior behaviour.
+    Parsed rather than pattern-matched, so target and value pair by position,
+    through either branch of the conditional the notebooks actually use. Falls
+    back to the first target when nothing pairs: a line that does not parse on
+    its own (a `{...}` placeholder, an f-string), a right-hand side that is not
+    a tuple, or branches that disagree about which name carries vLLM.
     """
     match = _ASSIGNMENT_RE.match(line)
     if match is None:
@@ -105,18 +119,56 @@ def _bound_name(line):
         return fallback
     if not isinstance(node, ast.Assign) or len(node.targets) != 1:
         return fallback
-    target, value = node.targets[0], node.value
-    if not isinstance(target, ast.Tuple) or not isinstance(value, ast.Tuple):
+    target = node.targets[0]
+    if not isinstance(target, ast.Tuple):
         return fallback
-    if len(target.elts) != len(value.elts):
-        return fallback
-    for name_node, value_node in zip(target.elts, value.elts):
-        if not isinstance(name_node, ast.Name): continue
-        if not isinstance(value_node, ast.Constant): continue
-        if not isinstance(value_node.value, str): continue
-        if _VLLM_SPEC_RE.search(f'"{value_node.value}"'):
-            return name_node.id
+    holders = set()
+    for result in _result_tuples(node.value):
+        if not isinstance(result, ast.Tuple): continue
+        if len(result.elts) != len(target.elts): continue
+        for name_node, value_node in zip(target.elts, result.elts):
+            if not isinstance(name_node, ast.Name): continue
+            if not isinstance(value_node, ast.Constant): continue
+            if not isinstance(value_node.value, str): continue
+            if _VLLM_SPEC_RE.search(f'"{value_node.value}"'):
+                holders.add(name_node.id)
+    # Branches that name different holders leave no single name to demand, so
+    # the strict first-target reading stands rather than a guess between them.
+    if len(holders) == 1:
+        return holders.pop()
     return fallback
+
+
+# A line that is itself the pip install, `!`/`%` prefixed or bare in a shell
+# cell, rather than a selector feeding one. Anchored on the invocation so a
+# selector line that merely mentions pip installing in a comment stays in the
+# binding check.
+_INSTALL_COMMAND_RE = re.compile(r"^\s*[!%]?\s*(?:uv\s+)?pip\s+install\b")
+
+
+def _installs_the_requirement_directly(line):
+    """Whether the requirement is written straight into the install command.
+
+    `!uv pip install --upgrade "vllm==0.15.1"` binds no name, so there is no
+    interpolation to demand of it and nothing the binding check can say. It is
+    not unchecked: the pin assertion above still requires the `==`, and the
+    bare-vLLM check below still rejects the unpinned spelling of the same line.
+    """
+    return _INSTALL_COMMAND_RE.match(line) is not None
+
+
+def _lines_needing_a_binding(cases):
+    """The detected lines the binding check is entitled to demand a name for.
+
+    Split out of the check so a synthetic case can drive it: no notebook uses
+    the direct form today, so a test that only called the helper would stay
+    green with the exemption removed from the check.
+    """
+    return {
+        (path, line)
+        for path, line, _spec in cases
+        if not _installs_the_requirement_directly(line)
+    }
 
 
 def _install_commands(source):
@@ -227,8 +279,9 @@ def test_every_selector_assignment_is_bound_to_a_command():
 
 def test_no_detected_selector_line_escapes_the_binding_check():
     """A count floor cannot see a shape that stopped being recognised: 47 of 48
-    bindings still clears it. Every detected line must produce a binding."""
-    detected = {(path, line) for path, line, _spec in _CASES}
+    bindings still clears it. Every detected line must produce a binding,
+    except the ones that need none because they install the pin themselves."""
+    detected = _lines_needing_a_binding(_CASES)
     bound = {(path, line) for path, line, _name, _commands in _BINDINGS}
     assert detected == bound, (
         f"{len(detected - bound)} line(s) carry a vLLM requirement but are not "
@@ -418,12 +471,90 @@ def test_a_line_that_does_not_parse_keeps_the_previous_behaviour():
     for line, name in (
         # A placeholder the generator fills in later.
         ("    _vllm, _t = ({SPEC}, 'triton')", "_vllm"),
-        # A ternary whose branches are not plain constants.
-        ("    _t, _vllm = ('t', 'vllm==0.15.1') if is_t4 else (_a, _b)", "_t"),
-        # Mismatched arity: nothing to pair by position.
+        # A right-hand side that is not a tuple: nothing to pair by position.
         ("    _t, _vllm = _pair", "_t"),
+        # Mismatched arity, in both branches.
+        ("    _t, _u, _vllm = ('t', 'vllm==0.15.1') if is_t4 else ('t', 'u')", "_t"),
+        # Branches disagreeing on which name carries vLLM: the notebook is
+        # broken either way, and guessing one would demand the wrong `{...}`.
+        (
+            "    _a, _b = ('vllm==0.9.2', 't') if is_t4 else ('t', 'vllm==0.15.1')",
+            "_a",
+        ),
     ):
         assert _bound_name(line) == name, line
+
+
+def test_the_conditional_selector_pairs_by_position_in_both_branches():
+    """The shape every notebook uses is a ternary, so pairing only a plain
+    tuple pairs none of the 48 selectors in the tree and the whole binding
+    check runs on the first-target fallback. Reverting `_result_tuples` to
+    return the value unchanged reddens the first three cases here.
+    """
+    for line, name in (
+        # vLLM second in both branches: the case the fallback gets wrong.
+        (
+            "    _triton, _vllm = ('triton==3.2.0', 'vllm==0.9.2') if is_t4 "
+            "else ('triton', 'vllm==0.15.1')",
+            "_vllm",
+        ),
+        # Pinned on one branch only: still the same holder, still bound.
+        ("    _t, _vllm = ('t', 'vllm') if is_t4 else ('t', 'vllm==0.15.1')", "_vllm"),
+        # A branch that is not a tuple of constants does not veto the other.
+        ("    _t, _vllm = ('t', 'vllm==0.15.1') if is_t4 else (_a, _b)", "_vllm"),
+        # ...without disturbing the spelling the notebooks use today.
+        (
+            "    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 "
+            "else ('vllm==0.15.1', 'triton')",
+            "_vllm",
+        ),
+    ):
+        assert _bound_name(line) == name, line
+
+
+def test_a_directly_pinned_install_needs_no_binding():
+    """`!uv pip install --upgrade "vllm==0.15.1"` carries the requirement with
+    no selector to interpolate, so demanding a binding for it would fail a
+    correct notebook. The other two checks still cover it, which is what makes
+    the exemption safe: dropping `_installs_the_requirement_directly` from the
+    binding check reddens this test.
+    """
+    path = REPO_ROOT / "nb" / "Synthetic.ipynb"
+    command = '!uv pip install --upgrade "vllm==0.15.1"'
+    # The gate itself, on a case list of one: detected must come out empty,
+    # because `_bound_name` records no binding for a command.
+    assert _bound_name(command) is None
+    assert _lines_needing_a_binding([(path, command, "vllm==0.15.1")]) == set()
+    # A line that carries the requirement and is neither a command nor a
+    # recognised assignment is still caught, so the exemption is not a blanket.
+    stray = "    _specs.append('vllm==0.15.1')"
+    assert _lines_needing_a_binding([(path, stray, "vllm==0.15.1")]) == {(path, stray)}
+    # Still pin-checked: the spec the parametrised assertion sees has the `==`.
+    assert _VLLM_SPEC_RE.findall(command) == ["vllm==0.15.1"]
+    # ...and the unpinned spelling of the same line is still rejected, both by
+    # the pin assertion and by the bare check.
+    unpinned = '!uv pip install --upgrade "vllm"'
+    assert "==" not in _VLLM_SPEC_RE.findall(unpinned)[0]
+    assert _BARE_VLLM_RE.search(unpinned)
+    assert not _BARE_VLLM_RE.search(command)
+
+
+def test_the_exemption_does_not_swallow_a_selector_assignment():
+    """Exempting every line that mentions pip installing would hand the
+    binding check a way to be satisfied by a comment."""
+    for line in (
+        "    _vllm, _t = ('vllm==0.15.1', 't')  # run pip install after this",
+        "    _vllm = 'vllm==0.15.1'",
+    ):
+        assert not _installs_the_requirement_directly(line), line
+    for command in (
+        '!uv pip install --upgrade "vllm==0.15.1"',
+        '!pip install "vllm==0.15.1"',
+        '%pip install "vllm==0.15.1"',
+        # No `!`, because a `%%bash` cell runs its lines as shell.
+        'uv pip install --system -U "vllm==0.15.1"',
+    ):
+        assert _installs_the_requirement_directly(command), command
 
 
 def test_a_line_that_is_not_an_assignment_binds_nothing():
