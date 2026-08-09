@@ -420,24 +420,22 @@ _MOLAB_PER_NOTEBOOK_RELAX: dict[str, dict[str, str]] = {
 #
 # An install cell can compute a pin at runtime and pass it to pip as an IPython
 # ``{var}`` expansion (Granite 4.0 / Nemotron Nano branch on compute capability
-# to set {_torch}, {_mamba}, {_conv}).  A PEP 723 header is static, so molab
-# must resolve each variable to exactly one arm: _TEMPLATE_STATIC_SPECS gives
-# the spec to pin, _TEMPLATE_NO_STATIC_SPEC the reason for dropping it instead.
-# Every {var} must be in exactly one table; test_molab_templated_pins.py fails
-# on any that is in neither, so a new pin cannot silently vanish from a header
-# the way torch 2.7.1 / mamba_ssm / causal_conv1d did.
+# for {_torch}, {_mamba}, {_conv}). A PEP 723 header is static, so molab must
+# resolve each variable to one arm: _TEMPLATE_STATIC_SPECS gives the spec to
+# pin, _TEMPLATE_NO_STATIC_SPEC the reason for dropping it. Every {var} must be
+# in exactly one table -- test_molab_templated_pins.py fails on any that is in
+# neither, so a new pin cannot vanish the way torch 2.7.1 did.
 _TEMPLATE_STATIC_SPECS: dict[str, str] = {
-    # Granite 4.0 and Nemotron Nano are Mamba hybrids and need mamba_ssm plus
-    # causal_conv1d built against a pinned torch.  The cell's Blackwell arm
-    # only avoids a ~30 minute source build on sm_100 / sm_120; molab takes the
-    # prebuilt non-Blackwell arm, which is what the headers carried all along.
+    # Granite 4.0 and Nemotron Nano are Mamba hybrids needing mamba_ssm and
+    # causal_conv1d built against a pinned torch. The cell's Blackwell arm only
+    # avoids a ~30 minute source build, so molab takes the prebuilt
+    # non-Blackwell arm, which is what the headers carried all along.
     "_torch": "torch==2.7.1",
     "_mamba": "mamba_ssm==2.2.5",
     "_conv": "causal_conv1d==1.5.2",
 }
 
-# Each reason is the message the drop is reported with, so it is written to be
-# read on its own; nothing below repeats it.
+# Each reason is the message the drop is reported with.
 _TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
     "xformers": (
         "version is looked up from the live torch build; unsloth pulls a "
@@ -470,8 +468,8 @@ _TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
     ),
 }
 
-# A pip token that is nothing but one expansion, e.g. ``{_torch}``. Quotes are
-# already stripped by ``_split_args``; the strip() is for hand-written cells.
+# A pip token that is only an expansion, e.g. ``{_torch}``. ``_split_args``
+# already strips quotes; the strip() covers hand-written cells.
 _RE_WHOLE_TEMPLATE_TOKEN = re.compile(r"^\{([A-Za-z_]\w*)\}$")
 
 # Any expansion inside a token, including the embedded ``torchao=={_qat_torchao}``.

@@ -120,11 +120,8 @@ def test_amd_composer_resolves_the_templated_kernel_pins(colab_name, amd_name):
     "colab_name,amd_name", KERNEL_NOTEBOOKS, ids=[n for n, _ in KERNEL_NOTEBOOKS])
 def test_committed_amd_notebook_matches_what_the_composer_produces(
         colab_name, amd_name):
-    """The artifact and the generator may not drift apart.
-
-    A hand-edited AMD pin that no regeneration reproduces is the failure this
-    catches, in either direction.
-    """
+    """A hand-edited AMD pin that no regeneration reproduces, in either
+    direction."""
     _, lines = _composed_amd_kernel_line(colab_name, amd_name)
     assert lines, f"composing {amd_name} produced no kernel install line"
     committed = (NB_DIR / amd_name).read_text(encoding="utf-8")

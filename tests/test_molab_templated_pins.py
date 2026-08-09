@@ -15,10 +15,10 @@
 
 An install cell may compute a pin at runtime and pass it to pip as an IPython
 ``{var}`` expansion (Granite 4.0 / Nemotron Nano branch on compute capability).
-``scripts/molab_generate.py`` drops the install cell and rebuilds the PEP 723
-header from ``molab_dependencies.plan_dependencies``, so a ``{var}`` the planner
-does not know vanishes with no diagnostic -- that is how torch 2.7.1,
-mamba_ssm and causal_conv1d were lost from four molab notebooks.
+``scripts/molab_generate.py`` rebuilds the PEP 723 header from
+``molab_dependencies.plan_dependencies``, so a ``{var}`` the planner does not
+know vanishes silently -- that is how torch 2.7.1, mamba_ssm and causal_conv1d
+were lost from four molab notebooks.
 
 Two obligations:
 
@@ -129,9 +129,8 @@ def test_every_templated_pip_token_is_registered(
 ) -> None:
     """Every ``{var}`` pip token resolves to a spec or a registered reason.
 
-    This is the recurrence gate.  Introduce a new runtime-computed pin in an
-    install cell without teaching molab_dependencies about it and this fails,
-    instead of the pin silently disappearing from ``molab/<stem>.py``.
+    The recurrence gate: a new runtime-computed pin that molab_dependencies has
+    not been taught fails here rather than disappearing from molab/<stem>.py.
     """
     unregistered: list[str] = []
     for token in md.iter_templated_tokens(nb_path):
@@ -203,11 +202,9 @@ def test_statically_resolved_template_reaches_the_plan(
 def test_mamba_hybrid_notebooks_keep_their_kernel_pins(stem: str) -> None:
     """Granite 4.0 / Nemotron Nano molab headers carry the Mamba kernel trio.
 
-    These models are Mamba hybrids: a molab run without ``mamba_ssm`` /
-    ``causal_conv1d``, or with those kernels resolved against an unpinned
-    torch, cannot run the model.  The install cell picks the pins through
-    ``{_torch}`` / ``{_mamba}`` / ``{_conv}``, so this asserts the planner
-    resolves the non-Blackwell arm rather than dropping all three.
+    These hybrids cannot run without ``mamba_ssm`` / ``causal_conv1d`` pinned
+    against a pinned torch, and the cell picks all three through ``{var}``, so
+    the planner has to resolve the non-Blackwell arm rather than drop them.
     """
     nb_path = REPO_ROOT / "nb" / f"{stem}.ipynb"
     if not nb_path.exists():
@@ -237,9 +234,8 @@ _GENERATED_FILES: list[Path] = (
 def test_generated_header_has_no_unexpanded_template(py_file: Path) -> None:
     """No committed PEP 723 dependency may still contain a ``{var}`` brace.
 
-    A resolution bug that substituted the variable NAME rather than its spec
-    would produce an unparseable dependency; uv would fail the sandbox build
-    at notebook start.
+    Substituting the variable NAME rather than its spec yields an unparseable
+    dependency, and uv fails the sandbox build at notebook start.
     """
     plan_specs = [
         line
