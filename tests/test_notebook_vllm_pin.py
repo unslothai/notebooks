@@ -51,6 +51,42 @@ _VLLM_SPEC_RE = re.compile(
 )
 
 
+def _logical_lines(source):
+    """The cell's lines with backslash continuations joined into one.
+
+    A wrapped command is a single statement, so reading it a physical line at a
+    time hands the checks below a tail such as `"vllm==0.15.1" unsloth` that
+    looks like a bare requirement rather than the install carrying it. The
+    notebooks wrap nearly every install, and the same fold is what
+    `scripts/molab_dependencies._logical_lines` and
+    `update_all_notebooks._logical_install_lines` already do.
+    """
+    lines, pending = [], ""
+    for line in source.splitlines():
+        pending = f"{pending} {line.strip()}" if pending else line
+        if line.rstrip().endswith("\\"):
+            pending = pending.rstrip()[:-1]
+            continue
+        lines.append(pending)
+        pending = ""
+    # A cell ending mid-continuation still carries its requirement, so the
+    # dangling text is kept rather than dropped out of every check.
+    if pending:
+        lines.append(pending)
+    return lines
+
+
+def _selector_cases(source):
+    """(line, spec) for every quoted vLLM requirement in one cell.
+
+    Split out of `_selector_lines` so a synthetic cell can drive the scan the
+    gate actually runs on, rather than a copy of it.
+    """
+    for line in _logical_lines(source):
+        for spec in _VLLM_SPEC_RE.findall(line):
+            yield line.strip(), spec
+
+
 def _selector_lines():
     """(notebook, line, spec) for every quoted vLLM requirement in a code cell.
 
@@ -60,9 +96,8 @@ def _selector_lines():
     """
     for path in ni.iter_notebooks():
         for _index, source in ni.iter_code_cells(path):
-            for line in source.splitlines():
-                for spec in _VLLM_SPEC_RE.findall(line):
-                    yield path, line.strip(), spec
+            for line, spec in _selector_cases(source):
+                yield path, line, spec
 
 
 _CASES = list(_selector_lines())
@@ -185,16 +220,11 @@ def _install_commands(source):
     the gate green.
     """
     shell_cell = ni.is_shell_cell(source)
-    commands, pending = [], ""
-    for line in source.splitlines():
-        pending = f"{pending} {line.strip()}" if pending else line
-        if line.rstrip().endswith("\\"):
-            pending = pending.rstrip()[:-1]
-            continue
-        prefixed = pending.lstrip().startswith(("!", "%"))
-        if (prefixed or shell_cell) and "pip install" in pending:
-            commands.append(pending)
-        pending = ""
+    commands = []
+    for command in _logical_lines(source):
+        prefixed = command.lstrip().startswith(("!", "%"))
+        if (prefixed or shell_cell) and "pip install" in command:
+            commands.append(command)
     return commands
 
 
@@ -228,7 +258,7 @@ def _selector_bindings():
     for path in ni.iter_notebooks():
         for _index, source in ni.iter_code_cells(path):
             commands = _upgrading(_install_commands(source))
-            for line in source.splitlines():
+            for line in _logical_lines(source):
                 if not _VLLM_SPEC_RE.search(line):
                     continue
                 name = _bound_name(line)
@@ -543,6 +573,28 @@ def test_a_directly_pinned_install_needs_no_binding():
     assert "==" not in _VLLM_SPEC_RE.findall(unpinned)[0]
     assert _BARE_VLLM_RE.search(unpinned)
     assert not _BARE_VLLM_RE.search(command)
+
+
+def test_a_wrapped_direct_install_is_exempt_like_an_unwrapped_one():
+    """The notebooks wrap nearly every install, so an exemption that only reads
+    unwrapped commands fails a correctly pinned notebook: scanned a physical
+    line at a time the tail is `"vllm==0.15.1"`, which is neither a command nor
+    an assignment, so the hard gate demands a binding no selector can supply.
+    Reverting `_selector_cases` to `source.splitlines()` reddens this."""
+    path = REPO_ROOT / "nb" / "Synthetic.ipynb"
+    cell = '    !uv pip install -qqq --upgrade \\\n        "vllm==0.15.1" unsloth\n'
+    cases = [(path, line, spec) for line, spec in _selector_cases(cell)]
+    assert [spec for _p, _l, spec in cases] == ["vllm==0.15.1"], cases
+    # The gate itself: every detected line must be bound or exempt, and a
+    # command binds nothing, so both sides have to come out empty.
+    bound = {(path, line) for line, _spec in _selector_cases(cell)
+             if _bound_name(line) is not None}
+    assert _lines_needing_a_binding(cases) == bound == set()
+    # The fold must not cost the check that makes the exemption safe: the
+    # unpinned spelling of the same wrapped command is still rejected.
+    unpinned = '    !uv pip install -qqq --upgrade \\\n        vllm unsloth\n'
+    upgrading = _upgrading(_install_commands(unpinned))
+    assert upgrading and _BARE_VLLM_RE.search(upgrading[0]), upgrading
 
 
 def test_the_exemption_does_not_swallow_a_selector_assignment():

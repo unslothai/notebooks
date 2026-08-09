@@ -145,6 +145,33 @@ def _excluded_shell_upgrades():
 _RE_PLACEHOLDER = re.compile(r"(?<!\$)\{(\w+)\}")
 
 
+def _strip_comment(line):
+    """`line` up to its first executable-code `#`, quotes respected.
+
+    A pip requirement can carry a `#` of its own, as in the `#egg=` fragment of
+    a VCS URL, so splitting on the first one would discard half a live command.
+    """
+    quote, escaped = None, False
+    for index, char in enumerate(line):
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif quote:
+            if char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char == "#":
+            return line[:index]
+    return line
+
+
+def _executable(text):
+    """`text` with comments dropped, because a commented pin pins nothing."""
+    return "\n".join(_strip_comment(line) for line in text.splitlines())
+
+
 def _pins_pillow(command, source):
     """Whether THIS command pins Pillow, not whether the notebook mentions it.
 
@@ -153,7 +180,13 @@ def _pins_pillow(command, source):
     resolves a fresh Pillow exactly as before. So a placeholder counts only
     when the notebook assigns that name an EXACT pin: the `get_pil = "pillow"`
     fallback, or a range like `pillow>=11`, is the failure rather than a pin.
+
+    Comments are stripped from both first. Commenting a pin out is how one gets
+    dropped, and the pattern is anchored on the name rather than the start of a
+    line, so `# get_pil = "pillow==11.3.0"` read as a live assignment and left
+    this gate green over an install reaching an undefined placeholder.
     """
+    command, source = _executable(command), _executable(source)
     if re.search(r"pillow\s*==", command, re.I):
         return True
     for name in _RE_PLACEHOLDER.findall(command):
@@ -456,6 +489,39 @@ def test_no_excluded_notebook_imports_pil_before_the_install():
         f"{len(offenders)} notebook(s) import PIL before an excluded install, "
         f"so the upgrade can break the kernel there: {offenders[:3]}"
     )
+
+
+def test_a_commented_out_assignment_is_not_a_pin():
+    """How a pin actually gets dropped. The assignment pattern is anchored on
+    the name, not on the start of a line, so a commented-out `get_pil` read as
+    live and the install still reached `{get_pil}` undefined."""
+    command = "!uv pip install --upgrade {get_pil} torchvision"
+    for definition in (
+        '# get_pil = "pillow==11.3.0"',
+        "#get_pil = f'pillow=={PIL.__version__}'",
+        '    # get_pil = "pillow==11.3.0"',
+    ):
+        assert not _pins_pillow(command, definition + "\n" + command), definition
+    # A pin surviving only in a trailing comment beside the unversioned
+    # fallback is the same hole, and the one an edit leaves behind.
+    trailing = 'get_pil = "pillow"  # was pillow==11.3.0'
+    assert not _pins_pillow(command, trailing + "\n" + command)
+    # A literal pin commented out of the command itself, likewise.
+    assert not _pins_pillow(
+        "!uv pip install --upgrade torchvision  # pillow==11.3.0",
+        "!uv pip install --upgrade torchvision  # pillow==11.3.0",
+    )
+
+
+def test_stripping_comments_leaves_live_code_alone():
+    """A quoted `#`, such as a VCS URL's `#egg=` fragment, is part of the
+    requirement; splitting on the first one would truncate a live command."""
+    assert _strip_comment(_DEFINES_PIL) == _DEFINES_PIL
+    assert _strip_comment('pip install "x @ git+https://h/r#egg=x"  # tail') == (
+        'pip install "x @ git+https://h/r#egg=x"  '
+    )
+    command = "!uv pip install --upgrade {get_pil} torchvision"
+    assert _pins_pillow(command, _DEFINES_PIL + "  # keep PIL in step\n" + command)
 
 
 def test_a_shell_variable_is_not_read_as_a_python_placeholder():
