@@ -92,7 +92,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # If you are using Google Colab, add the flag `uv_pip_set_python=true` to `ng_run` command.
 # 
 # The cell below will automatically:
-# 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (needs `uv` on the system; `uv` provisions the Python that NeMo Gym's own `requires-python` asks for)
+# 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (needs `uv` on the system; `uv` provisions the exact Python that NeMo Gym pins in its `.python-version`)
 # 2. Set up the virtual environment and install dependencies
 # 3. Create the mini sudoku training dataset
 # 4. Start the resources server in the background
@@ -105,7 +105,6 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 import subprocess
 import sys
 import os
-import re
 import time
 import atexit
 import requests
@@ -129,113 +128,52 @@ if not os.path.exists(GYM_DIR):
 
 # Step 2: Create venv and install dependencies
 #
-# `>=3.13.14`, not a fixed version: NeMo Gym raised its own floor to that on
-# 2026-08-04 (upstream ea4c6c6), and pinning 3.12 made `uv sync` exit 2 with
-# "incompatible with the project's Python requirement". A specifier tracks
-# whatever they declare next. `--python 3.13` is NOT enough: uv resolves it to
-# the newest 3.13 it has, which was 3.13.8 here, still under the floor.
-_GYM_PYTHON = ">=3.13.14"
-
-# Refresh uv before asking it for that interpreter. Colab ships a uv whose
-# embedded download list predates every 3.13.14 build, so the request matches
-# nothing at all and the rebuild below fails with uv saying so itself:
-#   error: No interpreter found for Python 3.13.14 in managed installations
-#   or search path
+# NeMo Gym pins its interpreter to one patch release. Gym/.python-version holds
+# 3.13.14 and `uv sync` honours that file, so no other interpreter is accepted;
+# `requires-python = ">=3.13.14"` in their pyproject.toml is only the floor.
+#
+# The uv preinstalled on Colab predates that release, so 3.13.14 is missing from
+# its embedded list of Python downloads and `uv sync` exits 2 with
+#   error: No interpreter found for Python 3.13.14 in managed installations or
+#   search path
 #   hint: uv embeds available Python downloads and may require an update to
 #   install new versions.
-# A standalone uv takes `self update`; a pip-installed one refuses that and
-# needs pip. Neither is fatal on its own, because the venv step reports the
-# real problem if uv is still too old afterwards.
-def _refresh_uv():
-    updated = subprocess.run(
-        ["uv", "self", "update"], capture_output = True, text = True,
-    )
-    if updated.returncode == 0:
-        return
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--upgrade", "-qqq", "uv"],
-        capture_output = True, text = True,
-    )
-
-_refresh_uv()
-
-def _uv_sync():
-    return subprocess.run(
-        ["bash", "-c", "source .venv/bin/activate && uv sync"],
-        cwd = GYM_DIR, capture_output = True, text = True,
-    )
-
-if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
-    print("Setting up NeMo Gym environment (this may take a few minutes)...")
-    subprocess.run(["uv", "venv", "--python", _GYM_PYTHON], cwd = GYM_DIR, check = True)
-
-# Outside the existence guard, and retried against a rebuilt venv. `uv venv`
-# succeeds and `uv sync` is the half that fails, so anyone who already hit the
-# floor error has a complete-looking .venv on disk holding the wrong Python.
-# Guarding the sync on that directory existing skips precisely the people who
-# need the repair, and they hit a missing `ng_run` much later instead. uv also
-# refuses to overwrite a venv without --clear, so the rebuild has to say so.
-# `uv sync` is a no-op when the environment already matches the lockfile.
+# Upgrade uv first, then `uv python install` fetches exactly what the checkout
+# asks for. Call uv through the binary its wheel ships rather than the name
+# `uv`, because the copy already on PATH is the stale one being replaced.
 #
-# The rebuild throws the environment away, so it is reserved for the failure it
-# repairs. A sync also fails for reasons that have nothing to do with the
-# interpreter -- an index outage, a resolution conflict, a dropped download --
-# and clearing the venv there destroys a working environment and then retries
-# the same losing command, leaving nothing behind. So ask the venv's own
-# interpreter whether it satisfies that requirement and rebuild only when it
-# does not. Asking the interpreter beats matching uv's error text, which is free to
-# be reworded.
-# The floor to measure the venv against is the one the CHECKED-OUT Gym
-# declares, not _GYM_PYTHON. Step 1 clones only when ~/Gym is missing, so a
-# checkout made before upstream raised its floor keeps the old requirement and
-# its Python 3.12 venv is still valid for it. Measured against the notebook's
-# newer constant that venv looks stale, and then any unrelated sync failure --
-# an index outage, a dropped download -- deletes a working environment, which
-# is the outcome this guard exists to prevent. _GYM_PYTHON remains the
-# fallback when the checkout cannot be read, and remains what a venv is built
-# with, since a fresh clone is what a new venv is for.
-def _gym_requires_python():
-    try:
-        with open(os.path.join(GYM_DIR, "pyproject.toml"), encoding = "utf-8") as file:
-            declared = re.search(
-                r"^\s*requires-python\s*=\s*[\"']([^\"']+)[\"']", file.read(), re.M,
-            )
-    except OSError:
-        declared = None
-    return declared.group(1) if declared else _GYM_PYTHON
-
-def _venv_python_satisfies_floor():
-    python = os.path.join(GYM_DIR, ".venv", "bin", "python")
-    if not os.path.exists(python): return False
-    probe = subprocess.run(
-        [python, "-c", "import sys; print('%d.%d.%d' % sys.version_info[:3])"],
-        capture_output = True, text = True,
+# Asking for the floor instead is not a substitute: uv then picks the newest
+# release it knows of, which is a 3.14, and `uv sync` dies compiling yappi (a
+# NeMo Gym dependency with no cp314 wheel) from source.
+#
+# `uv sync` owns the venv too. It creates Gym/.venv when missing and rebuilds it
+# when the interpreter inside does not match the pin, which is what repairs the
+# 3.14 venv a failed earlier attempt leaves on disk. So there is no separate
+# `uv venv` call and no guard on .venv already existing -- that guard skipped
+# the repair for exactly the people who needed it.
+print("Setting up NeMo Gym environment (this may take a few minutes)...")
+subprocess.run(
+    [sys.executable, "-m", "pip", "install", "--quiet", "--upgrade", "uv"],
+    check = True,
+)
+import uv as _uv_module
+_UV = _uv_module.find_uv_bin()
+subprocess.run([_UV, "python", "install"], cwd = GYM_DIR, check = True)
+subprocess.run([_UV, "sync"], cwd = GYM_DIR, check = True)
+# Everything below drives Gym/.venv by path, so fail here rather than several
+# subprocesses later if uv placed the environment somewhere this cell cannot
+# reach.
+_gym_venv_python = os.path.join(GYM_DIR, ".venv", "bin", "python")
+if not os.path.exists(_gym_venv_python):
+    raise RuntimeError(
+        f"uv sync finished but {_gym_venv_python} does not exist, so the NeMo "
+        "Gym environment is not where the rest of this cell looks for it."
     )
-    if probe.returncode != 0: return False
-    lower_bound = re.search(r">=\s*([0-9]+(?:\.[0-9]+)*)", _gym_requires_python())
-    # A requirement with no lower bound at all leaves nothing to fail: keep the
-    # venv rather than clear it over a specifier that was not understood.
-    if lower_bound is None: return True
-    floor = tuple(int(p) for p in lower_bound.group(1).split("."))
-    found = tuple(int(p) for p in probe.stdout.strip().split(".") if p.isdigit())
-    return bool(found) and found >= floor
-
-_sync = _uv_sync()
-if _sync.returncode != 0 and not _venv_python_satisfies_floor():
-    print("Rebuilding the NeMo Gym venv: its Python is below the floor NeMo Gym requires.")
-    subprocess.run(
-        ["uv", "venv", "--python", _GYM_PYTHON, "--clear"],
-        cwd = GYM_DIR, check = True,
-    )
-    _sync = _uv_sync()
-if _sync.returncode != 0:
-    print(_sync.stdout[-3000:])
-    print(_sync.stderr[-3000:])
-    _sync.check_returncode()
 # reasoning-gym and matplotlib, installed unconditionally and aimed at the
 # venv's interpreter by path rather than by `source activate`.
 #
-# Inside the `.venv` existence guard above, `uv pip install reasoning-gym` ran
+# Inside the `.venv` existence guard this cell used to carry, `uv pip install
+# reasoning-gym` ran
 # and exited 0, and create_dataset.py then died on
 #   ModuleNotFoundError: No module named 'reasoning_gym'
 # so whatever `source activate` selected was not the environment the following
