@@ -26,6 +26,7 @@ Public surface used by tests/ and CI:
   strip_jupyter_magics(source)            -> str    # cell-friendly
   extract_pip_pins_from_cell(source)      -> list[(pkg, version)]
   read_pin_constants()                    -> dict[str, str]
+  UPGRADE_FLAG_RE / is_upgrading(command) -> the `--upgrade` / `-U` test
 """
 from __future__ import annotations
 
@@ -40,6 +41,36 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_NOTEBOOK_ROOTS = ("original_template", "nb", "kaggle")
 
 _PIN_RE = re.compile(r"([A-Za-z][A-Za-z0-9_.\-]*)==([0-9][0-9A-Za-z.\-+_]*)")
+
+# `--upgrade` or its short form, including inside a cluster such as `-qU`.
+# `uv pip install --help`: `-U, --upgrade` is "Allow package upgrades,
+# ignoring pinned versions in any existing output file", so both spellings
+# resolve a fresh version over one already installed and both must count. The
+# single leading `-` is required, so `--force-reinstall` and `--index-url` do
+# not read as an upgrade flag.
+#
+# Lives here rather than in either gate because both the vLLM pin gate and the
+# Pillow pin gate ask the same question of the same commands, and a plain
+# `"--upgrade" in command` in one of them silently exempted the 152 AMD
+# notebooks that spell it `-U`.
+UPGRADE_FLAG_RE = re.compile(r"--upgrade\b|(?<![\w-])-[a-zA-Z]*U")
+
+
+def is_upgrading(command: str) -> bool:
+    """Whether a pip install command can replace an already-installed package."""
+    return UPGRADE_FLAG_RE.search(command) is not None
+
+
+# A cell whose whole body is shell, so its install lines carry no `!`. The AMD
+# notebooks are written this way: 152 such cells hold the ROCm torch install.
+# `%%capture` is not one of these -- that cell is still Python and still `!`.
+_SHELL_CELL_RE = re.compile(r"^%%(?:bash|sh|script)\b")
+
+
+def is_shell_cell(source: str) -> bool:
+    """Whether a cell's whole body runs as shell rather than as Python."""
+    first = source.lstrip().split("\n", 1)[0].strip()
+    return bool(_SHELL_CELL_RE.match(first))
 
 
 def iter_notebooks(roots: Iterable[str] | None = None) -> Iterator[Path]:

@@ -93,18 +93,16 @@ _ASSIGNMENT_RE = re.compile(
 )
 
 
-# A cell whose whole body is shell, so its install lines carry no `!`. The AMD
-# notebooks are written this way: 152 such cells hold 1064 pip installs that a
-# `!`-only scan never sees. `%%capture` is not one of these -- that cell is
-# still Python and still uses `!`.
-_SHELL_CELL_RE = re.compile(r"^%%(?:bash|sh|script)\b")
-
-
 def _install_commands(source):
     """The `pip install` commands of a cell, backslash continuations joined,
-    because the command that consumes the selector is often wrapped."""
-    stripped = source.lstrip()
-    shell_cell = bool(_SHELL_CELL_RE.match(stripped.split("\n", 1)[0].strip()))
+    because the command that consumes the selector is often wrapped.
+
+    A `%%bash` cell's lines run as shell and so carry no `!`. The AMD notebooks
+    are written this way: 152 such cells hold 1064 pip installs that a `!`-only
+    scan never sees. The test itself is `notebook_inventory.is_shell_cell`,
+    shared with the Pillow pin gate.
+    """
+    shell_cell = ni.is_shell_cell(source)
     commands, pending = [], ""
     for line in source.splitlines():
         pending = f"{pending} {line.strip()}" if pending else line
@@ -118,26 +116,22 @@ def _install_commands(source):
     return commands
 
 
-# `--upgrade` or its short form, including inside a cluster such as `-qU`.
-# The single leading `-` is required, so `--force-reinstall` and
-# `--index-url` do not read as an upgrade flag.
-_UPGRADE_FLAG_RE = re.compile(r"--upgrade\b|(?<![\w-])-[a-zA-Z]*U")
-
-
 def _upgrading(commands):
     """The commands that can replace an already-installed vLLM.
 
     `uv pip install --help`: `-U, --upgrade` is "Allow package upgrades,
     ignoring pinned versions in any existing output file", so only these
     resolve a fresh vLLM over one already present. Both spellings count; the
-    short one appears in the tree inside clusters such as `-qU`.
+    short one appears in the tree inside clusters such as `-qU`. The flag test
+    itself is `notebook_inventory.UPGRADE_FLAG_RE`, shared with the Pillow pin
+    gate so the two cannot drift apart on what an upgrade is.
 
     Narrowing to upgrades is what keeps the non-Colab branch of the same cell,
     `!pip install unsloth vllm`, out of scope: it is unpinned on purpose for
     people on their own CUDA, and it upgrades nothing. 85 commands in the tree
     are of that kind.
     """
-    return [command for command in commands if _UPGRADE_FLAG_RE.search(command)]
+    return [command for command in commands if ni.is_upgrading(command)]
 
 
 # A vLLM requirement written straight into a shell command with no exact

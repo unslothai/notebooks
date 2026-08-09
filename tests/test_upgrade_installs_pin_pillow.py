@@ -39,16 +39,26 @@ install already carried the pin; this test stops the 46th recurring.
 The scan folds backslash continuations before matching. The install that broke
 puts `--upgrade` and `torchvision` on different physical lines, so a per-line
 match reports zero offenders and the check silently passes.
+
+Both spellings of the flag count, via the shared
+`notebook_inventory.UPGRADE_FLAG_RE`. Matching only the long `--upgrade`
+exempted every install written `-U`, which is 152 of them.
+
+SCOPE: Python cells only. See `_torchvision_upgrades_by_cell`.
 """
 
 import json
 import re
+import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NB_DIR = REPO_ROOT / "nb"
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+import notebook_inventory as ni  # noqa: E402
 
 
 def _pip_commands(source):
@@ -56,10 +66,16 @@ def _pip_commands(source):
     commands, pending = [], None
     for line in source.splitlines():
         if pending is not None:
+            # Strip the `\` from EVERY continuation, not just the first. Left
+            # in, a folded command reads `... triton-rocm \ --index-url ...`
+            # and the stray token sits between two things a pattern may want
+            # to match across.
             pending += " " + line.strip()
             if not line.rstrip().endswith("\\"):
                 commands.append(pending)
                 pending = None
+            else:
+                pending = pending.rstrip()[:-1].rstrip()
             continue
         if "pip install" in line:
             if line.rstrip().endswith("\\"):
@@ -71,13 +87,17 @@ def _pip_commands(source):
     return commands
 
 
-def _code_cells(path):
+def _all_code_cells(path):
     notebook = json.loads(path.read_text(encoding="utf-8"))
     return [
         "".join(cell.get("source", []))
         for cell in notebook.get("cells", [])
         if cell.get("cell_type") == "code"
     ]
+
+
+def _code_cells(path):
+    return [cell for cell in _all_code_cells(path) if not ni.is_shell_cell(cell)]
 
 
 def _code(path):
@@ -87,7 +107,7 @@ def _code(path):
 def _upgrades_torchvision(source):
     return [
         command for command in _pip_commands(source)
-        if "--upgrade" in command and "torchvision" in command
+        if ni.is_upgrading(command) and "torchvision" in command
     ]
 
 
@@ -100,6 +120,55 @@ def _torchvision_upgrades_by_cell(path):
     separate cells. Resolving against the concatenated notebook lets one
     cell's exact `get_pil` answer for the other cell's unpinned one, so
     dropping the pin from either passes.
+
+    `%%bash` cells are deliberately not scanned, which excludes the 152 AMD
+    ROCm installs
+
+        uv pip install --system -U --force-reinstall \\
+            torch torchvision torchaudio triton-rocm \\
+            --index-url "$PYTORCH_INDEX_URL"
+
+    that recognising `-U` above makes visible for the first time. Not because
+    the upgrade is harmless in itself: the ROCm index does carry Pillow (to
+    12.2.0), and a `uv pip install --dry-run` of that exact command in an
+    environment holding Pillow 11.0.0 plans `- pillow==11.0.0 /
+    + pillow==12.2.0`. It moves Pillow just like the Colab one.
+
+    It is out of scope because the breakage needs a second ingredient the AMD
+    cells cannot supply. Pillow's `Image.py` compares `__version__`, read from
+    an ALREADY-CACHED `PIL/__init__.py`, against the freshly loaded
+    `_imaging.PILLOW_VERSION`, so the mismatch fires only when `PIL` is in
+    `sys.modules` and `PIL.Image` is not. Reproduced: with nothing imported the
+    upgrade is clean, with `PIL` and `PIL.Image` both loaded the kernel stays
+    coherently on the old version, and only a bare `import PIL` before the
+    upgrade produces the `Image.py:116` RuntimeWarning above.
+
+    Colab's kernel is in exactly that state before the first cell runs. Its
+    kernel class is `google.colab._kernel.Kernel`, loading it runs
+    `google/colab/__init__.py`, which imports `_reprs`, whose line 14 is a bare
+    `import PIL as pil` -- `pil.Image` is touched only inside `_image_repr`.
+    Colab reports it too, in the "previously imported in this runtime: [PIL]"
+    banner `google/colab/_pip.py` builds from `set(installed) & sys.modules`.
+
+    The AMD notebooks run on a bare JupyterLab in a ROCm container instead,
+    where a first-cell `sys.modules` dump holds no PIL: neither ipykernel nor
+    IPython imports it, and `%matplotlib inline` is not on by default (and
+    would load `PIL.Image` too, the safe state). No AMD notebook imports PIL,
+    the `%%bash` cell is code cell 0 and runs in a subprocess shell so it
+    cannot put PIL into the kernel on its way past, and every later AMD
+    upgrade is `--no-deps`. Every notebook the gate does police creates the
+    state itself, one line above the install:
+    `try: import PIL; get_pil = f'pillow=={PIL.__version__}'`.
+
+    The generator already draws the same line: `_AMD_INSTALL_PACKAGE_IGNORE` in
+    update_all_notebooks.py lists "pillow" and "pil", so a Colab pin is
+    deliberately not propagated into the AMD variant -- the ROCm cell owns that
+    half of the stack, as it does for torch and torchao.
+
+    The exclusion is a cell-type predicate rather than a list of notebooks, so
+    a rename cannot widen it and an AMD install that moves into a Python cell
+    is back in scope automatically. The tests below hold it to the ROCm install
+    at cell 0 with no PIL above it, so it cannot quietly grow.
     """
     return [
         (command, cell)
@@ -108,7 +177,21 @@ def _torchvision_upgrades_by_cell(path):
     ]
 
 
-_RE_PLACEHOLDER = re.compile(r"\{(\w+)\}")
+def _excluded_shell_upgrades():
+    """(path, command) for every torchvision upgrade the scope above drops."""
+    return [
+        (path, command)
+        for path in _NOTEBOOKS
+        for cell in _all_code_cells(path)
+        if ni.is_shell_cell(cell)
+        for command in _upgrades_torchvision(cell)
+    ]
+
+
+# `(?<!\$)` so a shell `${VAR}` is not read as a Python placeholder. The pin is
+# interpolated by Python, and letting `${PIL_PIN}` match meant a bash variable
+# could satisfy the gate through an assignment probe written for f-strings.
+_RE_PLACEHOLDER = re.compile(r"(?<!\$)\{(\w+)\}")
 
 
 def _pins_pillow(command, source):
@@ -145,6 +228,21 @@ def _pins_pillow(command, source):
 
 
 _NOTEBOOKS = sorted(NB_DIR.glob("*.ipynb")) if NB_DIR.is_dir() else []
+
+
+def _write_notebook(tmp_path, cells):
+    """A throwaway .ipynb holding `cells` as code cells, so the scope rules can
+    be exercised on a notebook instead of on a bare string."""
+    path = tmp_path / "sample.ipynb"
+    path.write_text(
+        json.dumps(
+            {"cells": [
+                {"cell_type": "code", "source": [source]} for source in cells
+            ]}
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 @pytest.mark.parametrize("path", _NOTEBOOKS, ids=lambda p: p.name)
@@ -325,3 +423,135 @@ def test_a_sibling_pin_on_the_same_line_does_not_count():
     assert not _pins_pillow(unpinned, source)
     pinned = "!uv pip install --upgrade unsloth {get_numpy} {get_pil} torchvision"
     assert _pins_pillow(pinned, definition + "\n" + pinned)
+
+
+def test_the_short_upgrade_flag_counts_as_an_upgrade():
+    """`uv pip install --help`: `-U, --upgrade` is "Allow package upgrades".
+    A plain `"--upgrade" in command` test read only the long spelling, so every
+    install written `-U` was exempt -- 152 of them in the tree."""
+    for command in (
+        "!uv pip install -U torchvision",
+        "!uv pip install -qU unsloth torchvision",
+        "uv pip install --system -U --force-reinstall torch torchvision",
+    ):
+        assert _upgrades_torchvision(command) == [command], command
+
+
+def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
+    """`--force-reinstall` and `--index-url` reinstall from a named index.
+    Reading either as an upgrade would drag unrelated installs into scope."""
+    for command in (
+        '!uv pip install --force-reinstall torchvision --index-url "$URL"',
+        "!uv pip install -qqq torchvision",
+    ):
+        assert _upgrades_torchvision(command) == [], command
+
+
+def test_a_short_flag_upgrade_in_a_python_cell_is_still_caught(tmp_path):
+    """The scope below drops `%%bash` cells. This is the other half of that
+    decision: a `-U torchvision` install in an ordinary Python cell, the kind
+    the gate exists for, must still be collected and must still be required to
+    pin. Without this the `-U` fix would be scoped away to nothing."""
+    unpinned = "!uv pip install -qU unsloth torchvision"
+    path = _write_notebook(tmp_path, [unpinned])
+    found = _torchvision_upgrades_by_cell(path)
+    assert [c for c, _cell in found] == [unpinned]
+    assert not _pins_pillow(*found[0])
+
+
+def test_a_shell_magic_install_is_out_of_scope(tmp_path):
+    """A `%%bash` cell runs in a subprocess shell, so it cannot leave `PIL`
+    resident in the kernel, which is the state the mismatch needs. See
+    `_torchvision_upgrades_by_cell` for the full reasoning."""
+    path = _write_notebook(
+        tmp_path,
+        [
+            "%%bash\nuv pip install --system -U --force-reinstall torch torchvision\n",
+            "!uv pip install -qU unsloth torchvision",
+        ],
+    )
+    found = [c for c, _cell in _torchvision_upgrades_by_cell(path)]
+    assert found == ["!uv pip install -qU unsloth torchvision"], found
+
+
+def test_the_shell_magic_exclusion_covers_only_the_rocm_stack_install():
+    """The exclusion is justified for one command shape: the AMD ROCm torch
+    stack install at code cell 0. Holding it to that shape is what stops it
+    growing into a general amnesty for anything anyone puts in a `%%bash`
+    cell -- add a different upgrading torchvision install there and this goes
+    red rather than silently exempting it."""
+    excluded = _excluded_shell_upgrades()
+    assert len(excluded) >= 100, (
+        f"only {len(excluded)} shell-magic torchvision upgrades found; either "
+        f"the AMD template changed or the scan stopped folding continuations"
+    )
+    unexpected = [
+        (path.name, command)
+        for path, command in excluded
+        if "triton-rocm" not in command or "$PYTORCH_INDEX_URL" not in command
+    ]
+    assert not unexpected, (
+        f"{len(unexpected)} shell-magic upgrade(s) are not the ROCm stack "
+        f"install the exclusion was reasoned about: {unexpected[:2]}. Either "
+        f"pin Pillow in them or extend the note in "
+        f"_torchvision_upgrades_by_cell to cover them."
+    )
+
+
+def test_the_excluded_installs_are_the_notebooks_first_cell():
+    """Half of why the exclusion holds: nothing has run in the kernel yet, so
+    there is no already-imported PIL for the upgrade to swap under."""
+    late = []
+    for path in _NOTEBOOKS:
+        cells = _all_code_cells(path)
+        for index, cell in enumerate(cells):
+            if ni.is_shell_cell(cell) and _upgrades_torchvision(cell) and index:
+                late.append((path.name, index))
+    assert not late, (
+        f"{len(late)} shell-magic torchvision upgrade(s) no longer run first, "
+        f"so Python cells above them may have imported PIL: {late[:3]}"
+    )
+
+
+def test_no_excluded_notebook_imports_pil_before_the_install():
+    """The other half. An `import PIL` anywhere above the install puts the
+    kernel in exactly the vulnerable state, and the exclusion stops holding."""
+    offenders = []
+    for path, _command in _excluded_shell_upgrades():
+        cells = _all_code_cells(path)
+        index = next(
+            i for i, cell in enumerate(cells)
+            if ni.is_shell_cell(cell) and _upgrades_torchvision(cell)
+        )
+        earlier = "\n".join(cells[:index])
+        if re.search(r"\bimport +PIL\b|\bfrom +PIL\b", earlier):
+            offenders.append(path.name)
+    assert not offenders, (
+        f"{len(offenders)} notebook(s) import PIL before an excluded install, "
+        f"so the upgrade can break the kernel there: {offenders[:3]}"
+    )
+
+
+def test_a_shell_variable_is_not_read_as_a_python_placeholder():
+    """The pin is a Python f-string interpolation. `${PIL_PIN}` is a shell
+    expansion, and reading it as `{PIL_PIN}` let a bash assignment satisfy a
+    probe written for `get_pil = f'pillow=={PIL.__version__}'`."""
+    command = "uv pip install -U torchvision ${PIL_PIN}"
+    source = 'PIL_PIN="pillow==11.0.0"\n' + command
+    assert not _pins_pillow(command, source)
+    assert _pins_pillow("!uv pip install -U torchvision {get_pil}", _DEFINES_PIL)
+
+
+def test_a_fold_leaves_no_stray_backslash():
+    """Each continuation drops its own `\\`. Left in, the folded command reads
+    `... triton-rocm \\ --index-url ...` and the stray token sits between two
+    things the next pattern may want to match across."""
+    text = (
+        "uv pip install --system -U --force-reinstall \\\n"
+        "    torch torchvision torchaudio triton-rocm \\\n"
+        '    --index-url "$PYTORCH_INDEX_URL"\n'
+    )
+    assert _pip_commands(text) == [
+        "uv pip install --system -U --force-reinstall torch torchvision "
+        'torchaudio triton-rocm --index-url "$PYTORCH_INDEX_URL"'
+    ]
