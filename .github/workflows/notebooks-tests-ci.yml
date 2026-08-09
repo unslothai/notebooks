@@ -171,6 +171,14 @@ jobs:
         run: |
           python -m pytest tests/test_molab_generation_parity.py -q --tb=short
 
+      - name: tests/test_molab_templated_pins.py
+        run: |
+          python -m pytest tests/test_molab_templated_pins.py -q --tb=short
+
+      - name: tests/test_amd_templated_kernel_pins.py
+        run: |
+          python -m pytest tests/test_amd_templated_kernel_pins.py -q --tb=short
+
       - name: tests/test_molab_marimo_validity.py
         run: |
           python -m pytest tests/test_molab_marimo_validity.py -q --tb=short

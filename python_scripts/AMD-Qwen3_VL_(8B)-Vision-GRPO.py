@@ -394,7 +394,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 1024,
 model.save_pretrained("qwen_lora")  # Local saving
 tokenizer.save_pretrained("qwen_lora")
 # model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
-# tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+# processor.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Verify LoRA is actually trained!
