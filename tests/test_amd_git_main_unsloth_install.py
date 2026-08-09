@@ -15,9 +15,9 @@
 
 A source installs unsloth / unsloth_zoo from git main only for code no release
 carries yet (`FastDiffusionModel`). Both names sit in
-`_AMD_INSTALL_PACKAGE_IGNORE`, and `_validate_amd_install_package_parity`
-subtracts the same set, so the upgrade vanished from the AMD variant unseen and
-the notebook died at `FastModel.from_pretrained` on the PyPI build.
+`_AMD_INSTALL_PACKAGE_IGNORE` and the parity validator subtracts the same set,
+so the upgrade vanished from the AMD variant unseen and the notebook died at
+`FastModel.from_pretrained` on the PyPI build.
 """
 from __future__ import annotations
 
