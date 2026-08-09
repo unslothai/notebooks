@@ -18,27 +18,15 @@
 
 """An `--upgrade` install that names torchvision must pin Pillow first.
 
-torchvision depends on Pillow, so `uv pip install --upgrade ... torchvision`
-resolves a newer Pillow and swaps it in underneath a kernel that has already
-imported PIL. The Python half of the package is then the new version while the
-compiled `_imaging` extension on the path is the old one, and PIL says so:
+torchvision drags in a newer Pillow and swaps it under a kernel that already
+imported PIL: the Python half is new, the compiled `_imaging` extension is old
+(`Image.py:116: RuntimeWarning`), torchvision's `import PIL` fails, and
+`unsloth_zoo` turns that into a hard error, so the notebook dies on its first
+real cell. Found on Colab in `Advanced_Llama3_1_(3B)_GRPO_LoRA`; 45 of the 46
+notebooks with such an install already carried the pin.
 
-    /usr/local/lib/python3.12/dist-packages/PIL/Image.py:116: RuntimeWarning:
-    The _imaging extension was built for another version of Pillow or PIL
-
-torchvision's own `import PIL` then fails, and because `unsloth_zoo`
-translates that into a hard error telling the user to reinstall Pillow and
-restart, `from unsloth import FastLanguageModel` never returns. The notebook
-dies on its first real cell with nothing trained.
-
-Found on a Colab L4: `Advanced_Llama3_1_(3B)_GRPO_LoRA` failed exactly that
-way while `Advanced_Llama3_2_(3B)_GRPO_LoRA`, which already pinned Pillow,
-passed on the same worker minutes later. 45 of the 46 notebooks with such an
-install already carried the pin; this test stops the 46th recurring.
-
-The scan folds backslash continuations before matching. The install that broke
-puts `--upgrade` and `torchvision` on different physical lines, so a per-line
-match reports zero offenders and the check silently passes.
+The scan folds backslash continuations before matching, since the broken install
+splits `--upgrade` from `torchvision` across physical lines.
 """
 
 import json
@@ -93,28 +81,19 @@ _RE_PLACEHOLDER = re.compile(r"\{(\w+)\}")
 def _pins_pillow(command, source):
     """Whether THIS command pins Pillow, not whether the notebook mentions it.
 
-    Asking the whole notebook is the failure this gate exists to prevent, one
-    level up: drop `{get_pil}` from the install but leave `get_pil = ...`
-    defined a few lines above, and a whole-notebook search still says yes while
-    the upgrade resolves a fresh Pillow exactly as before.
-
-    The pin is usually interpolated, so a placeholder counts only when the
-    notebook assigns that name an EXACT pin. `get_pil = "pillow"` is what these
-    notebooks fall back to when PIL is not importable, and passing that to an
-    `--upgrade` install resolves a fresh Pillow -- the failure itself, not a pin
-    of it. A range such as `pillow>=11` is no better.
+    Dropping `{get_pil}` from the install while leaving `get_pil = ...` a few
+    lines above still satisfies a whole-notebook search, and the upgrade
+    resolves a fresh Pillow exactly as before. So a placeholder counts only
+    when the notebook assigns that name an EXACT pin: the `get_pil = "pillow"`
+    fallback, or a range like `pillow>=11`, is the failure rather than a pin.
     """
     if re.search(r"pillow\s*==", command, re.I):
         return True
     for name in _RE_PLACEHOLDER.findall(command):
-        # `[^\n;]`, so the match cannot run past the end of the statement. These
-        # notebooks put both pins on one line:
-        #   try: import numpy, PIL; get_numpy = f'numpy=={numpy.__version__}'; get_pil = f'pillow=={PIL.__version__}'
-        # and allowing `;` lets `get_numpy` match the `pillow` belonging to
-        # `get_pil`. Every unpinned command then looks pinned through
-        # `{get_numpy}`, which is the whole bug this function was rewritten to
-        # catch. Caught by sabotage: dropping `{get_pil}` from the real notebook
-        # left the suite green.
+        # `[^\n;]` stops at the end of the statement. These notebooks chain both
+        # pins on one line, so allowing `;` let `{get_numpy}` borrow the
+        # `pillow` belonging to `get_pil` and every unpinned command read as
+        # pinned.
         assignment = re.search(
             rf"\b{re.escape(name)}\s*=\s*[^\n;]*pillow\s*==", source, re.I
         )
@@ -144,8 +123,8 @@ def test_an_upgrade_install_naming_torchvision_pins_pillow(path):
 
 
 def test_the_scan_folds_continuations_before_matching():
-    """The install that broke splits `--upgrade` from `torchvision` across a
-    backslash continuation. Matching per physical line finds nothing."""
+    """The broken install splits `--upgrade` from `torchvision` across a
+    continuation, so a per-line match finds nothing."""
     text = (
         "!uv pip install -qqq --upgrade \\\n"
         "    unsloth vllm torchvision bitsandbytes\n"
@@ -159,8 +138,7 @@ def test_the_scan_folds_continuations_before_matching():
 
 
 def test_an_upgrade_without_torchvision_is_not_flagged():
-    """Only torchvision drags Pillow in. Flagging every `--upgrade` would make
-    the check noise, and noise gets skipped."""
+    """Only torchvision drags Pillow in; flagging every `--upgrade` is noise."""
     assert not _upgrades_torchvision("!uv pip install -qqq --upgrade unsloth vllm")
 
 
@@ -189,9 +167,8 @@ def test_an_unpinned_command_is_reported():
 
 
 def test_a_definition_elsewhere_does_not_excuse_an_unpinned_command():
-    """The exact regression this gate exists for. Someone drops `{get_pil}` from
-    the install and leaves the assignment above it; a whole-notebook search says
-    Pillow is pinned while the upgrade resolves a fresh one just as before."""
+    """The regression this gate exists for: the assignment stays above the
+    install, so a whole-notebook search still calls it pinned."""
     command = "!uv pip install -qqq --upgrade unsloth torchvision"
     source = _DEFINES_PIL + "\n" + command
     assert re.search(r"pillow\s*==", source, re.I), "the decoy must look convincing"
@@ -199,8 +176,7 @@ def test_a_definition_elsewhere_does_not_excuse_an_unpinned_command():
 
 
 def test_a_placeholder_naming_something_else_does_not_count():
-    """`{get_numpy}` is interpolated into the same command and must not be read
-    as a Pillow pin."""
+    """`{get_numpy}` shares the command and must not read as a Pillow pin."""
     command = "!uv pip install --upgrade {get_numpy} torchvision"
     source = 'get_numpy = f"numpy=={numpy.__version__}"\n' + command
     assert not _pins_pillow(command, source)
@@ -212,11 +188,9 @@ def test_a_placeholder_naming_something_else_does_not_count():
     ids=["unversioned", "range", "unversioned-capitalised"],
 )
 def test_a_placeholder_that_is_not_an_exact_pin_does_not_count(definition):
-    """`{get_pil}` in the command is only half of it. These notebooks already
-    carry `except: get_pil = "pillow"` for the case where PIL is not importable,
-    so the unversioned spelling is one deleted line away -- and passing it to an
-    `--upgrade` install beside torchvision resolves a newer Pillow, which is the
-    failure this gate exists to stop rather than a pin against it."""
+    """These notebooks already carry `except: get_pil = "pillow"`, so the
+    unversioned spelling is one deleted line away -- and passing it to an
+    `--upgrade` install is the failure, not a pin against it."""
     command = "!uv pip install --upgrade {get_pil} torchvision"
     assert not _pins_pillow(command, definition + "\n" + command)
 
@@ -227,9 +201,9 @@ def test_the_real_fallback_line_does_not_hide_the_pinned_one():
         try: import PIL; get_pil = f'pillow=={PIL.__version__}'
         except: get_pil = "pillow"
 
-    The pinned assignment is what runs when PIL is loaded, which is exactly when
-    the mismatch can happen, so this must still count. Requiring the FIRST
-    assignment to be the pinned one would be a coin flip on source order."""
+    The pinned branch runs when PIL is loaded, which is exactly when the
+    mismatch can happen, so it must count; requiring the FIRST assignment to be
+    the pinned one would be a coin flip on source order."""
     command = "!uv pip install --upgrade {get_pil} torchvision"
     source = (
         'except: get_pil = "pillow"\n'
@@ -241,7 +215,7 @@ def test_the_real_fallback_line_does_not_hide_the_pinned_one():
 
 
 def test_one_unpinned_command_is_caught_beside_a_pinned_one():
-    """A notebook may run several upgrades. Checking only the first would let a
+    """A notebook may run several upgrades; checking only the first lets a
     later unpinned one through."""
     pinned = "!uv pip install --upgrade {get_pil} torchvision"
     unpinned = "!uv pip install --upgrade torchvision"
@@ -252,8 +226,8 @@ def test_one_unpinned_command_is_caught_beside_a_pinned_one():
 
 
 def test_at_least_one_notebook_actually_exercises_the_check():
-    """A glob that matched nothing, or a fold that silently stopped working,
-    would leave every parametrised case skipped and the suite green."""
+    """A broken glob or fold would leave every parametrised case skipped and
+    the suite green."""
     exercised = [p.name for p in _NOTEBOOKS if _upgrades_torchvision(_code(p))]
     assert len(exercised) >= 40, (
         f"only {len(exercised)} notebooks reached the assertion; the scan is "
@@ -262,12 +236,9 @@ def test_at_least_one_notebook_actually_exercises_the_check():
 
 
 def test_a_sibling_pin_on_the_same_line_does_not_count():
-    """These notebooks define both pins in one statement chain:
-
-        try: import numpy, PIL; get_numpy = f'numpy=={numpy.__version__}'; get_pil = f'pillow=={PIL.__version__}'
-
-    so a pattern that runs to end of LINE lets `{get_numpy}` borrow the `pillow`
-    that belongs to `get_pil`, and every unpinned command reads as pinned."""
+    """These notebooks chain both pins in one statement, so a pattern running to
+    end of LINE lets `{get_numpy}` borrow the `pillow` belonging to `get_pil`
+    and every unpinned command reads as pinned."""
     definition = (
         "try: import numpy, PIL; "
         "get_numpy = f'numpy=={numpy.__version__}'; "
