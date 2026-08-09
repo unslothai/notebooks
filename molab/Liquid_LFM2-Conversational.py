@@ -94,12 +94,17 @@ def _(mo):
 @app.cell
 def _():
     # Need main branch for Liquid LFM2 models
-    # --no-deps above means pip never enforces anything transformers main needs, so
-    # every floor it declares is a separate delayed import error. molab and Kaggle
-    # ship hub 0.36.2 and safetensors 0.7.0, and the pinned transformers installed
-    # earlier leaves tokenizers at 0.21.x, so all three fail in turn before a line
-    # of training. Pinning only the one that surfaced first just moves the error.
-    # Taken from transformers main setup.py.
+    # --no-deps above is deliberate: without it pip re-resolves torch and replaces
+    # the CUDA build the runtime already has. The cost is that pip enforces nothing
+    # transformers main declares. It only warns, and still exits 0, so every
+    # requirement it lists is a delayed import error waiting to happen. The rule,
+    # rather than adding one more floor each time one surfaces: take
+    # install_requires from transformers main setup.py and raise every entry the
+    # base images fall short of. Measured on hardware, both images reach this cell
+    # on huggingface_hub 0.36.2 and Kaggle ships safetensors 0.7.0, so those two
+    # need raising; tokenizers 0.22.2 already sits inside its window and is pinned
+    # only to hold it under the 0.23.0 cap that nothing else here enforces.
+    # tests/test_transformers_main_no_deps_floors.py holds this line to that rule.
     # Install Mamba kernels
     return
 
