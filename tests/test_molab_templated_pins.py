@@ -13,21 +13,12 @@
 
 """Runtime-templated install-pin gate.
 
-An install cell may compute a pin at runtime and pass it to pip as an IPython
-``{var}`` expansion (Granite 4.0 / Nemotron Nano branch on compute capability).
-``scripts/molab_generate.py`` rebuilds the PEP 723 header from
-``molab_dependencies.plan_dependencies``, so a ``{var}`` the planner does not
-know vanishes silently -- that is how torch 2.7.1, mamba_ssm and causal_conv1d
-were lost from four molab notebooks.
-
-Two obligations:
-
-1. Every ``{var}`` a molab-targeted install cell feeds to pip is registered in
-   ``molab_dependencies``, with a static spec (``_TEMPLATE_STATIC_SPECS``) or a
-   reason for having none (``_TEMPLATE_NO_STATIC_SPEC``).
-2. A variable registered with a static spec reaches ``plan.dependencies``.
-
-Static only: no torch, no GPU, no marimo.
+An install cell may pass pip an IPython ``{var}`` expansion computed at runtime.
+The PEP 723 header is rebuilt from ``plan_dependencies``, so a ``{var}`` the
+planner does not know vanishes silently: that is how torch 2.7.1, mamba_ssm and
+causal_conv1d were lost from four molab notebooks. So every ``{var}`` must be
+registered (static spec, or a reason for having none), and a registered static
+spec must reach ``plan.dependencies``.
 """
 from __future__ import annotations
 
@@ -42,13 +33,9 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import molab_dependencies as md  # noqa: E402
 import molab_manifest as mm  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# Notebooks in scope: every active manifest entry whose nb/ counterpart exists.
-# ---------------------------------------------------------------------------
-
-
+# In scope: every active manifest entry whose nb/ counterpart exists.
 def _resolved_sources() -> list[tuple[str, Path]]:
-    """``(stem, nb/<name>.ipynb)`` for each active manifest entry on disk."""
+    """``(stem, nb/<name>.ipynb)`` per active manifest entry on disk."""
     out: list[tuple[str, Path]] = []
     for nb in mm.get_active_notebooks():
         try:
@@ -62,9 +49,8 @@ def _resolved_sources() -> list[tuple[str, Path]]:
 
 _SOURCES: list[tuple[str, Path]] = _resolved_sources()
 
-# The Mamba-hybrid notebooks whose kernels are chosen by the compute-capability
-# branch.  Listed explicitly (not derived from the registry) so the expected
-# pins are asserted against a second, independent statement of the intent.
+# Listed explicitly rather than derived from the registry, so the expected pins
+# are asserted against a second, independent statement of the intent.
 _MAMBA_HYBRID_STEMS: tuple[str, ...] = (
     "Granite4.0",
     "Granite4.0_350M",
@@ -75,11 +61,6 @@ _MAMBA_HYBRID_STEMS: tuple[str, ...] = (
 _MAMBA_HYBRID_PINS: frozenset[str] = frozenset(
     {"torch==2.7.1", "mamba_ssm==2.2.5", "causal_conv1d==1.5.2"}
 )
-
-
-# ---------------------------------------------------------------------------
-# Registry shape
-# ---------------------------------------------------------------------------
 
 
 def test_template_registries_are_disjoint() -> None:
@@ -95,7 +76,7 @@ def test_template_registries_are_disjoint() -> None:
 
 
 def test_static_specs_are_parseable_pep508_names() -> None:
-    """Each static spec must start with a distribution name the planner can key."""
+    """A static spec must start with a name the planner can key."""
     for var, spec in sorted(md._TEMPLATE_STATIC_SPECS.items()):
         assert md.resolve_template_spec("{" + var + "}") == spec, (
             f"resolve_template_spec('{{{var}}}') did not return {spec!r}."
@@ -108,7 +89,7 @@ def test_static_specs_are_parseable_pep508_names() -> None:
 
 
 def test_no_static_spec_reasons_are_non_empty() -> None:
-    """A deliberate drop must say why, the same contract DroppedItem carries."""
+    """A deliberate drop must say why, as DroppedItem requires."""
     for var, reason in sorted(md._TEMPLATE_NO_STATIC_SPEC.items()):
         assert reason.strip(), (
             f"_TEMPLATE_NO_STATIC_SPEC[{var!r}] has an empty reason.  "
@@ -116,11 +97,7 @@ def test_no_static_spec_reasons_are_non_empty() -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# Obligation 1: no unregistered template variable
-# ---------------------------------------------------------------------------
-
-
+# Obligation 1: no unregistered template variable.
 @pytest.mark.parametrize(
     "stem,nb_path", _SOURCES, ids=[stem for stem, _ in _SOURCES]
 )
@@ -129,8 +106,7 @@ def test_every_templated_pip_token_is_registered(
 ) -> None:
     """Every ``{var}`` pip token resolves to a spec or a registered reason.
 
-    The recurrence gate: a new runtime-computed pin that molab_dependencies has
-    not been taught fails here rather than disappearing from molab/<stem>.py.
+    An untaught pin fails here rather than disappearing from molab/<stem>.py.
     """
     unregistered: list[str] = []
     for token in md.iter_templated_tokens(nb_path):
@@ -155,12 +131,9 @@ def test_every_templated_pip_token_is_registered(
         )
 
 
-# ---------------------------------------------------------------------------
-# Obligation 2: a registered static spec actually reaches the plan
-# ---------------------------------------------------------------------------
-
+# Obligation 2: a registered static spec actually reaches the plan.
 def _statically_resolved_specs(nb_path: Path) -> list[str]:
-    """Sorted, de-duplicated static specs the notebook's ``{var}`` tokens map to."""
+    """Sorted, de-duplicated static specs the ``{var}`` tokens map to."""
     specs = set()
     for token in md.iter_templated_tokens(nb_path):
         spec = md.resolve_template_spec(token)
@@ -184,10 +157,7 @@ _STATICALLY_RESOLVED: list[tuple[str, Path, str]] = [
 def test_statically_resolved_template_reaches_the_plan(
     stem: str, nb_path: Path, spec: str
 ) -> None:
-    """A ``{var}`` with a registered static spec must land in the PEP 723 list.
-
-    Calls the real planner and inspects ``plan.dependencies`` — no text search.
-    """
+    """A ``{var}`` with a registered static spec must land in the PEP 723 list."""
     plan = md.plan_dependencies(nb_path)
     assert spec in plan.dependencies, (
         f"TEMPLATED PIN LOST: {nb_path.name} installs a runtime-templated "
@@ -202,9 +172,9 @@ def test_statically_resolved_template_reaches_the_plan(
 def test_mamba_hybrid_notebooks_keep_their_kernel_pins(stem: str) -> None:
     """Granite 4.0 / Nemotron Nano molab headers carry the Mamba kernel trio.
 
-    These hybrids cannot run without ``mamba_ssm`` / ``causal_conv1d`` pinned
-    against a pinned torch, and the cell picks all three through ``{var}``, so
-    the planner has to resolve the non-Blackwell arm rather than drop them.
+    These hybrids cannot run without mamba_ssm / causal_conv1d pinned against a
+    pinned torch, and the cell picks all three through ``{var}``, so the planner
+    must resolve the non-Blackwell arm rather than drop them.
     """
     nb_path = REPO_ROOT / "nb" / f"{stem}.ipynb"
     if not nb_path.exists():
@@ -218,10 +188,6 @@ def test_mamba_hybrid_notebooks_keep_their_kernel_pins(stem: str) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Belt and braces: no unexpanded brace survives into a committed header
-# ---------------------------------------------------------------------------
-
 _MOLAB_DIR = REPO_ROOT / "molab"
 _GENERATED_FILES: list[Path] = (
     sorted(_MOLAB_DIR.glob("*.py")) if _MOLAB_DIR.exists() else []
@@ -234,8 +200,8 @@ _GENERATED_FILES: list[Path] = (
 def test_generated_header_has_no_unexpanded_template(py_file: Path) -> None:
     """No committed PEP 723 dependency may still contain a ``{var}`` brace.
 
-    Substituting the variable NAME rather than its spec yields an unparseable
-    dependency, and uv fails the sandbox build at notebook start.
+    A brace left in yields an unparseable dependency and uv fails the sandbox
+    build at notebook start.
     """
     plan_specs = [
         line

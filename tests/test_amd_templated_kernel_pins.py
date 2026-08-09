@@ -18,12 +18,10 @@
 
 """The AMD composer must resolve the runtime-templated kernel pins.
 
-The Colab cell picks mamba_ssm / causal_conv1d from the GPU's compute
-capability, so the composer receives `{_mamba}` / `{_conv}`, not a spec.
-`_package_key_from_install_token` refuses any token starting with `{`, so an
-unresolved variable keys to nothing, `_extract_install_package_groups` drops
-the whole `--no-build-isolation` group, and the AMD notebook ships without
-mamba_ssm. `_AMD_VARIABLE_PACKAGE_FALLBACKS` holds that resolution.
+The Colab cell picks mamba_ssm / causal_conv1d from compute capability, so the
+composer sees `{_mamba}` / `{_conv}`. An unresolved variable keys to nothing,
+the whole `--no-build-isolation` group is dropped, and the AMD notebook ships
+without mamba_ssm. `_AMD_VARIABLE_PACKAGE_FALLBACKS` holds that resolution.
 """
 
 from __future__ import annotations
@@ -38,8 +36,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NB_DIR = REPO_ROOT / "nb"
 
-# Colab notebook -> its AMD counterpart. These are the notebooks whose install
-# cell reaches for the templated kernel pair.
+# Colab notebook -> AMD counterpart, for the notebooks whose install cell
+# reaches for the templated kernel pair.
 KERNEL_NOTEBOOKS = [
     ("Granite4.0.ipynb", "AMD-Granite4.0.ipynb"),
     ("Granite4.0_350M.ipynb", "AMD-Granite4.0_350M.ipynb"),
@@ -68,7 +66,7 @@ _GEN = _load_generator()
 
 
 def _install_cell_text(path):
-    """The source notebook's install cell: the one that names the kernels."""
+    """The install cell that names the kernels."""
     notebook = json.loads(path.read_text(encoding="utf-8"))
     for cell in notebook.get("cells", []):
         if cell.get("cell_type") != "code":
@@ -120,8 +118,7 @@ def test_amd_composer_resolves_the_templated_kernel_pins(colab_name, amd_name):
     "colab_name,amd_name", KERNEL_NOTEBOOKS, ids=[n for n, _ in KERNEL_NOTEBOOKS])
 def test_committed_amd_notebook_matches_what_the_composer_produces(
         colab_name, amd_name):
-    """A hand-edited AMD pin that no regeneration reproduces, in either
-    direction."""
+    """Catches a hand-edited AMD pin that no regeneration reproduces."""
     _, lines = _composed_amd_kernel_line(colab_name, amd_name)
     assert lines, f"composing {amd_name} produced no kernel install line"
     committed = (NB_DIR / amd_name).read_text(encoding="utf-8")
