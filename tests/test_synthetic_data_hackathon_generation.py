@@ -21,6 +21,7 @@ trains on silently.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -93,3 +94,29 @@ def test_interrupted_run_leaves_nothing_for_the_next_run_to_accept() -> None:
 
     _run_generator()
     assert _published_records() == EXPECTED_RECORDS
+
+
+def test_interrupt_between_the_two_shard_swaps_is_not_mistaken_for_a_dataset() -> None:
+    real_replace = os.replace
+    calls = {"n": 0}
+
+    def replace_then_die(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise KeyboardInterrupt("kernel interrupted between the swaps")
+        return real_replace(*args, **kwargs)
+
+    os.replace = replace_then_die
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            _run_generator()
+    finally:
+        os.replace = real_replace
+
+    assert sorted(p.name for p in FINAL_DIR.glob("*.json")) == [
+        "knights_and_knaves_easy_ft.json"
+    ]
+
+    _run_generator()
+    assert _published_records() == EXPECTED_RECORDS
+    assert list(FINAL_DIR.glob("*.json.tmp")) == []

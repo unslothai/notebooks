@@ -81,7 +81,10 @@ def _():
     seed = 3407
     final_dir = Path(_data_dir)
     final_dir.mkdir(parents=True, exist_ok=True)
-    existing = sorted(final_dir.glob("*.json"))
+    interrupted = sorted(final_dir.glob("*.json.tmp"))
+    for leftover in interrupted:
+        leftover.unlink()
+    existing = [] if interrupted else sorted(final_dir.glob("*.json"))
     NAMES = [
         "Alice",
         "Bob",

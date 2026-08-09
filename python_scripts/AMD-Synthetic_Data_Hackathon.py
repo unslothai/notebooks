@@ -59,7 +59,14 @@ seed = 3407
 # Files already produced by the CLI are left untouched.
 final_dir = Path(data_dir)
 final_dir.mkdir(parents = True, exist_ok = True)
-existing = sorted(final_dir.glob("*.json"))
+
+# A leftover *.json.tmp is the marker of a publish that never finished, so
+# whatever shards are on disk are a partial set and must not be reused.
+interrupted = sorted(final_dir.glob("*.json.tmp"))
+for leftover in interrupted:
+    leftover.unlink()
+
+existing = [] if interrupted else sorted(final_dir.glob("*.json"))
 
 NAMES = [
     "Alice", "Bob", "Carol", "David", "Emma", "Frank", "Grace", "Henry",
