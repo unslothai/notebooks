@@ -27,6 +27,8 @@ Public surface used by tests/ and CI:
   extract_pip_pins_from_cell(source)      -> list[(pkg, version)]
   read_pin_constants()                    -> dict[str, str]
   UPGRADE_FLAG_RE / is_upgrading(command) -> the `--upgrade` / `-U` test
+  is_shell_cell(source)                   -> whether a cell's body is shell
+  strip_comment(line) / strip_comments(source) -> drop `#` comments
 """
 from __future__ import annotations
 
@@ -46,7 +48,11 @@ _PIN_RE = re.compile(r"([A-Za-z][A-Za-z0-9_.\-]*)==([0-9][0-9A-Za-z.\-+_]*)")
 # single leading `-` is required, so `--force-reinstall` and `--index-url` do not
 # read as upgrades. Shared by the vLLM and Pillow pin gates: a plain
 # `"--upgrade" in command` exempted the 152 AMD notebooks spelling it `-U`.
-UPGRADE_FLAG_RE = re.compile(r"--upgrade\b|(?<![\w-])-[a-zA-Z]*U")
+#
+# The long form must end the option, since `--upgrade-strategy` only picks how
+# dependencies are resolved and upgrades nothing on its own; `\b` matched it and
+# pulled ordinary installs into both gates.
+UPGRADE_FLAG_RE = re.compile(r"--upgrade(?![\w-])|(?<![\w-])-[a-zA-Z]*U")
 
 
 def is_upgrading(command: str) -> bool:
@@ -63,6 +69,34 @@ def is_shell_cell(source: str) -> bool:
     """Whether a cell's whole body runs as shell rather than as Python."""
     first = source.lstrip().split("\n", 1)[0].strip()
     return bool(_SHELL_CELL_RE.match(first))
+
+
+def strip_comment(line: str) -> str:
+    """`line` up to its first `#` outside a quoted string.
+
+    Quote-aware because a requirement can carry a `#` of its own, as in the
+    `#egg=` fragment of a VCS URL. 145 install commands in the tree end in a
+    trailing comment, so a gate reading raw lines matches on prose.
+    """
+    quote, escaped = None, False
+    for index, char in enumerate(line):
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif quote:
+            if char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char == "#":
+            return line[:index]
+    return line
+
+
+def strip_comments(source: str) -> str:
+    """`source` with every comment dropped, because comments do not execute."""
+    return "\n".join(strip_comment(line) for line in source.splitlines())
 
 
 def iter_notebooks(roots: Iterable[str] | None = None) -> Iterator[Path]:

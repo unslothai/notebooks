@@ -46,15 +46,31 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import notebook_inventory as ni  # noqa: E402
 
 
+def _runs_as_shell(command, shell_cell):
+    """Whether a folded line is a command rather than prose.
+
+    A Python cell needs `!`/`%` for a shell command, so `# !pip install -U
+    torchvision` and `print("pip install -U torchvision")` never execute: 87
+    such lines sit in the tree, and collecting them reports an unpinned upgrade
+    in a notebook that runs none. A `%%bash` cell runs every line as shell.
+
+    Applied to the FOLDED command, since a continuation line carries no prefix
+    of its own and filtering physical lines would drop the tail of every
+    wrapped install.
+    """
+    return shell_cell or command.lstrip().startswith(("!", "%"))
+
+
 def _pip_commands(source):
     """`pip install` commands with backslash continuations folded into one."""
-    commands, pending = [], None
-    for line in source.splitlines():
+    shell_cell = ni.is_shell_cell(source)
+    folded, pending = [], None
+    for line in ni.strip_comments(source).splitlines():
         if pending is not None:
             # EVERY continuation drops its `\`; one left in wedges a stray token.
             pending += " " + line.strip()
             if not line.rstrip().endswith("\\"):
-                commands.append(pending)
+                folded.append(pending)
                 pending = None
             else:
                 pending = pending.rstrip()[:-1].rstrip()
@@ -63,10 +79,10 @@ def _pip_commands(source):
             if line.rstrip().endswith("\\"):
                 pending = line.rstrip()[:-1].strip()
             else:
-                commands.append(line.strip())
+                folded.append(line.strip())
     if pending is not None:
-        commands.append(pending)
-    return commands
+        folded.append(pending)
+    return [c for c in folded if _runs_as_shell(c, shell_cell)]
 
 
 def _all_code_cells(path):
@@ -136,33 +152,6 @@ def _excluded_shell_upgrades():
 _RE_PLACEHOLDER = re.compile(r"(?<!\$)\{(\w+)\}")
 
 
-def _strip_comment(line):
-    """`line` up to its first executable-code `#`, quotes respected.
-
-    A pip requirement can carry a `#` of its own, as in the `#egg=` fragment of
-    a VCS URL, so splitting on the first one would discard half a live command.
-    """
-    quote, escaped = None, False
-    for index, char in enumerate(line):
-        if escaped:
-            escaped = False
-        elif char == "\\":
-            escaped = True
-        elif quote:
-            if char == quote:
-                quote = None
-        elif char in "\"'":
-            quote = char
-        elif char == "#":
-            return line[:index]
-    return line
-
-
-def _executable(text):
-    """`text` with comments dropped, because a commented pin pins nothing."""
-    return "\n".join(_strip_comment(line) for line in text.splitlines())
-
-
 def _pins_pillow(command, source):
     """Whether THIS command pins Pillow, not whether the notebook mentions it.
 
@@ -177,7 +166,7 @@ def _pins_pillow(command, source):
     `# get_pil = "pillow==11.3.0"` read as live and left the gate green over an
     install reaching an undefined placeholder.
     """
-    command, source = _executable(command), _executable(source)
+    command, source = ni.strip_comments(command), ni.strip_comments(source)
     if re.search(r"pillow\s*==", command, re.I):
         return True
     for name in _RE_PLACEHOLDER.findall(command):
@@ -384,9 +373,13 @@ def test_the_short_upgrade_flag_counts_as_an_upgrade():
     for command in (
         "!uv pip install -U torchvision",
         "!uv pip install -qU unsloth torchvision",
-        "uv pip install --system -U --force-reinstall torch torchvision",
     ):
         assert _upgrades_torchvision(command) == [command], command
+    # The AMD spelling carries no `!`, because it only ever runs in a `%%bash`
+    # cell; scanned as a bare line it is prose, not a command.
+    rocm = "uv pip install --system -U --force-reinstall torch torchvision"
+    assert _upgrades_torchvision(f"%%bash\n{rocm}") == [rocm]
+    assert _upgrades_torchvision(rocm) == []
 
 
 def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
@@ -503,6 +496,36 @@ def test_a_commented_out_assignment_is_not_a_pin():
     )
 
 
+def test_non_executable_text_is_not_collected_as_a_command():
+    """87 lines in the tree mention `pip install` in prose. A Python cell needs
+    `!`/`%` for a shell command, so collecting the rest reports an unpinned
+    upgrade in a notebook that never runs one."""
+    for source in (
+        "# !uv pip install --upgrade torchvision",
+        'print("uv pip install --upgrade torchvision")',
+        "    pip install --upgrade torchvision",
+        "!uv pip install --upgrade unsloth  # not torchvision",
+    ):
+        assert _upgrades_torchvision(source) == [], source
+    # ...while the executable spellings are still collected, `%%bash` included.
+    assert _upgrades_torchvision("!uv pip install --upgrade torchvision")
+    assert _upgrades_torchvision("%pip install --upgrade torchvision")
+    assert _upgrades_torchvision("%%bash\nuv pip install --system -U torchvision")
+
+
+def test_upgrade_strategy_is_not_an_upgrade():
+    """`--upgrade-strategy` only picks how dependencies resolve; it upgrades
+    nothing on its own, so reading it as one drags ordinary installs into both
+    gates. See pip's install docs on `-U` versus `--upgrade-strategy`."""
+    assert not ni.is_upgrading("!pip install --upgrade-strategy eager torchvision")
+    assert _upgrades_torchvision(
+        "!pip install --upgrade-strategy only-if-needed torchvision") == []
+    # The real flag, alone or paired with the strategy, still counts.
+    assert ni.is_upgrading("!pip install --upgrade torchvision")
+    assert ni.is_upgrading(
+        "!pip install --upgrade --upgrade-strategy eager torchvision")
+
+
 def test_only_a_real_assignment_defines_the_pin():
     """A single unanchored `=` reads a comparison or a keyword argument as a
     live pin, so the gate stays green over a name nothing ever assigns. The
@@ -529,8 +552,8 @@ def test_only_a_real_assignment_defines_the_pin():
 def test_stripping_comments_leaves_live_code_alone():
     """A quoted `#`, such as a VCS URL's `#egg=` fragment, is part of the
     requirement; splitting on the first one would truncate a live command."""
-    assert _strip_comment(_DEFINES_PIL) == _DEFINES_PIL
-    assert _strip_comment('pip install "x @ git+https://h/r#egg=x"  # tail') == (
+    assert ni.strip_comment(_DEFINES_PIL) == _DEFINES_PIL
+    assert ni.strip_comment('pip install "x @ git+https://h/r#egg=x"  # tail') == (
         'pip install "x @ git+https://h/r#egg=x"  '
     )
     command = "!uv pip install --upgrade {get_pil} torchvision"
@@ -550,6 +573,7 @@ def test_a_fold_leaves_no_stray_backslash():
     """Each continuation drops its own `\\`; one left in wedges a stray token
     into the folded command."""
     text = (
+        "%%bash\n"
         "uv pip install --system -U --force-reinstall \\\n"
         "    torch torchvision torchaudio triton-rocm \\\n"
         '    --index-url "$PYTORCH_INDEX_URL"\n'

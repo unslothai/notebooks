@@ -55,9 +55,15 @@ def _logical_lines(source):
     (`"vllm==0.15.1" unsloth`) reads as a bare requirement rather than as the
     install carrying it, and the notebooks wrap nearly every install. Same fold
     as `scripts/molab_dependencies._logical_lines`.
+
+    Comments go first, and for both scans at once so `_CASES` and `_BINDINGS`
+    keep comparing the same text. A line such as `# Pin "vllm==0.15.1" for CUDA
+    12` is prose, but it is neither a direct install nor a bindable assignment,
+    so leaving it in reddens the gate on a correct notebook; 145 install
+    commands in the tree already carry a trailing comment.
     """
     lines, pending = [], ""
-    for line in source.splitlines():
+    for line in ni.strip_comments(source).splitlines():
         pending = f"{pending} {line.strip()}" if pending else line
         if line.rstrip().endswith("\\"):
             pending = pending.rstrip()[:-1]
@@ -558,6 +564,30 @@ def test_a_wrapped_direct_install_is_exempt_like_an_unwrapped_one():
     unpinned = '    !uv pip install -qqq --upgrade \\\n        vllm unsloth\n'
     upgrading = _upgrading(_install_commands(unpinned))
     assert upgrading and _BARE_VLLM_RE.search(upgrading[0]), upgrading
+
+
+def test_a_requirement_named_only_in_a_comment_is_not_a_selector():
+    """Prose is not a selector: a commented requirement is neither a direct
+    install nor a bindable assignment, so leaving it in `_CASES` reddens the
+    hard gate on a correct notebook. 145 install commands already carry a
+    trailing comment, so this is a spelling away."""
+    path = REPO_ROOT / "nb" / "Synthetic.ipynb"
+    cell = (
+        '    # Pin "vllm==0.15.1"; the 0.20 wheel is CUDA 13.\n'
+        "    _vllm = 'vllm==0.15.1'  # keep in step with the generator\n"
+        "    !uv pip install -qqq --upgrade unsloth {_vllm}\n"
+    )
+    cases = [(path, line, spec) for line, spec in _selector_cases(cell)]
+    assert [spec for _p, _l, spec in cases] == ["vllm==0.15.1"], cases
+    bound = {(path, line) for line, _spec in _selector_cases(cell)
+             if _bound_name(line) is not None}
+    assert _lines_needing_a_binding(cases) == bound
+    # A trailing comment must not feed the bare check either.
+    assert not any(
+        _BARE_VLLM_RE.search(command)
+        for command in _upgrading(_install_commands(
+            "    !uv pip install -qqq --upgrade unsloth {_vllm}  # not vllm\n"))
+    )
 
 
 def test_the_exemption_does_not_swallow_a_selector_assignment():
