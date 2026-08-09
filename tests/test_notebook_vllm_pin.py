@@ -100,11 +100,29 @@ def _install_commands(source):
     return commands
 
 
+def _upgrading(commands):
+    """The commands that can replace an already-installed vLLM.
+
+    `uv pip install --help`: `--upgrade` is "Allow package upgrades, ignoring
+    pinned versions in any existing output file", so only these resolve a
+    fresh vLLM over one already present. Narrowing to them is what keeps the
+    non-Colab branch of the same cell, `!pip install unsloth vllm`, out of
+    scope: it is unpinned on purpose for people on their own CUDA, and it
+    carries no `--upgrade`. 85 commands in the tree are of that kind.
+    """
+    return [command for command in commands if "--upgrade" in command]
+
+
+# A bare `vllm` requirement: not `{_vllm}`, not `vllm==0.15.1`, not the
+# `vllm-project/vllm` in a URL, not `vllm_requirements.txt`.
+_BARE_VLLM_RE = re.compile(r"(?<![\w{=./\[-])vllm(?![\w}=./\[-])")
+
+
 def _selector_bindings():
-    """(notebook, line, name, commands) per vLLM selector assignment."""
+    """(notebook, line, name, upgrading commands) per vLLM selector."""
     for path in ni.iter_notebooks():
         for _index, source in ni.iter_code_cells(path):
-            commands = _install_commands(source)
+            commands = _upgrading(_install_commands(source))
             for line in source.splitlines():
                 if not _VLLM_SPEC_RE.search(line):
                     continue
@@ -115,6 +133,17 @@ def _selector_bindings():
 
 
 _BINDINGS = list(_selector_bindings())
+
+
+def _upgrading_commands():
+    """Every upgrading pip install in the tree, for the bare-vLLM check."""
+    for path in ni.iter_notebooks():
+        for _index, source in ni.iter_code_cells(path):
+            for command in _upgrading(_install_commands(source)):
+                yield path, command
+
+
+_UPGRADES = list(_upgrading_commands())
 
 
 def test_selector_lines_are_actually_found():
@@ -170,8 +199,34 @@ def test_the_install_command_still_reads_the_pinned_selector(path, line, name, c
     assert any(f"{{{name}}}" in command for command in commands), (
         f"{path.relative_to(REPO_ROOT)} pins vLLM in:\n"
         f"  {line}\n"
-        f"but no pip install command in that cell interpolates {{{name}}}, so "
-        f"the pin installs nothing. Commands found: {commands or 'none'}"
+        f"but no upgrading pip install in that cell interpolates {{{name}}}, "
+        f"so the pin installs nothing. Commands found: {commands or 'none'}"
+    )
+
+
+def test_upgrading_commands_are_actually_found():
+    """Guards the check below against an empty scan."""
+    assert len(_UPGRADES) >= 40, (
+        f"only {len(_UPGRADES)} upgrading pip installs found; the command scan "
+        f"has drifted away from the notebooks' install cells"
+    )
+
+
+@pytest.mark.parametrize(
+    "path,command",
+    _UPGRADES,
+    ids = [f"{p.parent.name}/{p.stem}" for p, _c in _UPGRADES],
+)
+def test_no_upgrading_command_names_vllm_bare(path, command):
+    """Satisfying the binding above with one command does not stop a second
+    command in the same cell upgrading vLLM unpinned. Every upgrading install
+    must name vLLM through the selector or not at all."""
+    assert not _BARE_VLLM_RE.search(command), (
+        f"{path.relative_to(REPO_ROOT)} upgrades an unpinned vLLM in:\n"
+        f"  {command}\n"
+        f"--upgrade resolves the latest release over whatever is installed, "
+        f"and its default PyPI wheel is the CUDA 13 build. Pass the pinned "
+        f"selector instead of a bare `vllm`."
     )
 
 
@@ -241,3 +296,50 @@ def test_a_single_target_selector_is_recognised_as_an_assignment():
 
 def test_a_comparison_is_not_mistaken_for_an_assignment():
     assert _ASSIGNMENT_RE.match("    if _vllm == 'vllm==0.15.1':") is None
+
+
+def test_a_bare_vllm_is_told_apart_from_a_pinned_or_interpolated_one():
+    """Discriminating cases for the bare check, held here so it keeps meaning
+    something once the tree is clean."""
+    for command in (
+        "!uv pip install -qqq --upgrade unsloth vllm torchvision",
+        "!pip install --upgrade vllm",
+    ):
+        assert _BARE_VLLM_RE.search(command), command
+    for command in (
+        "!uv pip install -qqq --upgrade unsloth {_vllm} torchvision",
+        "!uv pip install -qqq --upgrade unsloth {get_vllm} torchvision",
+        '!uv pip install --upgrade "vllm==0.15.1"',
+        "!pip install --upgrade -r vllm_requirements.txt",
+        "!pip install --upgrade git+https://github.com/vllm-project/vllm",
+    ):
+        assert not _BARE_VLLM_RE.search(command), command
+
+
+def test_a_non_upgrading_local_install_is_out_of_scope():
+    """The non-Colab branch of these same cells installs vLLM unpinned on
+    purpose. It is not an upgrade, so it must not be collected."""
+    cell = (
+        'if "COLAB_" not in "".join(os.environ.keys()):\n'
+        "    !pip install unsloth vllm\n"
+        "else:\n"
+        "    _vllm, _triton = ('vllm==0.9.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
+        "    !uv pip install -qqq --upgrade unsloth {_vllm} torchvision\n"
+    )
+    commands = _install_commands(cell)
+    assert len(commands) == 2, commands
+    upgrading = _upgrading(commands)
+    assert len(upgrading) == 1 and "{_vllm}" in upgrading[0], upgrading
+
+
+def test_a_second_upgrading_command_cannot_hide_behind_the_first():
+    """The failure this pair of checks exists for: the binding is satisfied by
+    one command while a later one upgrades vLLM unpinned."""
+    cell = (
+        "    _vllm, _triton = ('vllm==0.9.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
+        "    !uv pip install -qqq --upgrade {_vllm}\n"
+        "    !uv pip install -qqq --upgrade unsloth vllm torchvision\n"
+    )
+    upgrading = _upgrading(_install_commands(cell))
+    assert any("{_vllm}" in command for command in upgrading)
+    assert [c for c in upgrading if _BARE_VLLM_RE.search(c)], upgrading
