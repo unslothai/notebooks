@@ -19,6 +19,7 @@ later run would accept and train on.
 """
 from __future__ import annotations
 
+import itertools
 import json
 import os
 from pathlib import Path
@@ -113,6 +114,47 @@ def test_interrupt_between_the_two_shard_swaps_is_not_mistaken_for_a_dataset() -
 
     assert sorted(p.name for p in FINAL_DIR.glob("*.json")) == [
         "knights_and_knaves_easy_ft.json"
+    ]
+
+    _run_generator()
+    assert _published_records() == EXPECTED_RECORDS
+    assert list(FINAL_DIR.glob("*.json.tmp")) == []
+
+
+def test_marker_survives_an_interrupted_recovery_run() -> None:
+    real_replace = os.replace
+    calls = {"n": 0}
+
+    def replace_then_die(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise KeyboardInterrupt("interrupted between the swaps")
+        return real_replace(*args, **kwargs)
+
+    os.replace = replace_then_die
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            _run_generator()
+    finally:
+        os.replace = real_replace
+
+    # Interrupt the recovery run inside the puzzle loop, after it has seen the
+    # marker but before it stages anything. itertools.product is reached only
+    # from the solver, so it pins the failure to that window.
+    real_product = itertools.product
+
+    def product_dies(*args, **kwargs):
+        raise KeyboardInterrupt("interrupted while recovering")
+
+    itertools.product = product_dies
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            _run_generator()
+    finally:
+        itertools.product = real_product
+
+    assert sorted(p.name for p in FINAL_DIR.glob("*.json.tmp")) == [
+        "knights_and_knaves_hard_ft.json.tmp"
     ]
 
     _run_generator()

@@ -46,9 +46,6 @@ final_dir.mkdir(parents=True, exist_ok=True)
 
 # A leftover *.json.tmp means an earlier publish died, so the shards are partial.
 interrupted = sorted(final_dir.glob("*.json.tmp"))
-for leftover in interrupted:
-    leftover.unlink()
-
 existing = [] if interrupted else sorted(final_dir.glob("*.json"))
 
 NAMES = [
@@ -196,6 +193,11 @@ else:
     for tmp_path, final_path, count in staged:
         os.replace(tmp_path, final_path)
         print(f"Wrote {count} records to {final_path}")
+
+    # Only now is the set whole, so only now may the marker go; clearing it
+    # earlier would hide a recovery run that is itself interrupted.
+    for leftover in interrupted:
+        leftover.unlink(missing_ok=True)
 
 print(f"Total ft files now in {final_dir}: {len(sorted(final_dir.glob('*.json')))}")
 

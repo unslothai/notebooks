@@ -82,8 +82,6 @@ def _():
     final_dir = Path(_data_dir)
     final_dir.mkdir(parents=True, exist_ok=True)
     interrupted = sorted(final_dir.glob("*.json.tmp"))
-    for leftover in interrupted:
-        leftover.unlink()
     existing = [] if interrupted else sorted(final_dir.glob("*.json"))
     NAMES = [
         "Alice",
@@ -223,6 +221,8 @@ def _():
         for tmp_path, final_path, count in staged:
             os.replace(tmp_path, final_path)
             print(f"Wrote {count} records to {final_path}")
+        for leftover in interrupted:
+            leftover.unlink(missing_ok=True)
     print(f"Total ft files now in {final_dir}: {len(sorted(final_dir.glob('*.json')))}")
     return Path, json
 
