@@ -71,19 +71,40 @@ def _pip_commands(source):
     return commands
 
 
-def _code(path):
+def _code_cells(path):
     notebook = json.loads(path.read_text(encoding="utf-8"))
-    return "\n".join(
+    return [
         "".join(cell.get("source", []))
         for cell in notebook.get("cells", [])
         if cell.get("cell_type") == "code"
-    )
+    ]
+
+
+def _code(path):
+    return "\n".join(_code_cells(path))
 
 
 def _upgrades_torchvision(source):
     return [
         command for command in _pip_commands(source)
         if "--upgrade" in command and "torchvision" in command
+    ]
+
+
+def _torchvision_upgrades_by_cell(path):
+    """(command, cell) pairs. The cell, not the notebook, is the scope a
+    placeholder resolves in.
+
+    `Meta-Synthetic-Data-Llama3.1_(8B).ipynb` and
+    `Meta_Synthetic_Data_Llama3_2_(3B).ipynb` each hold two such installs, in
+    separate cells. Resolving against the concatenated notebook lets one
+    cell's exact `get_pil` answer for the other cell's unpinned one, so
+    dropping the pin from either passes.
+    """
+    return [
+        (command, cell)
+        for cell in _code_cells(path)
+        for command in _upgrades_torchvision(cell)
     ]
 
 
@@ -128,11 +149,10 @@ _NOTEBOOKS = sorted(NB_DIR.glob("*.ipynb")) if NB_DIR.is_dir() else []
 
 @pytest.mark.parametrize("path", _NOTEBOOKS, ids=lambda p: p.name)
 def test_an_upgrade_install_naming_torchvision_pins_pillow(path):
-    source = _code(path)
-    upgrades = _upgrades_torchvision(source)
+    upgrades = _torchvision_upgrades_by_cell(path)
     if not upgrades:
         pytest.skip("no --upgrade install names torchvision")
-    unpinned = [c for c in upgrades if not _pins_pillow(c, source)]
+    unpinned = [c for c, cell in upgrades if not _pins_pillow(c, cell)]
     assert not unpinned, (
         f"{path.name} runs {unpinned[0][:160]!r} without pinning Pillow in that "
         f"command. That resolves a newer Pillow, leaves `_imaging` behind, and "
@@ -259,6 +279,33 @@ def test_at_least_one_notebook_actually_exercises_the_check():
         f"only {len(exercised)} notebooks reached the assertion; the scan is "
         f"probably broken rather than the repo suddenly clean"
     )
+
+
+def test_every_torchvision_upgrade_is_still_reached_per_cell(tmp_path):
+    """Splitting the scan per cell must not lose commands. Two notebooks hold
+    two such installs each, so the per-cell pass has to find more commands
+    than there are notebooks carrying them."""
+    per_cell = sum(len(_torchvision_upgrades_by_cell(p)) for p in _NOTEBOOKS)
+    whole = sum(len(_upgrades_torchvision(_code(p))) for p in _NOTEBOOKS)
+    assert per_cell == whole >= 40, (per_cell, whole)
+
+
+def test_one_cells_pin_does_not_answer_for_another_cells_command():
+    """Two install cells, one pinned and one not. Resolving placeholders
+    against the whole notebook lets the pinned cell's `get_pil` satisfy the
+    unpinned cell, which is how a real notebook could drop the pin from one
+    of its two installs and stay green."""
+    command = "!uv pip install --upgrade unsloth {get_pil} torchvision"
+    pinned_cell = "try: import PIL; get_pil = f'pillow=={PIL.__version__}'\n" + command
+    # The fallback these notebooks use when PIL is not importable. Passed to an
+    # `--upgrade` install it resolves a fresh Pillow, which is the failure.
+    unpinned_cell = 'get_pil = "pillow"\n' + command
+    notebook = pinned_cell + "\n" + unpinned_cell
+    # Whole-notebook scope: the pinned cell answers for the unpinned one.
+    assert _pins_pillow(command, notebook)
+    # Cell scope: each cell answers for itself.
+    assert _pins_pillow(command, pinned_cell)
+    assert not _pins_pillow(command, unpinned_cell)
 
 
 def test_a_sibling_pin_on_the_same_line_does_not_count():

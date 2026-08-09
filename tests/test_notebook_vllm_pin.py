@@ -75,7 +75,14 @@ _CASES = list(_selector_lines())
 # Only the interpolation is required, not the absence of a bare `vllm`
 # elsewhere: the non-Colab branch of these cells is `!pip install unsloth
 # vllm` on purpose, unpinned for people on their own CUDA, in 83 cells.
-_ASSIGNMENT_RE = re.compile(r"^\s*(?P<name>[A-Za-z_]\w*)\s*,\s*[A-Za-z_]\w*\s*=")
+#
+# Any arity, not just the two-name unpack the notebooks happen to use today.
+# Requiring a tuple dropped `_vllm = 'vllm==...'` -- a spelling the detection
+# above accepts -- out of the bindings entirely, leaving that notebook's
+# command unchecked while the other 47 kept the count guard happy.
+_ASSIGNMENT_RE = re.compile(
+    r"^\s*(?P<name>[A-Za-z_]\w*)\s*(?:,\s*[A-Za-z_]\w*\s*)*=(?!=)"
+)
 
 
 def _install_commands(source):
@@ -138,6 +145,19 @@ def test_every_selector_assignment_is_bound_to_a_command():
     assert len(_BINDINGS) >= 40, (
         f"only {len(_BINDINGS)} vLLM selector assignments found; the assignment "
         f"pattern has drifted away from the notebooks' install cells"
+    )
+
+
+def test_no_detected_selector_line_escapes_the_binding_check():
+    """A count floor cannot see a shape that stopped being recognised: 47 of
+    48 bindings still clears it while the 48th notebook goes unchecked. So
+    every line the detection above found must also produce a binding."""
+    detected = {(path, line) for path, line, _spec in _CASES}
+    bound = {(path, line) for path, line, _name, _commands in _BINDINGS}
+    assert detected == bound, (
+        f"{len(detected - bound)} line(s) carry a vLLM requirement but are not "
+        f"recognised as an assignment, so no command is checked for them: "
+        f"{sorted(str(p.name) + ': ' + l for p, l in detected - bound)[:3]}"
     )
 
 
@@ -205,3 +225,19 @@ def test_extras_and_other_operators_still_read_as_requirements():
     assert _VLLM_SPEC_RE.findall('("vllm>=0.15.1",)') == ["vllm>=0.15.1"]
     # An unpinned extra is still unpinned, and must reach the assertion above.
     assert "==" not in _VLLM_SPEC_RE.findall("('vllm[audio]',)")[0]
+
+
+def test_a_single_target_selector_is_recognised_as_an_assignment():
+    """`_vllm = 'vllm==...'` is a spelling the detection accepts, so the
+    binding check has to accept it too or that notebook goes unchecked."""
+    for line, name in (
+        ("    _vllm = 'vllm==0.15.1'", "_vllm"),
+        ("    _vllm, _triton = ('vllm==0.9.2', 'triton')", "_vllm"),
+        ("    _vllm, _triton, _torch = ('vllm==0.9.2', 'triton', 'torch')", "_vllm"),
+    ):
+        match = _ASSIGNMENT_RE.match(line)
+        assert match is not None and match.group("name") == name, line
+
+
+def test_a_comparison_is_not_mistaken_for_an_assignment():
+    assert _ASSIGNMENT_RE.match("    if _vllm == 'vllm==0.15.1':") is None
