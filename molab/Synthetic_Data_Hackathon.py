@@ -49,62 +49,231 @@ def _(mo):
     mo.md(r"""
     ### Converting to Fine-Tuning Format
 
-    This command uses the **save-as** function to convert curated Q&A pairs to fine-tuning format:
+    The **save-as** function of the synthetic-data-kit CLI converts curated Q&A
+    pairs to fine-tuning format:
+
+    ```
+    synthetic-data-kit save-as ./logical_reasoning/data/curated/ --format ft
+    ```
+
     - Reads curated JSON files from `data/curated/`
     - Converts to format `ft` (fine-tuning format with messages structure)
     - Outputs are saved to `data/final/` with proper conversation format
     - The resulting format is compatible with standard fine-tuning pipelines
 
-    Successfully converted 2 files to fine-tuning format.
+    That command needs a served model behind it, so the next cell synthesises an
+    equivalent `data/final/` set in-notebook instead. It writes the same `ft`
+    schema, and it skips itself if you already produced those files with the CLI.
     """)
     return
 
 
 @app.cell
 def _():
+    import itertools
     import json
-    import glob
+    import random
     from pathlib import Path
+
+    _data_dir = "./logical_reasoning/data/final"
+    num_examples = 74  # how many puzzles to synthesise
+    seed = 3407
+    final_dir = Path(_data_dir)
+    final_dir.mkdir(parents=True, exist_ok=True)
+    existing = sorted(final_dir.glob("*.json"))
+    NAMES = [
+        "Alice",
+        "Bob",
+        "Carol",
+        "David",
+        "Emma",
+        "Frank",
+        "Grace",
+        "Henry",
+        "Isabel",
+        "Jack",
+        "Kate",
+        "Liam",
+        "Mia",
+        "Noah",
+        "Olivia",
+        "Peter",
+    ]
+    SYSTEM_PROMPT = "You are a careful logical reasoning assistant. Solve knight and knave puzzles by checking every possible assignment and explain your reasoning."
+    PUZZLE_INTRO = "On this island every inhabitant is either a knight, who always tells the truth, or a knave, who always lies."
+
+    def make_statement(rng, speaker, people):
+        """Return (english, predicate) for one random claim made by `speaker`."""
+        others = [p for p in people if p != speaker]
+        kind = rng.choice(
+            ["is_knight", "is_knave", "both", "either", "same", "different", "implies"]
+        )
+        if kind in ("is_knight", "is_knave"):
+            target = rng.choice(people)
+            if kind == "is_knight":
+                text = f"{target} is a knight."
+                return (text, lambda a, t=target: a[t])
+            text = f"{target} is a knave."
+            return (text, lambda a, t=target: not a[t])
+        if not others:
+            text = f"{speaker} is a knight."
+            return (text, lambda a, s=speaker: a[s])
+        a_name, b_name = (
+            rng.sample(people, 2) if len(people) >= 2 else (speaker, speaker)
+        )
+        if kind == "both":
+            text = f"{a_name} and {b_name} are both knights."
+            return (text, lambda a, x=a_name, y=b_name: a[x] and a[y])
+        if kind == "either":
+            text = f"At least one of {a_name} and {b_name} is a knight."
+            return (text, lambda a, x=a_name, y=b_name: a[x] or a[y])
+        if kind == "same":
+            text = f"{a_name} and {b_name} are the same kind."
+            return (text, lambda a, x=a_name, y=b_name: a[x] == a[y])
+        if kind == "different":
+            text = f"{a_name} and {b_name} are of different kinds."
+            return (text, lambda a, x=a_name, y=b_name: a[x] != a[y])
+        text = f"If {a_name} is a knight, then {b_name} is a knight."
+        return (text, lambda a, x=a_name, y=b_name: not a[x] or a[y])
+
+    def solve(people, predicates):
+        """Return every assignment where each speaker's claim matches their kind."""
+        solutions = []
+        for combo in itertools.product([True, False], repeat=len(people)):
+            assignment = dict(zip(people, combo))
+            if all((predicates[p](assignment) == assignment[p] for p in people)):
+                solutions.append(assignment)
+        return solutions
+
+    def build_puzzle(rng):
+        """Synthesise one puzzle that has exactly one consistent solution."""
+        people = rng.sample(NAMES, rng.choice([2, 3, 4]))
+        statements, predicates = ({}, {})
+        for person in people:
+            text, predicate = make_statement(rng, person, people)
+            statements[person] = text
+            predicates[person] = predicate
+        solutions = solve(people, predicates)
+        if len(solutions) != 1:
+            return None
+        answer = solutions[0]
+        lines = [PUZZLE_INTRO, "", "You meet the following inhabitants:", ""]
+        lines = lines + [f'- {p} says: "{statements[p]}"' for p in people]
+        lines = lines + ["", "Who is a knight and who is a knave?"]
+        question = "\n".join(lines)
+        reasoning = [
+            f"There are {len(people)} inhabitants, so there are {2 ** len(people)} possible assignments. Exactly one of them is consistent with every statement.",
+            "",
+        ]
+        for person in people:
+            kind = "knight" if answer[person] else "knave"
+            verdict = "true" if answer[person] else "false"
+            reasoning.append(
+                f'- {person} is a {kind}, so the claim "{statements[person]}" must be {verdict}, and it is.'
+            )
+        reasoning = reasoning + ["", "Final answer:"]
+        reasoning = reasoning + [
+            f"- {p}: {('knight' if answer[p] else 'knave')}" for p in people
+        ]
+        return {
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": "\n".join(reasoning)},
+            ]
+        }
+
+    if existing:
+        print(
+            f"Found {len(existing)} existing ft file(s) in {final_dir}, skipping generation."
+        )
+    else:
+        rng = random.Random(seed)
+        records, seen = ([], set())
+        attempts = 0
+        while len(records) < num_examples and attempts < num_examples * 500:
+            attempts = attempts + 1
+            puzzle = build_puzzle(rng)
+            if puzzle is None:
+                continue
+            key = puzzle["messages"][1]["content"]
+            if key in seen:
+                continue
+            seen.add(key)
+            records.append(puzzle)
+        if len(records) < num_examples:
+            raise RuntimeError(
+                f"Only synthesised {len(records)} of {num_examples} puzzles. Raise the attempt budget or lower num_examples."
+            )
+        midpoint = len(records) // 2
+        shards = {
+            "knights_and_knaves_easy_ft.json": records[:midpoint],
+            "knights_and_knaves_hard_ft.json": records[midpoint:],
+        }
+        for filename, shard in shards.items():
+            with open(final_dir / filename, "w") as _f:
+                json.dump(shard, _f, indent=2)
+            print(f"Wrote {len(shard)} records to {final_dir / filename}")
+    print(f"Total ft files now in {final_dir}: {len(sorted(final_dir.glob('*.json')))}")
+    return Path, json
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Building the Fine-Tuning Dataset
+
+    The cell above materialises the `data/final/` directory that the loader below
+    reads. It synthesises knight-and-knave logic puzzles directly in the notebook:
+
+    - Each puzzle picks two to four inhabitants and gives every one of them a
+      random claim about the others.
+    - All `2^n` knight/knave assignments are enumerated and only puzzles with
+      exactly one consistent assignment are kept, so every answer is verifiable.
+    - Records are written in the same `ft` schema that
+      `synthetic-data-kit save-as --format ft` emits, that is a JSON list of
+      `{"messages": [system, user, assistant]}` objects, split over two shards.
+
+    Generation is seeded, so the same 74 conversations come out on every run. If
+    you already produced `data/final/*.json` with the synthetic-data-kit CLI and a
+    served model, the cell detects those files and leaves them alone.
+    """)
+    return
+
+
+@app.cell
+def _(Path, json):
+    import glob
     from datasets import Dataset
 
-    # ===== CONFIGURATION =====
-    data_dir = "./logical_reasoning/data/final"  # Change this to your data directory
-
-    # ===== STEP 1: Find all FT files =====
-    data_path = Path(data_dir)
-    ft_files = glob.glob(str(data_path / "*.json"))
-
-    # ===== STEP 2: Load and convert all files =====
+    _data_dir = "./logical_reasoning/data/final"
+    data_path = Path(_data_dir)
+    ft_files = sorted(glob.glob(str(data_path / "*.json")))
+    if not ft_files:
+        raise FileNotFoundError(
+            f"No .json files found in {data_path.resolve()}. Run the synthetic data generation cell above, or produce the files yourself with `synthetic-data-kit save-as ./logical_reasoning/data/curated/ --format ft`, before running this cell."
+        )
     all_data = []
-
     for file_path in ft_files:
-        # Load the JSON file
-        with open(file_path, "r") as f:
-            ft_data = json.load(f)
-
-        # Convert each item
+        with open(file_path, "r") as _f:
+            ft_data = json.load(_f)
         for item in ft_data:
             if "messages" not in item:
                 continue
-
-            # Extract only user and assistant messages
             conversation = []
             for msg in item["messages"]:
                 if msg["role"] == "user" or msg["role"] == "assistant":
                     conversation.append(
                         {"role": msg["role"], "content": msg["content"]}
                     )
-
-            # Add to our data if we have at least one exchange
             if len(conversation) > 0:
                 all_data.append({"conversations": conversation})
-
-    print(f"\n🎯 Total conversations: {len(all_data)}")
-
-    # ===== STEP 3: Create HuggingFace Dataset =====
+    print(f"\nTotal conversations: {len(all_data)} from {len(ft_files)} file(s)")
+    if not all_data:
+        raise ValueError(
+            f"Found {len(ft_files)} file(s) in {data_path.resolve()} but none of them contained a usable record. Every record needs a `messages` list with at least one user or assistant turn, which is what the `ft` format produces. Check the files before training on an empty set."
+        )
     dataset = Dataset.from_list(all_data)
-
-    # ===== STEP 4: Preview the data =====
     print(json.dumps(dataset[0], indent=2))
     return (dataset,)
 
@@ -209,25 +378,63 @@ def _(mo):
 @app.cell
 def _(FastLanguageModel, torch):
     max_seq_length = 1024
-    dtype = torch.bfloat16  # Explicit bfloat16 for ROCm
-    load_in_4bit = False
+
+    # ===== HARDWARE AWARE CONFIGURATION =====
+    # This notebook was written for a single AMD MI300X (192GB HBM3), where
+    # Llama-3.3-70B fits in bfloat16 with no quantization and therefore no
+    # bitsandbytes. The weights alone are about 140GB, so on anything smaller
+    # (every free molab and Kaggle tier included) we fall back to Llama-3.1-8B.
+    # Override the values in this block if you know what your GPU can hold.
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "No GPU visible. Switch the runtime to a GPU accelerator before "
+            "running this cell."
+        )
+
+    gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
+    supports_bf16 = torch.cuda.is_bf16_supported()
+
+    if gpu_memory_gb >= 150:
+        model_name = "unsloth/Llama-3.3-70B-Instruct"
+        load_in_4bit = False
+        lora_rank = 64  # Higher rank for the 70B model
+        per_device_train_batch_size = 64  # MI300X can handle this with 192GB HBM3
+        gradient_accumulation_steps = 1
+        optim = "adamw_torch_fused"  # No bitsandbytes on the ROCm path
+    elif gpu_memory_gb >= 40:
+        model_name = "unsloth/Llama-3.1-8B-Instruct"
+        load_in_4bit = False
+        lora_rank = 32  # Higher rank for the 70B model
+        per_device_train_batch_size = 8  # MI300X can handle this with 192GB HBM3
+        gradient_accumulation_steps = 2
+        optim = "adamw_8bit"  # No bitsandbytes on the ROCm path
+    else:
+        model_name = "unsloth/Llama-3.1-8B-Instruct"
+        load_in_4bit = True
+        lora_rank = 16  # Higher rank for the 70B model
+        per_device_train_batch_size = 2  # MI300X can handle this with 192GB HBM3
+        gradient_accumulation_steps = 8
+        optim = "adamw_8bit"  # No bitsandbytes on the ROCm path
+
+    # T4 and other pre-Ampere cards have no bfloat16, so ask for float16 there.
+    dtype = torch.bfloat16 if supports_bf16 else torch.float16
 
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name="unsloth/Llama-3.3-70B-Instruct",
+        model_name=model_name,
         max_seq_length=max_seq_length,
-        dtype=dtype,  # Explicit bfloat16 for ROCm
+        dtype=dtype,
         load_in_4bit=load_in_4bit,
         device_map="auto",
-        torch_dtype=torch.bfloat16,  # Explicit for ROCm
         trust_remote_code=True,
     )
 
-    print(f"✅ Loaded: Llama-3.3-70B-Instruct (bfloat16, ROCm compatible)")
+    print(f"Loaded: {model_name} on a {gpu_memory_gb:.0f}GB GPU")
+    print(f"dtype={dtype}, load_in_4bit={load_in_4bit}, lora_rank={lora_rank}")
 
     # Add LoRA adapters
     model = FastLanguageModel.get_peft_model(
         model,
-        r=64,  # Higher rank for 70B model
+        r=lora_rank,
         target_modules=[
             "q_proj",
             "k_proj",
@@ -237,7 +444,7 @@ def _(FastLanguageModel, torch):
             "up_proj",
             "down_proj",
         ],
-        lora_alpha=64,
+        lora_alpha=lora_rank,
         lora_dropout=0,
         bias="none",
         use_gradient_checkpointing="unsloth",
@@ -245,30 +452,49 @@ def _(FastLanguageModel, torch):
         use_rslora=False,
         loftq_config=None,
     )
-    return max_seq_length, model, tokenizer
+    return (
+        gradient_accumulation_steps,
+        max_seq_length,
+        model,
+        optim,
+        per_device_train_batch_size,
+        supports_bf16,
+        tokenizer,
+    )
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Loading Llama-3.3-70B Model with LoRA
+    ### Loading the Model with LoRA
 
-    This cell sets up the model for efficient fine-tuning on AMD ROCm hardware:
+    This cell sizes the run to the GPU it finds:
 
-    **Model Configuration:**
+    **On a 150GB or larger GPU (the MI300X the hackathon used):**
     - Model: Llama-3.3-70B-Instruct (70 billion parameters)
-    - Data type: bfloat16 for ROCm compatibility
-    - No quantization (load_in_4bit=False) to avoid bitsandbytes dependency
-    - Max sequence length: 1024 tokens
+    - Data type: bfloat16, no quantization, so bitsandbytes is not needed
+    - LoRA rank 64, batch size 64, `adamw_torch_fused`
 
-    **LoRA (Low-Rank Adaptation) Configuration:**
-    - Rank (r): 64 - Higher rank for the large 70B model
-    - Target modules: All attention and MLP layers (q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj)
-    - LoRA alpha: 64
-    - Dropout: 0 (no dropout)
+    **On a 40GB to 150GB GPU:**
+    - Model: Llama-3.1-8B-Instruct in bfloat16, LoRA rank 32
+
+    **On anything smaller (free molab and Kaggle tiers):**
+    - Model: Llama-3.1-8B-Instruct in 4-bit, LoRA rank 16, batch size 2 with 8
+      gradient accumulation steps
+    - float16 instead of bfloat16, because T4 class cards do not support bfloat16
+
+    Llama-3.3-70B needs roughly 140GB for the weights alone, so it is only picked
+    when the GPU can actually hold it. Edit the configuration block directly if you
+    want to force a specific checkpoint.
+
+    **Shared LoRA configuration:**
+    - Target modules: all attention and MLP layers (q_proj, k_proj, v_proj, o_proj,
+      gate_proj, up_proj, down_proj)
+    - LoRA alpha equal to the rank, dropout 0
     - Gradient checkpointing: "unsloth" for memory efficiency
 
-    LoRA enables efficient fine-tuning by only training small adapter layers instead of the entire 70B model, making it feasible to train on a single AMD MI300X GPU with 192GB HBM3 memory.
+    LoRA enables efficient fine-tuning by only training small adapter layers
+    instead of every weight in the base model.
     """)
     return
 
@@ -344,12 +570,16 @@ def _(
     SFTConfig,
     SFTTrainer,
     dataset_1,
+    gradient_accumulation_steps,
     max_seq_length,
     model,
+    optim,
+    per_device_train_batch_size,
+    supports_bf16,
     tokenizer_1,
     train_on_responses_only,
 ):
-    """Train model with ROCm-optimized settings"""
+    """Train the model with the settings chosen for this GPU"""
     # Ensure tokenizer has proper padding
     if tokenizer_1.pad_token is None:
         tokenizer_1.pad_token = tokenizer_1.eos_token
@@ -363,59 +593,63 @@ def _(
         data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer_1, padding=True),
         packing=False,
         args=SFTConfig(
-            per_device_train_batch_size=64,  # 🚀 MI300X can handle this with 192GB HBM3!
-            gradient_accumulation_steps=1,  # Effective batch size = 8*2 = 16
+            per_device_train_batch_size=per_device_train_batch_size,  # MI300X can handle this with 192GB HBM3
+            gradient_accumulation_steps=gradient_accumulation_steps,
             warmup_steps=5,
             num_train_epochs=1,
             learning_rate=0.0001,
             logging_steps=1,
-            optim="adamw_8bit",  # Pure torch optimizer
+            optim=optim,  # No bitsandbytes on the ROCm path
             weight_decay=0.01,
             lr_scheduler_type="linear",
             seed=3407,
             output_dir="logical_reasoning_rocm_outputs",
             report_to="none",
-            bf16=True,
+            bf16=supports_bf16,
+            fp16=not supports_bf16,
             dataloader_pin_memory=False,
             remove_unused_columns=True,  # Remove unused columns to avoid tensor issues
             gradient_checkpointing=True,
-            dataloader_num_workers=0,  # Single worker for ROCm stability
+            dataloader_num_workers=0,  # Single worker for stability
         ),
     )
-    # Setup trainer with ROCm-friendly settings and proper data handling
+    # Setup trainer with the batch size, optimizer and precision chosen above
     trainer = train_on_responses_only(trainer)
     FastLanguageModel.for_training(model)
-    trainer_stats = trainer.train()
     # Train only on responses
-    trainer_stats = trainer.train()
+    trainer_stats = (
+        trainer.train()
+    )
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Training the Model with ROCm-Optimized Settings
+    ### Training the Model
 
     This cell configures and executes the fine-tuning process:
 
     **Training Configuration (SFTConfig):**
-    - **Batch size**: 64 per device - leveraging the AMD MI300X's massive 192GB HBM3 memory
-    - **Gradient accumulation**: 1 step
+    - **Batch size and gradient accumulation**: taken from the block that sized the
+      model, so 64 x 1 on an MI300X and 2 x 8 on a small GPU
     - **Warmup**: 5 steps
     - **Epochs**: 1 full pass through the dataset
     - **Learning rate**: 1e-4
-    - **Optimizer**: adamw_8bit for memory efficiency
-    - **Precision**: bf16 (bfloat16) for ROCm
-    - **Gradient checkpointing**: Enabled for memory efficiency
+    - **Optimizer**: `adamw_torch_fused` on the no-bitsandbytes ROCm path,
+      `adamw_8bit` elsewhere
+    - **Precision**: bfloat16 where the GPU supports it, float16 otherwise
+    - **Gradient checkpointing**: enabled for memory efficiency
 
     **Special Training Mode:**
-    Uses `train_on_responses_only` to compute loss only on the assistant's responses, not on the user's questions. This focuses the model on learning to generate accurate answers rather than memorizing the input format.
+    Uses `train_on_responses_only` to compute loss only on the assistant's
+    responses, not on the user's questions. This focuses the model on learning to
+    generate accurate answers rather than memorizing the input format.
 
     **Key Features:**
     - DataCollatorForSeq2Seq handles variable-length sequences with proper padding
-    - No packing to preserve conversation structure
-    - Single dataloader worker for ROCm stability
-    - Gradient checkpointing via Unsloth for memory optimization
+    - No packing, to preserve conversation structure
+    - Single dataloader worker for stability
 
     The model is then trained on the 74 logical reasoning conversations.
     """)
