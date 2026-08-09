@@ -178,6 +178,11 @@ def _install_commands(source):
     A `%%bash` cell's lines run as shell and carry no `!`: 152 AMD cells hold
     1064 installs a `!`-only scan never sees. The predicate is
     `notebook_inventory.is_shell_cell`, shared with the Pillow pin gate.
+
+    `%` counts alongside `!` because `%pip install` is the form IPython itself
+    recommends, and `_INSTALL_COMMAND_RE` already reads it as an install. A
+    `!`-only scan here would let that spelling install an unpinned vLLM with
+    the gate green.
     """
     shell_cell = ni.is_shell_cell(source)
     commands, pending = [], ""
@@ -186,7 +191,7 @@ def _install_commands(source):
         if line.rstrip().endswith("\\"):
             pending = pending.rstrip()[:-1]
             continue
-        prefixed = pending.lstrip().startswith("!")
+        prefixed = pending.lstrip().startswith(("!", "%"))
         if (prefixed or shell_cell) and "pip install" in pending:
             commands.append(pending)
         pending = ""
@@ -563,6 +568,27 @@ def test_a_line_that_is_not_an_assignment_binds_nothing():
     a binding named `None`."""
     assert _bound_name("    if _vllm == 'vllm==0.15.1':") is None
     assert _bound_name("    !pip install vllm==0.15.1") is None
+
+
+def test_a_percent_pip_install_is_collected():
+    """`%pip install` is IPython's own recommended spelling, so a `!`-only scan
+    is a hole rather than a strictness: no notebook uses it today, and the one
+    that adds it would ship an unpinned vLLM past a green gate.
+
+    Asserted through `_install_commands`, not the prefix test, because the
+    collector is what every later check reads from.
+    """
+    assert _install_commands("%pip install --upgrade vllm") == [
+        "%pip install --upgrade vllm"]
+    assert _BARE_VLLM_RE.search(_upgrading(
+        _install_commands("%pip install --upgrade vllm"))[0])
+
+
+def test_a_commented_percent_line_is_not_an_install():
+    """The prefix widened to `%`; it must not widen to anything that merely
+    starts a line."""
+    assert _install_commands("# %pip install --upgrade vllm") == []
+    assert _install_commands("    pip install vllm") == []
 
 
 def test_a_bare_vllm_is_told_apart_from_a_pinned_or_interpolated_one():
