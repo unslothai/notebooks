@@ -102,10 +102,16 @@ def _code(path):
     return "\n".join(_code_cells(path))
 
 
+# PEP 503 lowercases project names, so `TorchVision` installs the same wheel.
+# A case-sensitive test dropped such a command out of the gate entirely, which
+# is the one direction that fails silently: Pillow upgrades, nothing complains.
+_TORCHVISION_RE = re.compile(r"torchvision", re.I)
+
+
 def _upgrades_torchvision(source):
     return [
         command for command in _pip_commands(source)
-        if ni.is_upgrading(command) and "torchvision" in command
+        if ni.is_upgrading(command) and _TORCHVISION_RE.search(command)
     ]
 
 
@@ -511,6 +517,23 @@ def test_non_executable_text_is_not_collected_as_a_command():
     assert _upgrades_torchvision("!uv pip install --upgrade torchvision")
     assert _upgrades_torchvision("%pip install --upgrade torchvision")
     assert _upgrades_torchvision("%%bash\nuv pip install --system -U torchvision")
+
+
+def test_a_case_variant_torchvision_is_still_torchvision():
+    """PEP 503 lowercases project names, so `TorchVision` resolves the same
+    wheel and drags the same Pillow in. Excluding it drops the command out of
+    the gate, the one direction that fails quietly. The vLLM gate already reads
+    its own requirement case-insensitively for this reason."""
+    for command in (
+        "!uv pip install --upgrade TorchVision",
+        "!uv pip install --upgrade unsloth TORCHVISION",
+    ):
+        assert _upgrades_torchvision(command) == [command], command
+        assert not _pins_pillow(command, command)
+    # The pin still counts whatever case either name is written in.
+    pinned = "!uv pip install --upgrade Pillow==11.3.0 TorchVision"
+    assert _upgrades_torchvision(pinned) == [pinned]
+    assert _pins_pillow(pinned, pinned)
 
 
 def test_upgrade_strategy_is_not_an_upgrade():
