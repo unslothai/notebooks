@@ -131,6 +131,16 @@ jobs:
         run: |
           python -m pytest tests/test_amd_moe_autotune_guard.py -q --tb=short
 
+      - name: tests/test_saving_cell_names_a_bound_object.py
+        run: |
+          python -m pytest tests/test_saving_cell_names_a_bound_object.py -q --tb=short
+
+      - name: tests/test_amd_git_main_unsloth_install.py
+        # An AMD variant must keep the git-main unsloth upgrade its CUDA source
+        # uses; the ignore list hid the drop from the parity validator.
+        run: |
+          python -m pytest tests/test_amd_git_main_unsloth_install.py -q --tb=short
+
       - name: tests/test_transformers5_hub_floor.py
         run: |
           python -m pytest tests/test_transformers5_hub_floor.py -q --tb=short
