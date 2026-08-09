@@ -13,13 +13,11 @@
 
 """An AMD variant keeps the git-main unsloth upgrade its CUDA source uses.
 
-A source notebook only installs unsloth / unsloth_zoo from git main when it
-needs code no release carries yet (`FastDiffusionModel`, see
-`installation_diffusiongemma_content`). Both names are in
-`_AMD_INSTALL_PACKAGE_IGNORE` because the ROCm base cell owns their versions,
-and `_validate_amd_install_package_parity` subtracts that same set, so the
-upgrade used to vanish from the AMD variant with nothing to catch it: the
-notebook installed the PyPI build and died at `FastModel.from_pretrained`.
+A source installs unsloth / unsloth_zoo from git main only for code no release
+carries yet (`FastDiffusionModel`). Both names sit in
+`_AMD_INSTALL_PACKAGE_IGNORE`, and `_validate_amd_install_package_parity`
+subtracts the same set, so the upgrade vanished from the AMD variant unseen and
+the notebook died at `FastModel.from_pretrained` on the PyPI build.
 """
 from __future__ import annotations
 
@@ -89,7 +87,7 @@ def test_compose_reemits_the_git_main_upgrade():
     line = next((text for text in extras.splitlines() if UNSLOTH_GIT in text), None)
     assert line is not None, f"git main upgrade dropped from extras cell:\n{extras}"
     assert ZOO_GIT in line
-    # --no-deps protects the ROCm torch / bitsandbytes stack installed above.
+    # --no-deps protects the ROCm stack installed above.
     assert "--no-deps" in line
     assert "--force-reinstall" in line
 

@@ -18,27 +18,18 @@
 
 """A `!` command must not end in `&`. Only Colab's kernel tolerates it.
 
-`ipykernel`'s `ZMQInteractiveShell.system_piped` refuses a backgrounded
-command outright:
+`ipykernel`'s `ZMQInteractiveShell.system_piped` raises `OSError("Background
+processes not supported.")`, so on Kaggle, plain Jupyter or papermill the cell
+cannot run at all. Found twice: `Gemma3N_(2B)-Inference` starting sglang and
+`Meta-Synthetic-Data-Llama3.1_(8B)` starting vLLM. `subprocess.Popen` does the
+same job on every kernel.
 
-    if cmd.rstrip().endswith("&"):
-        raise OSError("Background processes not supported.")
+The `&` usually sits several continuations below the `!`, so the scan folds them
+first; per-line matching finds the sglang family and misses the vLLM one.
 
-so on Kaggle, plain Jupyter or papermill the cell cannot run at all. Found
-twice: `Gemma3N_(2B)-Inference` starting sglang, and
-`Meta-Synthetic-Data-Llama3.1_(8B)` starting vLLM, whose own comment says
-"we prepend nohup and postpend & to make the Colab cell run in background".
-`subprocess.Popen` does the same thing on every kernel.
-
-The `&` is usually several backslash continuations below the `!`, so the
-scan folds continuations first. Matching per physical line finds the sglang
-family and misses the vLLM one entirely, which is how the second one survived.
-
-The scan covers every notebook directory the CI workflow watches, not just the
-generated `nb/`. `original_template/` is the INPUT the generator reads, so a
-backgrounded command added there passed an `nb/`-only gate and was then copied
-into `nb/` on the next regeneration, which is the exact hole the sglang command
-came through.
+Every notebook directory the CI workflow watches is scanned, not just `nb/`:
+`original_template/` is the generator's INPUT, so a command added there passed
+an `nb/`-only gate and was copied into `nb/` on the next regeneration.
 """
 
 import json
@@ -50,24 +41,17 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "notebooks-tests-ci.yml"
 
-# Every notebook root the workflow watches. `molab/` holds marimo `.py` today
-# and `python_scripts/` holds nbconvert output, so neither contributes a
-# notebook right now, but both are listed so a notebook appearing there is
-# scanned rather than silently exempt.
+# Every notebook root the workflow watches. `molab/` and `python_scripts/` hold
+# no notebook today, but are listed so one appearing there is not exempt.
 ROOTS = ("nb", "original_template", "kaggle", "molab", "python_scripts")
 
 # Known offenders, keyed by repo-relative path, with the PR that fixes each and
-# the exact command allowed. The path matters: a template and its generated
-# copies share a basename, so a bare-filename key would grandfather every root
-# at once off one entry, which is the stale grandfathering this file exists to
-# prevent. The command matters too, and it is compared whole rather than by a
-# substring: skipping on a name match would hide a second backgrounded command
-# added to that same notebook, and skipping on a marker like
-# `sglang.launch_server` would hide a second backgrounded *sglang* command just
-# as thoroughly, plus it would keep passing if this command itself were edited.
-# A new one must fail rather than be added here; this list only exists so the
-# check can land before the other fix does, and it should be emptied when that
-# PR merges.
+# the exact command allowed. The path matters because a template and its copies
+# share a basename, so one bare-filename key would grandfather every root. The
+# whole command matters because a name or marker match would hide a second
+# backgrounded command in the same notebook, and would keep passing if this one
+# were edited. A new offender must fail rather than join the list, which exists
+# only so the check can land first and should be emptied when #317 merges.
 _SGLANG = (
     "unslothai/notebooks#317",
     "!nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it"
@@ -108,11 +92,10 @@ def _backgrounded(path):
         if cell.get("cell_type") != "code":
             continue
         for command in _shell_commands("".join(cell.get("source", []))):
-            # `[^&]&` so `a && b`, which is not backgrounding, does not match.
+            # `[^&]&` so `a && b` does not match.
             if re.search(r"[^&]&\s*$", command):
-                # Whole, not truncated: KNOWN compares the command exactly, and
-                # the sglang line is 125 characters, so a 120-character clip
-                # would never equal its entry.
+                # Whole, not truncated: KNOWN compares exactly and the sglang
+                # line is 125 characters.
                 found.append(command)
     return found
 
@@ -140,12 +123,11 @@ _NOTEBOOKS = _collect(REPO_ROOT)
 
 
 def _unaccounted(name, commands):
-    """The commands KNOWN does not already account for, so anything else in a
-    grandfathered notebook is a new regression and still has to fail.
+    """The commands KNOWN does not account for, so anything else in a
+    grandfathered notebook still fails.
 
-    One function, called by the check below and by every test that claims to
-    guard it. Spelling the filter out again inside those tests left them green
-    against any rewrite of it, including one that dropped every command.
+    One function, used by the check and by every test guarding it: spelling the
+    filter out again in those tests left them green against any rewrite of it.
     """
     if name not in KNOWN:
         return list(commands)
@@ -173,9 +155,8 @@ def _workflow_notebook_dirs():
 
 
 def test_the_scan_covers_every_watched_directory_that_holds_notebooks():
-    """Guard the gate: a root left out is scanned by nothing, and an empty
-    collection would make the parametrised check above assert about no files at
-    all."""
+    """A root left out is scanned by nothing, and an empty collection makes the
+    check above assert about no files."""
     watched = _workflow_notebook_dirs()
     assert len(watched) >= 5, watched
     missing = [
@@ -190,15 +171,12 @@ def test_the_scan_covers_every_watched_directory_that_holds_notebooks():
 
 
 def _stale(known, repo_root):
-    """Entries the repo has outgrown: the notebook stopped offending, or it is
-    gone entirely. Keys are repo-relative, so the root is joined here.
+    """Entries the repo has outgrown: the notebook stopped offending or is
+    gone. Keys are repo-relative, so the root is joined here.
 
-    The missing-file arm matters because #317 does not fix
-    `AMD-Gemma3N_(2B)-Inference` so much as delete it, along with its
-    `python_scripts` mirror. An `is_file()` guard on its own reads a deleted
-    notebook as "nothing to check" and keeps the entry forever, which is the
-    stale grandfathering this whole test exists to prevent, just arrived at by
-    deletion rather than by a fix.
+    The missing-file arm matters because #317 deletes
+    `AMD-Gemma3N_(2B)-Inference` rather than fixing it, and an `is_file()` guard
+    alone would read that as "nothing to check" and keep the entry forever.
     """
     stale = []
     for name, (_pr, allowed) in known.items():
@@ -211,36 +189,33 @@ def _stale(known, repo_root):
 
 
 def test_the_known_list_still_describes_reality():
-    """A name that no longer offends, or no longer exists, must leave the list,
-    or it hides the next regression in that notebook."""
+    """A name that no longer offends or no longer exists must leave the list,
+    or it hides the next regression there."""
     stale = _stale(KNOWN, REPO_ROOT)
     assert not stale, f"fixed, edited or deleted, so update KNOWN: {stale}"
 
 
 def test_a_deleted_notebook_does_not_stay_grandfathered(tmp_path):
-    """The discriminating case for the arm above. Point an entry at a notebook
-    that is not there and it has to be reported, not quietly skipped."""
+    """An entry pointing at a notebook that is not there must be reported."""
     assert _stale(KNOWN, tmp_path) == list(KNOWN)
 
 
 def test_a_present_and_still_offending_notebook_is_not_reported():
-    """The other side of it, so the check cannot pass by calling everything
-    stale."""
+    """So the check cannot pass by calling everything stale."""
     name = next(iter(KNOWN))
     assert name not in _stale({name: KNOWN[name]}, REPO_ROOT)
 
 
 def test_a_second_offender_in_a_known_notebook_is_not_hidden():
-    """The name match used to skip the whole notebook, so another backgrounded
-    command added beside the sglang one would never be reported."""
+    """A name match skipped the whole notebook, hiding anything added beside
+    the sglang command."""
     name, (_pr, _allowed) = next(iter(KNOWN.items()))
     commands = _backgrounded(REPO_ROOT / name) + ["!python other_server.py &"]
     assert _unaccounted(name, commands) == ["!python other_server.py &"]
 
 
 def test_a_second_sglang_command_is_not_hidden():
-    """A substring marker like `sglang.launch_server` would filter this one out
-    too, and the notebook would go on skipping instead of reporting it."""
+    """A marker like `sglang.launch_server` would filter this one out too."""
     name, (_pr, _allowed) = next(iter(KNOWN.items()))
     second = "!nohup python -m sglang.launch_server --port 8001 > two.log &"
     commands = _backgrounded(REPO_ROOT / name) + [second]
@@ -248,8 +223,7 @@ def test_a_second_sglang_command_is_not_hidden():
 
 
 def test_editing_the_grandfathered_command_is_reported():
-    """The entry pins one command, so changing it, even by a flag, has to fail
-    rather than stay silently grandfathered."""
+    """The entry pins one command, so changing even a flag has to fail."""
     name, (_pr, allowed) = next(iter(KNOWN.items()))
     edited = allowed.replace("--port 8000", "--port 8001")
     assert edited != allowed
@@ -257,8 +231,8 @@ def test_editing_the_grandfathered_command_is_reported():
 
 
 def test_the_known_command_survives_extraction_whole():
-    """It is 125 characters. The scan used to clip at 120, which would have made
-    every exact comparison here fail open into a hard error or a false report."""
+    """It is 125 characters, and the scan used to clip at 120, so every exact
+    comparison would have failed open."""
     _name, (_pr, allowed) = next(iter(KNOWN.items()))
     assert len(allowed) > 120
     for name in KNOWN:
