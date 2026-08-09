@@ -114,6 +114,15 @@ jobs:
         run: |
           python -m pytest tests/test_qat_numpy_pin.py -q --tb=short
 
+      - name: tests/test_nemo_gym_uv_interpreter.py
+        # The NeMo Gym setup cell must let uv fetch the interpreter
+        # Gym/.python-version pins instead of naming one itself. Colab's
+        # preinstalled uv cannot reach that release without an upgrade
+        # first, and satisfying only the floor lands on a 3.14 that
+        # cannot build yappi.
+        run: |
+          python -m pytest tests/test_nemo_gym_uv_interpreter.py -q --tb=short
+
       - name: tests/test_python_scripts_regen_parity.py
         # Runs the generator's convert_notebook_to_script (nbconvert
         # PythonExporter) live on each nb/*.ipynb, asserts byte-equal
