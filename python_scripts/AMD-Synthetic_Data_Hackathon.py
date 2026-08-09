@@ -4,7 +4,6 @@
 # <h1 align='center'>Synthetic Data Generation and Unsloth Tutorial</h1>
 
 # ### Installation
-# 
 
 # In[ ]:
 
