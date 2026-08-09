@@ -44,6 +44,7 @@ generated mirrors and a fix applied to only one layer is a fix that disappears
 on the next regeneration.
 """
 
+import ast
 import json
 import re
 from pathlib import Path
@@ -57,9 +58,10 @@ SEARCH_DIRS = ["nb", "kaggle", "python_scripts", "molab", "original_template"]
 
 GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
 
-# The notebooks known to bootstrap NeMo Gym today. Discovery below is by
-# content, so a new one is picked up automatically; this list only makes sure
-# discovery itself has not silently stopped finding anything.
+# The notebooks known to bootstrap NeMo Gym today. The checks below run over
+# whatever discovery finds, so a new one is covered the moment it clones Gym.
+# This list only makes sure discovery has not silently stopped finding
+# anything, which would leave those checks with nothing to run over.
 EXPECTED_FILES = {
     "molab/NeMo-Gym-Multi-Environment.py",
     "molab/NeMo-Gym-Sudoku.py",
@@ -115,12 +117,36 @@ def test_gym_bootstrap_files_are_all_present():
     )
 
 
-@pytest.mark.parametrize("relpath", sorted(EXPECTED_FILES))
+def test_every_behavioural_check_runs_over_what_discovery_found():
+    """The checks below promise to cover a newly added Gym notebook. They only
+    do that if they parameterize over what discovery returned.
+
+    Parameterizing over EXPECTED_FILES instead reads as equivalent while the
+    two sets happen to match, and silently stops covering the next notebook
+    that clones Gym: it could hardcode an interpreter or drop the uv upgrade
+    with CI green.
+    """
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    over = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for dec in node.decorator_list:
+            if not (isinstance(dec, ast.Call)
+                    and getattr(dec.func, "attr", "") == "parametrize"):
+                continue
+            if getattr(dec.args[0], "value", None) != "relpath":
+                continue
+            over[node.name] = ast.unparse(dec.args[1])
+    assert over, "no relpath-parameterized checks found; this test is vacuous"
+    wrong = {name: src for name, src in over.items() if "GYM_FILES" not in src}
+    assert not wrong, f"these run over a fixed list, not discovery: {wrong}"
+
+
+@pytest.mark.parametrize("relpath", sorted(GYM_FILES))
 def test_no_hardcoded_interpreter_request(relpath):
     """The notebook must not name a Python version for the Gym venv."""
-    text = GYM_FILES.get(relpath)
-    if text is None:
-        pytest.fail(f"DRIFT DETECTED: {relpath} is missing from the repo")
+    text = GYM_FILES[relpath]
 
     hardcoded = re.findall(r"--python[\"'\s,]+[0-9][0-9.]*", text)
     assert not hardcoded, (
@@ -146,12 +172,10 @@ def test_no_hardcoded_interpreter_request(relpath):
     )
 
 
-@pytest.mark.parametrize("relpath", sorted(EXPECTED_FILES))
+@pytest.mark.parametrize("relpath", sorted(GYM_FILES))
 def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     """uv must be upgraded, addressed by path, and told to fetch the pin."""
-    text = GYM_FILES.get(relpath)
-    if text is None:
-        pytest.fail(f"DRIFT DETECTED: {relpath} is missing from the repo")
+    text = GYM_FILES[relpath]
 
     upgrade = re.search(
         r"pip[\"'\s,]+.*install.*--upgrade[\"'\s,]+[\"']uv[\"']", text
@@ -190,12 +214,10 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     )
 
 
-@pytest.mark.parametrize("relpath", sorted(EXPECTED_FILES))
+@pytest.mark.parametrize("relpath", sorted(GYM_FILES))
 def test_setup_is_not_skipped_by_a_venv_existence_guard(relpath):
     """A half-built .venv from a failed run must not skip the repair."""
-    text = GYM_FILES.get(relpath)
-    if text is None:
-        pytest.fail(f"DRIFT DETECTED: {relpath} is missing from the repo")
+    text = GYM_FILES[relpath]
 
     guard = re.search(
         r"if\s+not\s+os\.path\.exists\(\s*os\.path\.join\(\s*GYM_DIR", text
@@ -208,12 +230,10 @@ def test_setup_is_not_skipped_by_a_venv_existence_guard(relpath):
     )
 
 
-@pytest.mark.parametrize("relpath", sorted(EXPECTED_FILES))
+@pytest.mark.parametrize("relpath", sorted(GYM_FILES))
 def test_venv_location_is_verified_after_sync(relpath):
     """uv must not be trusted to have put the venv where the cell looks."""
-    text = GYM_FILES.get(relpath)
-    if text is None:
-        pytest.fail(f"DRIFT DETECTED: {relpath} is missing from the repo")
+    text = GYM_FILES[relpath]
 
     assert "_gym_venv_python" in text and "RuntimeError" in text, (
         f"DRIFT DETECTED: {relpath} does not check that Gym/.venv/bin/python "
