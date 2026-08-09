@@ -51,15 +51,12 @@ import random
 from pathlib import Path
 
 # ===== CONFIGURATION =====
-# Where the fine-tuning ("ft") files live. This is the same directory the
-# synthetic-data-kit CLI writes to with:
-#     synthetic-data-kit save-as ./logical_reasoning/data/curated/ --format ft
+# The same data/final/ the CLI writes with `save-as --format ft`.
 data_dir = "./logical_reasoning/data/final"
 num_examples = 74          # how many puzzles to synthesise
 seed = 3407
 
-# If you already ran the synthetic-data-kit CLI against a served model, the
-# files are on disk already and this cell leaves them untouched.
+# Files already produced by the CLI are left untouched.
 final_dir = Path(data_dir)
 final_dir.mkdir(parents = True, exist_ok = True)
 existing = sorted(final_dir.glob("*.json"))
@@ -198,10 +195,8 @@ else:
         "knights_and_knaves_easy_ft.json": records[:midpoint],
         "knights_and_knaves_hard_ft.json": records[midpoint:],
     }
-    # Stage under *.json.tmp, which neither the skip check above nor the
-    # loader below can see, then swap the finished files into place. An
-    # interrupt or a full disk part-way through therefore leaves no shard for
-    # the next run to mistake for a complete dataset.
+    # Stage under *.json.tmp, invisible to the skip check and the loader, so
+    # an interrupted publish leaves no half dataset for the next run to keep.
     staged = []
     for filename, shard in shards.items():
         tmp_path = final_dir / f"{filename}.tmp"
@@ -364,11 +359,9 @@ from transformers import DataCollatorForSeq2Seq
 max_seq_length = 1024
 
 # ===== HARDWARE AWARE CONFIGURATION =====
-# This notebook was written for a single AMD MI300X (192GB HBM3), where
-# Llama-3.3-70B fits in bfloat16 with no quantization and therefore no
-# bitsandbytes. The weights alone are about 140GB, so on anything smaller
-# (every free Colab and Kaggle tier included) we fall back to Llama-3.1-8B.
-# Override the values in this block if you know what your GPU can hold.
+# Llama-3.3-70B needs about 140GB for its weights, so it is only picked on an
+# MI300X class GPU; smaller cards, free Colab and Kaggle included, get
+# Llama-3.1-8B. Override these values if you know what your GPU can hold.
 if not torch.cuda.is_available():
     raise RuntimeError(
         "No GPU visible. Switch the runtime to a GPU accelerator before "
@@ -381,10 +374,10 @@ supports_bf16 = torch.cuda.is_bf16_supported()
 if gpu_memory_gb >= 150:
     model_name = "unsloth/Llama-3.3-70B-Instruct"
     load_in_4bit = False
-    lora_rank = 64                    # Higher rank for the 70B model
-    per_device_train_batch_size = 64  # MI300X can handle this with 192GB HBM3
+    lora_rank = 64
+    per_device_train_batch_size = 64
     gradient_accumulation_steps = 1
-    optim = "adamw_torch_fused"       # No bitsandbytes on the ROCm path
+    optim = "adamw_torch_fused"  # bitsandbytes is not available on ROCm
 elif gpu_memory_gb >= 40:
     model_name = "unsloth/Llama-3.1-8B-Instruct"
     load_in_4bit = False
@@ -531,7 +524,6 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
-# Setup trainer with the batch size, optimizer and precision chosen above
 trainer = SFTTrainer(
     model = model,
     tokenizer = tokenizer,

@@ -385,11 +385,9 @@ def _(FastLanguageModel, torch):
     max_seq_length = 1024
 
     # ===== HARDWARE AWARE CONFIGURATION =====
-    # This notebook was written for a single AMD MI300X (192GB HBM3), where
-    # Llama-3.3-70B fits in bfloat16 with no quantization and therefore no
-    # bitsandbytes. The weights alone are about 140GB, so on anything smaller
-    # (every free molab and Kaggle tier included) we fall back to Llama-3.1-8B.
-    # Override the values in this block if you know what your GPU can hold.
+    # Llama-3.3-70B needs about 140GB for its weights, so it is only picked on an
+    # MI300X class GPU; smaller cards, free molab and Kaggle included, get
+    # Llama-3.1-8B. Override these values if you know what your GPU can hold.
     if not torch.cuda.is_available():
         raise RuntimeError(
             "No GPU visible. Switch the runtime to a GPU accelerator before "
@@ -402,24 +400,24 @@ def _(FastLanguageModel, torch):
     if gpu_memory_gb >= 150:
         model_name = "unsloth/Llama-3.3-70B-Instruct"
         load_in_4bit = False
-        lora_rank = 64  # Higher rank for the 70B model
-        per_device_train_batch_size = 64  # MI300X can handle this with 192GB HBM3
+        lora_rank = 64
+        per_device_train_batch_size = 64
         gradient_accumulation_steps = 1
-        optim = "adamw_torch_fused"  # No bitsandbytes on the ROCm path
+        optim = "adamw_torch_fused"  # bitsandbytes is not available on ROCm
     elif gpu_memory_gb >= 40:
         model_name = "unsloth/Llama-3.1-8B-Instruct"
         load_in_4bit = False
-        lora_rank = 32  # Higher rank for the 70B model
-        per_device_train_batch_size = 8  # MI300X can handle this with 192GB HBM3
+        lora_rank = 32
+        per_device_train_batch_size = 8
         gradient_accumulation_steps = 2
-        optim = "adamw_8bit"  # No bitsandbytes on the ROCm path
+        optim = "adamw_8bit"  # bitsandbytes is not available on ROCm
     else:
         model_name = "unsloth/Llama-3.1-8B-Instruct"
         load_in_4bit = True
-        lora_rank = 16  # Higher rank for the 70B model
-        per_device_train_batch_size = 2  # MI300X can handle this with 192GB HBM3
+        lora_rank = 16
+        per_device_train_batch_size = 2
         gradient_accumulation_steps = 8
-        optim = "adamw_8bit"  # No bitsandbytes on the ROCm path
+        optim = "adamw_8bit"  # bitsandbytes is not available on ROCm
 
     # T4 and other pre-Ampere cards have no bfloat16, so ask for float16 there.
     dtype = torch.bfloat16 if supports_bf16 else torch.float16
@@ -598,13 +596,13 @@ def _(
         data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer_1, padding=True),
         packing=False,
         args=SFTConfig(
-            per_device_train_batch_size=per_device_train_batch_size,  # MI300X can handle this with 192GB HBM3
+            per_device_train_batch_size=per_device_train_batch_size,
             gradient_accumulation_steps=gradient_accumulation_steps,
             warmup_steps=5,
             num_train_epochs=1,
             learning_rate=0.0001,
             logging_steps=1,
-            optim=optim,  # No bitsandbytes on the ROCm path
+            optim=optim,  # bitsandbytes is not available on ROCm
             weight_decay=0.01,
             lr_scheduler_type="linear",
             seed=3407,
@@ -618,7 +616,6 @@ def _(
             dataloader_num_workers=0,  # Single worker for stability
         ),
     )
-    # Setup trainer with the batch size, optimizer and precision chosen above
     trainer = train_on_responses_only(trainer)
     FastLanguageModel.for_training(model)
     # Train only on responses
