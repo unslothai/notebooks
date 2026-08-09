@@ -1874,8 +1874,8 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
             text = _cell_source_text(cell).strip()
             if len(text.splitlines()) > 1 or not _RE_DEPENDENCY_HEADING.match(text):
                 break
-            # `None` marks a heading: it is deleted with the cell but must not
-            # reach the install text the AMD recipe is built from.
+            # `None` marks a heading: deleted with the cell, but kept out of
+            # the install text the AMD recipe is built from.
             pending_headings.append((idx, None))
             idx += 1
             continue

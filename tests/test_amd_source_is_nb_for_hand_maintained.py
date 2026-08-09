@@ -59,8 +59,8 @@ def _hand_maintained_with_amd(gen):
 
 
 def test_the_drifted_pair_is_still_present(gen):
-    """If the template is ever refreshed this test is the one that says so,
-    rather than the check below quietly passing for the wrong reason."""
+    """If the template is ever refreshed this says so, rather than the check
+    below passing for the wrong reason."""
     drifted = [name for name in _hand_maintained_with_amd(gen)
                if (TEMPLATE_DIR / name).is_file()
                and _code_cells(TEMPLATE_DIR / name) != _code_cells(NB_DIR / name)]
@@ -68,8 +68,8 @@ def test_the_drifted_pair_is_still_present(gen):
 
 
 def test_an_amd_variant_follows_nb_not_the_template(gen):
-    """Every code cell of the AMD variant that is not install machinery has to
-    come from `nb/`. The install cell is rewritten for ROCm by design."""
+    """Every non-install code cell must come from `nb/`; the install cell is
+    rewritten for ROCm by design."""
     mismatched = []
     for name in _hand_maintained_with_amd(gen):
         if not (TEMPLATE_DIR / name).is_file():
@@ -93,8 +93,8 @@ _COLAB_BADGE = (
 
 
 def test_a_bare_colab_badge_counts_as_a_stale_announcement(gen):
-    """It carries no "to run this, press", so it walked past the check and the
-    AMD variant kept a button pointing at the CUDA notebook."""
+    """No "to run this, press", so it walked past the check and the AMD variant
+    kept a button pointing at the CUDA notebook."""
     assert gen._is_stale_amd_announcement(_COLAB_BADGE)
 
 
