@@ -13,12 +13,11 @@
 
 """The AMD MoE notebooks turn MoE autotuning off, and regeneration keeps it.
 
-`UNSLOTH_MOE_DISABLE_AUTOTUNE=1` makes `unsloth.kernels.moe.autotune_cache`
-hand back its heuristic configs instead of searching per device capability.
-It was set by hand on `AMD-Qwen3_5_MoE` and `AMD-Qwen3_6_MoE` and appears in
-no CUDA source, so once the AMD generator started rewriting the follow-up
-install cell the setting was composed away. It now comes from the generator's
-own variant extras, which is the only place a regeneration cannot lose it.
+`UNSLOTH_MOE_DISABLE_AUTOTUNE=1` makes `unsloth.kernels.moe.autotune_cache` hand
+back heuristic configs instead of searching per device capability. Set by hand on
+`AMD-Qwen3_5_MoE` and `AMD-Qwen3_6_MoE` and present in no CUDA source, it was
+composed away once the generator started rewriting the follow-up install cell.
+It now comes from the generator's variant extras, where regeneration keeps it.
 """
 from __future__ import annotations
 
@@ -85,8 +84,8 @@ def test_the_guard_is_set_before_unsloth_is_imported(name):
 
 
 def test_no_other_notebook_picks_the_guard_up(gen):
-    """Two notebooks carry it on main. The Qwen3.5 Vision notebooks sit next to
-    them and match a looser family test, so widening the predicate shows here."""
+    """The Qwen3.5 Vision notebooks sit next to the pair and match a looser
+    family test, so widening the predicate shows up here."""
     carriers = sorted(
         path.name for path in NB_DIR.glob("*.ipynb")
         if GUARD in path.read_text(encoding="utf-8")

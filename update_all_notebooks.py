@@ -681,10 +681,9 @@ installation_amd_extras_grpo = """\
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 """
 
-# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off, so
-# unsloth.kernels.moe.autotune_cache returns its heuristic configs instead of
-# searching per device capability. The CUDA sources they are minted from have
-# never carried it, so it has to live here or a regeneration drops it.
+# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off. The
+# CUDA sources they are minted from never carried it, so it lives here or a
+# regeneration drops it.
 installation_amd_extras_qwen3_moe = """\
 import os; os.environ["UNSLOTH_MOE_DISABLE_AUTOTUNE"] = "1"
 """
@@ -1747,10 +1746,9 @@ def validate_notebook_syntax(notebook_path):
 
 _RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
 _RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
-# A markdown heading that introduces a dependency install, e.g.
-# "### Install flash-linear-attention and causal-conv-1d". Deliberately not
-# `_RE_INSTALL_SECTION_MD`: that also matches "setup" and any position in the
-# line, which is how "### Setup the model" would qualify.
+# A heading introducing a dependency install, e.g. "### Install
+# flash-linear-attention and causal-conv-1d". Not `_RE_INSTALL_SECTION_MD`,
+# which also matches "setup" anywhere in the line.
 _RE_DEPENDENCY_HEADING = re.compile(r"^#+\s*(?:\d+[.)]\s*)?install", re.IGNORECASE)
 
 
@@ -1832,12 +1830,11 @@ def _is_installation_heading(source_text, is_amd_notebook=False):
 def _adjacent_install_like_code_cells(cells, first_code_idx):
     """Install cells following `first_code_idx`, stepping over their headings.
 
-    A second install cell often gets its own markdown heading, and stopping at
-    the first non-code cell missed it: Qwen3_5_MoE and Qwen3_6_MoE put a
-    CUDA-wheel resolver behind "### Install flash-linear-attention and
-    causal-conv-1d", so it was never collected, survived into the AMD variant,
-    and `_assert_amd_install_runtime` then refused the whole `--amd` run. The
-    heading is returned with it, or it would be left pointing at nothing.
+    Stopping at the first non-code cell missed a second install cell behind its
+    own heading: Qwen3_5_MoE and Qwen3_6_MoE hide a CUDA-wheel resolver there,
+    it survived into the AMD variant, and `_assert_amd_install_runtime` refused
+    the whole `--amd` run. The heading is returned too, or it would be left
+    pointing at nothing.
     """
     install_cells = []
     idx = first_code_idx + 1
@@ -1847,24 +1844,23 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
         if cell.get("cell_type") == "markdown":
             # Only a dependency-install heading, and only right before an
             # install cell. Any heading used to qualify, and the cell behind it
-            # then passed `_is_install_like_cell` on the strength of that
-            # heading alone: `### Start Unsloth Studio` collected the Studio
-            # launch code, which the caller deletes.
+            # then passed on that heading alone: `### Start Unsloth Studio`
+            # collected the Studio launch code, which the caller deletes.
             text = _cell_source_text(cell).strip()
             if len(text.splitlines()) > 1 or not _RE_DEPENDENCY_HEADING.match(text):
                 break
-            # `None` marks a heading: it is deleted with the cell but must not
-            # reach the install text the AMD recipe is built from.
+            # `None` marks a heading: deleted with the cell, but kept out of
+            # the install text the AMD recipe is built from.
             pending_headings.append((idx, None))
             idx += 1
             continue
         if cell.get("cell_type") != "code":
             break
         source_text = _cell_source_text(cell)
-        # After a heading, the cell must look like an install on its own
-        # content. `_is_install_like_cell` also answers yes on the strength of
-        # the preceding markdown, so a heading like "### Install the trainer"
-        # over ordinary code would qualify it, and the caller deletes both.
+        # After a heading the cell must look like an install on its own
+        # content: `_is_install_like_cell` also answers yes on the preceding
+        # markdown, so "### Install the trainer" over ordinary code qualified
+        # it and the caller deletes both.
         if pending_headings or install_cells:
             if not _is_install_code(source_text):
                 break
@@ -1900,10 +1896,9 @@ def _is_stale_amd_announcement(source_text):
         for marker in ("google colab", "open in colab", "tesla t4", "runtime")
     ):
         return True
-    # A bare "Open in Colab" badge, which is how some hand-maintained notebooks
-    # open. It carries no "to run this, press", so the test above walked past it
-    # and the AMD variant kept a button pointing at the CUDA notebook, with no
-    # Dev Cloud header and no News section above it.
+    # A bare "Open in Colab" badge, how some hand-maintained notebooks open. It
+    # carries no "to run this, press", so the test above walked past it and the
+    # AMD variant kept a button pointing at the CUDA notebook.
     stripped = source_text.strip()
     return (
         stripped.startswith("<a href=")
@@ -5823,10 +5818,9 @@ def _news_insert_index(cells):
 def _restore_news_section(amd_path, template_path, new_announcement):
     """Give an nb/-sourced AMD notebook the News section its template carries.
 
-    Hand-maintained `nb/` notebooks have no News cells -- only `original_template/`
-    does -- so minting the AMD variant from `nb/` dropped the `### News` heading and
-    the announcement that the template path produces. News is generator-owned
-    boilerplate, not hand-tuned content, so it still comes from the template.
+    Only `original_template/` has News cells, so minting from `nb/` dropped the
+    `### News` heading and its announcement. News is generator-owned
+    boilerplate, so it still comes from the template.
     """
     try:
         with open(template_path, "r", encoding="utf-8", newline="") as f:
@@ -5898,9 +5892,9 @@ def copy_and_update_amd_notebooks(
             continue
         source_notebooks.setdefault(basename, path)
     # For DONT_UPDATE_EXCEPTIONS, nb/ is the source of truth and the template
-    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` sits at
-    # weight_decay 0.1 under nb/ and 0.001 under original_template/. Sourcing
-    # from the template gave the AMD variant hyperparameters nobody chose.
+    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` sits at weight_decay
+    # 0.1 under nb/ and 0.001 under original_template/, so sourcing from the
+    # template gave the AMD variant hyperparameters nobody chose.
     for basename in DONT_UPDATE_EXCEPTIONS:
         if basename not in amd_base_names:
             continue
@@ -5951,9 +5945,9 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
     return sorted(list(only_in_nb))
 
 
-# Any heading depth. A template exports `# ### Installation`, but a hand-maintained
-# `nb/` source exports `# # Installation`, and that one word of difference left the
-# install cells live in the .py, where `get_ipython()` is not defined.
+# Any heading depth: a template exports `# ### Installation`, a hand-maintained
+# `nb/` source `# # Installation`, and that difference left the install cells
+# live in the .py, where `get_ipython()` is not defined.
 _RE_SCRIPT_INSTALL_HEADING = re.compile(r"^# #+ Installation\b", re.MULTILINE)
 _RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 
@@ -5961,11 +5955,10 @@ _RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 def remove_unwanted_section(script_content):
     start_match = _RE_SCRIPT_INSTALL_HEADING.search(script_content)
     start_index = -1 if start_match is None else start_match.start()
-    # From the Installation heading onwards, never from the top. Several
-    # notebooks open on an intro `# Unsloth` heading -- `Falcon_H1_(0.5B)-Alpaca`
-    # has one at offset 39 -- and matching that as the terminator puts the end
-    # before the start, which discards the range and leaves the install cells
-    # live. The old three-hash literal missed the intro by accident.
+    # From the Installation heading onwards, never from the top: several
+    # notebooks open on an intro `# Unsloth` heading, and matching that as the
+    # terminator puts the end before the start, discarding the range and leaving
+    # the install cells live. The old three-hash literal missed it by accident.
     end_match = (
         None if start_match is None
         else _RE_SCRIPT_UNSLOTH_HEADING.search(script_content, start_match.end())

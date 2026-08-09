@@ -14,17 +14,13 @@
 """A test nothing runs is not a gate.
 
 `notebooks-tests-ci.yml` names each test file in its own step rather than
-discovering `tests/`, which is fine until someone adds a file and forgets.
-Three had already drifted off the list: the two AMD generator tests here and
-`test_transformers5_hub_floor.py`, added with the hub floor it guards.
+discovering `tests/`, which is fine until someone adds a file and forgets --
+three had already drifted off the list. This fails on the file you just wrote
+rather than months later when the regression ships.
 
-This is the cheapest possible check, and it fails on the file you just wrote
-rather than months later when the regression it was meant to catch ships.
-
-It reads the `run:` commands rather than the file text. Every step names its
-test twice, once in `name:` and once in the command, and the header comment
-names four more, so a text scan stayed green when a step's command was
-replaced but its label left behind.
+It reads the `run:` commands, not the file text: every step names its test in
+`name:` too, so a text scan stayed green when a command was replaced and its
+label left behind.
 """
 
 import re
@@ -78,7 +74,7 @@ def test_every_test_file_has_a_ci_step(path):
 
 def test_a_label_without_a_command_does_not_count(tmp_path, monkeypatch):
     """The failure this file exists to catch: a step keeps its `name:` while
-    its command is replaced, so the test stops running and nothing says so."""
+    its command is replaced, and nothing says so."""
     workflow = tmp_path / "ci.yml"
     workflow.write_text(
         "# tests/test_ghost.py is mentioned here too\n"
