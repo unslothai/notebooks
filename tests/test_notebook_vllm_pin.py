@@ -465,9 +465,10 @@ def test_the_name_bound_is_the_one_holding_the_spec():
 
 
 def test_a_line_that_does_not_parse_keeps_the_previous_behaviour():
-    """Selector lines are extracted one physical line at a time, so many are
-    not valid Python alone. The first-target fallback keeps them as strict as
-    before rather than dropping them from the binding check."""
+    """Nothing pairs on these, whether because the line is not valid Python
+    alone (they are extracted one physical line at a time) or because no
+    branch lines a name up with the spec. The first-target fallback keeps them
+    as strict as before rather than dropping them from the binding check."""
     for line, name in (
         # A placeholder the generator fills in later.
         ("    _vllm, _t = ({SPEC}, 'triton')", "_vllm"),
