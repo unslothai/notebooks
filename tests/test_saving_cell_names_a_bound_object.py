@@ -13,17 +13,15 @@
 
 """Every saving call names an object the notebook actually binds.
 
-The saving cells are instructions: the local lines run, the upload lines sit
-commented for the reader to uncomment. So a wrong receiver there is invisible
-to every executing check and only shows up as a `NameError` on the reader's
-machine.
+The saving cells are instructions: local lines run, upload lines sit commented
+for the reader to uncomment, so a wrong receiver is invisible to every executing
+check and surfaces as a `NameError` on the reader's machine.
 
-It happened. The Qwen3 vision GRPO notebooks load with
-`model, tokenizer = FastVisionModel.from_pretrained(...)` and never bind
-`processor`, yet their online-saving line read `processor.push_to_hub(...)`.
-The Gemma and Sesame notebooks next to them unpack into `model, processor`,
-where the same line is right, which is how the mismatch survived review and
-then rode the AMD generator into a second copy.
+The Qwen3 vision GRPO notebooks load with `model, tokenizer =
+FastVisionModel.from_pretrained(...)` and never bind `processor`, yet their
+online-saving line read `processor.push_to_hub(...)`. The Gemma and Sesame
+notebooks beside them do unpack into `model, processor`, which is how the
+mismatch survived review and rode the AMD generator into a second copy.
 """
 from __future__ import annotations
 
@@ -57,9 +55,8 @@ _WALRUS = re.compile(r"([A-Za-z_]\w*)\s*:=")
 def _code(path: Path) -> list[str]:
     """Code-cell lines with any comment marker stripped.
 
-    Commented lines are read as code on purpose: an instruction the reader is
-    told to uncomment has to name something real, and the binding it depends
-    on is often commented right beside it.
+    Commented lines count as code on purpose: an instruction to uncomment has
+    to name something real, and its binding is often commented beside it.
     """
     notebook = json.loads(path.read_text(encoding="utf-8"))
     lines = []
@@ -104,8 +101,8 @@ def test_every_saving_call_has_a_receiver(path):
 
 
 def test_the_qwen3_vision_grpo_family_saves_through_its_tokenizer():
-    """The four that carried the bug. They unpack into `model, tokenizer`, so
-    the upload line has to say `tokenizer`, not `processor`."""
+    """The four that carried the bug unpack into `model, tokenizer`, so the
+    upload line has to say `tokenizer`."""
     for name in (
         "Qwen3_VL_(8B)-Vision-GRPO.ipynb",
         "AMD-Qwen3_VL_(8B)-Vision-GRPO.ipynb",
@@ -113,8 +110,8 @@ def test_the_qwen3_vision_grpo_family_saves_through_its_tokenizer():
         "AMD-Qwen3_5_(4B)_Vision_GRPO.ipynb",
     ):
         text = (NB_DIR / name).read_text(encoding="utf-8")
-        # `in` on the whole notebook, kept out of the assert so a failure
-        # reports the name instead of diffing megabytes of JSON.
+        # Kept out of the assert so a failure reports the name instead of
+        # diffing megabytes of JSON.
         pushes_processor = "processor.push_to_hub" in text
         pushes_tokenizer = "tokenizer.push_to_hub" in text
         assert not pushes_processor, (
@@ -124,8 +121,8 @@ def test_the_qwen3_vision_grpo_family_saves_through_its_tokenizer():
 
 
 def test_a_processor_receiver_is_fine_where_the_notebook_binds_one():
-    """Not a blanket ban on `processor`. The Gemma vision notebooks unpack into
-    `model, processor`, and the checker has to stay quiet on those."""
+    """Not a blanket ban: the Gemma vision notebooks do unpack into
+    `model, processor`."""
     gemma = NB_DIR / "Gemma3_(4B)-Vision.ipynb"
     pushes_processor = "processor.push_to_hub" in gemma.read_text(encoding="utf-8")
     assert pushes_processor, "the sample notebook no longer exercises the case"
