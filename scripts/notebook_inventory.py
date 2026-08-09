@@ -42,10 +42,9 @@ DEFAULT_NOTEBOOK_ROOTS = ("original_template", "nb", "kaggle")
 
 _PIN_RE = re.compile(r"([A-Za-z][A-Za-z0-9_.\-]*)==([0-9][0-9A-Za-z.\-+_]*)")
 
-# `--upgrade` or its short form, including inside a cluster such as `-qU`; both
-# resolve a fresh version over one already installed. The single leading `-` is
-# required, so `--force-reinstall` and `--index-url` do not read as upgrades.
-# Shared by the vLLM and Pillow pin gates, which ask the same question: a plain
+# `--upgrade` or its short form, including inside a cluster such as `-qU`. The
+# single leading `-` is required, so `--force-reinstall` and `--index-url` do not
+# read as upgrades. Shared by the vLLM and Pillow pin gates: a plain
 # `"--upgrade" in command` exempted the 152 AMD notebooks spelling it `-U`.
 UPGRADE_FLAG_RE = re.compile(r"--upgrade\b|(?<![\w-])-[a-zA-Z]*U")
 

@@ -27,7 +27,7 @@ notebooks with such an install already carried the pin.
 
 The scan folds backslash continuations first, since the broken install splits
 `--upgrade` from `torchvision` across lines, and counts both flag spellings via
-`notebook_inventory.UPGRADE_FLAG_RE` -- `-U` alone is 152 installs.
+`notebook_inventory.UPGRADE_FLAG_RE`: `-U` alone is 152 installs.
 
 SCOPE: Python cells only. See `_torchvision_upgrades_by_cell`.
 """
@@ -51,8 +51,7 @@ def _pip_commands(source):
     commands, pending = [], None
     for line in source.splitlines():
         if pending is not None:
-            # Strip the `\` from EVERY continuation: one left in wedges a stray
-            # token into the folded command.
+            # EVERY continuation drops its `\`; one left in wedges a stray token.
             pending += " " + line.strip()
             if not line.rstrip().endswith("\\"):
                 commands.append(pending)
@@ -100,27 +99,19 @@ def _torchvision_upgrades_by_cell(path):
     notebook scope lets one cell's exact `get_pil` answer for the other's.
 
     `%%bash` cells are deliberately not scanned, which excludes the 152 AMD
-    ROCm installs
+    ROCm installs that recognising `-U` makes visible. Not because they leave
+    Pillow alone (a `--dry-run` there plans `pillow==11.0.0 -> 12.2.0` just like
+    Colab) but because the mismatch also needs `PIL` in `sys.modules` without
+    `PIL.Image`, the state Colab's kernel is in before cell 1
+    (`google/colab/_reprs.py` line 14 is a bare `import PIL as pil`). The AMD
+    notebooks run on bare JupyterLab with no PIL resident, keep the `%%bash`
+    install at code cell 0 where a subprocess shell cannot import PIL into the
+    kernel, and make every later upgrade `--no-deps`. The generator draws the
+    same line via `update_all_notebooks._AMD_INSTALL_PACKAGE_IGNORE`.
 
-        uv pip install --system -U --force-reinstall \\
-            torch torchvision torchaudio triton-rocm \\
-            --index-url "$PYTORCH_INDEX_URL"
-
-    that recognising `-U` makes visible. Not because they leave Pillow alone --
-    a `--dry-run` there plans `pillow==11.0.0 -> 12.2.0` just like Colab -- but
-    because the mismatch also needs `PIL` in `sys.modules` without `PIL.Image`,
-    the state Colab's kernel is in before cell 1 (`google/colab/_reprs.py` line
-    14 is a bare `import PIL as pil`). The AMD notebooks run on bare JupyterLab
-    with no PIL resident, keep the `%%bash` install at code cell 0 where a
-    subprocess shell cannot import PIL into the kernel, and make every later
-    upgrade `--no-deps`. The generator draws the same line: update_all_notebooks
-    `_AMD_INSTALL_PACKAGE_IGNORE` keeps the Colab Pillow pin out of the AMD
-    variant, since the ROCm cell owns that half of the stack.
-
-    The exclusion is a cell-type predicate rather than a notebook list, so a
-    rename cannot widen it and an AMD install moved into a Python cell is back
-    in scope. The tests below hold it to the cell-0 ROCm install with no PIL
-    above it.
+    A cell-type predicate rather than a notebook list, so a rename cannot widen
+    it and an AMD install moved into a Python cell is back in scope. The tests
+    below hold it to the cell-0 ROCm install with no PIL above it.
     """
     return [
         (command, cell)
@@ -181,19 +172,18 @@ def _pins_pillow(command, source):
     when the notebook assigns that name an EXACT pin: the `get_pil = "pillow"`
     fallback, or a range like `pillow>=11`, is the failure rather than a pin.
 
-    Comments are stripped from both first. Commenting a pin out is how one gets
-    dropped, and the pattern is anchored on the name rather than the start of a
-    line, so `# get_pil = "pillow==11.3.0"` read as a live assignment and left
-    this gate green over an install reaching an undefined placeholder.
+    Comments go first, because commenting a pin out is how one gets dropped and
+    the pattern is anchored on the name, not the start of a line: so
+    `# get_pil = "pillow==11.3.0"` read as live and left the gate green over an
+    install reaching an undefined placeholder.
     """
     command, source = _executable(command), _executable(source)
     if re.search(r"pillow\s*==", command, re.I):
         return True
     for name in _RE_PLACEHOLDER.findall(command):
         # `[^\n;]` stops at the end of the statement. These notebooks chain both
-        # pins on one line, so allowing `;` let `{get_numpy}` borrow the
-        # `pillow` belonging to `get_pil` and every unpinned command read as
-        # pinned.
+        # pins on one line, so allowing `;` let `{get_numpy}` borrow the `pillow`
+        # belonging to `get_pil` and every unpinned command read as pinned.
         assignment = re.search(
             rf"\b{re.escape(name)}\s*=\s*[^\n;]*pillow\s*==", source, re.I
         )
@@ -309,14 +299,10 @@ def test_a_placeholder_that_is_not_an_exact_pin_does_not_count(definition):
 
 
 def test_the_real_fallback_line_does_not_hide_the_pinned_one():
-    """The notebook defines the name twice, pinned then unversioned:
-
-        try: import PIL; get_pil = f'pillow=={PIL.__version__}'
-        except: get_pil = "pillow"
-
-    The pinned branch runs when PIL is loaded, which is exactly when the
-    mismatch can happen, so it must count; requiring the FIRST assignment to be
-    the pinned one would be a coin flip on source order."""
+    """The notebook defines the name twice, pinned in the `try` and unversioned
+    in the `except`. The pinned branch runs when PIL is loaded, which is exactly
+    when the mismatch can happen, so it must count; requiring the FIRST
+    assignment to be the pinned one would be a coin flip on source order."""
     command = "!uv pip install --upgrade {get_pil} torchvision"
     source = (
         'except: get_pil = "pillow"\n'
@@ -492,9 +478,9 @@ def test_no_excluded_notebook_imports_pil_before_the_install():
 
 
 def test_a_commented_out_assignment_is_not_a_pin():
-    """How a pin actually gets dropped. The assignment pattern is anchored on
-    the name, not on the start of a line, so a commented-out `get_pil` read as
-    live and the install still reached `{get_pil}` undefined."""
+    """How a pin actually gets dropped. The pattern is anchored on the name, not
+    the start of a line, so a commented-out `get_pil` read as live while the
+    install still reached `{get_pil}` undefined."""
     command = "!uv pip install --upgrade {get_pil} torchvision"
     for definition in (
         '# get_pil = "pillow==11.3.0"',
@@ -502,8 +488,8 @@ def test_a_commented_out_assignment_is_not_a_pin():
         '    # get_pil = "pillow==11.3.0"',
     ):
         assert not _pins_pillow(command, definition + "\n" + command), definition
-    # A pin surviving only in a trailing comment beside the unversioned
-    # fallback is the same hole, and the one an edit leaves behind.
+    # The spelling an edit leaves behind: the live assignment is the
+    # unversioned fallback and only the trailing comment carries the pin.
     trailing = 'get_pil = "pillow"  # was pillow==11.3.0'
     assert not _pins_pillow(command, trailing + "\n" + command)
     # A literal pin commented out of the command itself, likewise.
