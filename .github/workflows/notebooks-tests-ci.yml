@@ -143,6 +143,22 @@ jobs:
         run: |
           python -m pytest tests/test_qat_numpy_pin.py -q --tb=short
 
+      - name: tests/test_no_backgrounded_shell_launch.py
+        # nbclient + ipykernel so the live-kernel case actually runs. Without
+        # them it importorskips, and the point of that case is to measure
+        # `system_piped` on the runner rather than read it off the source.
+        run: |
+          pip install nbclient ipykernel
+          python -m pytest tests/test_no_backgrounded_shell_launch.py -q --tb=short
+
+      - name: tests/test_no_amd_variant_without_sglang.py
+        run: |
+          python -m pytest tests/test_no_amd_variant_without_sglang.py -q --tb=short
+
+      - name: tests/test_sglang_torchvision_rebuild.py
+        run: |
+          python -m pytest tests/test_sglang_torchvision_rebuild.py -q --tb=short
+
       - name: tests/test_python_scripts_regen_parity.py
         # Runs the generator's convert_notebook_to_script (nbconvert
         # PythonExporter) live on each nb/*.ipynb, asserts byte-equal
