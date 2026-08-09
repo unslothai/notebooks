@@ -184,8 +184,12 @@ def _pins_pillow(command, source):
         # `[^\n;]` stops at the end of the statement. These notebooks chain both
         # pins on one line, so allowing `;` let `{get_numpy}` borrow the `pillow`
         # belonging to `get_pil` and every unpinned command read as pinned.
+        # The name must open a statement and take a single `=`, or a comparison
+        # (`if get_pil == "pillow==11.3.0":`) and a keyword argument both read as
+        # live pins. `_ASSIGNMENT_RE` in the vLLM gate draws the same line.
         assignment = re.search(
-            rf"\b{re.escape(name)}\s*=\s*[^\n;]*pillow\s*==", source, re.I
+            rf"(?:^|[;:])\s*{re.escape(name)}\s*=(?!=)\s*[^\n;]*pillow\s*==",
+            source, re.I | re.M,
         )
         if assignment:
             return True
@@ -497,6 +501,29 @@ def test_a_commented_out_assignment_is_not_a_pin():
         "!uv pip install --upgrade torchvision  # pillow==11.3.0",
         "!uv pip install --upgrade torchvision  # pillow==11.3.0",
     )
+
+
+def test_only_a_real_assignment_defines_the_pin():
+    """A single unanchored `=` reads a comparison or a keyword argument as a
+    live pin, so the gate stays green over a name nothing ever assigns. The
+    vLLM gate's `_ASSIGNMENT_RE` already requires both halves."""
+    command = "!uv pip install --upgrade {get_pil} torchvision"
+    for source in (
+        'if get_pil == "pillow==11.3.0":',
+        'assert get_pil == "pillow==11.3.0"',
+        'download(get_pil="pillow==11.3.0")',
+        'd = {"get_pil": "pillow==11.3.0"}',
+    ):
+        assert not _pins_pillow(command, source + "\n" + command), source
+    # ...without disturbing the spellings the notebooks actually use, where the
+    # assignment opens the line or follows the `try:`/`;` of a chained one.
+    for source in (
+        _DEFINES_PIL,
+        'get_pil = "pillow==11.3.0"',
+        '    get_pil = "pillow==11.3.0"',
+        'try: get_pil = "pillow==11.3.0"',
+    ):
+        assert _pins_pillow(command, source + "\n" + command), source
 
 
 def test_stripping_comments_leaves_live_code_alone():
