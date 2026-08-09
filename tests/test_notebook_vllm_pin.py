@@ -42,8 +42,16 @@ import notebook_inventory as ni  # noqa: E402
 # Strict on purpose. "everything up to the closing quote" also swallows
 # "vllm.entrypoints.openai.api_server", "vllm_requirements.txt" and
 # f"vllm server is running.", which are not requirements and cannot be pinned.
+#
+# Case-insensitive because PyPI names are: PEP 503 compares the name
+# `re.sub(r"[-_.]+", "-", name).lower()`, so `VLLM` installs the same project
+# and would resolve the same CUDA 13 wheel. Only the case half of that rule
+# applies here -- `vllm` has no `-`/`_`/`.` in it, so it has no separator
+# spellings to collapse, and matching separators would only invite the
+# `VLLM_USE_V1` kind of false positive.
 _VLLM_SPEC_RE = re.compile(
-    r"""['"](vllm(?:\[[^\[\]'"]*\])?\s*(?:[=<>!~]=?[^'"]*)?)['"]"""
+    r"""['"](vllm(?:\[[^\[\]'"]*\])?\s*(?:[=<>!~]=?[^'"]*)?)['"]""",
+    re.IGNORECASE,
 )
 
 
@@ -137,8 +145,13 @@ def _upgrading(commands):
 # the name, so skipping over it is what tells `vllm[audio]` (unpinned, and the
 # same CUDA 13 failure) apart from `vllm[audio]==0.15.1` (pinned). Not
 # `{_vllm}` or `{get_vllm}`, not `vllm==0.15.1`, not `vllm_requirements.txt`,
-# not the `vllm-project/vllm` of a URL.
-_BARE_VLLM_RE = re.compile(r"(?<![\w{=./\[-])vllm(?:\[[^\]\s]*\])?(?![\w}=./\[-])")
+# not the `vllm-project/vllm` of a URL. Case-insensitive for the same PEP 503
+# reason as the selector above; the `\w` lookarounds keep the tree's
+# `UNSLOTH_VLLM_STANDBY` and `VLLM_USE_V1=1` out, since a requirement is never
+# followed by `_`.
+_BARE_VLLM_RE = re.compile(
+    r"(?<![\w{=./\[-])vllm(?:\[[^\]\s]*\])?(?![\w}=./\[-])", re.IGNORECASE
+)
 
 
 def _selector_bindings():
@@ -285,6 +298,63 @@ def test_the_requirement_is_found_whatever_the_selector_is_called():
         "    _vllm = 'vllm' if is_t4 else 'vllm==0.15.1'",
     ):
         assert _VLLM_SPEC_RE.findall(line) == ["vllm", "vllm==0.15.1"]
+
+
+def test_a_case_variant_requirement_is_still_a_requirement():
+    """PEP 503 normalises a project name with
+    `re.sub(r"[-_.]+", "-", name).lower()`, so `VLLM` and `vLLM` are the same
+    PyPI project as `vllm` and resolve the same CUDA 13 wheel. No notebook
+    spells it that way today; the gate exists for the one that will.
+    """
+    assert _VLLM_SPEC_RE.findall("    _v, _t = ('VLLM', 't') if is_t4 else ('vLLM==0.15.1', 't')") == [
+        "VLLM", "vLLM==0.15.1",
+    ]
+    assert "==" not in _VLLM_SPEC_RE.findall("('VLLM[audio]',)")[0]
+    for command in (
+        "!uv pip install -qqq --upgrade unsloth VLLM torchvision",
+        "!pip install --upgrade vLLM",
+        "!uv pip install --upgrade VLLM[audio]",
+        "!uv pip install --upgrade VLLM>=0.15.1",
+    ):
+        assert _BARE_VLLM_RE.search(command), command
+    for command in (
+        '!uv pip install --upgrade "VLLM==0.15.1"',
+        "!uv pip install --upgrade unsloth {_vllm} torchvision",
+        "!pip install --upgrade git+https://github.com/vllm-project/VLLM",
+    ):
+        assert not _BARE_VLLM_RE.search(command), command
+
+
+def test_a_case_variant_requirement_in_a_shell_magic_cell_is_caught():
+    """The two halves have to line up: an install with no `!` is only scanned
+    because the cell is `%%bash`, and it is only flagged because the name
+    matches whatever its case."""
+    cell = (
+        "%%bash\n"
+        "set -e\n"
+        "uv pip install --system -U VLLM\n"
+    )
+    upgrading = _upgrading(_install_commands(cell))
+    assert upgrading == ["uv pip install --system -U VLLM"]
+    assert _BARE_VLLM_RE.search(upgrading[0])
+
+
+def test_an_upper_case_vllm_env_var_is_not_read_as_a_requirement():
+    """The tree really does carry these: 69 cells set `UNSLOTH_VLLM_STANDBY`
+    and 5 outputs mention `VLLM_USE_V1`. Matching an env var or a path as a
+    requirement would fail the gate on lines that install nothing."""
+    for line in (
+        'os.environ["UNSLOTH_VLLM_STANDBY"] = "1"',
+        'os.environ["VLLM_USE_V1"] = "1"',
+        'os.environ["VLLM_ATTENTION_BACKEND"] = "FLASH_ATTN"',
+    ):
+        assert _VLLM_SPEC_RE.findall(line) == [], line
+    for command in (
+        "!VLLM_USE_V1=1 uv pip install --upgrade {_vllm}",
+        "!uv pip install --upgrade --cache-dir /opt/VLLM_CACHE/ {_vllm}",
+        "!VLLM=1 pip install --upgrade unsloth",
+    ):
+        assert not _BARE_VLLM_RE.search(command), command
 
 
 def test_a_vllm_string_that_is_not_a_requirement_is_left_alone():
