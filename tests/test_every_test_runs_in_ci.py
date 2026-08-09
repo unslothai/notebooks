@@ -86,10 +86,8 @@ _PYTHON = re.compile(r"^python[0-9.]*$")
 def _invokes_pytest(command):
     """Whether pytest is what this command RUNS, not just a word inside it.
 
-    The word alone is not evidence: the workflow's own `pip install pytest ...`
-    steps contain it, and a step disabled as `echo pytest tests/test_x.py`
-    keeps it while running nothing -- which is the exact failure this file
-    exists to catch.
+    `pip install pytest ...` contains the word, and a step disabled as
+    `echo pytest tests/test_x.py` keeps it while running nothing.
     """
     try:
         tokens = shlex.split(command)
@@ -174,8 +172,7 @@ def _named_in(text):
     "grep -n pytest tests/test_ghost.py",
 ], ids=["echo", "echo-quoted", "pip-install", "grep"])
 def test_a_command_that_only_mentions_pytest_is_not_coverage(command):
-    """Matching the word treats a disabled or unrelated step as coverage, so
-    the test is absent from CI and the gate still passes."""
+    """Matching the word alone leaves the test absent from CI, gate still green."""
     assert _named_in(command) == set()
 
 
@@ -187,7 +184,7 @@ def test_a_command_that_only_mentions_pytest_is_not_coverage(command):
     ".venv/bin/pytest tests/test_real.py -q",
 ], ids=["bare", "module", "versioned", "env-prefix", "path"])
 def test_the_ways_we_really_invoke_pytest_still_count(command):
-    """The check must not go the other way and report a covered test missing."""
+    """The other direction: a covered test must not be reported missing."""
     assert _named_in(command) == {"test_real.py"}
 
 

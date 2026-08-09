@@ -24,24 +24,18 @@ interpreter. The uv preinstalled on Colab predates that release, so `uv sync`
 exits 2 with "No interpreter found for Python 3.13.14 in managed installations
 or search path" and the setup cell takes the whole notebook down with it.
 
-Two shapes of near-miss are what this guards against:
+Two near-misses this guards against: naming an interpreter in the notebook
+(`uv venv --python 3.12`) rather than letting the checkout name it, which is
+wrong the moment upstream moves; and satisfying only the
+`requires-python = ">=3.13.14"` floor, where uv hands back the newest release
+it knows, a 3.14, and `uv sync` dies compiling yappi (no cp314 wheel).
 
-  * naming an interpreter in the notebook (`uv venv --python 3.12`, or any
-    other fixed version) instead of letting the checkout name it. Whatever is
-    hardcoded here is wrong the moment upstream moves, and 3.12 is already
-    below their floor;
-  * satisfying only the `requires-python = ">=3.13.14"` floor. uv then hands
-    back the newest release it knows, which is a 3.14, and `uv sync` dies
-    compiling yappi (a NeMo Gym dependency with no cp314 wheel) from source.
+Ordering matters too: uv has to be refreshed before it is asked for the
+interpreter, and called through the binary the fresh wheel ships, since the
+name `uv` still resolves to the stale copy earlier on PATH.
 
-The remaining requirement is ordering: uv has to be refreshed before it is
-asked for the interpreter, and it has to be called through the binary the
-freshly installed wheel ships rather than through the name `uv`, which still
-resolves to the stale copy on PATH.
-
-Covers nb/, python_scripts/ and molab/ together, because those last two are
-generated mirrors and a fix applied to only one layer is a fix that disappears
-on the next regeneration.
+nb/, python_scripts/ and molab/ are covered together: the last two are
+generated mirrors, so a one-layer fix disappears on the next regeneration.
 """
 
 import ast
@@ -58,10 +52,8 @@ SEARCH_DIRS = ["nb", "kaggle", "python_scripts", "molab", "original_template"]
 
 GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
 
-# The notebooks known to bootstrap NeMo Gym today. The checks below run over
-# whatever discovery finds, so a new one is covered the moment it clones Gym.
-# This list only makes sure discovery has not silently stopped finding
-# anything, which would leave those checks with nothing to run over.
+# The checks below run over whatever discovery finds; this list only catches
+# discovery silently finding nothing, which would leave them with no cases.
 EXPECTED_FILES = {
     "molab/NeMo-Gym-Multi-Environment.py",
     "molab/NeMo-Gym-Sudoku.py",
@@ -118,13 +110,8 @@ def test_gym_bootstrap_files_are_all_present():
 
 
 def test_every_behavioural_check_runs_over_what_discovery_found():
-    """The checks below promise to cover a newly added Gym notebook. They only
-    do that if they parameterize over what discovery returned.
-
-    Parameterizing over EXPECTED_FILES instead reads as equivalent while the
-    two sets happen to match, and silently stops covering the next notebook
-    that clones Gym: it could hardcode an interpreter or drop the uv upgrade
-    with CI green.
+    """Parameterizing over EXPECTED_FILES reads as equivalent while the two
+    sets match, then silently stops covering the next notebook that clones Gym.
     """
     tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
     over = {}
