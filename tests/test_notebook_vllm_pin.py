@@ -15,11 +15,10 @@
 
     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 
-Leaving either side unpinned resolves to whatever is newest on PyPI. vLLM's
-default PyPI wheel is the CUDA 13 build from 0.20.0 on ("CUDA 13.0 default",
-v0.20.0 release notes), while Colab ships a CUDA 12 torch, so the wheel loads
-against libcudart.so.13, Unsloth disables vLLM, and `fast_inference = True`
-then dies with "Please install vLLM before enabling `fast_inference`!".
+Leaving either side unpinned resolves to whatever is newest on PyPI, and vLLM's
+default wheel is the CUDA 13 build from 0.20.0 on while Colab ships a CUDA 12
+torch, so Unsloth disables vLLM and `fast_inference = True` dies with "Please
+install vLLM before enabling `fast_inference`!".
 
 Advanced_Llama3_1_(3B)_GRPO_LoRA.ipynb shipped unpinned on the non-T4 branch and
 broke on L4. This gate keeps every branch of every such line pinned.
@@ -41,16 +40,11 @@ import notebook_inventory as ni  # noqa: E402
 
 
 # A quoted pip requirement for vLLM: 'vllm', "vllm==0.15.1", 'vllm[audio]==0.15.1'.
-# Strict on purpose. "everything up to the closing quote" also swallows
-# "vllm.entrypoints.openai.api_server", "vllm_requirements.txt" and
-# f"vllm server is running.", which are not requirements and cannot be pinned.
-#
-# Case-insensitive because PyPI names are: PEP 503 compares the name
-# `re.sub(r"[-_.]+", "-", name).lower()`, so `VLLM` installs the same project
-# and would resolve the same CUDA 13 wheel. Only the case half of that rule
-# applies here -- `vllm` has no `-`/`_`/`.` in it, so it has no separator
-# spellings to collapse, and matching separators would only invite the
-# `VLLM_USE_V1` kind of false positive.
+# Strict on purpose: "everything up to the closing quote" also swallows
+# "vllm.entrypoints.openai.api_server" and "vllm_requirements.txt", which are not
+# requirements. Case-insensitive because PEP 503 lowercases the project name, so
+# `VLLM` resolves the same CUDA 13 wheel; separators are left out since `vllm`
+# has none and matching them invites the `VLLM_USE_V1` false positive.
 _VLLM_SPEC_RE = re.compile(
     r"""['"](vllm(?:\[[^\[\]'"]*\])?\s*(?:[=<>!~]=?[^'"]*)?)['"]""",
     re.IGNORECASE,
@@ -60,11 +54,9 @@ _VLLM_SPEC_RE = re.compile(
 def _selector_lines():
     """(notebook, line, spec) for every quoted vLLM requirement in a code cell.
 
-    Keyed on the requirement itself, not on the names the install cell unpacks
-    it into. Matching `_vllm, _triton = ...` / `get_vllm, get_triton = ...`
-    literally meant a rename to any other valid spelling dropped those
-    notebooks from the gate silently, while the count guard below still
-    passed, so an unpinned vLLM could reach CI green.
+    Keyed on the requirement, not on the names the cell unpacks it into:
+    matching `_vllm, _triton = ...` literally let a rename drop notebooks from
+    the gate silently while the count guard below still passed.
     """
     for path in ni.iter_notebooks():
         for _index, source in ni.iter_code_cells(path):
@@ -76,20 +68,15 @@ def _selector_lines():
 _CASES = list(_selector_lines())
 
 
-# Pinning the selector only helps if the install command still reads it. The
-# Colab branch interpolates it -- `!uv pip install -qqq --upgrade {_vllm} ...`
-# -- and swapping that `{_vllm}` for a bare `vllm` leaves every case above
-# intact and green while Colab resolves the latest wheel again. So each
-# assignment is checked against the commands in its own cell.
+# Pinning the selector only helps if the install command still reads it, so each
+# assignment is checked against the commands in its own cell: swapping the
+# interpolated `{_vllm}` for a bare `vllm` leaves every case above green while
+# Colab resolves the latest wheel again. Only the interpolation is required, not
+# the absence of a bare `vllm` elsewhere -- the non-Colab branch is `!pip install
+# unsloth vllm`, unpinned on purpose in 83 cells.
 #
-# Only the interpolation is required, not the absence of a bare `vllm`
-# elsewhere: the non-Colab branch of these cells is `!pip install unsloth
-# vllm` on purpose, unpinned for people on their own CUDA, in 83 cells.
-#
-# Any arity, not just the two-name unpack the notebooks happen to use today.
-# Requiring a tuple dropped `_vllm = 'vllm==...'` -- a spelling the detection
-# above accepts -- out of the bindings entirely, leaving that notebook's
-# command unchecked while the other 47 kept the count guard happy.
+# Any arity, not just today's two-name unpack: requiring a tuple dropped
+# `_vllm = 'vllm==...'` out of the bindings while the count guard stayed happy.
 _ASSIGNMENT_RE = re.compile(
     r"^\s*(?P<name>[A-Za-z_]\w*)\s*(?:,\s*[A-Za-z_]\w*\s*)*=(?!=)"
 )
@@ -98,20 +85,15 @@ _ASSIGNMENT_RE = re.compile(
 def _bound_name(line):
     """The name that actually holds the vLLM spec on an assignment line.
 
-    Taking the first target is wrong the moment vLLM is not the first value:
+    Taking the first target is wrong once vLLM is not the first value:
+    `_triton, _vllm = ("triton", "vllm==0.15.1")` records `_triton`, so a
+    command interpolating only `{_triton}` satisfies the binding check while
+    the pin is never installed. Today's notebooks all put vLLM first, so it is
+    a hole rather than a live break, but a future edit falls into it.
 
-        _triton, _vllm = ("triton", "vllm==0.15.1")
-
-    records `_triton`, so a command interpolating only `{_triton}` satisfies
-    the binding check -- exact selector, name consumed, no bare `vllm` -- while
-    the pin is never installed. Today's notebooks all put vLLM first, so this
-    is a hole rather than a live break, but it is the hole a future edit falls
-    into, and this gate exists for future edits.
-
-    Parsed rather than pattern-matched, so target and value are paired by
-    position instead of by hope. Falls back to the first target when the line
-    does not parse (a `{...}` placeholder, an f-string, a ternary spanning the
-    assignment) so the previous behaviour still applies where it always did.
+    Parsed rather than pattern-matched, so target and value pair by position.
+    Falls back to the first target when the line does not parse on its own (a
+    `{...}` placeholder, an f-string, a ternary), keeping prior behaviour.
     """
     match = _ASSIGNMENT_RE.match(line)
     if match is None:
@@ -139,12 +121,11 @@ def _bound_name(line):
 
 def _install_commands(source):
     """The `pip install` commands of a cell, backslash continuations joined,
-    because the command that consumes the selector is often wrapped.
+    because the command consuming the selector is often wrapped.
 
-    A `%%bash` cell's lines run as shell and so carry no `!`. The AMD notebooks
-    are written this way: 152 such cells hold 1064 pip installs that a `!`-only
-    scan never sees. The test itself is `notebook_inventory.is_shell_cell`,
-    shared with the Pillow pin gate.
+    A `%%bash` cell's lines run as shell and carry no `!`: 152 AMD cells hold
+    1064 installs a `!`-only scan never sees. The predicate is
+    `notebook_inventory.is_shell_cell`, shared with the Pillow pin gate.
     """
     shell_cell = ni.is_shell_cell(source)
     commands, pending = [], ""
@@ -163,30 +144,23 @@ def _install_commands(source):
 def _upgrading(commands):
     """The commands that can replace an already-installed vLLM.
 
-    `uv pip install --help`: `-U, --upgrade` is "Allow package upgrades,
-    ignoring pinned versions in any existing output file", so only these
-    resolve a fresh vLLM over one already present. Both spellings count; the
-    short one appears in the tree inside clusters such as `-qU`. The flag test
-    itself is `notebook_inventory.UPGRADE_FLAG_RE`, shared with the Pillow pin
-    gate so the two cannot drift apart on what an upgrade is.
+    Only `-U`/`--upgrade` resolves a fresh vLLM over one already present. Both
+    spellings count, the short one inside clusters such as `-qU`; the flag test
+    is `notebook_inventory.UPGRADE_FLAG_RE`, shared with the Pillow pin gate so
+    the two cannot drift on what an upgrade is.
 
-    Narrowing to upgrades is what keeps the non-Colab branch of the same cell,
-    `!pip install unsloth vllm`, out of scope: it is unpinned on purpose for
-    people on their own CUDA, and it upgrades nothing. 85 commands in the tree
-    are of that kind.
+    Narrowing to upgrades keeps the non-Colab branch, `!pip install unsloth
+    vllm`, out of scope: unpinned on purpose, and it upgrades nothing.
     """
     return [command for command in commands if ni.is_upgrading(command)]
 
 
 # A vLLM requirement written straight into a shell command with no exact
-# version: `vllm`, `vllm[audio]`, `vllm>=0.15.1`. An extras suffix is part of
-# the name, so skipping over it is what tells `vllm[audio]` (unpinned, and the
-# same CUDA 13 failure) apart from `vllm[audio]==0.15.1` (pinned). Not
-# `{_vllm}` or `{get_vllm}`, not `vllm==0.15.1`, not `vllm_requirements.txt`,
-# not the `vllm-project/vllm` of a URL. Case-insensitive for the same PEP 503
-# reason as the selector above; the `\w` lookarounds keep the tree's
-# `UNSLOTH_VLLM_STANDBY` and `VLLM_USE_V1=1` out, since a requirement is never
-# followed by `_`.
+# version: `vllm`, `vllm[audio]`, `vllm>=0.15.1`. Extras are part of the name,
+# so hopping over them separates `vllm[audio]` from `vllm[audio]==0.15.1`. Not
+# `{_vllm}`, `vllm==0.15.1`, `vllm_requirements.txt` or a `vllm-project/vllm`
+# URL. Case-insensitive for the PEP 503 reason above; the lookarounds keep
+# `UNSLOTH_VLLM_STANDBY` and `VLLM_USE_V1=1` out.
 _BARE_VLLM_RE = re.compile(
     r"(?<![\w{=./\[-])vllm(?:\[[^\]\s]*\])?(?![\w}=./\[-])", re.IGNORECASE
 )
@@ -252,9 +226,8 @@ def test_every_selector_assignment_is_bound_to_a_command():
 
 
 def test_no_detected_selector_line_escapes_the_binding_check():
-    """A count floor cannot see a shape that stopped being recognised: 47 of
-    48 bindings still clears it while the 48th notebook goes unchecked. So
-    every line the detection above found must also produce a binding."""
+    """A count floor cannot see a shape that stopped being recognised: 47 of 48
+    bindings still clears it. Every detected line must produce a binding."""
     detected = {(path, line) for path, line, _spec in _CASES}
     bound = {(path, line) for path, line, _name, _commands in _BINDINGS}
     assert detected == bound, (
@@ -292,9 +265,8 @@ def test_upgrading_commands_are_actually_found():
     ids = [f"{p.parent.name}/{p.stem}" for p, _c in _UPGRADES],
 )
 def test_no_upgrading_command_names_vllm_bare(path, command):
-    """Satisfying the binding above with one command does not stop a second
-    command in the same cell upgrading vLLM unpinned. Every upgrading install
-    must name vLLM through the selector or not at all."""
+    """One command satisfying the binding does not stop a second in the same
+    cell upgrading vLLM unpinned; every upgrade goes through the selector."""
     assert not _BARE_VLLM_RE.search(command), (
         f"{path.relative_to(REPO_ROOT)} upgrades an unpinned vLLM in:\n"
         f"  {command}\n"
@@ -326,9 +298,7 @@ def test_a_wrapped_command_still_counts_as_reading_the_selector():
 
 
 def test_the_requirement_is_found_whatever_the_selector_is_called():
-    """Discriminating case for the detection above, held here so it keeps
-    meaning something no matter how the notebooks spell the assignment. The
-    names are not part of the contract; the quoted requirement is."""
+    """The names are not part of the contract; the quoted requirement is."""
     for line in (
         "    _vllm, _triton = ('vllm', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')",
         "    get_vllm, get_triton = ('vllm', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')",
@@ -339,10 +309,9 @@ def test_the_requirement_is_found_whatever_the_selector_is_called():
 
 
 def test_a_case_variant_requirement_is_still_a_requirement():
-    """PEP 503 normalises a project name with
-    `re.sub(r"[-_.]+", "-", name).lower()`, so `VLLM` and `vLLM` are the same
-    PyPI project as `vllm` and resolve the same CUDA 13 wheel. No notebook
-    spells it that way today; the gate exists for the one that will.
+    """PEP 503 lowercases project names, so `VLLM` and `vLLM` are the same
+    project as `vllm` and resolve the same CUDA 13 wheel. No notebook spells it
+    that way today; the gate exists for the one that will.
     """
     assert _VLLM_SPEC_RE.findall("    _v, _t = ('VLLM', 't') if is_t4 else ('vLLM==0.15.1', 't')") == [
         "VLLM", "vLLM==0.15.1",
@@ -364,9 +333,8 @@ def test_a_case_variant_requirement_is_still_a_requirement():
 
 
 def test_a_case_variant_requirement_in_a_shell_magic_cell_is_caught():
-    """The two halves have to line up: an install with no `!` is only scanned
-    because the cell is `%%bash`, and it is only flagged because the name
-    matches whatever its case."""
+    """Both halves must line up: no `!`, so it is scanned only because the cell
+    is `%%bash`, and flagged only because the name matches any case."""
     cell = (
         "%%bash\n"
         "set -e\n"
@@ -378,8 +346,7 @@ def test_a_case_variant_requirement_in_a_shell_magic_cell_is_caught():
 
 
 def test_an_upper_case_vllm_env_var_is_not_read_as_a_requirement():
-    """The tree really does carry these: 69 cells set `UNSLOTH_VLLM_STANDBY`
-    and 5 outputs mention `VLLM_USE_V1`. Matching an env var or a path as a
+    """69 cells set `UNSLOTH_VLLM_STANDBY`. Matching an env var or a path as a
     requirement would fail the gate on lines that install nothing."""
     for line in (
         'os.environ["UNSLOTH_VLLM_STANDBY"] = "1"',
@@ -396,8 +363,7 @@ def test_an_upper_case_vllm_env_var_is_not_read_as_a_requirement():
 
 
 def test_a_vllm_string_that_is_not_a_requirement_is_left_alone():
-    """These all appear in the notebooks. Treating them as requirements would
-    fail the gate on lines that install nothing."""
+    """All appear in the notebooks and install nothing."""
     for line in (
         '!pkill -f "vllm.entrypoints.openai.api_server"',
         'with open("vllm_requirements.txt", "wb") as file:',
@@ -430,13 +396,10 @@ def test_a_comparison_is_not_mistaken_for_an_assignment():
 
 
 def test_the_name_bound_is_the_one_holding_the_spec():
-    """The whole point of the binding check is that the command installs the
-    *pinned* selector. Pairing by position rather than by "first target" is
-    what makes that true when vLLM is not the first value.
-
-    Sabotage check: reverting `_bound_name` to `match.group("name")` turns the
-    second case red and leaves every other case in this file green, which is
-    exactly the hole being closed."""
+    """The binding check only means something if the command installs the
+    *pinned* selector, which needs pairing by position once vLLM is not the
+    first value. Reverting `_bound_name` to the first target reddens the second
+    case here and nothing else in the file."""
     for line, name in (
         # The case the first-target reading gets wrong.
         ("    _triton, _vllm = ('triton', 'vllm==0.15.1')", "_vllm"),
@@ -449,10 +412,9 @@ def test_the_name_bound_is_the_one_holding_the_spec():
 
 
 def test_a_line_that_does_not_parse_keeps_the_previous_behaviour():
-    """Selector lines are extracted one physical line at a time, so plenty of
-    them are not valid Python on their own. Falling back to the first target
-    keeps those exactly as strict as they were before, rather than dropping
-    them out of the binding check entirely."""
+    """Selector lines are extracted one physical line at a time, so many are
+    not valid Python alone. The first-target fallback keeps them as strict as
+    before rather than dropping them from the binding check."""
     for line, name in (
         # A placeholder the generator fills in later.
         ("    _vllm, _t = ({SPEC}, 'triton')", "_vllm"),
@@ -465,20 +427,20 @@ def test_a_line_that_does_not_parse_keeps_the_previous_behaviour():
 
 
 def test_a_line_that_is_not_an_assignment_binds_nothing():
-    """`None` is what makes `_selector_bindings` skip a line, so this is the
-    difference between skipping and recording a binding named `None`."""
+    """`None` is what makes `_selector_bindings` skip a line rather than record
+    a binding named `None`."""
     assert _bound_name("    if _vllm == 'vllm==0.15.1':") is None
     assert _bound_name("    !pip install vllm==0.15.1") is None
 
 
 def test_a_bare_vllm_is_told_apart_from_a_pinned_or_interpolated_one():
-    """Discriminating cases for the bare check, held here so it keeps meaning
-    something once the tree is clean."""
+    """Discriminating cases, so the bare check keeps meaning something once the
+    tree is clean."""
     for command in (
         "!uv pip install -qqq --upgrade unsloth vllm torchvision",
         "!pip install --upgrade vllm",
-        # Extras are part of the name, not a version. Without the extras hop
-        # the `[` ended the match and an unpinned extras install read as clean.
+        # Extras are part of the name: without the hop, `[` ended the match and
+        # an unpinned extras install read as clean.
         "!uv pip install --upgrade vllm[audio]",
         "!uv pip install --upgrade unsloth vllm[audio,video] torchvision",
         # A range resolves the latest that satisfies it, so it is not a pin.
@@ -500,8 +462,8 @@ def test_a_bare_vllm_is_told_apart_from_a_pinned_or_interpolated_one():
 
 
 def test_a_non_upgrading_local_install_is_out_of_scope():
-    """The non-Colab branch of these same cells installs vLLM unpinned on
-    purpose. It is not an upgrade, so it must not be collected."""
+    """The non-Colab branch installs vLLM unpinned on purpose; it upgrades
+    nothing, so it must not be collected."""
     cell = (
         'if "COLAB_" not in "".join(os.environ.keys()):\n'
         "    !pip install unsloth vllm\n"
@@ -516,8 +478,8 @@ def test_a_non_upgrading_local_install_is_out_of_scope():
 
 
 def test_a_second_upgrading_command_cannot_hide_behind_the_first():
-    """The failure this pair of checks exists for: the binding is satisfied by
-    one command while a later one upgrades vLLM unpinned."""
+    """The failure this pair of checks exists for: one command satisfies the
+    binding while a later one upgrades vLLM unpinned."""
     cell = (
         "    _vllm, _triton = ('vllm==0.9.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
         "    !uv pip install -qqq --upgrade {_vllm}\n"
@@ -529,8 +491,8 @@ def test_a_second_upgrading_command_cannot_hide_behind_the_first():
 
 
 def test_the_short_upgrade_flag_counts_as_an_upgrade():
-    """`uv pip install --help`: `-U, --upgrade`. Matching only the long
-    spelling let `!uv pip install -U vllm` past the check entirely."""
+    """Matching only the long spelling let `!uv pip install -U vllm` past the
+    check entirely."""
     for command in (
         "!uv pip install -U vllm",
         "!uv pip install -qU vllm",
@@ -541,8 +503,8 @@ def test_the_short_upgrade_flag_counts_as_an_upgrade():
 
 
 def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
-    """`--force-reinstall` and `--index-url` reinstall from a named index;
-    reading either as an upgrade would pull unrelated commands into scope."""
+    """Reading `--force-reinstall` or `--index-url` as an upgrade would pull
+    unrelated commands into scope."""
     for command in (
         '!uv pip install --system --force-reinstall torch --index-url "$URL"',
         "!uv pip install -qqq unsloth vllm",
@@ -563,9 +525,8 @@ def test_a_shell_magic_cell_has_its_installs_scanned():
 
 
 def test_a_python_cell_still_needs_the_bang():
-    """`%%capture` cells are Python and their installs are `!` lines, so a
-    bare `pip install` in Python source is a comment or a string, not a
-    command."""
+    """`%%capture` cells are Python, so a bare `pip install` there is a string
+    or a comment rather than a command."""
     cell = (
         "%%capture\n"
         "print('run pip install vllm yourself')\n"

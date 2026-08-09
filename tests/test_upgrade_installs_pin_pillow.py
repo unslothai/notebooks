@@ -18,31 +18,16 @@
 
 """An `--upgrade` install that names torchvision must pin Pillow first.
 
-torchvision depends on Pillow, so `uv pip install --upgrade ... torchvision`
-resolves a newer Pillow and swaps it in underneath a kernel that has already
-imported PIL. The Python half of the package is then the new version while the
-compiled `_imaging` extension on the path is the old one, and PIL says so:
+torchvision drags in a newer Pillow and swaps it under a kernel that already
+imported PIL: the Python half is new, the compiled `_imaging` extension is old
+(`Image.py:116: RuntimeWarning`), torchvision's `import PIL` fails, and
+`unsloth_zoo` turns that into a hard error, so the notebook dies on its first
+real cell. Found on Colab in `Advanced_Llama3_1_(3B)_GRPO_LoRA`; 45 of the 46
+notebooks with such an install already carried the pin.
 
-    /usr/local/lib/python3.12/dist-packages/PIL/Image.py:116: RuntimeWarning:
-    The _imaging extension was built for another version of Pillow or PIL
-
-torchvision's own `import PIL` then fails, and because `unsloth_zoo`
-translates that into a hard error telling the user to reinstall Pillow and
-restart, `from unsloth import FastLanguageModel` never returns. The notebook
-dies on its first real cell with nothing trained.
-
-Found on a Colab L4: `Advanced_Llama3_1_(3B)_GRPO_LoRA` failed exactly that
-way while `Advanced_Llama3_2_(3B)_GRPO_LoRA`, which already pinned Pillow,
-passed on the same worker minutes later. 45 of the 46 notebooks with such an
-install already carried the pin; this test stops the 46th recurring.
-
-The scan folds backslash continuations before matching. The install that broke
-puts `--upgrade` and `torchvision` on different physical lines, so a per-line
-match reports zero offenders and the check silently passes.
-
-Both spellings of the flag count, via the shared
-`notebook_inventory.UPGRADE_FLAG_RE`. Matching only the long `--upgrade`
-exempted every install written `-U`, which is 152 of them.
+The scan folds backslash continuations first, since the broken install splits
+`--upgrade` from `torchvision` across lines, and counts both flag spellings via
+`notebook_inventory.UPGRADE_FLAG_RE` -- `-U` alone is 152 installs.
 
 SCOPE: Python cells only. See `_torchvision_upgrades_by_cell`.
 """
@@ -66,10 +51,8 @@ def _pip_commands(source):
     commands, pending = [], None
     for line in source.splitlines():
         if pending is not None:
-            # Strip the `\` from EVERY continuation, not just the first. Left
-            # in, a folded command reads `... triton-rocm \ --index-url ...`
-            # and the stray token sits between two things a pattern may want
-            # to match across.
+            # Strip the `\` from EVERY continuation: one left in wedges a stray
+            # token into the folded command.
             pending += " " + line.strip()
             if not line.rstrip().endswith("\\"):
                 commands.append(pending)
@@ -112,14 +95,9 @@ def _upgrades_torchvision(source):
 
 
 def _torchvision_upgrades_by_cell(path):
-    """(command, cell) pairs. The cell, not the notebook, is the scope a
-    placeholder resolves in.
-
-    `Meta-Synthetic-Data-Llama3.1_(8B).ipynb` and
-    `Meta_Synthetic_Data_Llama3_2_(3B).ipynb` each hold two such installs, in
-    separate cells. Resolving against the concatenated notebook lets one
-    cell's exact `get_pil` answer for the other cell's unpinned one, so
-    dropping the pin from either passes.
+    """(command, cell) pairs. A placeholder resolves in its cell, not in the
+    notebook: two notebooks hold two such installs in separate cells, and
+    notebook scope lets one cell's exact `get_pil` answer for the other's.
 
     `%%bash` cells are deliberately not scanned, which excludes the 152 AMD
     ROCm installs
@@ -128,47 +106,21 @@ def _torchvision_upgrades_by_cell(path):
             torch torchvision torchaudio triton-rocm \\
             --index-url "$PYTORCH_INDEX_URL"
 
-    that recognising `-U` above makes visible for the first time. Not because
-    the upgrade is harmless in itself: the ROCm index does carry Pillow (to
-    12.2.0), and a `uv pip install --dry-run` of that exact command in an
-    environment holding Pillow 11.0.0 plans `- pillow==11.0.0 /
-    + pillow==12.2.0`. It moves Pillow just like the Colab one.
+    that recognising `-U` makes visible. Not because they leave Pillow alone --
+    a `--dry-run` there plans `pillow==11.0.0 -> 12.2.0` just like Colab -- but
+    because the mismatch also needs `PIL` in `sys.modules` without `PIL.Image`,
+    the state Colab's kernel is in before cell 1 (`google/colab/_reprs.py` line
+    14 is a bare `import PIL as pil`). The AMD notebooks run on bare JupyterLab
+    with no PIL resident, keep the `%%bash` install at code cell 0 where a
+    subprocess shell cannot import PIL into the kernel, and make every later
+    upgrade `--no-deps`. The generator draws the same line: update_all_notebooks
+    `_AMD_INSTALL_PACKAGE_IGNORE` keeps the Colab Pillow pin out of the AMD
+    variant, since the ROCm cell owns that half of the stack.
 
-    It is out of scope because the breakage needs a second ingredient the AMD
-    cells cannot supply. Pillow's `Image.py` compares `__version__`, read from
-    an ALREADY-CACHED `PIL/__init__.py`, against the freshly loaded
-    `_imaging.PILLOW_VERSION`, so the mismatch fires only when `PIL` is in
-    `sys.modules` and `PIL.Image` is not. Reproduced: with nothing imported the
-    upgrade is clean, with `PIL` and `PIL.Image` both loaded the kernel stays
-    coherently on the old version, and only a bare `import PIL` before the
-    upgrade produces the `Image.py:116` RuntimeWarning above.
-
-    Colab's kernel is in exactly that state before the first cell runs. Its
-    kernel class is `google.colab._kernel.Kernel`, loading it runs
-    `google/colab/__init__.py`, which imports `_reprs`, whose line 14 is a bare
-    `import PIL as pil` -- `pil.Image` is touched only inside `_image_repr`.
-    Colab reports it too, in the "previously imported in this runtime: [PIL]"
-    banner `google/colab/_pip.py` builds from `set(installed) & sys.modules`.
-
-    The AMD notebooks run on a bare JupyterLab in a ROCm container instead,
-    where a first-cell `sys.modules` dump holds no PIL: neither ipykernel nor
-    IPython imports it, and `%matplotlib inline` is not on by default (and
-    would load `PIL.Image` too, the safe state). No AMD notebook imports PIL,
-    the `%%bash` cell is code cell 0 and runs in a subprocess shell so it
-    cannot put PIL into the kernel on its way past, and every later AMD
-    upgrade is `--no-deps`. Every notebook the gate does police creates the
-    state itself, one line above the install:
-    `try: import PIL; get_pil = f'pillow=={PIL.__version__}'`.
-
-    The generator already draws the same line: `_AMD_INSTALL_PACKAGE_IGNORE` in
-    update_all_notebooks.py lists "pillow" and "pil", so a Colab pin is
-    deliberately not propagated into the AMD variant -- the ROCm cell owns that
-    half of the stack, as it does for torch and torchao.
-
-    The exclusion is a cell-type predicate rather than a list of notebooks, so
-    a rename cannot widen it and an AMD install that moves into a Python cell
-    is back in scope automatically. The tests below hold it to the ROCm install
-    at cell 0 with no PIL above it, so it cannot quietly grow.
+    The exclusion is a cell-type predicate rather than a notebook list, so a
+    rename cannot widen it and an AMD install moved into a Python cell is back
+    in scope. The tests below hold it to the cell-0 ROCm install with no PIL
+    above it.
     """
     return [
         (command, cell)
@@ -188,37 +140,27 @@ def _excluded_shell_upgrades():
     ]
 
 
-# `(?<!\$)` so a shell `${VAR}` is not read as a Python placeholder. The pin is
-# interpolated by Python, and letting `${PIL_PIN}` match meant a bash variable
-# could satisfy the gate through an assignment probe written for f-strings.
+# `(?<!\$)` so a shell `${VAR}` is not read as a Python placeholder: a bash
+# assignment must not satisfy a probe written for an f-string pin.
 _RE_PLACEHOLDER = re.compile(r"(?<!\$)\{(\w+)\}")
 
 
 def _pins_pillow(command, source):
     """Whether THIS command pins Pillow, not whether the notebook mentions it.
 
-    Asking the whole notebook is the failure this gate exists to prevent, one
-    level up: drop `{get_pil}` from the install but leave `get_pil = ...`
-    defined a few lines above, and a whole-notebook search still says yes while
-    the upgrade resolves a fresh Pillow exactly as before.
-
-    The pin is usually interpolated, so a placeholder counts only when the
-    notebook assigns that name an EXACT pin. `get_pil = "pillow"` is what these
-    notebooks fall back to when PIL is not importable, and passing that to an
-    `--upgrade` install resolves a fresh Pillow -- the failure itself, not a pin
-    of it. A range such as `pillow>=11` is no better.
+    Dropping `{get_pil}` from the install while leaving `get_pil = ...` a few
+    lines above still satisfies a whole-notebook search, and the upgrade
+    resolves a fresh Pillow exactly as before. So a placeholder counts only
+    when the notebook assigns that name an EXACT pin: the `get_pil = "pillow"`
+    fallback, or a range like `pillow>=11`, is the failure rather than a pin.
     """
     if re.search(r"pillow\s*==", command, re.I):
         return True
     for name in _RE_PLACEHOLDER.findall(command):
-        # `[^\n;]`, so the match cannot run past the end of the statement. These
-        # notebooks put both pins on one line:
-        #   try: import numpy, PIL; get_numpy = f'numpy=={numpy.__version__}'; get_pil = f'pillow=={PIL.__version__}'
-        # and allowing `;` lets `get_numpy` match the `pillow` belonging to
-        # `get_pil`. Every unpinned command then looks pinned through
-        # `{get_numpy}`, which is the whole bug this function was rewritten to
-        # catch. Caught by sabotage: dropping `{get_pil}` from the real notebook
-        # left the suite green.
+        # `[^\n;]` stops at the end of the statement. These notebooks chain both
+        # pins on one line, so allowing `;` let `{get_numpy}` borrow the
+        # `pillow` belonging to `get_pil` and every unpinned command read as
+        # pinned.
         assignment = re.search(
             rf"\b{re.escape(name)}\s*=\s*[^\n;]*pillow\s*==", source, re.I
         )
@@ -231,8 +173,7 @@ _NOTEBOOKS = sorted(NB_DIR.glob("*.ipynb")) if NB_DIR.is_dir() else []
 
 
 def _write_notebook(tmp_path, cells):
-    """A throwaway .ipynb holding `cells` as code cells, so the scope rules can
-    be exercised on a notebook instead of on a bare string."""
+    """A throwaway .ipynb holding `cells` as code cells."""
     path = tmp_path / "sample.ipynb"
     path.write_text(
         json.dumps(
@@ -262,8 +203,8 @@ def test_an_upgrade_install_naming_torchvision_pins_pillow(path):
 
 
 def test_the_scan_folds_continuations_before_matching():
-    """The install that broke splits `--upgrade` from `torchvision` across a
-    backslash continuation. Matching per physical line finds nothing."""
+    """The broken install splits `--upgrade` from `torchvision` across a
+    continuation, so a per-line match finds nothing."""
     text = (
         "!uv pip install -qqq --upgrade \\\n"
         "    unsloth vllm torchvision bitsandbytes\n"
@@ -277,8 +218,7 @@ def test_the_scan_folds_continuations_before_matching():
 
 
 def test_an_upgrade_without_torchvision_is_not_flagged():
-    """Only torchvision drags Pillow in. Flagging every `--upgrade` would make
-    the check noise, and noise gets skipped."""
+    """Only torchvision drags Pillow in; flagging every `--upgrade` is noise."""
     assert not _upgrades_torchvision("!uv pip install -qqq --upgrade unsloth vllm")
 
 
@@ -307,9 +247,8 @@ def test_an_unpinned_command_is_reported():
 
 
 def test_a_definition_elsewhere_does_not_excuse_an_unpinned_command():
-    """The exact regression this gate exists for. Someone drops `{get_pil}` from
-    the install and leaves the assignment above it; a whole-notebook search says
-    Pillow is pinned while the upgrade resolves a fresh one just as before."""
+    """The regression this gate exists for: the assignment stays above the
+    install, so a whole-notebook search still calls it pinned."""
     command = "!uv pip install -qqq --upgrade unsloth torchvision"
     source = _DEFINES_PIL + "\n" + command
     assert re.search(r"pillow\s*==", source, re.I), "the decoy must look convincing"
@@ -317,8 +256,7 @@ def test_a_definition_elsewhere_does_not_excuse_an_unpinned_command():
 
 
 def test_a_placeholder_naming_something_else_does_not_count():
-    """`{get_numpy}` is interpolated into the same command and must not be read
-    as a Pillow pin."""
+    """`{get_numpy}` shares the command and must not read as a Pillow pin."""
     command = "!uv pip install --upgrade {get_numpy} torchvision"
     source = 'get_numpy = f"numpy=={numpy.__version__}"\n' + command
     assert not _pins_pillow(command, source)
@@ -330,11 +268,9 @@ def test_a_placeholder_naming_something_else_does_not_count():
     ids=["unversioned", "range", "unversioned-capitalised"],
 )
 def test_a_placeholder_that_is_not_an_exact_pin_does_not_count(definition):
-    """`{get_pil}` in the command is only half of it. These notebooks already
-    carry `except: get_pil = "pillow"` for the case where PIL is not importable,
-    so the unversioned spelling is one deleted line away -- and passing it to an
-    `--upgrade` install beside torchvision resolves a newer Pillow, which is the
-    failure this gate exists to stop rather than a pin against it."""
+    """These notebooks already carry `except: get_pil = "pillow"`, so the
+    unversioned spelling is one deleted line away -- and passing it to an
+    `--upgrade` install is the failure, not a pin against it."""
     command = "!uv pip install --upgrade {get_pil} torchvision"
     assert not _pins_pillow(command, definition + "\n" + command)
 
@@ -345,9 +281,9 @@ def test_the_real_fallback_line_does_not_hide_the_pinned_one():
         try: import PIL; get_pil = f'pillow=={PIL.__version__}'
         except: get_pil = "pillow"
 
-    The pinned assignment is what runs when PIL is loaded, which is exactly when
-    the mismatch can happen, so this must still count. Requiring the FIRST
-    assignment to be the pinned one would be a coin flip on source order."""
+    The pinned branch runs when PIL is loaded, which is exactly when the
+    mismatch can happen, so it must count; requiring the FIRST assignment to be
+    the pinned one would be a coin flip on source order."""
     command = "!uv pip install --upgrade {get_pil} torchvision"
     source = (
         'except: get_pil = "pillow"\n'
@@ -359,7 +295,7 @@ def test_the_real_fallback_line_does_not_hide_the_pinned_one():
 
 
 def test_one_unpinned_command_is_caught_beside_a_pinned_one():
-    """A notebook may run several upgrades. Checking only the first would let a
+    """A notebook may run several upgrades; checking only the first lets a
     later unpinned one through."""
     pinned = "!uv pip install --upgrade {get_pil} torchvision"
     unpinned = "!uv pip install --upgrade torchvision"
@@ -370,8 +306,8 @@ def test_one_unpinned_command_is_caught_beside_a_pinned_one():
 
 
 def test_at_least_one_notebook_actually_exercises_the_check():
-    """A glob that matched nothing, or a fold that silently stopped working,
-    would leave every parametrised case skipped and the suite green."""
+    """A broken glob or fold would leave every parametrised case skipped and
+    the suite green."""
     exercised = [p.name for p in _NOTEBOOKS if _upgrades_torchvision(_code(p))]
     assert len(exercised) >= 40, (
         f"only {len(exercised)} notebooks reached the assertion; the scan is "
@@ -380,23 +316,20 @@ def test_at_least_one_notebook_actually_exercises_the_check():
 
 
 def test_every_torchvision_upgrade_is_still_reached_per_cell(tmp_path):
-    """Splitting the scan per cell must not lose commands. Two notebooks hold
-    two such installs each, so the per-cell pass has to find more commands
-    than there are notebooks carrying them."""
+    """Splitting the scan per cell must not lose commands: two notebooks hold
+    two such installs each."""
     per_cell = sum(len(_torchvision_upgrades_by_cell(p)) for p in _NOTEBOOKS)
     whole = sum(len(_upgrades_torchvision(_code(p))) for p in _NOTEBOOKS)
     assert per_cell == whole >= 40, (per_cell, whole)
 
 
 def test_one_cells_pin_does_not_answer_for_another_cells_command():
-    """Two install cells, one pinned and one not. Resolving placeholders
-    against the whole notebook lets the pinned cell's `get_pil` satisfy the
-    unpinned cell, which is how a real notebook could drop the pin from one
-    of its two installs and stay green."""
+    """Two install cells, one pinned and one not. Notebook scope lets the
+    pinned cell's `get_pil` satisfy the unpinned one."""
     command = "!uv pip install --upgrade unsloth {get_pil} torchvision"
     pinned_cell = "try: import PIL; get_pil = f'pillow=={PIL.__version__}'\n" + command
-    # The fallback these notebooks use when PIL is not importable. Passed to an
-    # `--upgrade` install it resolves a fresh Pillow, which is the failure.
+    # The fallback when PIL is not importable; an `--upgrade` install resolves
+    # a fresh Pillow from it.
     unpinned_cell = 'get_pil = "pillow"\n' + command
     notebook = pinned_cell + "\n" + unpinned_cell
     # Whole-notebook scope: the pinned cell answers for the unpinned one.
@@ -407,12 +340,9 @@ def test_one_cells_pin_does_not_answer_for_another_cells_command():
 
 
 def test_a_sibling_pin_on_the_same_line_does_not_count():
-    """These notebooks define both pins in one statement chain:
-
-        try: import numpy, PIL; get_numpy = f'numpy=={numpy.__version__}'; get_pil = f'pillow=={PIL.__version__}'
-
-    so a pattern that runs to end of LINE lets `{get_numpy}` borrow the `pillow`
-    that belongs to `get_pil`, and every unpinned command reads as pinned."""
+    """These notebooks chain both pins in one statement, so a pattern running to
+    end of LINE lets `{get_numpy}` borrow the `pillow` belonging to `get_pil`
+    and every unpinned command reads as pinned."""
     definition = (
         "try: import numpy, PIL; "
         "get_numpy = f'numpy=={numpy.__version__}'; "
@@ -426,9 +356,8 @@ def test_a_sibling_pin_on_the_same_line_does_not_count():
 
 
 def test_the_short_upgrade_flag_counts_as_an_upgrade():
-    """`uv pip install --help`: `-U, --upgrade` is "Allow package upgrades".
-    A plain `"--upgrade" in command` test read only the long spelling, so every
-    install written `-U` was exempt -- 152 of them in the tree."""
+    """`-U` and `--upgrade` are the same flag; reading only the long spelling
+    exempted 152 installs."""
     for command in (
         "!uv pip install -U torchvision",
         "!uv pip install -qU unsloth torchvision",
@@ -438,8 +367,8 @@ def test_the_short_upgrade_flag_counts_as_an_upgrade():
 
 
 def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
-    """`--force-reinstall` and `--index-url` reinstall from a named index.
-    Reading either as an upgrade would drag unrelated installs into scope."""
+    """Reading `--force-reinstall` or `--index-url` as an upgrade would drag
+    unrelated installs into scope."""
     for command in (
         '!uv pip install --force-reinstall torchvision --index-url "$URL"',
         "!uv pip install -qqq torchvision",
@@ -448,10 +377,9 @@ def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
 
 
 def test_a_short_flag_upgrade_in_a_python_cell_is_still_caught(tmp_path):
-    """The scope below drops `%%bash` cells. This is the other half of that
-    decision: a `-U torchvision` install in an ordinary Python cell, the kind
-    the gate exists for, must still be collected and must still be required to
-    pin. Without this the `-U` fix would be scoped away to nothing."""
+    """The other half of dropping `%%bash` cells: a `-U torchvision` install in
+    an ordinary Python cell must still be collected and required to pin,
+    otherwise the `-U` fix is scoped away to nothing."""
     unpinned = "!uv pip install -qU unsloth torchvision"
     path = _write_notebook(tmp_path, [unpinned])
     found = _torchvision_upgrades_by_cell(path)
@@ -461,8 +389,8 @@ def test_a_short_flag_upgrade_in_a_python_cell_is_still_caught(tmp_path):
 
 def test_a_shell_magic_install_is_out_of_scope(tmp_path):
     """A `%%bash` cell runs in a subprocess shell, so it cannot leave `PIL`
-    resident in the kernel, which is the state the mismatch needs. See
-    `_torchvision_upgrades_by_cell` for the full reasoning."""
+    resident, which is the state the mismatch needs. See
+    `_torchvision_upgrades_by_cell`."""
     path = _write_notebook(
         tmp_path,
         [
@@ -475,11 +403,9 @@ def test_a_shell_magic_install_is_out_of_scope(tmp_path):
 
 
 def test_the_shell_magic_exclusion_covers_only_the_rocm_stack_install():
-    """The exclusion is justified for one command shape: the AMD ROCm torch
-    stack install at code cell 0. Holding it to that shape is what stops it
-    growing into a general amnesty for anything anyone puts in a `%%bash`
-    cell -- add a different upgrading torchvision install there and this goes
-    red rather than silently exempting it."""
+    """The exclusion covers one command shape, the AMD ROCm stack install at
+    code cell 0, so it cannot grow into an amnesty for anything in a `%%bash`
+    cell: a different upgrading torchvision install there goes red."""
     excluded = _excluded_shell_upgrades()
     assert len(excluded) >= 100, (
         f"only {len(excluded)} shell-magic torchvision upgrades found; either "
@@ -499,8 +425,8 @@ def test_the_shell_magic_exclusion_covers_only_the_rocm_stack_install():
 
 
 def test_the_excluded_installs_are_the_notebooks_first_cell():
-    """Half of why the exclusion holds: nothing has run in the kernel yet, so
-    there is no already-imported PIL for the upgrade to swap under."""
+    """Half of why the exclusion holds: nothing has run yet, so there is no
+    imported PIL for the upgrade to swap under."""
     late = []
     for path in _NOTEBOOKS:
         cells = _all_code_cells(path)
@@ -514,8 +440,8 @@ def test_the_excluded_installs_are_the_notebooks_first_cell():
 
 
 def test_no_excluded_notebook_imports_pil_before_the_install():
-    """The other half. An `import PIL` anywhere above the install puts the
-    kernel in exactly the vulnerable state, and the exclusion stops holding."""
+    """The other half: an `import PIL` above the install puts the kernel in the
+    vulnerable state and the exclusion stops holding."""
     offenders = []
     for path, _command in _excluded_shell_upgrades():
         cells = _all_code_cells(path)
@@ -533,9 +459,8 @@ def test_no_excluded_notebook_imports_pil_before_the_install():
 
 
 def test_a_shell_variable_is_not_read_as_a_python_placeholder():
-    """The pin is a Python f-string interpolation. `${PIL_PIN}` is a shell
-    expansion, and reading it as `{PIL_PIN}` let a bash assignment satisfy a
-    probe written for `get_pil = f'pillow=={PIL.__version__}'`."""
+    """`${PIL_PIN}` is a shell expansion, and reading it as `{PIL_PIN}` let a
+    bash assignment satisfy a probe written for an f-string pin."""
     command = "uv pip install -U torchvision ${PIL_PIN}"
     source = 'PIL_PIN="pillow==11.0.0"\n' + command
     assert not _pins_pillow(command, source)
@@ -543,9 +468,8 @@ def test_a_shell_variable_is_not_read_as_a_python_placeholder():
 
 
 def test_a_fold_leaves_no_stray_backslash():
-    """Each continuation drops its own `\\`. Left in, the folded command reads
-    `... triton-rocm \\ --index-url ...` and the stray token sits between two
-    things the next pattern may want to match across."""
+    """Each continuation drops its own `\\`; one left in wedges a stray token
+    into the folded command."""
     text = (
         "uv pip install --system -U --force-reinstall \\\n"
         "    torch torchvision torchaudio triton-rocm \\\n"
