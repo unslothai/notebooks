@@ -67,8 +67,7 @@ def _hand_maintained_with_amd_and_template(gen):
 
 
 def test_a_hand_maintained_source_without_news_still_exists(gen):
-    """If every hand-maintained source grows a News section, the check below
-    passes for the wrong reason."""
+    """Without one, the check below passes for the wrong reason."""
     stranded = [
         name
         for name in _hand_maintained_with_amd_and_template(gen)
@@ -144,8 +143,7 @@ def test_restore_inserts_news_above_installation(gen, tmp_path):
 
 
 def test_restore_is_idempotent(gen, tmp_path):
-    """A second pass over the same file must not stack a second News
-    section."""
+    """A second pass must not stack a second News section."""
     template = tmp_path / "T.ipynb"
     amd = tmp_path / "AMD-T.ipynb"
     _write(template, [("markdown", NEWS), ("markdown", "Placeholder"),
@@ -160,8 +158,7 @@ def test_restore_is_idempotent(gen, tmp_path):
 
 
 def test_restore_declines_when_the_template_has_no_news(gen, tmp_path):
-    """The nb/-only notebooks have no template to take News from, and none
-    carries a News section today."""
+    """The nb/-only notebooks have no template to take News from."""
     template = tmp_path / "T.ipynb"
     amd = tmp_path / "AMD-T.ipynb"
     _write(template, [("markdown", "### Installation")])

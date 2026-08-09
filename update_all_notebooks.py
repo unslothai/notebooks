@@ -681,10 +681,8 @@ installation_amd_extras_grpo = """\
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 """
 
-# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off, so
-# unsloth.kernels.moe.autotune_cache hands back heuristic configs instead of
-# searching per device capability. Their CUDA sources never carried it, so it
-# lives here or a regeneration drops it.
+# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off. Their
+# CUDA sources never carried it, so it lives here or a regeneration drops it.
 installation_amd_extras_qwen3_moe = """\
 import os; os.environ["UNSLOTH_MOE_DISABLE_AUTOTUNE"] = "1"
 """
@@ -1747,9 +1745,9 @@ def validate_notebook_syntax(notebook_path):
 
 _RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
 _RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
-# A heading introducing a dependency install, e.g. "### Install
-# flash-linear-attention". Not `_RE_INSTALL_SECTION_MD`, which also matches
-# "setup" anywhere in the line and so accepts "### Setup the model".
+# A heading introducing a dependency install. Not `_RE_INSTALL_SECTION_MD`,
+# which matches "setup" anywhere in the line and so accepts "### Setup the
+# model".
 _RE_DEPENDENCY_HEADING = re.compile(r"^#+\s*(?:\d+[.)]\s*)?install", re.IGNORECASE)
 
 
@@ -1834,8 +1832,8 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
     Stopping at the first non-code cell missed a second install cell behind its
     own heading: Qwen3_5_MoE / Qwen3_6_MoE hid a CUDA-wheel resolver behind
     "### Install flash-linear-attention and causal-conv-1d", which survived into
-    the AMD variant and made `_assert_amd_install_runtime` refuse the whole
-    `--amd` run. The heading comes back too, or it would point at nothing.
+    the AMD variant and made `_assert_amd_install_runtime` refuse the `--amd`
+    run. The heading comes back too, or it would point at nothing.
     """
     install_cells = []
     idx = first_code_idx + 1
@@ -1844,14 +1842,13 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
         cell = cells[idx]
         if cell.get("cell_type") == "markdown":
             # Only a dependency-install heading. When any heading qualified,
-            # the cell behind it passed `_is_install_like_cell` on that alone,
-            # so `### Start Unsloth Studio` collected the Studio launch code,
-            # which the caller deletes.
+            # `### Start Unsloth Studio` collected the Studio launch code, which
+            # the caller deletes.
             text = _cell_source_text(cell).strip()
             if len(text.splitlines()) > 1 or not _RE_DEPENDENCY_HEADING.match(text):
                 break
-            # `None` marks a heading: it is deleted with the cell but must not
-            # reach the install text the AMD recipe is built from.
+            # `None` marks a heading: deleted with the cell, but kept out of the
+            # install text the AMD recipe is built from.
             pending_headings.append((idx, None))
             idx += 1
             continue
@@ -1860,8 +1857,7 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
         source_text = _cell_source_text(cell)
         # Past the first cell, judge on the cell's own content:
         # `_is_install_like_cell` also says yes for the preceding markdown, so
-        # "### Install the trainer" over ordinary code would qualify it and the
-        # caller would delete both.
+        # "### Install the trainer" over ordinary code would qualify both.
         if pending_headings or install_cells:
             if not _is_install_code(source_text):
                 break
@@ -1897,9 +1893,9 @@ def _is_stale_amd_announcement(source_text):
         for marker in ("google colab", "open in colab", "tesla t4", "runtime")
     ):
         return True
-    # A bare "Open in Colab" badge, which is how some hand-maintained notebooks
-    # open. With no "to run this, press" the test above walked past it and the
-    # AMD variant kept a button pointing at the CUDA notebook.
+    # A bare "Open in Colab" badge, how some hand-maintained notebooks open.
+    # With no "to run this, press" the test above walked past it and the AMD
+    # variant kept a button pointing at the CUDA notebook.
     stripped = source_text.strip()
     return (
         stripped.startswith("<a href=")
@@ -2886,13 +2882,12 @@ def _extract_preserved_setup_lines(text):
 # unsloth / unsloth_zoo sit in _AMD_INSTALL_PACKAGE_IGNORE and the parity
 # validator subtracts the same set, so dropping them is invisible. A source
 # installs them from git main only for a feature no release carries yet
-# (FastDiffusionModel), and losing that leaves the AMD variant failing at
-# FastModel.from_pretrained, so the git specs are re-emitted in the extras cell.
+# (FastDiffusionModel), so the git specs are re-emitted in the extras cell.
 _AMD_GIT_MAIN_PROJECTS = frozenset({"unsloth", "unsloth_zoo"})
 
 
 def _iter_install_tokens(text):
-    """Yield install tokens from both `!pip install ...` lines and `_pip(...)` blocks."""
+    """Install tokens from `!pip install ...` lines and `_pip(...)` blocks."""
     for arg_string in _iter_pip_install_arg_strings(text):
         yield from _split_pip_args(arg_string)
     in_pip_call = False
@@ -2916,8 +2911,8 @@ def _extract_git_main_unsloth_specs(source_install_texts):
     """Git URLs for unsloth / unsloth_zoo the source installs from main.
 
     Both the bare ``git+https://...`` form and the PEP 508 ``unsloth[base] @
-    git+https://...`` reference count. Only the URL half is kept: the AMD
-    re-install is ``--no-deps``, so an extra would be a no-op.
+    git+https://...`` reference count. Only the URL half is kept, since the AMD
+    re-install is ``--no-deps`` and an extra would be a no-op.
     """
     specs = []
     seen = set()
@@ -3141,8 +3136,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     git_main_specs = _extract_git_main_unsloth_specs(source_install_texts)
     if git_main_specs:
         # --no-deps keeps the ROCm stack the base cell just installed. That
-        # cell's own "unsloth[amd]" is --no-deps too, so its extras never
-        # resolved and overwriting it with main loses nothing.
+        # cell's own "unsloth[amd]" is --no-deps too, so overwriting it with
+        # main loses nothing.
         extra_blocks.append(
             _format_amd_pip_call(
                 ("--upgrade", "--force-reinstall", "--no-deps"), git_main_specs
@@ -5884,9 +5879,8 @@ def _news_insert_index(cells):
 def _restore_news_section(amd_path, template_path, new_announcement):
     """Give an nb/-sourced AMD notebook the News section its template carries.
 
-    Only `original_template/` carries News cells, so minting an AMD variant
-    from `nb/` dropped the heading and announcement. News is generator-owned
-    boilerplate, so it still comes from the template.
+    Only `original_template/` carries News cells, so minting from `nb/` dropped
+    the heading and announcement.
     """
     try:
         with open(template_path, "r", encoding="utf-8", newline="") as f:
@@ -5959,8 +5953,8 @@ def copy_and_update_amd_notebooks(
         source_notebooks.setdefault(basename, path)
     # For DONT_UPDATE_EXCEPTIONS, nb/ is the source of truth and the template
     # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` is weight_decay 0.1
-    # under nb/ and 0.001 under original_template/, so sourcing from the
-    # template gave the AMD variant hyperparameters nobody chose.
+    # under nb/ and 0.001 under original_template/, so the template gave the AMD
+    # variant hyperparameters nobody chose.
     for basename in DONT_UPDATE_EXCEPTIONS:
         if basename not in amd_base_names:
             continue
@@ -6023,8 +6017,8 @@ def remove_unwanted_section(script_content):
     start_index = -1 if start_match is None else start_match.start()
     # Search from the Installation heading, never from the top: notebooks like
     # `Falcon_H1_(0.5B)-Alpaca` open on an intro `# Unsloth` heading, and taking
-    # that as the terminator puts the end before the start, discarding the range
-    # and leaving the install cells live.
+    # that as the terminator puts the end before the start, so the range is
+    # discarded and the install cells stay live.
     end_match = (
         None if start_match is None
         else _RE_SCRIPT_UNSLOTH_HEADING.search(script_content, start_match.end())

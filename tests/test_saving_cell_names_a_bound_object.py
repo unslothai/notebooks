@@ -19,9 +19,8 @@ check and surfaces as a `NameError` on the reader's machine.
 
 The Qwen3 vision GRPO notebooks load with `model, tokenizer =
 FastVisionModel.from_pretrained(...)` and never bind `processor`, yet their
-online-saving line read `processor.push_to_hub(...)`. The Gemma and Sesame
-notebooks beside them do unpack into `model, processor`, which is how the
-mismatch survived review and rode the AMD generator into a second copy.
+online-saving line read `processor.push_to_hub(...)`. The Gemma notebooks beside
+them do unpack into `model, processor`, which is how it survived review.
 """
 from __future__ import annotations
 
@@ -101,8 +100,8 @@ def test_every_saving_call_has_a_receiver(path):
 
 
 def test_the_qwen3_vision_grpo_family_saves_through_its_tokenizer():
-    """The four that carried the bug unpack into `model, tokenizer`, so the
-    upload line has to say `tokenizer`."""
+    """These four unpack into `model, tokenizer`, so the upload line has to say
+    `tokenizer`."""
     for name in (
         "Qwen3_VL_(8B)-Vision-GRPO.ipynb",
         "AMD-Qwen3_VL_(8B)-Vision-GRPO.ipynb",
@@ -121,8 +120,7 @@ def test_the_qwen3_vision_grpo_family_saves_through_its_tokenizer():
 
 
 def test_a_processor_receiver_is_fine_where_the_notebook_binds_one():
-    """Not a blanket ban: the Gemma vision notebooks do unpack into
-    `model, processor`."""
+    """Not a blanket ban: the Gemma vision notebooks do bind `processor`."""
     gemma = NB_DIR / "Gemma3_(4B)-Vision.ipynb"
     pushes_processor = "processor.push_to_hub" in gemma.read_text(encoding="utf-8")
     assert pushes_processor, "the sample notebook no longer exercises the case"

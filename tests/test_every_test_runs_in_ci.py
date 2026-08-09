@@ -14,9 +14,8 @@
 """A test nothing runs is not a gate.
 
 `notebooks-tests-ci.yml` names each test file in its own step rather than
-discovering `tests/`, which is fine until someone adds a file and forgets --
-three had already drifted off the list. This fails on the file you just wrote
-rather than months later when the regression ships.
+discovering `tests/`, which is fine until someone adds a file and forgets, as
+three already had.
 
 It reads the `run:` commands, not the file text: every step names its test in
 `name:` too, so a text scan stayed green when a command was replaced and its
@@ -58,8 +57,7 @@ _SEPARATORS = re.compile(r";|&&|\|\|")
 
 def _shell_commands(block):
     """The individual commands in one `run:` block, comments stripped and
-    continuations folded, so a filename is collected only from a line that
-    executes it."""
+    continuations folded."""
     folded, pending = [], ""
     for raw in block.splitlines():
         line = _COMMENT.sub("", raw).rstrip()
@@ -80,9 +78,8 @@ def _shell_commands(block):
 def _named_in_workflow():
     """Test files a `pytest` command in the workflow actually runs.
 
-    Asking whether the whole `run:` block contains "pytest" and harvesting every
-    filename in it reads a comment naming another test as coverage, so that test
-    can be absent from CI while the gate passes. Hence per command.
+    Per command, not per block: a block-wide scan reads a comment naming another
+    test as coverage, so that test can be absent from CI with the gate green.
     """
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     named = set()
@@ -108,8 +105,8 @@ def test_every_test_file_has_a_ci_step(path):
 
 
 def test_a_label_without_a_command_does_not_count(tmp_path, monkeypatch):
-    """The failure this file exists to catch: a step keeps its `name:` while
-    its command is replaced, and nothing says so."""
+    """The failure this file exists to catch: a step keeps its `name:` while its
+    command is replaced."""
     workflow = tmp_path / "ci.yml"
     workflow.write_text(
         "# tests/test_ghost.py is mentioned here too\n"
@@ -148,8 +145,8 @@ def test_a_comment_beside_a_real_pytest_call_is_not_coverage():
 
 
 def test_a_non_pytest_command_beside_a_pytest_one_is_not_coverage():
-    """`echo` and `ls` name files too, so splitting on the separators keeps a
-    pytest call from vouching for its neighbours."""
+    """`echo` and `ls` name files too, so a pytest call must not vouch for its
+    neighbours."""
     block = (
         "echo tests/test_echoed.py\n"
         "python -m pytest tests/test_real.py -q\n"
@@ -169,8 +166,8 @@ def test_a_pytest_call_split_over_a_continuation_still_counts():
 
 
 def test_a_url_fragment_is_not_read_as_a_comment():
-    """`#subdirectory=` must survive comment stripping, or the command is
-    truncated and its filenames lost."""
+    """`#subdirectory=` must survive comment stripping, or the command is cut
+    short and its filenames lost."""
     block = (
         "pip install 'x @ git+https://example.com/x.git@abc#subdirectory=y'\n"
         "python -m pytest tests/test_after_url.py -q\n"
@@ -180,6 +177,6 @@ def test_a_url_fragment_is_not_read_as_a_comment():
 
 
 def test_the_real_workflow_still_reports_its_pytest_files():
-    """A fold or split that stopped matching would leave the gate asserting
-    against an empty set."""
+    """A fold or split that stopped matching leaves the gate asserting against
+    an empty set."""
     assert len(_named_in_workflow()) >= 10
