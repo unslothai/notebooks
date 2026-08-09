@@ -85,16 +85,26 @@ _ASSIGNMENT_RE = re.compile(
 )
 
 
+# A cell whose whole body is shell, so its install lines carry no `!`. The AMD
+# notebooks are written this way: 152 such cells hold 1064 pip installs that a
+# `!`-only scan never sees. `%%capture` is not one of these -- that cell is
+# still Python and still uses `!`.
+_SHELL_CELL_RE = re.compile(r"^%%(?:bash|sh|script)\b")
+
+
 def _install_commands(source):
-    """The `!...pip install...` lines of a cell, backslash continuations
-    joined, because the command that consumes the selector is often wrapped."""
+    """The `pip install` commands of a cell, backslash continuations joined,
+    because the command that consumes the selector is often wrapped."""
+    stripped = source.lstrip()
+    shell_cell = bool(_SHELL_CELL_RE.match(stripped.split("\n", 1)[0].strip()))
     commands, pending = [], ""
     for line in source.splitlines():
         pending = f"{pending} {line.strip()}" if pending else line
         if line.rstrip().endswith("\\"):
             pending = pending.rstrip()[:-1]
             continue
-        if pending.lstrip().startswith("!") and "pip install" in pending:
+        prefixed = pending.lstrip().startswith("!")
+        if (prefixed or shell_cell) and "pip install" in pending:
             commands.append(pending)
         pending = ""
     return commands
@@ -389,3 +399,26 @@ def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
         "!pip install --no-deps unsloth vllm",
     ):
         assert _upgrading([command]) == [], command
+
+
+def test_a_shell_magic_cell_has_its_installs_scanned():
+    """`%%bash` cells run their lines as shell, so an install there needs no
+    `!`. A `!`-only scan skipped 1064 commands across the AMD notebooks."""
+    cell = (
+        "%%bash\n"
+        "set -e\n"
+        "uv pip install --system -U vllm\n"
+    )
+    assert _install_commands(cell) == ["uv pip install --system -U vllm"]
+
+
+def test_a_python_cell_still_needs_the_bang():
+    """`%%capture` cells are Python and their installs are `!` lines, so a
+    bare `pip install` in Python source is a comment or a string, not a
+    command."""
+    cell = (
+        "%%capture\n"
+        "print('run pip install vllm yourself')\n"
+        "!uv pip install --upgrade {_vllm}\n"
+    )
+    assert _install_commands(cell) == ["!uv pip install --upgrade {_vllm}"]
