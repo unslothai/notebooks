@@ -100,17 +100,26 @@ def _install_commands(source):
     return commands
 
 
+# `--upgrade` or its short form, including inside a cluster such as `-qU`.
+# The single leading `-` is required, so `--force-reinstall` and
+# `--index-url` do not read as an upgrade flag.
+_UPGRADE_FLAG_RE = re.compile(r"--upgrade\b|(?<![\w-])-[a-zA-Z]*U")
+
+
 def _upgrading(commands):
     """The commands that can replace an already-installed vLLM.
 
-    `uv pip install --help`: `--upgrade` is "Allow package upgrades, ignoring
-    pinned versions in any existing output file", so only these resolve a
-    fresh vLLM over one already present. Narrowing to them is what keeps the
-    non-Colab branch of the same cell, `!pip install unsloth vllm`, out of
-    scope: it is unpinned on purpose for people on their own CUDA, and it
-    carries no `--upgrade`. 85 commands in the tree are of that kind.
+    `uv pip install --help`: `-U, --upgrade` is "Allow package upgrades,
+    ignoring pinned versions in any existing output file", so only these
+    resolve a fresh vLLM over one already present. Both spellings count; the
+    short one appears in the tree inside clusters such as `-qU`.
+
+    Narrowing to upgrades is what keeps the non-Colab branch of the same cell,
+    `!pip install unsloth vllm`, out of scope: it is unpinned on purpose for
+    people on their own CUDA, and it upgrades nothing. 85 commands in the tree
+    are of that kind.
     """
-    return [command for command in commands if "--upgrade" in command]
+    return [command for command in commands if _UPGRADE_FLAG_RE.search(command)]
 
 
 # A vLLM requirement written straight into a shell command with no exact
@@ -357,3 +366,26 @@ def test_a_second_upgrading_command_cannot_hide_behind_the_first():
     upgrading = _upgrading(_install_commands(cell))
     assert any("{_vllm}" in command for command in upgrading)
     assert [c for c in upgrading if _BARE_VLLM_RE.search(c)], upgrading
+
+
+def test_the_short_upgrade_flag_counts_as_an_upgrade():
+    """`uv pip install --help`: `-U, --upgrade`. Matching only the long
+    spelling let `!uv pip install -U vllm` past the check entirely."""
+    for command in (
+        "!uv pip install -U vllm",
+        "!uv pip install -qU vllm",
+        "!uv pip install --system -U --force-reinstall vllm",
+        "!uv pip install --upgrade vllm",
+    ):
+        assert _upgrading([command]) == [command], command
+
+
+def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
+    """`--force-reinstall` and `--index-url` reinstall from a named index;
+    reading either as an upgrade would pull unrelated commands into scope."""
+    for command in (
+        '!uv pip install --system --force-reinstall torch --index-url "$URL"',
+        "!uv pip install -qqq unsloth vllm",
+        "!pip install --no-deps unsloth vllm",
+    ):
+        assert _upgrading([command]) == [], command
