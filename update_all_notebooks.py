@@ -2884,13 +2884,11 @@ def _extract_preserved_setup_lines(text):
     return preserved
 
 
-# unsloth / unsloth_zoo sit in _AMD_INSTALL_PACKAGE_IGNORE because the ROCm
-# base cell owns their versions, and the parity validator subtracts that same
-# set, so the drop is invisible. But a source notebook installing them from git
-# main does it for a feature no release carries yet (FastDiffusionModel is the
-# current example, see installation_diffusiongemma_content). Losing that leaves
-# the AMD variant on the PyPI build and FastModel.from_pretrained fails, so the
-# git specs are re-emitted in the extras cell.
+# unsloth / unsloth_zoo sit in _AMD_INSTALL_PACKAGE_IGNORE and the parity
+# validator subtracts the same set, so dropping them is invisible. A source
+# installs them from git main only for a feature no release carries yet
+# (FastDiffusionModel), and losing that leaves the AMD variant failing at
+# FastModel.from_pretrained, so the git specs are re-emitted in the extras cell.
 _AMD_GIT_MAIN_PROJECTS = frozenset({"unsloth", "unsloth_zoo"})
 
 
@@ -2916,12 +2914,11 @@ def _iter_install_tokens(text):
 
 
 def _extract_git_main_unsloth_specs(source_install_texts):
-    """Return git URLs for unsloth / unsloth_zoo installed from main by the source.
+    """Git URLs for unsloth / unsloth_zoo the source installs from main.
 
-    Both the bare ``git+https://...`` form and the PEP 508 direct reference
-    ``unsloth[base] @ git+https://...`` are recognised; only the URL half is
-    kept, since the AMD re-install runs with ``--no-deps`` and an extra is then
-    a no-op anyway (the base cell's own ``unsloth[amd]`` is ``--no-deps`` too).
+    Both the bare ``git+https://...`` form and the PEP 508 ``unsloth[base] @
+    git+https://...`` reference count. Only the URL half is kept: the AMD
+    re-install is ``--no-deps``, so an extra would be a no-op.
     """
     specs = []
     seen = set()
@@ -3144,10 +3141,9 @@ def _compose_amd_installation(notebook_path, source_install_texts):
         extra_blocks.append("\n".join(setup_lines))
     git_main_specs = _extract_git_main_unsloth_specs(source_install_texts)
     if git_main_specs:
-        # --no-deps keeps the ROCm torch/bitsandbytes stack the base cell just
-        # installed; the base cell's own "unsloth[amd]" is --no-deps too, so the
-        # extras it names were never resolved and nothing is lost by overwriting
-        # that install with main.
+        # --no-deps keeps the ROCm stack the base cell just installed. That
+        # cell's own "unsloth[amd]" is --no-deps too, so its extras never
+        # resolved and overwriting it with main loses nothing.
         extra_blocks.append(
             _format_amd_pip_call(
                 ("--upgrade", "--force-reinstall", "--no-deps"), git_main_specs
