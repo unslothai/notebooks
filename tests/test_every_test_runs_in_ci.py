@@ -14,12 +14,9 @@
 """A test nothing runs is not a gate.
 
 `notebooks-tests-ci.yml` names each test file in its own step rather than
-discovering `tests/`, which is fine until someone adds a file and forgets.
-Three had already drifted off the list: the two AMD generator tests here and
-`test_transformers5_hub_floor.py`, added with the hub floor it guards.
-
-This is the cheapest possible check, and it fails on the file you just wrote
-rather than months later when the regression it was meant to catch ships.
+discovering `tests/`, which is fine until someone adds a file and forgets --
+three had already drifted off the list. This fails on the file you just wrote
+rather than months later when the regression ships.
 """
 
 import re
