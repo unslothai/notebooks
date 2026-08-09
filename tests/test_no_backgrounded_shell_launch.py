@@ -23,14 +23,13 @@
     !nohup python -m sglang.launch_server ... > sglang.log &
 
 IPython refuses that: `InteractiveShell.system_piped` raises
-`OSError("Background processes not supported.")` for any command whose
-stripped form ends in `&`, and `ipykernel.zmqshell.ZMQInteractiveShell` binds
-`system = system_piped`. Only Colab survives it, by swapping in `system_raw`;
-Kaggle, plain Jupyter and papermill could not run the cell at all.
+`OSError("Background processes not supported.")` for any command whose stripped
+form ends in `&`. Only Colab survives it, by swapping in `system_raw`; Kaggle,
+plain Jupyter and papermill could not run the cell at all.
 
 `subprocess.Popen` works everywhere and hands back a handle, which also bounds
 the wait: sglang's `wait_for_server` takes `timeout` and `process`, and with
-neither it waits forever, like the `while ! grep -q ...` loop it replaces.
+neither it waits forever.
 """
 
 import json
@@ -44,8 +43,7 @@ NB_DIR = REPO_ROOT / "nb"
 TEMPLATE_DIR = REPO_ROOT / "original_template"
 
 # A `!` shell command left in the background. `&&` is a conjunction, not
-# backgrounding, so it is excluded; `system_piped` inspects only the last
-# character of the stripped command.
+# backgrounding, so it is excluded.
 _BACKGROUNDED = re.compile(r"^\s*!.*(?<!&)&\s*$")
 
 
@@ -87,10 +85,9 @@ def test_the_pattern_matches_the_shape_it_is_meant_to_catch():
 
 
 def test_a_live_kernel_rejects_the_background_form_and_accepts_popen():
-    """Measured, not read off the IPython source, and on this platform.
+    """Measured on this platform, not read off the IPython source.
 
-    Runs on Linux, macOS and Windows: the child is `sys.executable`, so nothing
-    here depends on a POSIX shell or on `sleep` existing.
+    The child is `sys.executable`, so nothing here needs a POSIX shell.
     """
     nbformat = pytest.importorskip("nbformat")
     nbclient = pytest.importorskip("nbclient")

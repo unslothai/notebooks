@@ -18,11 +18,9 @@
 
 """An AMD notebook may not import a package the ROCm recipe cannot install.
 
-sglang is the case: it publishes no ROCm wheel (see `AMD_SKIP_NOTEBOOKS` in
-update_all_notebooks.py), so `AMD-Gemma3N_(2B)-Inference` shipped with no
-sglang and a first cell reading `from sglang.utils import wait_for_server`,
-and Run All stopped on ModuleNotFoundError. The answer is not to mint that AMD
-variant at all.
+sglang publishes no ROCm wheel, so `AMD-Gemma3N_(2B)-Inference` shipped with no
+sglang and a first cell reading `from sglang.utils import wait_for_server`, and
+Run All stopped on ModuleNotFoundError. See `AMD_SKIP_NOTEBOOKS`.
 """
 
 from __future__ import annotations
@@ -74,7 +72,7 @@ def test_sglang_serving_templates_are_skipped_for_amd(path):
 @pytest.mark.parametrize(
     "path", sorted(NB_DIR.glob("AMD-*.ipynb")), ids=lambda p: p.name)
 def test_no_shipped_amd_notebook_imports_sglang(path):
-    """The artifact, not the intent: nothing under nb/AMD-* may import sglang."""
+    """The artifact, not the intent: no nb/AMD-* may import sglang."""
     assert not _GEN._notebook_imports_sglang(_load(path)), (
         f"{path.name} imports sglang but no ROCm recipe installs it, so the "
         f"notebook stops on ModuleNotFoundError."
@@ -85,8 +83,7 @@ def test_the_amd_generator_does_not_mint_a_skipped_notebook(monkeypatch, tmp_pat
     """End to end over the real selection in copy_and_update_amd_notebooks.
 
     Only the per-notebook rewrite and the file copy are neutralised, so what is
-    measured is which notebooks the generator chose, on the real
-    original_template/ and nb/ trees.
+    measured is which notebooks the generator chose.
     """
     minted = []
     monkeypatch.setattr(_GEN, "update_notebook_sections", lambda *a, **k: None)

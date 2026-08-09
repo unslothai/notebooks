@@ -55,8 +55,7 @@ _KNOWN_PIN_OUTLIERS: set[tuple[str, str, str]] = {
     ("nb/AMD-Openenv_wordle_grpo.ipynb", "trl", "0.29.1"),
     ("nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb", "transformers", "4.57.0"),
     ("nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb", "trl", "0.26.2"),
-    # The AMD variant is minted from the nb/ copy above, so it inherits that
-    # pin. Same shape as the Openenv_wordle_grpo pair a few lines up.
+    # Minted from the nb/ copy above, so it inherits that pin.
     ("nb/AMD-Qwen3_VL_(8B)-Vision-GRPO.ipynb", "trl", "0.26.2"),
 }
 
@@ -95,9 +94,7 @@ def test_notebook_pip_pins_match_generator_canonical_or_override(path: Path) -> 
     constants + the per-model override pins extracted from the
     generator."""
     # as_posix, not str: on Windows str() gives `nb\X.ipynb`, which matches no
-    # key in _KNOWN_PIN_OUTLIERS, so every allowed outlier fires as drift. Five
-    # false failures on a Windows checkout, none on Linux, which is why CI never
-    # saw it.
+    # key in _KNOWN_PIN_OUTLIERS, so every allowed outlier fires as drift.
     rel_path = path.relative_to(REPO_ROOT).as_posix()
     bad: list[tuple[int, str, str]] = []
     for cell_idx, src in ni.iter_code_cells(path):
