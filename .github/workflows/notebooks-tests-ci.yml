@@ -141,6 +141,12 @@ jobs:
         run: |
           python -m pytest tests/test_transformers5_hub_floor.py -q --tb=short
 
+      - name: tests/test_transformers_main_no_deps_floors.py
+        # A --no-deps install of transformers main has to pin every floor the
+        # base images fall short of, not only the one that broke last.
+        run: |
+          python -m pytest tests/test_transformers_main_no_deps_floors.py -q --tb=short
+
       - name: tests/test_every_test_runs_in_ci.py
         run: |
           python -m pytest tests/test_every_test_runs_in_ci.py -q --tb=short
