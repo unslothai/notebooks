@@ -72,6 +72,7 @@ def _(mo):
 def _():
     import itertools
     import json
+    import os
     import random
     from pathlib import Path
 
@@ -210,10 +211,15 @@ def _():
             "knights_and_knaves_easy_ft.json": records[:midpoint],
             "knights_and_knaves_hard_ft.json": records[midpoint:],
         }
+        staged = []
         for filename, shard in shards.items():
-            with open(final_dir / filename, "w") as _f:
+            tmp_path = final_dir / f"{filename}.tmp"
+            with open(tmp_path, "w") as _f:
                 json.dump(shard, _f, indent=2)
-            print(f"Wrote {len(shard)} records to {final_dir / filename}")
+            staged.append((tmp_path, final_dir / filename, len(shard)))
+        for tmp_path, final_path, count in staged:
+            os.replace(tmp_path, final_path)
+            print(f"Wrote {count} records to {final_path}")
     print(f"Total ft files now in {final_dir}: {len(sorted(final_dir.glob('*.json')))}")
     return Path, json
 
@@ -309,7 +315,6 @@ def _(mo):
 
 @app.cell
 def _():
-    import os
     import torch
     import shutil
 

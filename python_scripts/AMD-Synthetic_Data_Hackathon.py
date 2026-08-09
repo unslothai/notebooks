@@ -46,6 +46,7 @@ get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "tr
 
 import itertools
 import json
+import os
 import random
 from pathlib import Path
 
@@ -197,10 +198,20 @@ else:
         "knights_and_knaves_easy_ft.json": records[:midpoint],
         "knights_and_knaves_hard_ft.json": records[midpoint:],
     }
+    # Stage under *.json.tmp, which neither the skip check above nor the
+    # loader below can see, then swap the finished files into place. An
+    # interrupt or a full disk part-way through therefore leaves no shard for
+    # the next run to mistake for a complete dataset.
+    staged = []
     for filename, shard in shards.items():
-        with open(final_dir / filename, "w") as f:
+        tmp_path = final_dir / f"{filename}.tmp"
+        with open(tmp_path, "w") as f:
             json.dump(shard, f, indent = 2)
-        print(f"Wrote {len(shard)} records to {final_dir / filename}")
+        staged.append((tmp_path, final_dir / filename, len(shard)))
+
+    for tmp_path, final_path, count in staged:
+        os.replace(tmp_path, final_path)
+        print(f"Wrote {count} records to {final_path}")
 
 print(f"Total ft files now in {final_dir}: {len(sorted(final_dir.glob('*.json')))}")
 
