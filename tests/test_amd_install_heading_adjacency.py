@@ -13,12 +13,10 @@
 
 """A second install cell behind its own heading must still be AMD-stripped.
 
-`_adjacent_install_like_code_cells` stopped at the first non-code cell, so an
-install cell behind its own markdown heading was invisible. Qwen3_5_MoE and
-Qwen3_6_MoE put a CUDA-wheel resolver behind "### Install
-flash-linear-attention and causal-conv-1d", it survived into the AMD variant,
-and `_assert_amd_install_runtime` refused the whole `--amd` run -- blocking all
-153 AMD notebooks.
+`_adjacent_install_like_code_cells` stopped at the first non-code cell, so
+Qwen3_5_MoE and Qwen3_6_MoE hid a CUDA-wheel resolver behind "### Install
+flash-linear-attention and causal-conv-1d"; it survived into the AMD variant and
+made `_assert_amd_install_runtime` refuse the whole `--amd` run.
 
 test_notebook_amd_install_parity.py cannot catch this: it reads the committed
 `nb/AMD-*.ipynb`, stale but valid. The bad content appears only on regeneration.
@@ -129,9 +127,8 @@ def test_back_to_back_install_cells_still_work(gen):
     "## Setup",
 ])
 def test_a_non_install_heading_stops_the_scan(gen, heading):
-    """Stepping over any heading let the cell behind it qualify on that
-    heading alone, and the caller deletes what this returns: `### Start Unsloth
-    Studio` collected the Studio launch code."""
+    """Stepping over any heading let the cell behind it qualify on the heading
+    alone, and the caller deletes what this returns."""
     cells = [
         _md("### Installation"),
         _code("%%capture\n!pip install unsloth\n"),
@@ -159,9 +156,8 @@ def test_a_dependency_heading_is_still_stepped_over(gen, heading):
 
 
 def test_a_heading_cannot_make_ordinary_code_an_install(gen):
-    """`_is_install_like_cell` answers yes on the markdown above a cell, so an
-    install-shaped heading over ordinary code qualified it and both got deleted.
-    After a heading the cell must carry the evidence itself."""
+    """`_is_install_like_cell` answers yes on the markdown above a cell, so after
+    a heading the cell must carry the install evidence itself."""
     cells = [
         _md("### Installation"),
         _code("%%capture\n!pip install unsloth\n"),
@@ -173,7 +169,7 @@ def test_a_heading_cannot_make_ordinary_code_an_install(gen):
 
 def test_the_first_cell_still_uses_the_wider_test(gen):
     """Nothing stepped over yet, so the section heading above the canonical
-    install block is the signal that identifies it."""
+    install block is still what identifies it."""
     cells = [
         _md("### Installation"),
         _code("%%capture\nimport os\nfrom setup import bootstrap\n"),
@@ -183,3 +179,4 @@ def test_the_first_cell_still_uses_the_wider_test(gen):
 
 def _cell_text(cell):
     return "".join(cell["source"])
+

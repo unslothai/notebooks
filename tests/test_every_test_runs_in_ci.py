@@ -14,9 +14,8 @@
 """A test nothing runs is not a gate.
 
 `notebooks-tests-ci.yml` names each test file in its own step rather than
-discovering `tests/`, which is fine until someone adds a file and forgets --
-three had already drifted off the list. This fails on the file you just wrote
-rather than months later when the regression ships.
+discovering `tests/`, which is fine until someone adds a file and forgets, as
+three already had.
 """
 
 import re
