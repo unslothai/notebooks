@@ -131,7 +131,7 @@ def _():
         full_finetuning=False,  # [NEW!] We have full finetuning now!
         # token = "YOUR_HF_TOKEN", # HF Token for gated models
     )
-    return FastModel, model, torch
+    return FastModel, model, tokenizer, torch
 
 
 @app.cell(hide_code=True)
@@ -145,13 +145,13 @@ def _(mo):
 
 
 @app.cell
-def _(model, processor):
+def _(model, tokenizer):
     from transformers import TextStreamer
 
     # Helper function for inference
     def do_gemma_4_inference(messages, max_new_tokens=128):
         _ = model.generate(
-            **processor.apply_chat_template(
+            **tokenizer.apply_chat_template(
                 messages,
                 add_generation_prompt=True,  # Must add for generation
                 tokenize=True,
@@ -161,7 +161,7 @@ def _(model, processor):
             max_new_tokens=max_new_tokens,  # Increase for longer outputs!
             do_sample=False,
             use_cache=False,
-            streamer=TextStreamer(processor, skip_prompt=True),
+            streamer=TextStreamer(tokenizer, skip_prompt=True),
         )
 
     return TextStreamer, do_gemma_4_inference
@@ -346,7 +346,7 @@ def _(mo):
 
 
 @app.cell
-def _(dataset_1, model_1, processor):
+def _(dataset_1, model_1, tokenizer):
     # Use UnslothVisionDataCollator which handles audio token alignment correctly
     from unsloth.trainer import UnslothVisionDataCollator
     from trl import SFTTrainer, SFTConfig
@@ -354,8 +354,8 @@ def _(dataset_1, model_1, processor):
     trainer = SFTTrainer(
         model=model_1,
         train_dataset=dataset_1,
-        processing_class=processor.tokenizer,
-        data_collator=UnslothVisionDataCollator(model_1, processor),
+        processing_class=tokenizer.tokenizer,
+        data_collator=UnslothVisionDataCollator(model_1, tokenizer),
         args=SFTConfig(
             per_device_train_batch_size=8,
             gradient_accumulation_steps=1,
@@ -471,9 +471,9 @@ def _(mo):
 
 
 @app.cell
-def _(model_1, processor):
+def _(model_1, tokenizer):
     model_1.save_pretrained("gemma_4_lora")
-    processor.save_pretrained("gemma_4_lora")
+    tokenizer.save_pretrained("gemma_4_lora")
     return
 
 
@@ -486,17 +486,17 @@ def _(mo):
 
 
 @app.cell
-def _(TextStreamer, model_1, processor):
+def _(TextStreamer, model_1, tokenizer):
     if False:
         from unsloth import FastModel as _FastModel
 
-        _model, _processor = _FastModel.from_pretrained(
+        _model, _tokenizer = _FastModel.from_pretrained(
             model_name="gemma_4_lora", max_seq_length=2048, load_in_4bit=True  # YOUR MODEL YOU USED FOR TRAINING
         )
     messages_2 = [
         {"role": "user", "content": [{"type": "text", "text": "What is Gemma-4?"}]}
     ]
-    inputs = processor.apply_chat_template(
+    inputs = tokenizer.apply_chat_template(
         messages_2,
         add_generation_prompt=True,  # Must add for generation
         return_tensors="pt",
@@ -509,7 +509,7 @@ def _(TextStreamer, model_1, processor):
         temperature=1.0,
         top_p=0.95,
         top_k=64,
-        streamer=TextStreamer(processor, skip_prompt=True),
+        streamer=TextStreamer(tokenizer, skip_prompt=True),
     )
     return
 
@@ -525,9 +525,9 @@ def _(mo):
 
 
 @app.cell
-def _(model_1, processor):
+def _(model_1, tokenizer):
     if False:  # Change to True to save finetune!
-        model_1.save_pretrained_merged("gemma-4", processor)
+        model_1.save_pretrained_merged("gemma-4", tokenizer)
     return
 
 
@@ -540,10 +540,10 @@ def _(mo):
 
 
 @app.cell
-def _(model_1, processor):
+def _(model_1, tokenizer):
     if False:  # Change to True to upload finetune
         model_1.push_to_hub_merged(
-            "HF_ACCOUNT/gemma-4-finetune", processor, token="YOUR_HF_TOKEN"
+            "HF_ACCOUNT/gemma-4-finetune", tokenizer, token="YOUR_HF_TOKEN"
         )
     return
 
@@ -558,10 +558,10 @@ def _(mo):
 
 
 @app.cell
-def _(model_1, processor):
+def _(model_1, tokenizer):
     if False:  # Change to True to save to GGUF
         model_1.save_pretrained_gguf(
-            "gemma_4_finetune", processor, quantization_method="Q8_0"
+            "gemma_4_finetune", tokenizer, quantization_method="Q8_0"
         )  # For now only Q8_0, BF16, F16 supported
     return
 
@@ -575,11 +575,11 @@ def _(mo):
 
 
 @app.cell
-def _(model_1, processor):
+def _(model_1, tokenizer):
     if False:  # Change to True to upload GGUF
         model_1.push_to_hub_gguf(
             "HF_ACCOUNT/gemma_4_finetune",
-            processor,
+            tokenizer,
             quantization_method="Q8_0",  # For now only Q8_0, BF16, F16 supported
             token="YOUR_HF_TOKEN",
         )  # Only Q8_0, BF16, F16 supported

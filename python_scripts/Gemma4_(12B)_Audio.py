@@ -87,7 +87,7 @@ from transformers import TextStreamer
 # Helper function for inference
 def do_gemma_4_inference(messages, max_new_tokens = 128):
     _ = model.generate(
-        **processor.apply_chat_template(
+        **tokenizer.apply_chat_template(
             messages,
             add_generation_prompt = True, # Must add for generation
             tokenize = True,
@@ -97,7 +97,7 @@ def do_gemma_4_inference(messages, max_new_tokens = 128):
         max_new_tokens = max_new_tokens,
         do_sample = False,
         use_cache = False,
-        streamer = TextStreamer(processor, skip_prompt = True),
+        streamer = TextStreamer(tokenizer, skip_prompt = True),
     )
 
 
@@ -253,8 +253,8 @@ from trl import SFTTrainer, SFTConfig
 trainer = SFTTrainer(
     model = model,
     train_dataset = dataset,
-    processing_class = processor.tokenizer,
-    data_collator = UnslothVisionDataCollator(model, processor),
+    processing_class = tokenizer.tokenizer,
+    data_collator = UnslothVisionDataCollator(model, tokenizer),
     args = SFTConfig(
         per_device_train_batch_size = 8,
         gradient_accumulation_steps = 1,
@@ -358,9 +358,9 @@ do_gemma_4_inference(messages, max_new_tokens = 256)
 
 
 model.save_pretrained("gemma_4_lora")  # Local saving
-processor.save_pretrained("gemma_4_lora")
+tokenizer.save_pretrained("gemma_4_lora")
 # model.push_to_hub("HF_ACCOUNT/gemma_4_lora", token = "YOUR_HF_TOKEN") # Online saving
-# processor.push_to_hub("HF_ACCOUNT/gemma_4_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("HF_ACCOUNT/gemma_4_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -370,7 +370,7 @@ processor.save_pretrained("gemma_4_lora")
 
 if False:
     from unsloth import FastModel
-    model, processor = FastModel.from_pretrained(
+    model, tokenizer = FastModel.from_pretrained(
         model_name = "gemma_4_lora", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 2048,
         load_in_4bit = True,
@@ -380,7 +380,7 @@ messages = [{
     "role": "user",
     "content": [{"type" : "text", "text" : "What is Gemma-4?",}]
 }]
-inputs = processor.apply_chat_template(
+inputs = tokenizer.apply_chat_template(
     messages,
     add_generation_prompt = True, # Must add for generation
     return_tensors = "pt",
@@ -394,7 +394,7 @@ _ = model.generate(
     max_new_tokens = 128, # Increase for longer outputs!
     # Recommended Gemma-4 settings!
     temperature = 1.0, top_p = 0.95, top_k = 64,
-    streamer = TextStreamer(processor, skip_prompt = True),
+    streamer = TextStreamer(tokenizer, skip_prompt = True),
 )
 
 
@@ -406,7 +406,7 @@ _ = model.generate(
 
 
 if False: # Change to True to save finetune!
-    model.save_pretrained_merged("gemma-4", processor)
+    model.save_pretrained_merged("gemma-4", tokenizer)
 
 
 # If you want to upload / push to your Hugging Face account, set `if False` to `if True` and add your Hugging Face token and upload location!
@@ -416,7 +416,7 @@ if False: # Change to True to save finetune!
 
 if False: # Change to True to upload finetune
     model.push_to_hub_merged(
-        "HF_ACCOUNT/gemma-4-finetune", processor,
+        "HF_ACCOUNT/gemma-4-finetune", tokenizer,
         token = "YOUR_HF_TOKEN"
     )
 
@@ -430,7 +430,7 @@ if False: # Change to True to upload finetune
 if False: # Change to True to save to GGUF
     model.save_pretrained_gguf(
         "gemma_4_finetune",
-        processor,
+        tokenizer,
         quantization_method = "Q8_0", # For now only Q8_0, BF16, F16 supported
     )
 
@@ -443,7 +443,7 @@ if False: # Change to True to save to GGUF
 if False: # Change to True to upload GGUF
     model.push_to_hub_gguf(
         "HF_ACCOUNT/gemma_4_finetune",
-        processor,
+        tokenizer,
         quantization_method = "Q8_0", # Only Q8_0, BF16, F16 supported
         token = "YOUR_HF_TOKEN",
     )
