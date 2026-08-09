@@ -60,8 +60,7 @@ seed = 3407
 final_dir = Path(data_dir)
 final_dir.mkdir(parents = True, exist_ok = True)
 
-# A leftover *.json.tmp is the marker of a publish that never finished, so
-# whatever shards are on disk are a partial set and must not be reused.
+# A leftover *.json.tmp means an earlier publish died, so the shards are partial.
 interrupted = sorted(final_dir.glob("*.json.tmp"))
 for leftover in interrupted:
     leftover.unlink()
@@ -202,8 +201,7 @@ else:
         "knights_and_knaves_easy_ft.json": records[:midpoint],
         "knights_and_knaves_hard_ft.json": records[midpoint:],
     }
-    # Stage under *.json.tmp, invisible to the skip check and the loader, so
-    # an interrupted publish leaves no half dataset for the next run to keep.
+    # Stage as *.json.tmp, which the skip glob above and the loader both ignore.
     staged = []
     for filename, shard in shards.items():
         tmp_path = final_dir / f"{filename}.tmp"

@@ -14,9 +14,8 @@
 """Gate on the Synthetic_Data_Hackathon in-notebook dataset generator.
 
 The generator skips itself whenever ``data/final/`` already holds a
-``*.json`` file, so a run that dies part-way through writing the shards
-would otherwise leave a half dataset that every later run accepts and
-trains on silently.
+``*.json`` file, so a run that dies mid-publish must leave nothing a
+later run would accept and train on.
 """
 from __future__ import annotations
 
@@ -83,8 +82,7 @@ def test_interrupted_run_leaves_nothing_for_the_next_run_to_accept() -> None:
             raise KeyboardInterrupt("kernel interrupted mid-publish")
         return real_dump(*args, **kwargs)
 
-    # Restored by hand rather than through monkeypatch, whose undo() would
-    # also drop the autouse chdir into the temporary directory.
+    # Not monkeypatch: its undo() would also drop the autouse chdir.
     json.dump = dump_then_die
     try:
         with pytest.raises(KeyboardInterrupt):
