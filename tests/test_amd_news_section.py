@@ -13,11 +13,10 @@
 
 """An nb/-sourced AMD variant still gets the News section.
 
-News lives in `original_template/` only, so once the AMD generator minted
-hand-maintained notebooks from `nb/`, `AMD-Ministral_3_(3B)_
-Reinforcement_Learning_Sudoku_Game` lost the `### News` heading and its
-announcement. `_is_stale_amd_announcement` only rewrites the opening Colab
-announcements, so it never put them back.
+News lives in `original_template/` only, so minting hand-maintained notebooks
+from `nb/` cost `AMD-Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game` its
+`### News` heading and announcement. `_is_stale_amd_announcement` only rewrites
+the opening Colab announcements, so it never put them back.
 """
 from __future__ import annotations
 
@@ -68,8 +67,8 @@ def _hand_maintained_with_amd_and_template(gen):
 
 
 def test_a_hand_maintained_source_without_news_still_exists(gen):
-    """The pair that motivates this file. If every hand-maintained source grows
-    a News section the check below would pass for the wrong reason."""
+    """If every hand-maintained source grows a News section, the check below
+    passes for the wrong reason."""
     stranded = [
         name
         for name in _hand_maintained_with_amd_and_template(gen)
@@ -145,8 +144,8 @@ def test_restore_inserts_news_above_installation(gen, tmp_path):
 
 
 def test_restore_is_idempotent(gen, tmp_path):
-    """The AMD copy is rebuilt from nb/ every run, but a second pass over the
-    same file must not stack a second News section on top."""
+    """A second pass over the same file must not stack a second News
+    section."""
     template = tmp_path / "T.ipynb"
     amd = tmp_path / "AMD-T.ipynb"
     _write(template, [("markdown", NEWS), ("markdown", "Placeholder"),
@@ -161,8 +160,8 @@ def test_restore_is_idempotent(gen, tmp_path):
 
 
 def test_restore_declines_when_the_template_has_no_news(gen, tmp_path):
-    """The nb/-only notebooks have no template to take News from, and none of
-    them carries a News section on main. They must stay that way."""
+    """The nb/-only notebooks have no template to take News from, and none
+    carries a News section today."""
     template = tmp_path / "T.ipynb"
     amd = tmp_path / "AMD-T.ipynb"
     _write(template, [("markdown", "### Installation")])
