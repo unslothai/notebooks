@@ -43,13 +43,7 @@
 # import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 # 
 # get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.1" vllm')
-# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
-# 
-# 
-# # In[ ]:
-# 
-# 
-# # Placeholder
+# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.26.2"')
 # 
 # 
 # # ### Unsloth
@@ -205,24 +199,6 @@ train_dataset = train_dataset.rename_column("decoded_image", "image")
 
 # Now let's apply the chat template across the entire dataset:
 
-# In[9]:
-
-
-from unsloth_zoo.utils import Version
-
-# Only apply chat template for TRL < 0.24.0, otherwise TRL handles it
-if Version("trl") < Version("0.24.0"):
-    train_dataset = train_dataset.map(
-        lambda example: {
-            "prompt": tokenizer.apply_chat_template(
-                example["prompt"],
-                tokenize = False,
-                add_generation_prompt = True, # Must add assistant
-            )
-        }
-    )
-
-
 # ## Reward functions
 # 
 # We now define some basic formatting rewards functions to see if reasoning starts and ends, and also another to see if the answers were written correctly.
@@ -242,6 +218,8 @@ def formatting_reward_func(completions,**kwargs):
 
     scores = []
     for completion in completions:
+        if isinstance(completion, list):
+            completion = completion[0]["content"] if completion else ""
         score = 0
         thinking_matches = re.findall(thinking_pattern, completion, re.DOTALL)
         answer_matches = re.findall(answer_pattern, completion, re.DOTALL)
@@ -265,6 +243,7 @@ def formatting_reward_func(completions,**kwargs):
 def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[float]:
     answer_pattern = f'{SOLUTION_START}(.*?){SOLUTION_END}'
 
+    completions = [(c[0]["content"] if c else "") if isinstance(c, list) else c for c in completions]
     responses = [re.findall(answer_pattern, completion, re.DOTALL) for completion in completions]
     q = prompts[0]
     print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:{completions[0]}")
@@ -415,7 +394,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 1024,
 model.save_pretrained("qwen_lora")  # Local saving
 tokenizer.save_pretrained("qwen_lora")
 # model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
-# tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+# processor.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Verify LoRA is actually trained!
@@ -497,14 +476,15 @@ if False:
 
 
 # Special Credits to [GAD-Cell](https://github.com/GAD-cell) for helping Unsloth create this notebook and bringing VLM GRPO into Unsloth!
+# Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
+# 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
-# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
-# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
-# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
-# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
-# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
+# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
+# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
+# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
+# 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
 # 
 # <div class="align-center">
 #   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
@@ -512,6 +492,6 @@ if False:
 #   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
 # 
 #   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
-# 
-#   <b>This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)</b>
 # </div>
+# 
+#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)

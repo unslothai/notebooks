@@ -392,7 +392,7 @@ def formatting_prompts_func(examples):
     return { "text" : texts, }
 
 from datasets import load_dataset, Dataset
-dataset = Dataset.from_json("/content/data/final/ai_meta_com_qa_pairs_cleaned_ft.json")
+dataset = Dataset.from_json("data/final/ai_meta_com_qa_pairs_cleaned_ft.json")
 dataset = dataset.map(formatting_prompts_func, batched = True,)
 
 

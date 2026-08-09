@@ -55,6 +55,8 @@ _KNOWN_PIN_OUTLIERS: set[tuple[str, str, str]] = {
     ("nb/AMD-Openenv_wordle_grpo.ipynb", "trl", "0.29.1"),
     ("nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb", "transformers", "4.57.0"),
     ("nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb", "trl", "0.26.2"),
+    # Minted from the nb/ copy above, so it inherits that pin.
+    ("nb/AMD-Qwen3_VL_(8B)-Vision-GRPO.ipynb", "trl", "0.26.2"),
 }
 
 
