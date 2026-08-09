@@ -1,22 +1,9 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
-#     "accelerate",
-#     "bitsandbytes>=0.43.0",
-#     "datasets==4.3.0",
-#     "hf_transfer",
-#     "huggingface_hub>=0.34.0",
 #     "marimo",
-#     "peft",
-#     "protobuf",
-#     "sentencepiece",
-#     "torchao>=0.16.0",
-#     "torchcodec",
-#     "transformers==4.56.2",
-#     "triton>=3.2.0",
-#     "trl==0.22.2",
-#     "unsloth @ git+https://github.com/unslothai/unsloth",
-#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
+#     "sglang[all]==0.5.16",
+#     "torchvision==0.26.0",
 # ]
 #
 # [tool.uv]
@@ -105,22 +92,50 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess
-    import subprocess
+    # Load and run the model using sglang.
+    #
+    # Popen, not `!... &`: IPython's `system_piped`, which every kernel except
+    # molab's uses, raises OSError on a trailing `&`, so on Kaggle, plain Jupyter
+    # or papermill this cell could never run.
+    # Backend left to sglang: `fa3` is Hopper (sm90) only, so it fails on the
+    # T4 / L4 / A100 a session actually hands out.
+    import subprocess, sys
+    from sglang.utils import wait_for_server
 
-    # Load and run the model using sglang
-    #! nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it --attention-backend fa3 --port 8000 > sglang.log &
-    subprocess.call(
-        "nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it --attention-backend fa3 --port 8000 > sglang.log &",
-        shell=True,
+    log = open("sglang.log", "w")
+    server = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "sglang.launch_server",
+            "--model-path",
+            "unsloth/gemma-3n-E2B-it",
+            "--port",
+            "8000",
+        ],
+        stdout=log,
+        stderr=subprocess.STDOUT,
     )
 
-    # tail vllm logs. Check server has been started correctly
-    #! while ! grep -q "The server is fired up and ready to roll" sglang.log; do tail -n 1 sglang.log; sleep 5; done
-    subprocess.call(
-        "while ! grep -q 'The server is fired up and ready to roll' sglang.log; do tail -n 1 sglang.log; sleep 5; done",
-        shell=True,
-    )
+    # Both arguments matter. `wait_for_server` defaults to timeout = None, which is
+    # wait forever, so without one this is the same unbounded hang as the shell
+    # `while ! grep -q` loop it replaces. `process` makes it poll the subprocess and
+    # raise as soon as a failed launch exits, instead of waiting out the timeout.
+    try:
+        wait_for_server("http://localhost:8000", timeout=900, process=server)
+    except Exception:
+        # On the timeout path the server is still alive, and the kernel outlives the
+        # cell, so re-raising alone would leave it holding the GPU and port 8000 and
+        # the retry would fail on address-in-use rather than on the real problem.
+        server.terminate()
+        try:
+            server.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            server.kill()
+        log.close()
+        # The server's own log is the only thing that says why it did not start.
+        print(open("sglang.log").read()[-4000:])
+        raise
     return
 
 
@@ -219,7 +234,7 @@ def _(mo):
 
 @app.cell
 def _(image, process_image, requests):
-    from sglang.utils import wait_for_server, print_highlight, terminate_process
+    from sglang.utils import print_highlight, terminate_process
 
     processed_image = process_image(image)
     url = f"http://localhost:8000/v1/chat/completions"

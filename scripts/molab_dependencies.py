@@ -416,6 +416,104 @@ _MOLAB_PER_NOTEBOOK_RELAX: dict[str, dict[str, str]] = {
 }
 
 
+# Runtime-templated install specs. An install cell can compute a pin at runtime
+# and pass it to pip as an IPython ``{var}``; a PEP 723 header is static, so
+# molab must resolve each variable to one arm. Every {var} must be in exactly
+# one of these two tables -- test_molab_templated_pins.py fails on any that is
+# in neither, so a new pin cannot vanish the way torch 2.7.1 did.
+_TEMPLATE_STATIC_SPECS: dict[str, str] = {
+    # The Blackwell arm of the cell only avoids a ~30 minute source build, so
+    # molab takes the prebuilt non-Blackwell arm.
+    "_torch": "torch==2.7.1",
+    "_mamba": "mamba_ssm==2.2.5",
+    "_conv": "causal_conv1d==1.5.2",
+}
+
+_TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
+    "xformers": (
+        "version is looked up from the live torch build; unsloth pulls a "
+        "compatible xformers transitively"
+    ),
+    "_numpy": (
+        "pins numpy to the version already imported in the hosted kernel; "
+        "molab builds a fresh venv, so there is nothing to hold in place"
+    ),
+    "_pil": (
+        "pins pillow to the version already imported in the hosted kernel; "
+        "molab builds a fresh venv, so there is nothing to hold in place"
+    ),
+    "get_numpy": (
+        "pins numpy to the version already imported in the hosted kernel; "
+        "molab builds a fresh venv, so there is nothing to hold in place"
+    ),
+    "_qat_numpy": (
+        "pins numpy to the version already imported in the hosted kernel; "
+        "molab builds a fresh venv, so there is nothing to hold in place"
+    ),
+    "_qat_torchao": (
+        "torchao version is chosen from the live torch version; molab does "
+        "not pin torch for this notebook, so no arm is statically correct"
+    ),
+    "_qat_fbgemm": (
+        "fbgemm-gpu-genai version is chosen from the live torch version; "
+        "molab does not pin torch for this notebook, so no arm is "
+        "statically correct"
+    ),
+}
+
+# A pip token that is nothing but an expansion, e.g. ``{_torch}``.
+_RE_WHOLE_TEMPLATE_TOKEN = re.compile(r"^\{([A-Za-z_]\w*)\}$")
+
+# Any expansion inside a token, including an embedded ``torchao=={_qat_torchao}``.
+_RE_TEMPLATE_VAR = re.compile(r"\{([A-Za-z_]\w*)\}")
+
+
+def template_var_names(token: str) -> list[str]:
+    """``"torchao=={_qat_torchao}"`` -> ``["_qat_torchao"]``; no expansion -> ``[]``."""
+    return _RE_TEMPLATE_VAR.findall(token)
+
+
+def resolve_template_spec(token: str) -> Optional[str]:
+    """Static PEP 508 spec for a whole-token ``{var}`` expansion, or ``None``.
+
+    Only an entirely-one-expansion token resolves, since the mapping is variable
+    -> full spec; anything else returns ``None`` and is dropped with a reason.
+    """
+    m = _RE_WHOLE_TEMPLATE_TOKEN.match(token.strip().strip("\"'"))
+    if m is None:
+        return None
+    return _TEMPLATE_STATIC_SPECS.get(m.group(1))
+
+
+def template_drop_reason(token: str) -> Optional[str]:
+    """The registered reason a templated ``token`` carries no static spec.
+
+    ``None`` means the token is unknown to the planner, which the templated-pin
+    test fails on.
+    """
+    for name in template_var_names(token):
+        reason = _TEMPLATE_NO_STATIC_SPEC.get(name)
+        if reason is not None:
+            return reason
+    return None
+
+
+def iter_templated_tokens(nb_path: Path) -> list[str]:
+    """Every ``{var}``-bearing pip token in ``nb_path``'s install cells.
+
+    Source order, duplicates included, exactly as :func:`plan_dependencies` sees
+    them. Public so the templated-pin test uses the real tokenizer.
+    """
+    tokens: list[str] = []
+    for cell_src in extract_install_cells(nb_path):
+        for line in _logical_lines(cell_src):
+            parsed = _parse_pip_line(line)
+            if parsed is None:
+                continue
+            tokens.extend(parsed.templated)
+    return tokens
+
+
 def plan_dependencies(nb_path: Path) -> DependencyPlan:
     """Build a :class:`DependencyPlan` from a post-injection ``nb/*.ipynb``.
 
@@ -465,18 +563,32 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
                 ))
                 continue
 
-            # Record templated specs (e.g. {xformers}) as intentional drops:
-            # the version is resolved at runtime from the torch build, which a
-            # static PEP 723 header cannot reproduce.  unsloth pulls a
-            # compatible xformers transitively, so dropping the explicit pin
-            # is safe.
+            # Resolve through _TEMPLATE_STATIC_SPECS and treat as a literal, or
+            # drop with the registered _TEMPLATE_NO_STATIC_SPEC reason.
             for tok in parsed.templated:
+                static_spec = resolve_template_spec(tok)
+                if static_spec is not None:
+                    key = _normalise_pkg(
+                        _RE_PKG_NAME.match(static_spec).group(1)
+                    )
+                    static_spec = _normalise_molab_spec(key, static_spec)
+                    existing = chosen.get(key)
+                    if (
+                        existing is None
+                        or _spec_rank(static_spec) > _spec_rank(existing)
+                    ):
+                        chosen[key] = static_spec
+                    continue
                 plan.dropped.append(DroppedItem(
                     text=tok,
                     reason="runtime-templated: spec uses an IPython {var} "
-                           "expansion resolved from the live torch version; "
-                           "not statically expressible in PEP 723 — resolved "
-                           "transitively via the unsloth dependency",
+                           "expansion with no static PEP 723 equivalent — "
+                           + (
+                               template_drop_reason(tok)
+                               or "no registered reason; add the variable to "
+                                  "molab_dependencies._TEMPLATE_STATIC_SPECS "
+                                  "or _TEMPLATE_NO_STATIC_SPEC"
+                           ),
                 ))
 
             for spec in parsed.specs:
