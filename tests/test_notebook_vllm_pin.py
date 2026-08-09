@@ -26,8 +26,10 @@ broke on L4. This gate keeps every branch of every such line pinned.
 """
 from __future__ import annotations
 
+import ast
 import re
 import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -93,6 +95,48 @@ _ASSIGNMENT_RE = re.compile(
 )
 
 
+def _bound_name(line):
+    """The name that actually holds the vLLM spec on an assignment line.
+
+    Taking the first target is wrong the moment vLLM is not the first value:
+
+        _triton, _vllm = ("triton", "vllm==0.15.1")
+
+    records `_triton`, so a command interpolating only `{_triton}` satisfies
+    the binding check -- exact selector, name consumed, no bare `vllm` -- while
+    the pin is never installed. Today's notebooks all put vLLM first, so this
+    is a hole rather than a live break, but it is the hole a future edit falls
+    into, and this gate exists for future edits.
+
+    Parsed rather than pattern-matched, so target and value are paired by
+    position instead of by hope. Falls back to the first target when the line
+    does not parse (a `{...}` placeholder, an f-string, a ternary spanning the
+    assignment) so the previous behaviour still applies where it always did.
+    """
+    match = _ASSIGNMENT_RE.match(line)
+    if match is None:
+        return None
+    fallback = match.group("name")
+    try:
+        node = ast.parse(textwrap.dedent(line).strip()).body[0]
+    except (SyntaxError, ValueError, IndexError):
+        return fallback
+    if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+        return fallback
+    target, value = node.targets[0], node.value
+    if not isinstance(target, ast.Tuple) or not isinstance(value, ast.Tuple):
+        return fallback
+    if len(target.elts) != len(value.elts):
+        return fallback
+    for name_node, value_node in zip(target.elts, value.elts):
+        if not isinstance(name_node, ast.Name): continue
+        if not isinstance(value_node, ast.Constant): continue
+        if not isinstance(value_node.value, str): continue
+        if _VLLM_SPEC_RE.search(f'"{value_node.value}"'):
+            return name_node.id
+    return fallback
+
+
 def _install_commands(source):
     """The `pip install` commands of a cell, backslash continuations joined,
     because the command that consumes the selector is often wrapped.
@@ -156,10 +200,10 @@ def _selector_bindings():
             for line in source.splitlines():
                 if not _VLLM_SPEC_RE.search(line):
                     continue
-                match = _ASSIGNMENT_RE.match(line)
-                if match is None:
+                name = _bound_name(line)
+                if name is None:
                     continue
-                yield path, line.strip(), match.group("name"), commands
+                yield path, line.strip(), name, commands
 
 
 _BINDINGS = list(_selector_bindings())
@@ -383,6 +427,48 @@ def test_a_single_target_selector_is_recognised_as_an_assignment():
 
 def test_a_comparison_is_not_mistaken_for_an_assignment():
     assert _ASSIGNMENT_RE.match("    if _vllm == 'vllm==0.15.1':") is None
+
+
+def test_the_name_bound_is_the_one_holding_the_spec():
+    """The whole point of the binding check is that the command installs the
+    *pinned* selector. Pairing by position rather than by "first target" is
+    what makes that true when vLLM is not the first value.
+
+    Sabotage check: reverting `_bound_name` to `match.group("name")` turns the
+    second case red and leaves every other case in this file green, which is
+    exactly the hole being closed."""
+    for line, name in (
+        # The case the first-target reading gets wrong.
+        ("    _triton, _vllm = ('triton', 'vllm==0.15.1')", "_vllm"),
+        ("    _t, _u, _vllm = ('t', 'u', 'vllm==0.15.1')", "_vllm"),
+        # ...without disturbing the spelling every notebook uses today.
+        ("    _vllm, _triton = ('vllm==0.9.2', 'triton')", "_vllm"),
+        ("    _vllm = 'vllm==0.15.1'", "_vllm"),
+    ):
+        assert _bound_name(line) == name, line
+
+
+def test_a_line_that_does_not_parse_keeps_the_previous_behaviour():
+    """Selector lines are extracted one physical line at a time, so plenty of
+    them are not valid Python on their own. Falling back to the first target
+    keeps those exactly as strict as they were before, rather than dropping
+    them out of the binding check entirely."""
+    for line, name in (
+        # A placeholder the generator fills in later.
+        ("    _vllm, _t = ({SPEC}, 'triton')", "_vllm"),
+        # A ternary whose branches are not plain constants.
+        ("    _t, _vllm = ('t', 'vllm==0.15.1') if is_t4 else (_a, _b)", "_t"),
+        # Mismatched arity: nothing to pair by position.
+        ("    _t, _vllm = _pair", "_t"),
+    ):
+        assert _bound_name(line) == name, line
+
+
+def test_a_line_that_is_not_an_assignment_binds_nothing():
+    """`None` is what makes `_selector_bindings` skip a line, so this is the
+    difference between skipping and recording a binding named `None`."""
+    assert _bound_name("    if _vllm == 'vllm==0.15.1':") is None
+    assert _bound_name("    !pip install vllm==0.15.1") is None
 
 
 def test_a_bare_vllm_is_told_apart_from_a_pinned_or_interpolated_one():
