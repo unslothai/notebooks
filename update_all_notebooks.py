@@ -786,13 +786,18 @@ else:
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
+# A wheel, not a source build of `main`: every sglang release pins ONE exact
+# transformers, so cloning main and then forcing transformers==4.53.0 left the
+# two disagreeing.
+#
+# sglang pins torch==2.11.0, whose default CUDA build disagrees with Colab's
+# torchvision ("PyTorch has CUDA Version=13.0 and torchvision has CUDA
+# Version=12.8"). PEP 440 ignores a local label, so `torchvision==0.26.0` is
+# already satisfied by Colab's 0.26.0+cu128; force-reinstalling the same
+# version is what pulls it from the index the new torch came from.
 installation_sglang_content = """%%capture
-import sys
-import os
-!git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e "python[all]"
-!pip install -U transformers==4.53.0
-sys.path.append(f'{os.getcwd()}/sglang/')
-sys.path.append(f'{os.getcwd()}/sglang/python')"""
+!pip install "sglang[all]==0.5.16"
+!pip install --force-reinstall --no-deps "torchvision==0.26.0\""""
 installation_sglang_kaggle_content = installation_sglang_content
 
 installation_deepseek_ocr_content = installation_content
@@ -1251,6 +1256,16 @@ DONT_UPDATE_EXCEPTIONS = [
     "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb", # OpenEnv BF16 variant
     "Synthetic_Data_Hackathon.ipynb",                                  # Hackathon-specific notebook
     "Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb",       # Custom Sudoku RL environment
+]
+
+# Notebooks that get no AMD counterpart at all. `Gemma3N_(2B)-Inference` only
+# serves through sglang, which publishes no ROCm wheel: 0.5.16 wants CUDA-13
+# builds of torch==2.11.0 and sglang-kernel==0.4.5, so the Colab line would
+# drop a CUDA torch on top of the ROCm one. The AMD path is a prebuilt
+# `lmsysorg/sglang:v0.5.16-rocm*` image or a `setup_rocm.py` compile, neither
+# of which fits in an install cell.
+AMD_SKIP_NOTEBOOKS = [
+    "Gemma3N_(2B)-Inference.ipynb",
 ]
 
 # Notebooks that live ONLY under nb/ (not original_template/) but for which we
@@ -1843,6 +1858,17 @@ def _owns_extra_grpo_install_cell(notebook_path, cells, idx):
     if idx < 0 or idx >= len(cells):
         return False
     return cells[idx].get("cell_type") == "code"
+
+
+def _notebook_imports_sglang(notebook_content):
+    """Whether any code cell imports sglang."""
+    for cell in notebook_content.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        source = _cell_source_text(cell)
+        if re.search(r"^\s*(?:import\s+sglang|from\s+sglang)", source, re.MULTILINE):
+            return True
+    return False
 
 
 def _is_installation_heading(source_text, is_amd_notebook=False):
@@ -4360,13 +4386,6 @@ def update_notebook_sections(
                             else:
                                 installation = installation_sesame_csm_content
 
-                        # SGLANG INSTALLATION
-                        if is_path_contains_any(notebook_path.lower(), ["sglang"]):
-                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
-                                installation = installation_sglang_kaggle_content
-                            else:
-                                installation = installation_sglang_content
-
                         # QAT INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qat"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -4394,6 +4413,15 @@ def update_notebook_sections(
                                 installation = installation_gemma3n_kaggle_content
                             else:
                                 installation = installation_gemma3n_content
+
+                        # Keyed off the import: the only sglang notebook is named
+                        # Gemma3N_(2B)-Inference, so a filename match never fired and
+                        # Gemma3N overwrote it. Must stay after the Gemma3N branch.
+                        if _notebook_imports_sglang(notebook_content):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_sglang_kaggle_content
+                            else:
+                                installation = installation_sglang_content
 
                         # Gemma4 INSTALLATION: preserve the custom
                         # transformers==5.5.0 --no-deps + torchcodec block.
@@ -5949,6 +5977,9 @@ def copy_and_update_amd_notebooks(
         nb_path = os.path.join(destination_dir, basename)
         if os.path.isfile(nb_path):
             source_notebooks[basename] = nb_path
+    # Last, so it overrides every seeding path above.
+    for basename in AMD_SKIP_NOTEBOOKS:
+        source_notebooks.pop(basename, None)
 
     amd_paths = []
     for notebook_name, template_notebook_path in sorted(source_notebooks.items()):

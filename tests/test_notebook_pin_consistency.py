@@ -93,7 +93,9 @@ def test_notebook_pip_pins_match_generator_canonical_or_override(path: Path) -> 
     we care about, assert each is in the union of canonical PIN_*
     constants + the per-model override pins extracted from the
     generator."""
-    rel_path = str(path.relative_to(REPO_ROOT))
+    # as_posix, not str: on Windows str() gives `nb\X.ipynb`, which matches no
+    # key in _KNOWN_PIN_OUTLIERS, so every allowed outlier fires as drift.
+    rel_path = path.relative_to(REPO_ROOT).as_posix()
     bad: list[tuple[int, str, str]] = []
     for cell_idx, src in ni.iter_code_cells(path):
         for pkg, ver in ni.extract_pip_pins_from_cell(src):
