@@ -227,11 +227,19 @@ def test_one_unpinned_command_is_caught_beside_a_pinned_one():
 
 def test_at_least_one_notebook_actually_exercises_the_check():
     """A broken glob or fold would leave every parametrised case skipped and
-    the suite green."""
+    the suite green.
+
+    Deliberately not a floor near today's 46: retiring notebooks, or moving
+    them off `--upgrade`, is routine maintenance and must not fail a hard CI
+    gate that reports the scan as broken. A fold that silently stops matching
+    is caught directly by `test_the_scan_folds_continuations_before_matching`,
+    on a fixture that cannot match without the fold.
+    """
     exercised = [p.name for p in _NOTEBOOKS if _upgrades_torchvision(_code(p))]
-    assert len(exercised) >= 40, (
-        f"only {len(exercised)} notebooks reached the assertion; the scan is "
-        f"probably broken rather than the repo suddenly clean"
+    assert exercised, (
+        f"no notebook out of {len(_NOTEBOOKS)} reached the assertion, so every "
+        f"parametrised case skipped; the scan is broken rather than the repo "
+        f"suddenly clean"
     )
 
 
