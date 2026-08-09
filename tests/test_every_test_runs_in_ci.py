@@ -24,7 +24,8 @@ label left behind.
 """
 
 import re
-from pathlib import Path
+import shlex
+from pathlib import Path, PurePosixPath
 
 import pytest
 import yaml
@@ -77,18 +78,46 @@ def _shell_commands(block):
             for part in _SEPARATORS.split(line) if part.strip()]
 
 
+# Leading `FOO=bar` assignments belong to the command, not to a different one.
+_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_PYTHON = re.compile(r"^python[0-9.]*$")
+
+
+def _invokes_pytest(command):
+    """Whether pytest is what this command RUNS, not just a word inside it.
+
+    `pip install pytest ...` contains the word, and a step disabled as
+    `echo pytest tests/test_x.py` keeps it while running nothing.
+    """
+    try:
+        tokens = shlex.split(command)
+    except ValueError:      # an unbalanced quote, e.g. left by comment stripping
+        tokens = command.split()
+    while tokens and _ASSIGNMENT.match(tokens[0]):
+        tokens.pop(0)
+    if not tokens:
+        return False
+    head = PurePosixPath(tokens[0]).name    # `.venv/bin/pytest` is still pytest
+    if head in ("pytest", "py.test"):
+        return True
+    if not _PYTHON.match(head) or "-m" not in tokens:
+        return False
+    return tokens[tokens.index("-m") + 1:][:1] == ["pytest"]
+
+
 def _named_in_workflow():
     """Test files a `pytest` command in the workflow actually runs.
 
     Asking whether the whole `run:` block contains "pytest" and harvesting every
     filename in it reads a comment naming another test as coverage, so that test
-    can be absent from CI while the gate passes. Hence per command.
+    can be absent from CI while the gate passes. Hence per command, and per
+    command that really invokes pytest.
     """
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     named = set()
     for block in _run_commands(workflow):
         for command in _shell_commands(block):
-            if "pytest" not in command:
+            if not _invokes_pytest(command):
                 continue
             named.update(_TEST_FILE.findall(command))
     return named
@@ -130,10 +159,33 @@ def _named_in(text):
     """The gate's collection rule applied to one `run:` block."""
     named = set()
     for command in _shell_commands(text):
-        if "pytest" not in command:
+        if not _invokes_pytest(command):
             continue
         named.update(_TEST_FILE.findall(command))
     return named
+
+
+@pytest.mark.parametrize("command", [
+    "echo pytest tests/test_ghost.py",
+    'echo "skipping python -m pytest tests/test_ghost.py for now"',
+    "pip install pytest -r tests/test_requirements.py",
+    "grep -n pytest tests/test_ghost.py",
+], ids=["echo", "echo-quoted", "pip-install", "grep"])
+def test_a_command_that_only_mentions_pytest_is_not_coverage(command):
+    """Matching the word alone leaves the test absent from CI, gate still green."""
+    assert _named_in(command) == set()
+
+
+@pytest.mark.parametrize("command", [
+    "pytest tests/test_real.py -q",
+    "python -m pytest tests/test_real.py -q",
+    "python3.12 -m pytest tests/test_real.py -q",
+    "PYTHONPATH=. python -m pytest tests/test_real.py -q",
+    ".venv/bin/pytest tests/test_real.py -q",
+], ids=["bare", "module", "versioned", "env-prefix", "path"])
+def test_the_ways_we_really_invoke_pytest_still_count(command):
+    """The other direction: a covered test must not be reported missing."""
+    assert _named_in(command) == {"test_real.py"}
 
 
 def test_a_comment_beside_a_real_pytest_call_is_not_coverage():
