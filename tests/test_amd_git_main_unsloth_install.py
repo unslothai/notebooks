@@ -13,13 +13,11 @@
 
 """An AMD variant keeps the git-main unsloth upgrade its CUDA source uses.
 
-A source notebook only installs unsloth / unsloth_zoo from git main when it
-needs code no release carries yet (`FastDiffusionModel`, see
-`installation_diffusiongemma_content`). Both names are in
-`_AMD_INSTALL_PACKAGE_IGNORE` because the ROCm base cell owns their versions,
-and `_validate_amd_install_package_parity` subtracts that same set, so the
-upgrade used to vanish from the AMD variant with nothing to catch it: the
-notebook installed the PyPI build and died at `FastModel.from_pretrained`.
+A source installs unsloth / unsloth_zoo from git main only for code no release
+carries yet (`FastDiffusionModel`). Both names are in
+`_AMD_INSTALL_PACKAGE_IGNORE` and `_validate_amd_install_package_parity`
+subtracts that same set, so the upgrade used to vanish from the AMD variant
+uncaught: it installed the PyPI build and died at `FastModel.from_pretrained`.
 """
 from __future__ import annotations
 

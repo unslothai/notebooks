@@ -18,30 +18,21 @@
 
 """Installing transformers main with `--no-deps` means pinning its floors here.
 
-`--no-deps` is deliberate on those cells: without it pip re-resolves torch and
-replaces the CUDA build the runtime already has. The cost is that pip never
-enforces a single thing transformers declares. It prints a WARNING and exits 0,
-so the install looks fine and the notebook dies at the next import instead:
+`--no-deps` is deliberate: without it pip re-resolves torch and replaces the
+CUDA build the runtime already has. The cost is that pip enforces nothing
+transformers declares, so a short requirement only surfaces at the next import:
 
     safetensors>=0.8.0 is required for a normal functioning of this module,
     but found safetensors==0.7.0.
 
-That is one requirement of nine. Fixing whichever one surfaced first only moves
-the error to the next, which is how this same cell has now broken twice, on
-`huggingface_hub` and then on `safetensors`. So this gate is written against
-the whole requirement set rather than against the two names that have bitten.
+The cell has broken this way twice, on `huggingface_hub` then `safetensors`, so
+the gate covers the whole requirement set rather than the names that bit.
 
 `TRANSFORMERS_MAIN_REQUIREMENTS` is `install_requires` from transformers'
 `setup.py`, resolved through `src/transformers/dependency_versions_table.py`,
-at 5.15.0.dev0 (`e8ea728a`). `BASE_IMAGE_VERSIONS` is what Colab and Kaggle
-actually shipped at the point the notebook reaches that cell, read off executed
-notebooks rather than assumed. A requirement that either image fails is a
-requirement the notebook has to pin; the rest are satisfied already and pinning
-them would be noise.
-
-There is no network here on purpose: a test that resolves transformers main at
-run time fails on an unrelated upstream commit. When transformers moves a
-floor, move it in the table below and the notebooks go red together.
+at 5.15.0.dev0 (`e8ea728a`); `BASE_IMAGE_VERSIONS` is read off executed
+notebooks. Resolving main at run time would fail on unrelated upstream commits,
+so there is no network here: when transformers moves a floor, move the table.
 """
 
 import json
@@ -55,9 +46,7 @@ from packaging.version import Version
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NB_DIR = REPO_ROOT / "nb"
 
-# `install_requires` in transformers' setup.py at 5.15.0.dev0 (`e8ea728a`),
-# with each name expanded through dependency_versions_table.py. `typer` is
-# declared with no bound, so any installed version satisfies it.
+# `typer` is declared with no bound, so any installed version satisfies it.
 TRANSFORMERS_MAIN_REQUIREMENTS = {
     "huggingface-hub": ">=1.5.0,<2.0",
     "numpy": ">=1.17",
@@ -70,10 +59,9 @@ TRANSFORMERS_MAIN_REQUIREMENTS = {
     "tqdm": ">=4.60",
 }
 
-# What each image has installed by the time the git-main install runs, which is
-# not the same as what the image boots with: the Liquid LFM2 cells install
-# `transformers==4.56.2` first, and that pulls `huggingface_hub` back under 1.0
-# on both. Measured from executed notebooks, Colab A100 and Kaggle T4.
+# Not what the image boots with: the Liquid LFM2 cells install
+# `transformers==4.56.2` first, which pulls `huggingface_hub` back under 1.0 on
+# both. Measured from executed notebooks, Colab A100 and Kaggle T4.
 BASE_IMAGE_VERSIONS = {
     "colab": {
         "huggingface-hub": "0.36.2",
@@ -94,8 +82,8 @@ BASE_IMAGE_VERSIONS = {
         "regex": "2025.11.3",
         "tokenizers": "0.22.2",
         "typer": "0.24.2",
-        # The one that broke the notebook. Colab ships 0.8.0, Kaggle 0.7.0, so
-        # a Colab-only check reports this cell as healthy.
+        # The one that broke the notebook: Colab ships 0.8.0, so a Colab-only
+        # check reports this cell as healthy.
         "safetensors": "0.7.0",
         "tqdm": "4.67.3",
     },
@@ -103,16 +91,14 @@ BASE_IMAGE_VERSIONS = {
 
 # A version each requirement's own upper bound excludes. Under `--no-deps` an
 # open-ended floor resolves whatever is newest, so `huggingface_hub>=1.5.0`
-# alone installs hub 2.x the day it ships and transformers rejects it. A floor
-# without the cap is half a pin, so the notebook's specifier has to reject
-# these too. Requirements with no upper bound have nothing to sample.
+# alone installs hub 2.x the day it ships and transformers rejects it.
 ABOVE_THE_CAP = {
     "huggingface-hub": "2.0.0",
     "tokenizers": "0.24.0",
 }
 
-# The install this gate is about. `transformers==5.x` pins are a different
-# shape and already covered by test_transformers5_hub_floor.py.
+# `transformers==5.x` pins are a different shape, covered by
+# test_transformers5_hub_floor.py.
 _GIT_MAIN_TRANSFORMERS = re.compile(
     r"--no-deps[^\n]*git\+https://github\.com/huggingface/transformers")
 
@@ -150,7 +136,6 @@ def _install_cell_index(cells):
     return None
 
 
-# `huggingface_hub>=1.5.0,<2.0`, `"safetensors>=0.8.0"`, `-U tokenizers>=0.22`.
 # Underscore and hyphen spellings are the same distribution to pip.
 def _specifier_for(text, name):
     pattern = re.compile(
@@ -182,8 +167,7 @@ def test_some_notebook_installs_transformers_main_without_deps():
 
 
 def test_the_requirement_set_still_asks_for_something():
-    """Guard the guard. If a table edit ever leaves nothing unsatisfied, the
-    parametrised check would pass while pinning nothing at all."""
+    """A table edit leaving nothing unsatisfied would pass while pinning nothing."""
     needed = _requirements_needing_a_pin()
     assert "safetensors" in needed, (
         "safetensors>=0.8.0 against Kaggle's 0.7.0 is the case this file was "
@@ -242,9 +226,9 @@ def test_pins_respect_the_upper_bound(name, cells, install_index):
     "name, cells, install_index", _CASES,
     ids = lambda v: v if isinstance(v, str) and len(v) < 80 else "")
 def test_the_pins_are_not_left_behind_an_earlier_install(name, cells, install_index):
-    """Order matters: these notebooks install `transformers==4.56.2` first, and
-    that resolves `huggingface_hub` back under 1.0. A floor placed before it is
-    undone by it, silently, and the cell looks correct in a text scan."""
+    """These notebooks install `transformers==4.56.2` first, which resolves
+    `huggingface_hub` back under 1.0: an earlier floor is silently undone, and
+    the cell still looks correct in a text scan."""
     for package in _requirements_needing_a_pin():
         pinned_in = [index for index, source in enumerate(cells)
                      if _specifier_for(source, package) is not None]
@@ -255,8 +239,8 @@ def test_the_pins_are_not_left_behind_an_earlier_install(name, cells, install_in
 
 
 def test_a_floor_below_the_shipped_version_is_not_a_floor():
-    """The discriminating case for the comparison itself: `safetensors>=0.4.3`
-    reads as a pin and changes nothing, because Kaggle's 0.7.0 satisfies it."""
+    """`safetensors>=0.4.3` reads as a pin and changes nothing: Kaggle's 0.7.0
+    already satisfies it."""
     specifier = _specifier_for('!pip install "safetensors>=0.4.3"', "safetensors")
     assert specifier is not None
     assert specifier.contains(Version("0.7.0"))
@@ -265,8 +249,8 @@ def test_a_floor_below_the_shipped_version_is_not_a_floor():
 
 
 def test_the_underscore_spelling_is_read_as_the_same_package():
-    """Notebooks write `huggingface_hub`; transformers declares
-    `huggingface-hub`. Missing that reports a pinned notebook as unpinned."""
+    """Notebooks write `huggingface_hub`, transformers declares
+    `huggingface-hub`; missing that reports a pinned notebook as unpinned."""
     text = '!pip install "huggingface_hub>=1.5.0,<2.0"'
     specifier = _specifier_for(text, "huggingface-hub")
     assert specifier is not None
