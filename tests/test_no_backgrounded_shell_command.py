@@ -33,6 +33,12 @@ twice: `Gemma3N_(2B)-Inference` starting sglang, and
 The `&` is usually several backslash continuations below the `!`, so the
 scan folds continuations first. Matching per physical line finds the sglang
 family and misses the vLLM one entirely, which is how the second one survived.
+
+The scan covers every notebook directory the CI workflow watches, not just the
+generated `nb/`. `original_template/` is the INPUT the generator reads, so a
+backgrounded command added there passed an `nb/`-only gate and was then copied
+into `nb/` on the next regeneration, which is the exact hole the sglang command
+came through.
 """
 
 import json
@@ -42,25 +48,36 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-NB_DIR = REPO_ROOT / "nb"
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "notebooks-tests-ci.yml"
 
-# Known offenders, with the PR that fixes each and the exact command allowed.
-# The command matters, and it is compared whole rather than by a substring:
-# skipping on a name match would hide a second backgrounded command added to
-# that same notebook, and skipping on a marker like `sglang.launch_server`
-# would hide a second backgrounded *sglang* command just as thoroughly, plus
-# it would keep passing if this command itself were edited. A new one must fail
-# rather than be added here; this list only exists so the check can land before
-# the other fix does, and it should be emptied when that PR merges.
+# Every notebook root the workflow watches. `molab/` holds marimo `.py` today
+# and `python_scripts/` holds nbconvert output, so neither contributes a
+# notebook right now, but both are listed so a notebook appearing there is
+# scanned rather than silently exempt.
+ROOTS = ("nb", "original_template", "kaggle", "molab", "python_scripts")
+
+# Known offenders, keyed by repo-relative path, with the PR that fixes each and
+# the exact command allowed. The path matters: a template and its generated
+# copies share a basename, so a bare-filename key would grandfather every root
+# at once off one entry, which is the stale grandfathering this file exists to
+# prevent. The command matters too, and it is compared whole rather than by a
+# substring: skipping on a name match would hide a second backgrounded command
+# added to that same notebook, and skipping on a marker like
+# `sglang.launch_server` would hide a second backgrounded *sglang* command just
+# as thoroughly, plus it would keep passing if this command itself were edited.
+# A new one must fail rather than be added here; this list only exists so the
+# check can land before the other fix does, and it should be emptied when that
+# PR merges.
 _SGLANG = (
     "unslothai/notebooks#317",
     "!nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it"
     " --attention-backend fa3 --port 8000 > sglang.log &",
 )
 KNOWN = {
-    "Gemma3N_(2B)-Inference.ipynb": _SGLANG,
-    "Kaggle-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
-    "AMD-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
+    "original_template/Gemma3N_(2B)-Inference.ipynb": _SGLANG,
+    "nb/Gemma3N_(2B)-Inference.ipynb": _SGLANG,
+    "nb/Kaggle-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
+    "nb/AMD-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
 }
 
 
@@ -105,7 +122,21 @@ def _for_message(commands):
     return [c if len(c) <= 120 else c[:117] + "..." for c in commands]
 
 
-_NOTEBOOKS = sorted(NB_DIR.glob("*.ipynb")) if NB_DIR.is_dir() else []
+def _collect(repo_root):
+    """Every notebook under every watched root, as repo-relative paths."""
+    found = []
+    for root in ROOTS:
+        directory = repo_root / root
+        if directory.is_dir():
+            found += sorted(directory.rglob("*.ipynb"))
+    return found
+
+
+def _rel(path):
+    return Path(path).resolve().relative_to(REPO_ROOT).as_posix()
+
+
+_NOTEBOOKS = _collect(REPO_ROOT)
 
 
 def _unaccounted(name, commands):
@@ -122,21 +153,45 @@ def _unaccounted(name, commands):
     return [command for command in commands if command != allowed]
 
 
-@pytest.mark.parametrize("path", _NOTEBOOKS, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _NOTEBOOKS, ids=_rel)
 def test_no_notebook_backgrounds_a_shell_command(path):
-    found = _unaccounted(path.name, _backgrounded(path))
-    if path.name in KNOWN and not found:
-        pytest.skip(f"known, fixed by {KNOWN[path.name][0]}")
+    name = _rel(path)
+    found = _unaccounted(name, _backgrounded(path))
+    if name in KNOWN and not found:
+        pytest.skip(f"known, fixed by {KNOWN[name][0]}")
     assert not found, (
-        f"{path.name} ends a `!` command with `&`: {_for_message(found)}. "
+        f"{name} ends a `!` command with `&`: {_for_message(found)}. "
         f"ipykernel raises OSError on that, so the cell cannot run outside "
         f"Colab. Use subprocess.Popen"
     )
 
 
-def _stale(known, nb_dir):
+def _workflow_notebook_dirs():
+    """Top-level directories the CI workflow watches, from its own `paths:`."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    return sorted({m for m in re.findall(r"^\s+- '([^'/]+)/\*\*'", text, re.M)})
+
+
+def test_the_scan_covers_every_watched_directory_that_holds_notebooks():
+    """Guard the gate: a root left out is scanned by nothing, and an empty
+    collection would make the parametrised check above assert about no files at
+    all."""
+    watched = _workflow_notebook_dirs()
+    assert len(watched) >= 5, watched
+    missing = [
+        directory
+        for directory in watched
+        if directory not in ROOTS and any((REPO_ROOT / directory).rglob("*.ipynb"))
+    ]
+    assert not missing, f"the workflow watches these notebook dirs, add to ROOTS: {missing}"
+    scanned = {_rel(path).split("/")[0] for path in _NOTEBOOKS}
+    assert {"nb", "original_template", "kaggle"} <= scanned, scanned
+    assert len(_NOTEBOOKS) >= 500, len(_NOTEBOOKS)
+
+
+def _stale(known, repo_root):
     """Entries the repo has outgrown: the notebook stopped offending, or it is
-    gone entirely.
+    gone entirely. Keys are repo-relative, so the root is joined here.
 
     The missing-file arm matters because #317 does not fix
     `AMD-Gemma3N_(2B)-Inference` so much as delete it, along with its
@@ -147,7 +202,7 @@ def _stale(known, nb_dir):
     """
     stale = []
     for name, (_pr, allowed) in known.items():
-        path = nb_dir / name
+        path = repo_root / name
         if not path.is_file():
             stale.append(name)
         elif allowed not in _backgrounded(path):
@@ -158,7 +213,7 @@ def _stale(known, nb_dir):
 def test_the_known_list_still_describes_reality():
     """A name that no longer offends, or no longer exists, must leave the list,
     or it hides the next regression in that notebook."""
-    stale = _stale(KNOWN, NB_DIR)
+    stale = _stale(KNOWN, REPO_ROOT)
     assert not stale, f"fixed, edited or deleted, so update KNOWN: {stale}"
 
 
@@ -172,14 +227,14 @@ def test_a_present_and_still_offending_notebook_is_not_reported():
     """The other side of it, so the check cannot pass by calling everything
     stale."""
     name = next(iter(KNOWN))
-    assert name not in _stale({name: KNOWN[name]}, NB_DIR)
+    assert name not in _stale({name: KNOWN[name]}, REPO_ROOT)
 
 
 def test_a_second_offender_in_a_known_notebook_is_not_hidden():
     """The name match used to skip the whole notebook, so another backgrounded
     command added beside the sglang one would never be reported."""
     name, (_pr, _allowed) = next(iter(KNOWN.items()))
-    commands = _backgrounded(NB_DIR / name) + ["!python other_server.py &"]
+    commands = _backgrounded(REPO_ROOT / name) + ["!python other_server.py &"]
     assert _unaccounted(name, commands) == ["!python other_server.py &"]
 
 
@@ -188,7 +243,7 @@ def test_a_second_sglang_command_is_not_hidden():
     too, and the notebook would go on skipping instead of reporting it."""
     name, (_pr, _allowed) = next(iter(KNOWN.items()))
     second = "!nohup python -m sglang.launch_server --port 8001 > two.log &"
-    commands = _backgrounded(NB_DIR / name) + [second]
+    commands = _backgrounded(REPO_ROOT / name) + [second]
     assert _unaccounted(name, commands) == [second]
 
 
@@ -207,8 +262,8 @@ def test_the_known_command_survives_extraction_whole():
     _name, (_pr, allowed) = next(iter(KNOWN.items()))
     assert len(allowed) > 120
     for name in KNOWN:
-        if (NB_DIR / name).is_file():
-            assert allowed in _backgrounded(NB_DIR / name)
+        if (REPO_ROOT / name).is_file():
+            assert allowed in _backgrounded(REPO_ROOT / name)
 
 
 def test_a_double_ampersand_is_not_backgrounding():
