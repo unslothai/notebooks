@@ -43,7 +43,7 @@
 # get_ipython().system('uv pip install --system -qqq "transformers==4.56.2" sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer')
 # get_ipython().system('uv pip install --system -qqq --no-deps "torchcodec==0.5" accelerate peft')
 # get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
-# get_ipython().system('uv pip install --system -qqq --no-build-isolation "mamba_ssm==2.2.5" "causal_conv1d==1.5.2"')
+# get_ipython().system('uv pip install --system -qqq --no-build-isolation "mamba_ssm==2.3.2.post1" "causal_conv1d==1.6.2.post1"')
 # 
 # 
 # # ### Unsloth

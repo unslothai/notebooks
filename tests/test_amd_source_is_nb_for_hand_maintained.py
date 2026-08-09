@@ -14,9 +14,10 @@
 """An AMD variant must not be minted from an abandoned template.
 
 For `DONT_UPDATE_EXCEPTIONS`, `nb/` is the source of truth and the
-`original_template/` copy is left behind: `Advanced_Llama3_1_(3B)_GRPO_LoRA`
-had drifted to `weight_decay = 0.1` under `nb/` against `0.001` in the
-template, so the AMD reader got hyperparameters nobody chose.
+`original_template/` copy is left behind: `Advanced_Llama3_1_(3B)_GRPO_LoRA` sat
+at `weight_decay = 0.1` under `nb/` and `0.001` under the template, so the AMD
+reader got hyperparameters nobody chose. Three of the eleven exceptions have
+both a stale template and an AMD variant.
 """
 from __future__ import annotations
 
@@ -58,7 +59,8 @@ def _hand_maintained_with_amd(gen):
 
 
 def test_the_drifted_pair_is_still_present(gen):
-    """Without drift the check below would pass for the wrong reason."""
+    """If the template is ever refreshed this says so, rather than the check
+    below passing for the wrong reason."""
     drifted = [name for name in _hand_maintained_with_amd(gen)
                if (TEMPLATE_DIR / name).is_file()
                and _code_cells(TEMPLATE_DIR / name) != _code_cells(NB_DIR / name)]
@@ -66,7 +68,8 @@ def test_the_drifted_pair_is_still_present(gen):
 
 
 def test_an_amd_variant_follows_nb_not_the_template(gen):
-    """Non-install code cells come from `nb/`; the install cell is rewritten."""
+    """Every non-install code cell must come from `nb/`; the install cell is
+    rewritten for ROCm by design."""
     mismatched = []
     for name in _hand_maintained_with_amd(gen):
         if not (TEMPLATE_DIR / name).is_file():
@@ -90,7 +93,8 @@ _COLAB_BADGE = (
 
 
 def test_a_bare_colab_badge_counts_as_a_stale_announcement(gen):
-    """No "to run this, press", so the check walked past it."""
+    """No "to run this, press", so it walked past the check and the AMD variant
+    kept a button pointing at the CUDA notebook."""
     assert gen._is_stale_amd_announcement(_COLAB_BADGE)
 
 

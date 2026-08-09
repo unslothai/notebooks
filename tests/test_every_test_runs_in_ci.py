@@ -14,24 +14,84 @@
 """A test nothing runs is not a gate.
 
 `notebooks-tests-ci.yml` names each test file in its own step rather than
-discovering `tests/`, which is fine until someone adds a file and forgets.
-Three had already drifted off the list, including
-`test_transformers5_hub_floor.py`, added with the hub floor it guards.
+discovering `tests/`, which is fine until someone adds a file and forgets --
+three had already drifted off the list. This fails on the file you just wrote
+rather than months later when the regression ships.
+
+It reads the `run:` commands, not the file text: every step names its test in
+`name:` too, so a text scan stayed green when a command was replaced and its
+label left behind.
 """
 
 import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "notebooks-tests-ci.yml"
 TESTS = REPO_ROOT / "tests"
 
+_TEST_FILE = re.compile(r"tests/([A-Za-z0-9_]+\.py)")
+
+
+def _run_commands(node):
+    """Every `run:` string in the workflow, at any nesting depth."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "run" and isinstance(value, str):
+                yield value
+            else:
+                yield from _run_commands(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _run_commands(item)
+
+
+# `#` only starts a comment at a word boundary, leaving `...#subdirectory=x`
+# in a URL alone.
+_COMMENT = re.compile(r"(?<!\S)#.*$")
+# A pytest call must not vouch for what runs beside it.
+_SEPARATORS = re.compile(r";|&&|\|\|")
+
+
+def _shell_commands(block):
+    """The individual commands in one `run:` block, comments stripped and
+    continuations folded, so a filename is collected only from a line that
+    executes it."""
+    folded, pending = [], ""
+    for raw in block.splitlines():
+        line = _COMMENT.sub("", raw).rstrip()
+        if not line.strip():
+            continue
+        if line.endswith("\\"):
+            pending += " " + line[:-1].strip()
+            continue
+        pending += " " + line.strip()
+        folded.append(pending.strip())
+        pending = ""
+    if pending.strip():
+        folded.append(pending.strip())
+    return [part.strip() for line in folded
+            for part in _SEPARATORS.split(line) if part.strip()]
+
 
 def _named_in_workflow():
-    text = WORKFLOW.read_text(encoding="utf-8")
-    return set(re.findall(r"tests/([A-Za-z0-9_]+\.py)", text))
+    """Test files a `pytest` command in the workflow actually runs.
+
+    Asking whether the whole `run:` block contains "pytest" and harvesting every
+    filename in it reads a comment naming another test as coverage, so that test
+    can be absent from CI while the gate passes. Hence per command.
+    """
+    workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    named = set()
+    for block in _run_commands(workflow):
+        for command in _shell_commands(block):
+            if "pytest" not in command:
+                continue
+            named.update(_TEST_FILE.findall(command))
+    return named
 
 
 def test_the_workflow_is_where_we_think_it_is():
@@ -45,3 +105,81 @@ def test_every_test_file_has_a_ci_step(path):
         f"{path.name} is never run by notebooks-tests-ci.yml. Add a step for "
         f"it, or the tests in it are decoration."
     )
+
+
+def test_a_label_without_a_command_does_not_count(tmp_path, monkeypatch):
+    """The failure this file exists to catch: a step keeps its `name:` while
+    its command is replaced, and nothing says so."""
+    workflow = tmp_path / "ci.yml"
+    workflow.write_text(
+        "# tests/test_ghost.py is mentioned here too\n"
+        "jobs:\n"
+        "  lint:\n"
+        "    steps:\n"
+        "      - name: tests/test_ghost.py\n"
+        "        run: echo skipped\n"
+        "      - name: tests/test_real.py\n"
+        "        run: python -m pytest tests/test_real.py -q\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("tests.test_every_test_runs_in_ci.WORKFLOW", workflow)
+    assert _named_in_workflow() == {"test_real.py"}
+
+
+def _named_in(text):
+    """The gate's collection rule applied to one `run:` block."""
+    named = set()
+    for command in _shell_commands(text):
+        if "pytest" not in command:
+            continue
+        named.update(_TEST_FILE.findall(command))
+    return named
+
+
+def test_a_comment_beside_a_real_pytest_call_is_not_coverage():
+    """Harvesting every filename in a block that contains "pytest" counts the
+    commented one."""
+    block = (
+        "set -euxo pipefail\n"
+        "# tests/test_ghost.py is coming in a follow-up\n"
+        "python -m pytest tests/test_real.py -q\n"
+    )
+    assert _named_in(block) == {"test_real.py"}
+
+
+def test_a_non_pytest_command_beside_a_pytest_one_is_not_coverage():
+    """`echo` and `ls` name files too, so splitting on the separators keeps a
+    pytest call from vouching for its neighbours."""
+    block = (
+        "echo tests/test_echoed.py\n"
+        "python -m pytest tests/test_real.py -q\n"
+        "ls tests/test_listed.py && cat tests/test_catted.py\n"
+    )
+    assert _named_in(block) == {"test_real.py"}
+
+
+def test_a_pytest_call_split_over_a_continuation_still_counts():
+    """Without folding, a wrapped command reads as a missing test."""
+    block = (
+        "python -m pytest \\\n"
+        "    tests/test_wrapped.py \\\n"
+        "    -q --tb=short\n"
+    )
+    assert _named_in(block) == {"test_wrapped.py"}
+
+
+def test_a_url_fragment_is_not_read_as_a_comment():
+    """`#subdirectory=` must survive comment stripping, or the command is
+    truncated and its filenames lost."""
+    block = (
+        "pip install 'x @ git+https://example.com/x.git@abc#subdirectory=y'\n"
+        "python -m pytest tests/test_after_url.py -q\n"
+    )
+    assert _named_in(block) == {"test_after_url.py"}
+    assert any("subdirectory=y" in c for c in _shell_commands(block))
+
+
+def test_the_real_workflow_still_reports_its_pytest_files():
+    """A fold or split that stopped matching would leave the gate asserting
+    against an empty set."""
+    assert len(_named_in_workflow()) >= 10
