@@ -14,8 +14,8 @@
 """A second install cell behind its own heading must still be AMD-stripped.
 
 `_adjacent_install_like_code_cells` stopped at the first non-code cell, so an
-install cell introduced by its own markdown heading was invisible. Qwen3_5_MoE
-and Qwen3_6_MoE put a CUDA-wheel resolver behind "### Install
+install cell behind its own markdown heading was invisible. Qwen3_5_MoE and
+Qwen3_6_MoE put a CUDA-wheel resolver behind "### Install
 flash-linear-attention and causal-conv-1d", it survived into the AMD variant,
 and `_assert_amd_install_runtime` refused the whole `--amd` run -- blocking all
 153 AMD notebooks.

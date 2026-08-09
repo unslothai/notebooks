@@ -385,7 +385,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 1024,
 model.save_pretrained("grpo_lora")  # Local saving
 tokenizer.save_pretrained("grpo_lora")
 # model.push_to_hub("your_name/grpo_lora", token = "...") # Online saving
-# processor.push_to_hub("your_name/grpo_lora", token = "...") # Online saving
+# tokenizer.push_to_hub("your_name/grpo_lora", token = "...") # Online saving
 
 
 # Verify LoRA is actually trained!

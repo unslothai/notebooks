@@ -681,9 +681,10 @@ installation_amd_extras_grpo = """\
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 """
 
-# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off. The
-# CUDA sources they are minted from never carried it, so it lives here or a
-# regeneration drops it.
+# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off, so
+# unsloth.kernels.moe.autotune_cache hands back heuristic configs instead of
+# searching per device capability. Their CUDA sources never carried it, so it
+# lives here or a regeneration drops it.
 installation_amd_extras_qwen3_moe = """\
 import os; os.environ["UNSLOTH_MOE_DISABLE_AUTOTUNE"] = "1"
 """
@@ -743,6 +744,22 @@ installation_qwen3_vl_kaggle_content  = update_or_append_pip_install(
     "!pip install transformers==4.57.1",
 )
 
+# LFM2.5-VL is an `lfm2_vl` checkpoint, and that architecture landed in
+# transformers 4.57.0, so the canonical 4.56.2 cannot load it: the notebook
+# stopped at "`LiquidAI/LFM2.5-VL-1.6B` is not supported yet in
+# `transformers==4.56.2`". The text LFM2.5 notebooks are `lfm2`, which 4.56.2
+# does have, so only the vision one moves.
+installation_lfm2_vl_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==4.57.1",
+)
+installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.57.1",
+)
+
 installation_qwen3_5_content = """%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
@@ -769,13 +786,18 @@ else:
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
+# A wheel, not a source build of `main`: every sglang release pins ONE exact
+# transformers, so cloning main and then forcing transformers==4.53.0 left the
+# two disagreeing.
+#
+# sglang pins torch==2.11.0, whose default CUDA build disagrees with Colab's
+# torchvision ("PyTorch has CUDA Version=13.0 and torchvision has CUDA
+# Version=12.8"). PEP 440 ignores a local label, so `torchvision==0.26.0` is
+# already satisfied by Colab's 0.26.0+cu128; force-reinstalling the same
+# version is what pulls it from the index the new torch came from.
 installation_sglang_content = """%%capture
-import sys
-import os
-!git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e "python[all]"
-!pip install -U transformers==4.53.0
-sys.path.append(f'{os.getcwd()}/sglang/')
-sys.path.append(f'{os.getcwd()}/sglang/python')"""
+!pip install "sglang[all]==0.5.16"
+!pip install --force-reinstall --no-deps "torchvision==0.26.0\""""
 installation_sglang_kaggle_content = installation_sglang_content
 
 installation_deepseek_ocr_content = installation_content
@@ -793,13 +815,28 @@ installation_ernie_4_5_vl_kaggle_content = installation_kaggle_content
 installation_ernie_4_5_vl_kaggle_content += """\n!pip install decord"""
 
 installation_nemotron_nano_content = """%%capture
-import os, importlib.util
+import os, importlib.util, subprocess
 !pip install --upgrade -qqq uv
+# mamba_ssm 2.2.5 / causal_conv1d 1.5.2 ship wheels for torch 2.7.1 only, so
+# pin it: without a wheel they build from source and the cell takes ~30 min.
+# That wheel stops at sm_90, so Blackwell (cc 10 and 12) keeps its own torch
+# and the newer pair, and pays the build. T4/A100/L4 stay on the fast path.
+# Read from nvidia-smi, not torch: importing torch and then replacing it under
+# the live kernel breaks torchvision ("torchvision::nms does not exist").
+try: _cc = int(subprocess.run(["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"], capture_output=True, text=True).stdout.split()[0].split(".")[0])
+except: _cc = 0
+if _cc >= 10:
+    # Safe to import: this branch pins torch to what is already loaded.
+    try: import torch as _t; _torch = f"torch=={_t.__version__.split('+')[0]}"
+    except: _torch = "torch"
+    _mamba, _conv = "mamba_ssm==2.3.2.post1", "causal_conv1d==1.6.2.post1"
+else:
+    _torch, _mamba, _conv = "torch==2.7.1", "mamba_ssm==2.2.5", "causal_conv1d==1.5.2"
 if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
-        "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
+        {_torch} "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
     !uv pip install -qqq --no-deps "torchcodec==0.5"
@@ -807,8 +844,9 @@ elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps transformers==4.56.2 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 
-# Mamba is supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes!
-!uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2
+# Prebuilt for the torch pinned above. On Blackwell this builds from source,
+# which is the wait, not a failure.
+!uv pip install --no-build-isolation {_mamba} {_conv}
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
@@ -1218,6 +1256,16 @@ DONT_UPDATE_EXCEPTIONS = [
     "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb", # OpenEnv BF16 variant
     "Synthetic_Data_Hackathon.ipynb",                                  # Hackathon-specific notebook
     "Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb",       # Custom Sudoku RL environment
+]
+
+# Notebooks that get no AMD counterpart at all. `Gemma3N_(2B)-Inference` only
+# serves through sglang, which publishes no ROCm wheel: 0.5.16 wants CUDA-13
+# builds of torch==2.11.0 and sglang-kernel==0.4.5, so the Colab line would
+# drop a CUDA torch on top of the ROCm one. The AMD path is a prebuilt
+# `lmsysorg/sglang:v0.5.16-rocm*` image or a `setup_rocm.py` compile, neither
+# of which fits in an install cell.
+AMD_SKIP_NOTEBOOKS = [
+    "Gemma3N_(2B)-Inference.ipynb",
 ]
 
 # Notebooks that live ONLY under nb/ (not original_template/) but for which we
@@ -1747,8 +1795,8 @@ def validate_notebook_syntax(notebook_path):
 _RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
 _RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
 # A heading introducing a dependency install, e.g. "### Install
-# flash-linear-attention and causal-conv-1d". Not `_RE_INSTALL_SECTION_MD`,
-# which also matches "setup" anywhere in the line.
+# flash-linear-attention". Not `_RE_INSTALL_SECTION_MD`, which also matches
+# "setup" anywhere in the line and so accepts "### Setup the model".
 _RE_DEPENDENCY_HEADING = re.compile(r"^#+\s*(?:\d+[.)]\s*)?install", re.IGNORECASE)
 
 
@@ -1812,6 +1860,17 @@ def _owns_extra_grpo_install_cell(notebook_path, cells, idx):
     return cells[idx].get("cell_type") == "code"
 
 
+def _notebook_imports_sglang(notebook_content):
+    """Whether any code cell imports sglang."""
+    for cell in notebook_content.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        source = _cell_source_text(cell)
+        if re.search(r"^\s*(?:import\s+sglang|from\s+sglang)", source, re.MULTILINE):
+            return True
+    return False
+
+
 def _is_installation_heading(source_text, is_amd_notebook=False):
     stripped = source_text.strip()
     if stripped == "### Installation":
@@ -1831,10 +1890,10 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
     """Install cells following `first_code_idx`, stepping over their headings.
 
     Stopping at the first non-code cell missed a second install cell behind its
-    own heading: Qwen3_5_MoE and Qwen3_6_MoE hide a CUDA-wheel resolver there,
-    it survived into the AMD variant, and `_assert_amd_install_runtime` refused
-    the whole `--amd` run. The heading is returned too, or it would be left
-    pointing at nothing.
+    own heading: Qwen3_5_MoE / Qwen3_6_MoE hid a CUDA-wheel resolver behind
+    "### Install flash-linear-attention and causal-conv-1d", which survived into
+    the AMD variant and made `_assert_amd_install_runtime` refuse the whole
+    `--amd` run. The heading comes back too, or it would point at nothing.
     """
     install_cells = []
     idx = first_code_idx + 1
@@ -1842,10 +1901,10 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
     while idx < len(cells):
         cell = cells[idx]
         if cell.get("cell_type") == "markdown":
-            # Only a dependency-install heading, and only right before an
-            # install cell. Any heading used to qualify, and the cell behind it
-            # then passed on that heading alone: `### Start Unsloth Studio`
-            # collected the Studio launch code, which the caller deletes.
+            # Only a dependency-install heading. When any heading qualified,
+            # the cell behind it passed `_is_install_like_cell` on that alone,
+            # so `### Start Unsloth Studio` collected the Studio launch code,
+            # which the caller deletes.
             text = _cell_source_text(cell).strip()
             if len(text.splitlines()) > 1 or not _RE_DEPENDENCY_HEADING.match(text):
                 break
@@ -1857,10 +1916,10 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
         if cell.get("cell_type") != "code":
             break
         source_text = _cell_source_text(cell)
-        # After a heading the cell must look like an install on its own
-        # content: `_is_install_like_cell` also answers yes on the preceding
-        # markdown, so "### Install the trainer" over ordinary code qualified
-        # it and the caller deletes both.
+        # Past the first cell, judge on the cell's own content:
+        # `_is_install_like_cell` also says yes for the preceding markdown, so
+        # "### Install the trainer" over ordinary code would qualify it and the
+        # caller would delete both.
         if pending_headings or install_cells:
             if not _is_install_code(source_text):
                 break
@@ -1896,8 +1955,8 @@ def _is_stale_amd_announcement(source_text):
         for marker in ("google colab", "open in colab", "tesla t4", "runtime")
     ):
         return True
-    # A bare "Open in Colab" badge, how some hand-maintained notebooks open. It
-    # carries no "to run this, press", so the test above walked past it and the
+    # A bare "Open in Colab" badge, which is how some hand-maintained notebooks
+    # open. With no "to run this, press" the test above walked past it and the
     # AMD variant kept a button pointing at the CUDA notebook.
     stripped = source_text.strip()
     return (
@@ -2656,6 +2715,14 @@ _AMD_VARIABLE_PACKAGE_FALLBACKS = {
     "{_numpy}": "numpy",
     "{_pil}": "pillow",
     "{xformers}": "xformers",
+    # Unresolved these key to nothing and the whole --no-build-isolation group
+    # is dropped. ROCm never gets the torch 2.7.1 CUDA wheel 2.2.5/1.5.2 needs,
+    # so AMD takes the newer pair unconditionally.
+    "{_mamba}": "mamba_ssm==2.3.2.post1",
+    "{_conv}": "causal_conv1d==1.6.2.post1",
+    # torch is owned by the ROCm bootstrap and already ignored; named so the
+    # variable is never emitted literally into a %%bash cell.
+    "{_torch}": "torch",
 }
 
 _AMD_PIP_VALUE_FLAGS = {
@@ -2882,6 +2949,60 @@ def _extract_preserved_setup_lines(text):
     return preserved
 
 
+# unsloth / unsloth_zoo sit in _AMD_INSTALL_PACKAGE_IGNORE and the parity
+# validator subtracts the same set, so dropping them is invisible. A source
+# installs them from git main only for a feature no release carries yet
+# (FastDiffusionModel), so the git specs are re-emitted in the extras cell.
+_AMD_GIT_MAIN_PROJECTS = frozenset({"unsloth", "unsloth_zoo"})
+
+
+def _iter_install_tokens(text):
+    """Install tokens from `!pip install ...` lines and `_pip(...)` blocks."""
+    for arg_string in _iter_pip_install_arg_strings(text):
+        yield from _split_pip_args(arg_string)
+    in_pip_call = False
+    pip_call_lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not in_pip_call and not line.startswith("_pip("):
+            continue
+        in_pip_call = True
+        pip_call_lines.append(line)
+        if ")" not in line:
+            continue
+        block = "\n".join(pip_call_lines)
+        for match in re.findall(r"\"([^\"]+)\"|'([^']+)'", block):
+            yield match[0] or match[1]
+        in_pip_call = False
+        pip_call_lines = []
+
+
+def _extract_git_main_unsloth_specs(source_install_texts):
+    """Git URLs for unsloth / unsloth_zoo the source installs from main.
+
+    Both the bare ``git+https://...`` form and the PEP 508 ``unsloth[base] @
+    git+https://...`` reference count. Only the URL half is kept, since the AMD
+    re-install is ``--no-deps`` and an extra would be a no-op.
+    """
+    specs = []
+    seen = set()
+    for text in source_install_texts:
+        if not text:
+            continue
+        for token in _iter_install_tokens(text):
+            spec = _clean_install_spec(token)
+            if " @ " in spec:
+                spec = spec.split(" @ ", 1)[1].strip()
+            if not spec.startswith("git+"):
+                continue
+            if _package_key_from_install_token(spec) not in _AMD_GIT_MAIN_PROJECTS:
+                continue
+            if spec not in seen:
+                seen.add(spec)
+                specs.append(spec)
+    return specs
+
+
 _AMD_SHELL_BARE_RE = re.compile(r'^[A-Za-z0-9_\-./+:@]+$')
 
 
@@ -3082,6 +3203,16 @@ def _compose_amd_installation(notebook_path, source_install_texts):
         _pin_qat_numpy_beside_fbgemm(merged_groups)
     if setup_lines:
         extra_blocks.append("\n".join(setup_lines))
+    git_main_specs = _extract_git_main_unsloth_specs(source_install_texts)
+    if git_main_specs:
+        # --no-deps keeps the ROCm stack the base cell just installed. That
+        # cell's own "unsloth[amd]" is --no-deps too, so overwriting it with
+        # main loses nothing.
+        extra_blocks.append(
+            _format_amd_pip_call(
+                ("--upgrade", "--force-reinstall", "--no-deps"), git_main_specs
+            )
+        )
     for flags, specs in merged_groups.items():
         if specs:
             extra_blocks.append(_format_amd_pip_call(flags, specs))
@@ -4319,13 +4450,6 @@ def update_notebook_sections(
                             else:
                                 installation = installation_sesame_csm_content
 
-                        # SGLANG INSTALLATION
-                        if is_path_contains_any(notebook_path.lower(), ["sglang"]):
-                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
-                                installation = installation_sglang_kaggle_content
-                            else:
-                                installation = installation_sglang_content
-
                         # QAT INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qat"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -4353,6 +4477,15 @@ def update_notebook_sections(
                                 installation = installation_gemma3n_kaggle_content
                             else:
                                 installation = installation_gemma3n_content
+
+                        # Keyed off the import: the only sglang notebook is named
+                        # Gemma3N_(2B)-Inference, so a filename match never fired and
+                        # Gemma3N overwrote it. Must stay after the Gemma3N branch.
+                        if _notebook_imports_sglang(notebook_content):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_sglang_kaggle_content
+                            else:
+                                installation = installation_sglang_content
 
                         # Gemma4 INSTALLATION: preserve the custom
                         # transformers==5.5.0 --no-deps + torchcodec block.
@@ -4383,6 +4516,13 @@ def update_notebook_sections(
                             else:
                                 installation = installation_deepseek_ocr_content
                                 
+                        # LFM2.5-VL INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["lfm2.5_vl"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_lfm2_vl_kaggle_content
+                            else:
+                                installation = installation_lfm2_vl_content
+
                         # Qwen3VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qwen3"]) and is_vision:
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -5818,8 +5958,8 @@ def _news_insert_index(cells):
 def _restore_news_section(amd_path, template_path, new_announcement):
     """Give an nb/-sourced AMD notebook the News section its template carries.
 
-    Only `original_template/` has News cells, so minting from `nb/` dropped the
-    `### News` heading and its announcement. News is generator-owned
+    Only `original_template/` carries News cells, so minting an AMD variant
+    from `nb/` dropped the heading and announcement. News is generator-owned
     boilerplate, so it still comes from the template.
     """
     try:
@@ -5892,8 +6032,8 @@ def copy_and_update_amd_notebooks(
             continue
         source_notebooks.setdefault(basename, path)
     # For DONT_UPDATE_EXCEPTIONS, nb/ is the source of truth and the template
-    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` sits at weight_decay
-    # 0.1 under nb/ and 0.001 under original_template/, so sourcing from the
+    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` is weight_decay 0.1
+    # under nb/ and 0.001 under original_template/, so sourcing from the
     # template gave the AMD variant hyperparameters nobody chose.
     for basename in DONT_UPDATE_EXCEPTIONS:
         if basename not in amd_base_names:
@@ -5901,6 +6041,9 @@ def copy_and_update_amd_notebooks(
         nb_path = os.path.join(destination_dir, basename)
         if os.path.isfile(nb_path):
             source_notebooks[basename] = nb_path
+    # Last, so it overrides every seeding path above.
+    for basename in AMD_SKIP_NOTEBOOKS:
+        source_notebooks.pop(basename, None)
 
     amd_paths = []
     for notebook_name, template_notebook_path in sorted(source_notebooks.items()):
@@ -5945,9 +6088,9 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
     return sorted(list(only_in_nb))
 
 
-# Any heading depth: a template exports `# ### Installation`, a hand-maintained
-# `nb/` source `# # Installation`, and that difference left the install cells
-# live in the .py, where `get_ipython()` is not defined.
+# Any heading depth: a template exports `# ### Installation` but a
+# hand-maintained `nb/` source exports `# # Installation`, and that difference
+# left the install cells live in the .py, where `get_ipython()` is undefined.
 _RE_SCRIPT_INSTALL_HEADING = re.compile(r"^# #+ Installation\b", re.MULTILINE)
 _RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 
@@ -5955,10 +6098,10 @@ _RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 def remove_unwanted_section(script_content):
     start_match = _RE_SCRIPT_INSTALL_HEADING.search(script_content)
     start_index = -1 if start_match is None else start_match.start()
-    # From the Installation heading onwards, never from the top: several
-    # notebooks open on an intro `# Unsloth` heading, and matching that as the
-    # terminator puts the end before the start, discarding the range and leaving
-    # the install cells live. The old three-hash literal missed it by accident.
+    # Search from the Installation heading, never from the top: notebooks like
+    # `Falcon_H1_(0.5B)-Alpaca` open on an intro `# Unsloth` heading, and taking
+    # that as the terminator puts the end before the start, discarding the range
+    # and leaving the install cells live.
     end_match = (
         None if start_match is None
         else _RE_SCRIPT_UNSLOTH_HEADING.search(script_content, start_match.end())

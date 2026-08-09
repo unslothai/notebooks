@@ -43,6 +43,7 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 
 os.environ["FLA_TILELANG"] = "0"
+get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 get_ipython().system('uv pip install --system -qqq --no-deps "torchcodec==0.7.0"')
 get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 get_ipython().system('uv pip install --system -qqq "transformers==5.2.0" vllm')
@@ -393,7 +394,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 1024,
 model.save_pretrained("qwen_lora")  # Local saving
 tokenizer.save_pretrained("qwen_lora")
 # model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
-# processor.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Verify LoRA is actually trained!
