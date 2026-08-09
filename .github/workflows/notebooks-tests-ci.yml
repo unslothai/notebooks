@@ -6,6 +6,7 @@
 #   1. notebook-lint (HARD GATE, every PR, ~2-3 min, no torch installed)
 #      tests/test_notebook_json_validity.py
 #      tests/test_notebook_pin_consistency.py
+#      tests/test_nemo_gym_uv_interpreter.py
 #      tests/test_notebook_amd_install_parity.py
 #      tests/test_python_scripts_regen_parity.py  (live nbconvert)
 #
@@ -109,6 +110,15 @@ jobs:
       - name: tests/test_notebook_amd_install_parity.py
         run: |
           python -m pytest tests/test_notebook_amd_install_parity.py -q --tb=short
+
+      - name: tests/test_nemo_gym_uv_interpreter.py
+        # The NeMo Gym setup cell must let uv fetch the interpreter
+        # Gym/.python-version pins instead of naming one itself. Colab's
+        # preinstalled uv cannot reach that release without an upgrade
+        # first, and satisfying only the floor lands on a 3.14 that
+        # cannot build yappi.
+        run: |
+          python -m pytest tests/test_nemo_gym_uv_interpreter.py -q --tb=short
 
       - name: tests/test_amd_install_heading_adjacency.py
         # The parity test above reads the COMMITTED nb/AMD-*.ipynb, which stay
