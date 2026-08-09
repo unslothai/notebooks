@@ -120,6 +120,13 @@ jobs:
         run: |
           python -m pytest tests/test_nemo_gym_uv_interpreter.py -q --tb=short
 
+      - name: tests/test_synthetic_data_hackathon_generation.py
+        # The in-notebook generator skips itself once data/final/ holds a
+        # *.json, so a run that dies mid-publish must leave nothing behind
+        # that a later run would accept and train on.
+        run: |
+          python -m pytest tests/test_synthetic_data_hackathon_generation.py -q --tb=short
+
       - name: tests/test_amd_install_heading_adjacency.py
         # The parity test above reads the COMMITTED nb/AMD-*.ipynb, which stay
         # valid while stale. This one drives the collector directly, so it sees
