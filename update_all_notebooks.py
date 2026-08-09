@@ -795,9 +795,19 @@ installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 # Version=12.8"). PEP 440 ignores a local label, so `torchvision==0.26.0` is
 # already satisfied by Colab's 0.26.0+cu128; force-reinstalling the same
 # version is what pulls it from the index the new torch came from.
+#
+# torchaudio is the same story and needs the same line. sglang 0.5.16 does pin
+# `torchaudio==2.11.0`, but that pin is already satisfied by Colab's
+# 2.11.0+cu128, so pip leaves the CUDA 12.8 build in place next to the new
+# CUDA 13.0 torch. torchaudio checks the two at import and raises
+# "Detected that PyTorch and TorchAudio were compiled with different CUDA
+# versions", and sglang imports torchaudio (srt/utils/common.py, the multimodal
+# processors, the realtime session), so launch_server never comes up. PyPI's
+# torchaudio 2.11.0 is itself a +cu130 build, so pulling it from the same index
+# as torch is all that is needed.
 installation_sglang_content = """%%capture
 !pip install "sglang[all]==0.5.16"
-!pip install --force-reinstall --no-deps "torchvision==0.26.0\""""
+!pip install --force-reinstall --no-deps "torchvision==0.26.0" "torchaudio==2.11.0\""""
 installation_sglang_kaggle_content = installation_sglang_content
 
 installation_deepseek_ocr_content = installation_content

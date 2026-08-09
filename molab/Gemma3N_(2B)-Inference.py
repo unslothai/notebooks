@@ -3,6 +3,7 @@
 # dependencies = [
 #     "marimo",
 #     "sglang[all]==0.5.16",
+#     "torchaudio==2.11.0",
 #     "torchvision==0.26.0",
 # ]
 #
