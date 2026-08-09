@@ -810,13 +810,28 @@ installation_ernie_4_5_vl_kaggle_content = installation_kaggle_content
 installation_ernie_4_5_vl_kaggle_content += """\n!pip install decord"""
 
 installation_nemotron_nano_content = """%%capture
-import os, importlib.util
+import os, importlib.util, subprocess
 !pip install --upgrade -qqq uv
+# mamba_ssm 2.2.5 / causal_conv1d 1.5.2 ship wheels for torch 2.7.1 only, so
+# pin it: without a wheel they build from source and the cell takes ~30 min.
+# That wheel stops at sm_90, so Blackwell (cc 10 and 12) keeps its own torch
+# and the newer pair, and pays the build. T4/A100/L4 stay on the fast path.
+# Read from nvidia-smi, not torch: importing torch and then replacing it under
+# the live kernel breaks torchvision ("torchvision::nms does not exist").
+try: _cc = int(subprocess.run(["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"], capture_output=True, text=True).stdout.split()[0].split(".")[0])
+except: _cc = 0
+if _cc >= 10:
+    # Safe to import: this branch pins torch to what is already loaded.
+    try: import torch as _t; _torch = f"torch=={_t.__version__.split('+')[0]}"
+    except: _torch = "torch"
+    _mamba, _conv = "mamba_ssm==2.3.2.post1", "causal_conv1d==1.6.2.post1"
+else:
+    _torch, _mamba, _conv = "torch==2.7.1", "mamba_ssm==2.2.5", "causal_conv1d==1.5.2"
 if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
-        "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
+        {_torch} "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
     !uv pip install -qqq --no-deps "torchcodec==0.5"
@@ -824,8 +839,9 @@ elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps transformers==4.56.2 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 
-# Mamba is supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes!
-!uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2
+# Prebuilt for the torch pinned above. On Blackwell this builds from source,
+# which is the wait, not a failure.
+!uv pip install --no-build-isolation {_mamba} {_conv}
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
@@ -2673,6 +2689,14 @@ _AMD_VARIABLE_PACKAGE_FALLBACKS = {
     "{_numpy}": "numpy",
     "{_pil}": "pillow",
     "{xformers}": "xformers",
+    # Unresolved these key to nothing and the whole --no-build-isolation group
+    # is dropped. ROCm never gets the torch 2.7.1 CUDA wheel 2.2.5/1.5.2 needs,
+    # so AMD takes the newer pair unconditionally.
+    "{_mamba}": "mamba_ssm==2.3.2.post1",
+    "{_conv}": "causal_conv1d==1.6.2.post1",
+    # torch is owned by the ROCm bootstrap and already ignored; named so the
+    # variable is never emitted literally into a %%bash cell.
+    "{_torch}": "torch",
 }
 
 _AMD_PIP_VALUE_FLAGS = {
