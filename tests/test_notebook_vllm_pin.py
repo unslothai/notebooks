@@ -113,9 +113,13 @@ def _upgrading(commands):
     return [command for command in commands if "--upgrade" in command]
 
 
-# A bare `vllm` requirement: not `{_vllm}`, not `vllm==0.15.1`, not the
-# `vllm-project/vllm` in a URL, not `vllm_requirements.txt`.
-_BARE_VLLM_RE = re.compile(r"(?<![\w{=./\[-])vllm(?![\w}=./\[-])")
+# A vLLM requirement written straight into a shell command with no exact
+# version: `vllm`, `vllm[audio]`, `vllm>=0.15.1`. An extras suffix is part of
+# the name, so skipping over it is what tells `vllm[audio]` (unpinned, and the
+# same CUDA 13 failure) apart from `vllm[audio]==0.15.1` (pinned). Not
+# `{_vllm}` or `{get_vllm}`, not `vllm==0.15.1`, not `vllm_requirements.txt`,
+# not the `vllm-project/vllm` of a URL.
+_BARE_VLLM_RE = re.compile(r"(?<![\w{=./\[-])vllm(?:\[[^\]\s]*\])?(?![\w}=./\[-])")
 
 
 def _selector_bindings():
@@ -304,14 +308,24 @@ def test_a_bare_vllm_is_told_apart_from_a_pinned_or_interpolated_one():
     for command in (
         "!uv pip install -qqq --upgrade unsloth vllm torchvision",
         "!pip install --upgrade vllm",
+        # Extras are part of the name, not a version. Without the extras hop
+        # the `[` ended the match and an unpinned extras install read as clean.
+        "!uv pip install --upgrade vllm[audio]",
+        "!uv pip install --upgrade unsloth vllm[audio,video] torchvision",
+        # A range resolves the latest that satisfies it, so it is not a pin.
+        "!uv pip install --upgrade vllm>=0.15.1",
     ):
         assert _BARE_VLLM_RE.search(command), command
     for command in (
         "!uv pip install -qqq --upgrade unsloth {_vllm} torchvision",
         "!uv pip install -qqq --upgrade unsloth {get_vllm} torchvision",
         '!uv pip install --upgrade "vllm==0.15.1"',
+        "!uv pip install --upgrade vllm==0.15.1",
+        '!uv pip install --upgrade "vllm[audio]==0.15.1"',
+        "!uv pip install --upgrade vllm[audio]==0.15.1",
         "!pip install --upgrade -r vllm_requirements.txt",
         "!pip install --upgrade git+https://github.com/vllm-project/vllm",
+        "!pip install --upgrade unsloth[vllm]==2026.8.9",
     ):
         assert not _BARE_VLLM_RE.search(command), command
 
