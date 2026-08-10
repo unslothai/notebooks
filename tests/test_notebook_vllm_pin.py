@@ -168,7 +168,17 @@ def _bound_name(line):
 # A line that is itself the pip install rather than a selector feeding one.
 # Anchored on the invocation, so a selector line that merely mentions pip
 # installing in a comment stays in the binding check.
-_INSTALL_COMMAND_RE = re.compile(r"^\s*[!%]?\s*(?:uv\s+)?pip\s+install\b")
+#
+# `python -m pip install` is the same command by pip's own documented syntax,
+# and it is how this repo already spells it: 156 install lines under nb/ use
+# it, all of them in the AMD cells. Reading only the bare `pip` left
+# `!python -m pip install -U "vllm==0.15.1"` looking like a selector line that
+# binds no name, so a correctly pinned install would have failed
+# `test_no_detected_selector_line_escapes_the_binding_check` -- the gate
+# rejecting the very spelling it asks for.
+_INSTALL_COMMAND_RE = re.compile(
+    r"^\s*[!%]?\s*(?:uv\s+|python[0-9.]*\s+-m\s+)?pip\s+install\b"
+)
 
 
 def _installs_the_requirement_directly(line):
@@ -606,6 +616,29 @@ def test_the_exemption_does_not_swallow_a_selector_assignment():
         'uv pip install --system -U "vllm==0.15.1"',
     ):
         assert _installs_the_requirement_directly(command), command
+
+
+def test_the_module_invocation_is_the_same_install():
+    """`python -m pip install` is pip's own documented syntax and the spelling
+    this repo already uses, 156 install lines of it under nb/. Reading only the
+    bare `pip` made a correctly pinned `!python -m pip install -U
+    "vllm==0.15.1"` look like a selector line binding no name, so the gate
+    would have rejected the spelling it asks for."""
+    for command in (
+        '!python -m pip install -U "vllm==0.15.1"',
+        '!python3 -m pip install "vllm==0.15.1"',
+        '%python -m pip install "vllm==0.15.1"',
+        # `%%bash` cells carry no `!`, which is where the repo's own uses live.
+        'python3.12 -m pip install --root-user-action=ignore "vllm==0.15.1"',
+    ):
+        assert _installs_the_requirement_directly(command), command
+    # Still anchored on a real invocation: prose about the module form, and a
+    # module that is not pip, both stay in the binding check.
+    for line in (
+        "    _vllm = 'vllm==0.15.1'  # then python -m pip install it",
+        '    !python -m build install "vllm==0.15.1"',
+    ):
+        assert not _installs_the_requirement_directly(line), line
 
 
 def test_a_line_that_is_not_an_assignment_binds_nothing():
