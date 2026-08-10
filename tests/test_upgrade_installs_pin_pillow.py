@@ -174,22 +174,44 @@ def _excluded_shell_upgrades():
 _RE_PLACEHOLDER = re.compile(r"(?<!\$)\{(\w+)\}")
 
 
+# The pin has to name the version ALREADY IMPORTED into the kernel, which only
+# a read off the live module can promise. An exact literal is not the same
+# thing: against a kernel holding Pillow 12, `pillow==11.3.0` is still a pin,
+# and pip still swaps the on-disk Pillow beneath the cached `PIL` -- downwards
+# this time, but the same replacement, and the same broken `_imaging`. So a
+# literal satisfies the letter of "pinned" while reproducing the exact failure
+# this gate exists to stop. Only `pillow=={PIL.__version__}` leaves pip with
+# the requirement already satisfied and nothing to install.
+#
+# This is what the gate's own message has always prescribed, and what all 84
+# Pillow pins under nb/ are already written as, so the narrower rule rejects
+# nothing the repo does today.
+#
+# `(?i:pillow)` because pip folds distribution names per PEP 503, while
+# `PIL.__version__` stays case-sensitive: it is a Python attribute, and
+# `pil.__version__` is a NameError rather than a quieter spelling.
+_PILLOW_PIN = r"(?i:pillow)\s*==\s*\{\s*PIL\.__version__\s*\}"
+_PILLOW_PIN_RE = re.compile(_PILLOW_PIN)
+
+
 def _pins_pillow(command, source):
     """Whether THIS command pins Pillow, not whether the notebook mentions it.
 
     Dropping `{get_pil}` from the install while leaving `get_pil = ...` a few
     lines above still satisfies a whole-notebook search, and the upgrade
     resolves a fresh Pillow exactly as before. So a placeholder counts only
-    when the notebook assigns that name an EXACT pin: the `get_pil = "pillow"`
-    fallback, or a range like `pillow>=11`, is the failure rather than a pin.
+    when the notebook assigns that name a pin READ OFF THE LOADED MODULE: the
+    `get_pil = "pillow"` fallback, a range like `pillow>=11`, and a literal
+    `pillow==11.3.0` are each the failure rather than a pin against it. See
+    `_PILLOW_PIN` on why an exact literal is not enough.
 
     Comments go first, because commenting a pin out is how one gets dropped and
     the pattern is anchored on the name, not the start of a line: so
-    `# get_pil = "pillow==11.3.0"` read as live and left the gate green over an
-    install reaching an undefined placeholder.
+    `# get_pil = f'pillow=={PIL.__version__}'` read as live and left the gate
+    green over an install reaching an undefined placeholder.
     """
     command, source = ni.strip_comments(command), ni.strip_comments(source)
-    if re.search(r"pillow\s*==", command, re.I):
+    if _PILLOW_PIN_RE.search(command):
         return True
     for name in _RE_PLACEHOLDER.findall(command):
         # `[^\n;]` stops at the end of the statement. These notebooks chain both
@@ -199,8 +221,8 @@ def _pins_pillow(command, source):
         # (`if get_pil == "pillow==11.3.0":`) and a keyword argument both read as
         # live pins. `_ASSIGNMENT_RE` in the vLLM gate draws the same line.
         assignment = re.search(
-            rf"(?:^|[;:])\s*{re.escape(name)}\s*=(?!=)\s*[^\n;]*pillow\s*==",
-            source, re.I | re.M,
+            r"(?:^|[;:])\s*" + re.escape(name) + r"\s*=(?!=)\s*[^\n;]*" + _PILLOW_PIN,
+            source, re.M,
         )
         if assignment:
             return True
@@ -267,10 +289,24 @@ def test_a_pinned_torchvision_install_without_upgrade_is_not_flagged():
 _DEFINES_PIL = "try: import PIL; get_pil = f'pillow=={PIL.__version__}'"
 
 
-@pytest.mark.parametrize("pin", ["pillow==11.3.0", "Pillow==11.3.0"])
-def test_a_literal_pin_in_the_command_counts(pin):
-    command = f"!uv pip install --upgrade {pin} torchvision"
+@pytest.mark.parametrize("name", ["pillow", "Pillow", "PILLOW"])
+def test_a_pin_written_into_the_command_counts(name):
+    """Spelled inline rather than through a placeholder, and in any case pip
+    accepts, since PEP 503 folds the distribution name."""
+    command = f"!uv pip install --upgrade {name}=={{PIL.__version__}} torchvision"
     assert _pins_pillow(command, command)
+
+
+@pytest.mark.parametrize("pin", ["pillow==11.3.0", "Pillow==11.3.0"])
+def test_an_exact_literal_is_not_a_pin_against_the_loaded_pillow(pin):
+    """The version that matters is the one already in `sys.modules`, and a
+    literal only equals it by luck. Against a kernel holding Pillow 12,
+    `pillow==11.3.0` is exact and still makes pip replace Pillow underneath the
+    cached `PIL`, which is the mismatch verbatim. Accepting it let a command
+    reproduce the failure while reading as pinned."""
+    command = f"!uv pip install --upgrade {pin} torchvision"
+    assert _upgrades_torchvision(command) == [command]
+    assert not _pins_pillow(command, command)
 
 
 def test_an_interpolated_pin_counts_when_the_notebook_defines_it():
@@ -302,13 +338,22 @@ def test_a_placeholder_naming_something_else_does_not_count():
 
 @pytest.mark.parametrize(
     "definition",
-    ['get_pil = "pillow"', "get_pil = 'pillow>=11.3.0'", 'get_pil = "Pillow"'],
-    ids=["unversioned", "range", "unversioned-capitalised"],
+    [
+        'get_pil = "pillow"',
+        "get_pil = 'pillow>=11.3.0'",
+        'get_pil = "Pillow"',
+        'get_pil = "pillow==11.3.0"',
+    ],
+    ids=["unversioned", "range", "unversioned-capitalised", "literal"],
 )
-def test_a_placeholder_that_is_not_an_exact_pin_does_not_count(definition):
+def test_a_placeholder_that_is_not_read_off_the_loaded_pillow_does_not_count(
+    definition,
+):
     """These notebooks already carry `except: get_pil = "pillow"`, so the
     unversioned spelling is one deleted line away -- and passing it to an
-    `--upgrade` install is the failure, not a pin against it."""
+    `--upgrade` install is the failure, not a pin against it. A literal exact
+    version is the same failure wearing a pin's clothes: it only matches the
+    loaded Pillow by luck, and pip replaces the package whenever it does not."""
     command = "!uv pip install --upgrade {get_pil} torchvision"
     assert not _pins_pillow(command, definition + "\n" + command)
 
@@ -430,7 +475,7 @@ def test_a_no_deps_install_cannot_pull_a_new_pillow():
     named = "!uv pip install -U --no-deps pillow torchvision"
     assert _upgrades_torchvision(named) == [named]
     assert not _pins_pillow(named, named)
-    pinned = "!uv pip install -U --no-deps pillow==11.3.0 torchvision"
+    pinned = "!uv pip install -U --no-deps pillow=={PIL.__version__} torchvision"
     assert _upgrades_torchvision(pinned) == [pinned]
     assert _pins_pillow(pinned, pinned)
 
@@ -568,7 +613,7 @@ def test_a_case_variant_torchvision_is_still_torchvision():
         assert _upgrades_torchvision(command) == [command], command
         assert not _pins_pillow(command, command)
     # The pin still counts whatever case either name is written in.
-    pinned = "!uv pip install --upgrade Pillow==11.3.0 TorchVision"
+    pinned = "!uv pip install --upgrade Pillow=={PIL.__version__} TorchVision"
     assert _upgrades_torchvision(pinned) == [pinned]
     assert _pins_pillow(pinned, pinned)
 
@@ -598,7 +643,7 @@ def test_a_reinstall_is_a_replacing_install():
         assert _upgrades_torchvision(command) == [command], command
         assert not _pins_pillow(command, command)
     # Pinned in the same command, it is a pin rather than a resolve.
-    pinned = "!pip install --force-reinstall pillow==11.3.0 torchvision"
+    pinned = "!pip install --force-reinstall pillow=={PIL.__version__} torchvision"
     assert _upgrades_torchvision(pinned) == [pinned]
     assert _pins_pillow(pinned, pinned)
     # `--reinstall-package` replaces one named package, not the environment.
@@ -621,9 +666,9 @@ def test_only_a_real_assignment_defines_the_pin():
     # assignment opens the line or follows the `try:`/`;` of a chained one.
     for source in (
         _DEFINES_PIL,
-        'get_pil = "pillow==11.3.0"',
-        '    get_pil = "pillow==11.3.0"',
-        'try: get_pil = "pillow==11.3.0"',
+        "get_pil = f'pillow=={PIL.__version__}'",
+        "    get_pil = f'pillow=={PIL.__version__}'",
+        "try: get_pil = f'pillow=={PIL.__version__}'",
     ):
         assert _pins_pillow(command, source + "\n" + command), source
 
@@ -643,7 +688,7 @@ def test_a_shell_variable_is_not_read_as_a_python_placeholder():
     """`${PIL_PIN}` is a shell expansion, and reading it as `{PIL_PIN}` let a
     bash assignment satisfy a probe written for an f-string pin."""
     command = "uv pip install -U torchvision ${PIL_PIN}"
-    source = 'PIL_PIN="pillow==11.0.0"\n' + command
+    source = 'PIL_PIN="pillow=={PIL.__version__}"\n' + command
     assert not _pins_pillow(command, source)
     assert _pins_pillow("!uv pip install -U torchvision {get_pil}", _DEFINES_PIL)
 
