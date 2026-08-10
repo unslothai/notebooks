@@ -223,6 +223,19 @@ jobs:
         run: |
           python -m pytest tests/test_sglang_torchvision_rebuild.py -q --tb=short
 
+      - name: tests/test_sglang_launch_cell_guards.py
+        # sglang-kernel's wheels carry no kernel below compute capability
+        # 8.0, so a T4 session has to be turned away in the cell rather
+        # than inside the server subprocess.
+        run: |
+          python -m pytest tests/test_sglang_launch_cell_guards.py -q --tb=short
+
+      - name: tests/test_notebook_image_urls_load.py
+        # Downloads every sample image the notebooks fetch, so a link that
+        # rots upstream fails here rather than in a user's PIL traceback.
+        run: |
+          python -m pytest tests/test_notebook_image_urls_load.py -q --tb=short
+
       - name: tests/test_no_torch_import_before_torch_pin.py
         run: |
           python -m pytest tests/test_no_torch_import_before_torch_pin.py -q --tb=short

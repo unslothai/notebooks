@@ -44,6 +44,31 @@
 # In[2]:
 
 
+# sglang publishes no Turing kernels. sgl-kernel dropped its compute_75
+# gencode flag in sgl-project/sglang#9207, so the sglang-kernel 0.4.5 that
+# sglang 0.5.16 pins carries SASS for sm_80, sm_89, sm_90, sm_90a, sm_100a,
+# sm_103a and sm_120a, and no PTX to JIT a Turing kernel from. On a T4
+# (sm_75) `import sgl_kernel` raises while the server is still parsing its
+# arguments, and all this cell would report is "Server process exited with
+# code 1". Check the GPU first and name the fix.
+import torch
+
+if not torch.cuda.is_available():
+    raise RuntimeError(
+        "sglang needs an NVIDIA GPU, and this session has none. Switch the "
+        "runtime to one with an L4 or A100 attached."
+    )
+
+_capability = torch.cuda.get_device_capability()
+if _capability < (8, 0):
+    raise RuntimeError(
+        f"sglang cannot run on this GPU: {torch.cuda.get_device_name(0)} is "
+        f"compute capability {_capability[0]}.{_capability[1]}, and the "
+        "sglang-kernel wheels carry kernels for compute capability 8.0 and "
+        "newer only. Switch the runtime to an Ampere or newer GPU, such as "
+        "an L4 or an A100."
+    )
+
 # Load and run the model using sglang.
 #
 # Popen, not `!... &`: IPython's `system_piped`, which every kernel except
@@ -51,15 +76,43 @@
 # or papermill this cell could never run.
 # Backend left to sglang: `fa3` is Hopper (sm90) only, so it fails on the
 # T4 / L4 / A100 a session actually hands out.
-import subprocess, sys
+import glob, os, subprocess, sys
 from sglang.utils import wait_for_server
+
+# sglang-kernel's common_ops library links libnvrtc.so.13 and carries no
+# RUNPATH, so it loads only if that exact file is already in the process or
+# on the loader path. torch preloads one libnvrtc by absolute path
+# (`_preload_cuda_deps` in torch/__init__.py) and looks in
+# `nvidia/cuda_nvrtc/lib` before `nvidia/cu13/lib`. A session that still
+# carries the CUDA 12 `nvidia-cuda-nvrtc-cu12` wheel beside the CUDA 13 one
+# -- which Colab does, because installing sglang replaces torch but leaves
+# the old torch's NVIDIA wheels installed -- therefore preloads
+# libnvrtc.so.12 and never .so.13, and the server exits inside
+# `import sgl_kernel` with "libnvrtc.so.13: cannot open shared object
+# file". Hand the child the directory holding the libnvrtc that matches
+# this torch.
+_site_packages = os.path.dirname(os.path.dirname(torch.__file__))
+_cuda_major = (torch.version.cuda or "").split(".")[0]
+_nvrtc_dirs = sorted({
+    os.path.dirname(_path)
+    for _path in glob.glob(os.path.join(
+        _site_packages, "nvidia", "*", "lib", f"libnvrtc.so.{_cuda_major}",
+    ))
+}) if _cuda_major else []
+
+_env = dict(os.environ)
+if _nvrtc_dirs:
+    _previous = _env.get("LD_LIBRARY_PATH", "")
+    _env["LD_LIBRARY_PATH"] = os.pathsep.join(
+        _nvrtc_dirs + ([_previous] if _previous else [])
+    )
 
 log = open("sglang.log", "w")
 server = subprocess.Popen(
     [sys.executable, "-m", "sglang.launch_server",
      "--model-path", "unsloth/gemma-3n-E2B-it",
      "--port", "8000"],
-    stdout = log, stderr = subprocess.STDOUT,
+    stdout = log, stderr = subprocess.STDOUT, env = _env,
 )
 
 # Both arguments matter. `wait_for_server` defaults to timeout = None, which is
@@ -97,7 +150,17 @@ import requests
 from io import BytesIO
 
 def load_image_from_url(url):
-    response = requests.get(url)
+    response = requests.get(url, timeout = 60)
+    # A moved or deleted file still answers, with a 404 whose body is text.
+    # `Image.open` on that reports "cannot identify image file <BytesIO ...>",
+    # which names neither the URL nor the status, so check the response.
+    response.raise_for_status()
+    content_type = response.headers.get("Content-Type", "")
+    if not content_type.startswith("image/"):
+        raise ValueError(
+            f"{url} answered with Content-Type {content_type!r}, not an "
+            f"image. The link has most likely moved or been deleted."
+        )
     img = Image.open(BytesIO(response.content))
     return img
 
@@ -129,7 +192,7 @@ def process_image(image: ImageFile) -> str:
 # ## Gemma3n Inference using sglang (source model: https://huggingface.co/unsloth/gemma-3n-E2B-it)
 
 # ## Inference 1
-# Image source file "https://raw.githubusercontent.com/sgl-project/sglang/refs/heads/main/test/lang/example_image.png"
+# Image source file "https://raw.githubusercontent.com/sgl-project/sglang/196b940aed024fd4a072dcae9f96d3ce153e57ed/examples/assets/example_image.png"
 
 # load image from url source
 
@@ -137,7 +200,7 @@ def process_image(image: ImageFile) -> str:
 
 
 from IPython.display import display
-image = load_image_from_url("https://raw.githubusercontent.com/sgl-project/sglang/refs/heads/main/test/lang/example_image.png")
+image = load_image_from_url("https://raw.githubusercontent.com/sgl-project/sglang/196b940aed024fd4a072dcae9f96d3ce153e57ed/examples/assets/example_image.png")
 display(image)
 
 
