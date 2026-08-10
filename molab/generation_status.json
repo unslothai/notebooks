@@ -78,7 +78,7 @@
   "ModernBert": "ok",
   "Muse_Glimmer_(30B)-Conversational": "ok",
   "Muse_Glimmer_(30B)-GRPO": "ok",
-  "Muse_Glimmer_(30B)-Multimodal": "failed: RuntimeError: marimo check failed: critical[unparsable-cells]: Notebook contains unparsable code",
+  "Muse_Glimmer_(30B)-Multimodal": "ok",
   "Muse_Glimmer_(30B)-Vision": "ok",
   "NeMo-Gym-Multi-Environment": "ok",
   "NeMo-Gym-Sudoku": "ok",

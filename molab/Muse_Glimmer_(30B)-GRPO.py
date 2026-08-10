@@ -327,7 +327,7 @@ def _(mo):
 
 @app.cell
 def _(model, tokenizer):
-    # tokenizer is an Muse GlimmerProcessor, the text tokenizer is one level down
+    # tokenizer is a MuseGlimmerProcessor, the text tokenizer is one level down
     _text_tokenizer = getattr(tokenizer, "tokenizer", tokenizer)
     print("eos before:", _text_tokenizer.eos_token, _text_tokenizer.eos_token_id)
     _text_tokenizer.eos_token = "<|eot|>"
@@ -490,7 +490,7 @@ def _(ANSWER_PREFIX, ANSWER_SUFFIX, tokenizer):
         + "72"
         + ANSWER_SUFFIX
     )
-    # tokenizer is an Muse GlimmerProcessor, so text has to be passed by keyword
+    # tokenizer is a MuseGlimmerProcessor, so text has to be passed by keyword
     _ids = tokenizer(text=_with, add_special_tokens=False)["input_ids"]
     if len(_ids) and isinstance(_ids[0], (list, tuple)):
         _ids = _ids[0]
@@ -597,7 +597,7 @@ def _(REASONING_STRENGTH, dataset, max_seq_length, tokenizer):
     def prompt_length(messages):
         """Token count of a rendered prompt.
 
-        tokenizer is an Muse GlimmerProcessor, and its apply_chat_template returns a string here rather
+        tokenizer is a MuseGlimmerProcessor, and its apply_chat_template returns a string here rather
         than ids, so render first and tokenize explicitly instead of taking len() of the result.
         """
         text = tokenizer.apply_chat_template(

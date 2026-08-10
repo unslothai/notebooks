@@ -224,7 +224,7 @@ print(model.config.model_type, type(model).__name__)
 # In[ ]:
 
 
-# tokenizer is an Muse GlimmerProcessor, the text tokenizer is one level down
+# tokenizer is a MuseGlimmerProcessor, the text tokenizer is one level down
 _text_tokenizer = getattr(tokenizer, "tokenizer", tokenizer)
 print("eos before:", _text_tokenizer.eos_token, _text_tokenizer.eos_token_id)
 _text_tokenizer.eos_token = "<|eot|>"
@@ -343,7 +343,7 @@ def split_channels(text):
 
 # sanity check on both decodings of the same completion
 _with    = " to=self<|message|>48/2 = 24, 48+24 = 72.<|eom|>" + ANSWER_PREFIX + "72" + ANSWER_SUFFIX
-# tokenizer is an Muse GlimmerProcessor, so text has to be passed by keyword
+# tokenizer is a MuseGlimmerProcessor, so text has to be passed by keyword
 _ids     = tokenizer(text = _with, add_special_tokens = False)["input_ids"]
 if len(_ids) and isinstance(_ids[0], (list, tuple)): _ids = _ids[0]
 _without = tokenizer.decode(_ids, skip_special_tokens = True)
@@ -428,7 +428,7 @@ import numpy as np
 def prompt_length(messages):
     """Token count of a rendered prompt.
 
-    tokenizer is an Muse GlimmerProcessor, and its apply_chat_template returns a string here rather
+    tokenizer is a MuseGlimmerProcessor, and its apply_chat_template returns a string here rather
     than ids, so render first and tokenize explicitly instead of taking len() of the result.
     """
     text = tokenizer.apply_chat_template(messages, tokenize = False, add_generation_prompt = True,

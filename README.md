@@ -828,6 +828,7 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **ModernBert** | Classification | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ModernBert.py) |
 | **Muse Glimmer** **(30B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Muse_Glimmer_(30B)-Conversational.py) |
 | **Muse Glimmer** **(30B)** | GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Muse_Glimmer_(30B)-GRPO.py) |
+| **Muse Glimmer** **(30B)** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Muse_Glimmer_(30B)-Multimodal.py) |
 | **Muse Glimmer** **(30B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Muse_Glimmer_(30B)-Vision.py) |
 | **NeMo Gym Multi Environment** | Multi Environment | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/NeMo-Gym-Multi-Environment.py) |
 | **NeMo Gym Sudoku** | Sudoku | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/NeMo-Gym-Sudoku.py) |
