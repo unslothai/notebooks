@@ -43,18 +43,40 @@ ROOTS = ("nb", "original_template", "kaggle", "molab", "python_scripts")
 # Known offenders, keyed by repo-relative path (a template and its copies share
 # a basename) and pinned to the exact command (a name or marker match would hide
 # a second backgrounded command in the same notebook). A new offender must fail
-# rather than join the list, which should be emptied when #317 merges.
-_SGLANG = (
-    "unslothai/notebooks#317",
+# rather than join this list.
+#
+# Empty, and meant to stay that way. #317 rewrote the sglang launch onto
+# subprocess.Popen in the template and its two surviving copies, and deleted the
+# AMD one, which retired all four entries this list ever held.
+KNOWN = {}
+
+# The mechanics below -- what `_unaccounted` filters and what `_stale` reports --
+# are properties of the filter, not of whatever the repo happens to be
+# grandfathering today. They are exercised against this fixture so they keep
+# testing the filter with KNOWN empty, instead of quietly testing nothing.
+_SAMPLE_NAME = "nb/Sample-Offender.ipynb"
+_SAMPLE_COMMAND = (
     "!nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it"
-    " --attention-backend fa3 --port 8000 > sglang.log &",
+    " --attention-backend fa3 --port 8000 > sglang.log &"
 )
-KNOWN = {
-    "original_template/Gemma3N_(2B)-Inference.ipynb": _SGLANG,
-    "nb/Gemma3N_(2B)-Inference.ipynb": _SGLANG,
-    "nb/Kaggle-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
-    "nb/AMD-Gemma3N_(2B)-Inference.ipynb": _SGLANG,
-}
+_SAMPLE = {_SAMPLE_NAME: ("unslothai/notebooks#317", _SAMPLE_COMMAND)}
+
+
+def _write_notebook(root, name, commands):
+    """A minimal notebook at ``root/name`` whose one code cell runs `commands`."""
+    path = root / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({
+        "cells": [{
+            "cell_type": "code",
+            "metadata": {},
+            "source": [c + "\n" for c in commands],
+        }],
+        "metadata": {},
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }), encoding="utf-8")
+    return path
 
 
 def _shell_commands(source):
@@ -114,14 +136,18 @@ def _rel(path):
 _NOTEBOOKS = _collect(REPO_ROOT)
 
 
-def _unaccounted(name, commands):
-    """The commands KNOWN does not account for, so anything else in a
+def _unaccounted(name, commands, known=None):
+    """The commands `known` does not account for, so anything else in a
     grandfathered notebook still fails. The tests guarding the filter call it
     rather than restating it, or they stay green against any rewrite of it.
+
+    `known` defaults to KNOWN; the tests pass a fixture so they exercise the
+    filter rather than the current contents of the list.
     """
-    if name not in KNOWN:
+    known = KNOWN if known is None else known
+    if name not in known:
         return list(commands)
-    _pr, allowed = KNOWN[name]
+    _pr, allowed = known[name]
     return [command for command in commands if command != allowed]
 
 
@@ -183,48 +209,63 @@ def test_the_known_list_still_describes_reality():
     assert not stale, f"fixed, edited or deleted, so update KNOWN: {stale}"
 
 
+def test_the_known_list_is_empty_and_nothing_is_grandfathered():
+    """#317 retired the last entry. An addition should be a deliberate act, so
+    pin the empty state rather than letting one drift back in unnoticed."""
+    assert KNOWN == {}
+
+
 def test_a_deleted_notebook_does_not_stay_grandfathered(tmp_path):
     """An entry whose notebook is gone must be reported."""
-    assert _stale(KNOWN, tmp_path) == list(KNOWN)
+    assert _stale(_SAMPLE, tmp_path) == list(_SAMPLE)
 
 
-def test_a_present_and_still_offending_notebook_is_not_reported():
+def test_a_present_and_still_offending_notebook_is_not_reported(tmp_path):
     """So the check cannot pass by calling everything stale."""
-    name = next(iter(KNOWN))
-    assert name not in _stale({name: KNOWN[name]}, REPO_ROOT)
+    _write_notebook(tmp_path, _SAMPLE_NAME, [_SAMPLE_COMMAND])
+    assert _stale(_SAMPLE, tmp_path) == []
+
+
+def test_a_notebook_that_stopped_offending_is_reported(tmp_path):
+    """The case that retired all four real entries: the file is still there but
+    the command is gone."""
+    _write_notebook(tmp_path, _SAMPLE_NAME, ["!echo done"])
+    assert _stale(_SAMPLE, tmp_path) == [_SAMPLE_NAME]
 
 
 def test_a_second_offender_in_a_known_notebook_is_not_hidden():
     """A name match skipped the notebook, hiding anything beside the sglang command."""
-    name, (_pr, _allowed) = next(iter(KNOWN.items()))
-    commands = _backgrounded(REPO_ROOT / name) + ["!python other_server.py &"]
-    assert _unaccounted(name, commands) == ["!python other_server.py &"]
+    commands = [_SAMPLE_COMMAND, "!python other_server.py &"]
+    assert _unaccounted(_SAMPLE_NAME, commands, _SAMPLE) == ["!python other_server.py &"]
 
 
 def test_a_second_sglang_command_is_not_hidden():
     """A marker like `sglang.launch_server` would filter this one out too."""
-    name, (_pr, _allowed) = next(iter(KNOWN.items()))
     second = "!nohup python -m sglang.launch_server --port 8001 > two.log &"
-    commands = _backgrounded(REPO_ROOT / name) + [second]
-    assert _unaccounted(name, commands) == [second]
+    commands = [_SAMPLE_COMMAND, second]
+    assert _unaccounted(_SAMPLE_NAME, commands, _SAMPLE) == [second]
 
 
 def test_editing_the_grandfathered_command_is_reported():
     """The entry pins one command, so changing even a flag has to fail."""
-    name, (_pr, allowed) = next(iter(KNOWN.items()))
-    edited = allowed.replace("--port 8000", "--port 8001")
-    assert edited != allowed
-    assert _unaccounted(name, [edited]) == [edited]
+    edited = _SAMPLE_COMMAND.replace("--port 8000", "--port 8001")
+    assert edited != _SAMPLE_COMMAND
+    assert _unaccounted(_SAMPLE_NAME, [edited], _SAMPLE) == [edited]
 
 
-def test_the_known_command_survives_extraction_whole():
+def test_an_unlisted_notebook_is_never_filtered():
+    """With KNOWN empty this is the only path left, so it carries the whole
+    check: nothing is exempt unless it is listed."""
+    assert _unaccounted("nb/Anything.ipynb", [_SAMPLE_COMMAND], _SAMPLE) == [_SAMPLE_COMMAND]
+    assert _unaccounted("nb/Anything.ipynb", [_SAMPLE_COMMAND]) == [_SAMPLE_COMMAND]
+
+
+def test_the_known_command_survives_extraction_whole(tmp_path):
     """It is 125 characters and the scan used to clip at 120, so every exact
     comparison failed open."""
-    _name, (_pr, allowed) = next(iter(KNOWN.items()))
-    assert len(allowed) > 120
-    for name in KNOWN:
-        if (REPO_ROOT / name).is_file():
-            assert allowed in _backgrounded(REPO_ROOT / name)
+    assert len(_SAMPLE_COMMAND) > 120
+    path = _write_notebook(tmp_path, _SAMPLE_NAME, [_SAMPLE_COMMAND])
+    assert _SAMPLE_COMMAND in _backgrounded(path)
 
 
 def test_a_double_ampersand_is_not_backgrounding():
