@@ -17,7 +17,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"\n!pip install "huggingface_hub>=1.5.0,<2.0"\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import importlib.metadata as _torch_meta; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(_torch_meta.version("torch"))).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"\n!pip install "huggingface_hub>=1.5.0,<2.0"\n!pip install torchcodec\n')
 # 
 # 
 # # In[ ]:
@@ -47,6 +47,7 @@
 #     get_ipython().system('uv pip install -qqq --no-deps --upgrade "{_torchao}"')
 # get_ipython().system('uv pip install transformers==4.56.2')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
+# import torch; torch._dynamo.config.recompile_limit = 64;
 # 
 # 
 # # ### Unsloth

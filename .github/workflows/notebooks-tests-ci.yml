@@ -152,6 +152,12 @@ jobs:
         run: |
           python -m pytest tests/test_saving_cell_names_a_bound_object.py -q --tb=short
 
+      - name: tests/test_every_notebook_installs_its_stack.py
+        # Colab and Kaggle ship neither unsloth nor trl, so a notebook that
+        # imports them without an install cell cannot run at all.
+        run: |
+          python -m pytest tests/test_every_notebook_installs_its_stack.py -q --tb=short
+
       - name: tests/test_vllm_cells_resolve_torchao_against_torch.py
         # A pinned vLLM takes torch backwards, so torchao has to be chosen
         # against the torch that ends up installed, not against latest.
@@ -201,6 +207,10 @@ jobs:
       - name: tests/test_sglang_torchvision_rebuild.py
         run: |
           python -m pytest tests/test_sglang_torchvision_rebuild.py -q --tb=short
+
+      - name: tests/test_no_torch_import_before_torch_pin.py
+        run: |
+          python -m pytest tests/test_no_torch_import_before_torch_pin.py -q --tb=short
 
       - name: tests/test_fast_inference_installs_vllm.py
         run: |
