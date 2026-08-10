@@ -374,7 +374,7 @@ def _(canvas_len, examples, model_1, random, torch, vocab):
             ptr = ptr + 1
             out = model_1(
                 input_ids=prompt_ids.unsqueeze(0).to(dev),
-                canvas_ids=corrupt(x0),
+                decoder_input_ids=corrupt(x0),
                 self_conditioning_logits=None,
             )
             logits = out.logits[0].float()  # [canvas_len, vocab]
