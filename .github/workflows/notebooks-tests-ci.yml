@@ -202,6 +202,10 @@ jobs:
         run: |
           python -m pytest tests/test_sglang_torchvision_rebuild.py -q --tb=short
 
+      - name: tests/test_no_torch_import_before_torch_pin.py
+        run: |
+          python -m pytest tests/test_no_torch_import_before_torch_pin.py -q --tb=short
+
       - name: tests/test_fast_inference_installs_vllm.py
         run: |
           python -m pytest tests/test_fast_inference_installs_vllm.py -q --tb=short
