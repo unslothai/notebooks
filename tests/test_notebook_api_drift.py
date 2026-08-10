@@ -431,3 +431,58 @@ def test_datasets_dataset_class_present():
     datasets = pytest.importorskip("datasets")
     if not hasattr(datasets, "Dataset"):
         pytest.fail("DRIFT DETECTED: datasets.Dataset is missing.")
+
+
+# ===========================================================================
+# vLLM-only generate kwargs
+#
+# `tests/test_generate_takes_transformers_kwargs.py` refuses notebooks that
+# pass vLLM sampling names to `transformers`' `.generate()`. That deny list is
+# only correct while transformers still rejects those names, so it is checked
+# here rather than there: this file runs under the api-drift matrix, which
+# installs transformers at three versions, whereas the static gate installs
+# none and the checks could only ever skip.
+# ===========================================================================
+
+
+def _vllm_only_kwargs():
+    """The deny list, from the gate that owns it, so there is one copy.
+
+    Loaded by path: `tests/` is not a package, so the sibling is not
+    importable by name when pytest is pointed at this file alone, which is
+    exactly how the api-drift job invokes it.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).with_name("test_generate_takes_transformers_kwargs.py")
+    spec = importlib.util.spec_from_file_location("_generate_kwargs_gate", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.VLLM_ONLY_KWARGS
+
+
+def test_transformers_still_rejects_the_vllm_generate_names():
+    """If a release adopts one of these the gate starts failing correct cells."""
+    transformers = pytest.importorskip("transformers")
+    config = transformers.GenerationConfig()
+    adopted = sorted(n for n in _vllm_only_kwargs() if hasattr(config, n))
+    if adopted:
+        pytest.fail(
+            "DRIFT DETECTED: transformers now accepts " + ", ".join(adopted)
+            + "; drop it from VLLM_ONLY_KWARGS or the gate rejects valid cells."
+        )
+
+
+def test_the_replacements_the_gate_recommends_still_exist():
+    """The other direction: the name it tells people to switch to must exist."""
+    transformers = pytest.importorskip("transformers")
+    config = transformers.GenerationConfig()
+    missing = sorted(
+        replacement for replacement in _vllm_only_kwargs().values()
+        if replacement and not hasattr(config, replacement))
+    if missing:
+        pytest.fail(
+            f"DRIFT DETECTED: suggested replacement(s) gone from "
+            f"transformers: {missing}; the gate's advice is now wrong."
+        )

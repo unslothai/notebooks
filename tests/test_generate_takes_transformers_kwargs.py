@@ -200,33 +200,6 @@ def test_generate_is_not_given_vllm_sampling_names(path):
     )
 
 
-def test_the_denied_names_are_really_not_transformers_names():
-    """Keeps the deny list honest against the installed transformers.
-
-    If a release ever adopts one of these spellings the list must shrink, or
-    this gate starts failing notebooks that are correct.
-    """
-    from transformers import GenerationConfig
-
-    config = GenerationConfig()
-    adopted = sorted(n for n in VLLM_ONLY_KWARGS if hasattr(config, n))
-    assert not adopted, (
-        "transformers now accepts " + ", ".join(adopted)
-        + "; drop it from VLLM_ONLY_KWARGS."
-    )
-
-
-def test_the_transformers_spelling_is_accepted():
-    """The other direction: the replacement this test recommends must exist."""
-    from transformers import GenerationConfig
-
-    config = GenerationConfig()
-    missing = sorted(
-        replacement for replacement in VLLM_ONLY_KWARGS.values()
-        if replacement and not hasattr(config, replacement))
-    assert not missing, f"suggested replacement(s) gone from transformers: {missing}"
-
-
 # --------------------------------------------------------------------------
 # The extractor itself, so a hit and a miss are both demonstrated.
 # --------------------------------------------------------------------------
