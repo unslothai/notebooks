@@ -1870,6 +1870,74 @@ def _owns_extra_grpo_install_cell(notebook_path, cells, idx):
     return cells[idx].get("cell_type") == "code"
 
 
+# `import torch` as a statement, including after a `;` or as the body of a
+# one-line `else:`. Install cells write both shapes.
+_TORCH_IMPORT_STATEMENT = re.compile(
+    r"(?:^|(?<=[;:]))\s*(?:import\s+torch\b|from\s+torch[\s.])"
+)
+
+
+def _defer_torch_imports_past_downgrade(install_text):
+    """Stop the first install cell from loading libtorch before the vLLM cell.
+
+    The GRPO extra install cell pins vLLM, and vLLM pins one exact torch
+    (`vllm==0.15.1` wants `torch==2.9.1` / `torchvision==0.24.1`), so on Colab
+    (`torch 2.11.0+cu128`) it DOWNGRADES both on disk. That is survivable while
+    nothing has imported torch yet, which is why the 44 GRPO notebooks built on
+    `installation_grpo_content` are fine: that block never imports torch.
+
+    The family-specific install blocks selected further below --
+    `installation_gemma4_content`, `installation_qwen3_vl_content` -- do import
+    torch, and they overwrite the GRPO choice for cell i+1 while the extra cell
+    at i+2 stays. libtorch 2.11.0 is then already live in the kernel when the
+    downgrade lands, so torchvision 0.24.1's `_C.so` cannot register its
+    operators against it and the next `import torchvision` dies with
+    `RuntimeError: operator torchvision::nms does not exist`.
+
+    Reinstalling torchvision does not help: on disk torch 2.9.1 and torchvision
+    0.24.1 are already a matched pair. The split is live-kernel versus disk, so
+    the only fix is to not load libtorch first. Two rewrites do that:
+
+    1. The xformers version probe reads `importlib.metadata` instead of
+       importing torch. It returns the same string for the installed
+       distribution (`2.11.0+cu128`) without loading the extension module.
+    2. Any remaining torch-importing line is handed back to the caller to
+       re-emit at the END of the extra install cell, i.e. after the downgrade,
+       where it binds the torch that is actually on disk.
+
+    Returns ``(rewritten_install_text, lines_to_relocate)``.
+    """
+    had_trailing_newline = install_text.endswith("\n")
+    kept, relocated = [], []
+    for line in install_text.split("\n"):
+        if not _TORCH_IMPORT_STATEMENT.search(line):
+            kept.append(line)
+            continue
+        if "torch.__version__" in line:
+            rewritten = line.replace(
+                "import torch;", "import importlib.metadata as _torch_meta;"
+            ).replace("torch.__version__", '_torch_meta.version("torch")')
+            if _TORCH_IMPORT_STATEMENT.search(rewritten):
+                raise RuntimeError(
+                    "cannot rewrite the torch version probe without importing "
+                    f"torch: {line!r}"
+                )
+            kept.append(rewritten)
+            continue
+        if line != line.lstrip():
+            raise RuntimeError(
+                "an indented `import torch` cannot be moved past the vLLM "
+                f"downgrade without changing control flow: {line!r}"
+            )
+        relocated.append(line.strip())
+    while kept and not kept[-1].strip():
+        kept.pop()
+    rewritten_text = "\n".join(kept)
+    if had_trailing_newline:
+        rewritten_text += "\n"
+    return rewritten_text, relocated
+
+
 def _notebook_imports_sglang(notebook_content):
     """Whether any code cell imports sglang."""
     for cell in notebook_content.get("cells", []):
@@ -4377,6 +4445,14 @@ def update_notebook_sections(
                         else:
                             installation = installation_steps
 
+                        # Index of the cell holding the vLLM-pinning extra
+                        # install block, once one has been stamped. The family
+                        # branches below overwrite `installation` for cell i+1
+                        # without withdrawing it, so the first cell has to be
+                        # kept torch-free -- see
+                        # `_defer_torch_imports_past_downgrade`.
+                        extra_grpo_install_idx = None
+
                         # GRPO INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -4394,6 +4470,7 @@ def update_notebook_sections(
                                     notebook_path, notebook_content["cells"], i + 2
                                 ):
                                     notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
+                                    extra_grpo_install_idx = i + 2
 
                         # META INSTALLATION
                         elif is_path_contains_any(notebook_path.lower(), ["Meta"]):
@@ -4410,7 +4487,8 @@ def update_notebook_sections(
                                 # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
                                 if i + 2 < len(notebook_content["cells"]):
                                     notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
-                        
+                                    extra_grpo_install_idx = i + 2
+
                         # ORPHEUS INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["orpheus"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -4616,6 +4694,24 @@ def update_notebook_sections(
                             new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
                         if not is_amd_notebook:
                             _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
+
+                        # The extra install cell pins vLLM, which pins one exact
+                        # torch and so downgrades the session's torch on disk.
+                        # Whatever family block won cell i+1 above must not have
+                        # loaded libtorch by then, or torchvision's operators
+                        # fail to register: `operator torchvision::nms does not
+                        # exist`. AMD composes everything into one cell, so it
+                        # has no before/after to get wrong.
+                        if extra_grpo_install_idx is not None and not is_amd_notebook:
+                            new_install_text, relocated_torch_lines = (
+                                _defer_torch_imports_past_downgrade(new_install_text)
+                            )
+                            if relocated_torch_lines:
+                                extra_cell = notebook_content["cells"][extra_grpo_install_idx]
+                                extra_text = _cell_source_text(extra_cell).rstrip("\n")
+                                extra_cell["source"] = (
+                                    extra_text + "\n" + "\n".join(relocated_torch_lines)
+                                )
 
                         notebook_content["cells"][i + 1]["source"] = new_install_text
                         if is_amd_notebook:

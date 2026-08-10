@@ -1,7 +1,21 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
+#     "accelerate",
+#     "bitsandbytes>=0.43.0",
+#     "datasets==4.3.0",
+#     "hf_transfer",
+#     "huggingface_hub>=0.34.0",
 #     "marimo",
+#     "peft",
+#     "protobuf",
+#     "sentencepiece",
+#     "torchao>=0.16.0",
+#     "transformers==4.56.2",
+#     "triton>=3.2.0",
+#     "trl==0.22.2",
+#     "unsloth @ git+https://github.com/unslothai/unsloth",
+#     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 # ]
 #
 # [tool.uv]
@@ -76,11 +90,14 @@ def _():
     import random
     from pathlib import Path
 
-    _data_dir = "./logical_reasoning/data/final"
+    data_dir = "./logical_reasoning/data/final"  # Change this to your data directory
+    # ===== CONFIGURATION =====
+    # The same data/final/ the CLI writes with `save-as --format ft`.
     num_examples = 74  # how many puzzles to synthesise
-    seed = 3407
-    final_dir = Path(_data_dir)
+    seed = 3407  # how many puzzles to synthesise
+    final_dir = Path(data_dir)
     final_dir.mkdir(parents=True, exist_ok=True)
+    # Files already produced by the CLI are left untouched.
     interrupted = sorted(final_dir.glob("*.json.tmp"))
     existing = [] if interrupted else sorted(final_dir.glob("*.json"))
     NAMES = [
@@ -101,6 +118,7 @@ def _():
         "Olivia",
         "Peter",
     ]
+    # A leftover *.json.tmp means an earlier publish died, so the shards are partial.
     SYSTEM_PROMPT = "You are a careful logical reasoning assistant. Solve knight and knave puzzles by checking every possible assignment and explain your reasoning."
     PUZZLE_INTRO = "On this island every inhabitant is either a knight, who always tells the truth, or a knave, who always lies."
 
@@ -215,15 +233,17 @@ def _():
         staged = []
         for filename, shard in shards.items():
             tmp_path = final_dir / f"{filename}.tmp"
-            with open(tmp_path, "w") as _f:
-                json.dump(shard, _f, indent=2)
+            with open(tmp_path, "w") as f:
+                json.dump(shard, f, indent=2)
             staged.append((tmp_path, final_dir / filename, len(shard)))
         for tmp_path, final_path, count in staged:
             os.replace(tmp_path, final_path)
             print(f"Wrote {count} records to {final_path}")
         for leftover in interrupted:
             leftover.unlink(missing_ok=True)
-    print(f"Total ft files now in {final_dir}: {len(sorted(final_dir.glob('*.json')))}")
+    print(
+        f"Total ft files now in {final_dir}: {len(sorted(final_dir.glob('*.json')))}"
+    )
     return Path, json
 
 
@@ -255,17 +275,19 @@ def _(Path, json):
     import glob
     from datasets import Dataset
 
-    _data_dir = "./logical_reasoning/data/final"
-    data_path = Path(_data_dir)
+    data_dir_1 = "./logical_reasoning/data/final"
+    data_path = Path(data_dir_1)
     ft_files = sorted(glob.glob(str(data_path / "*.json")))
-    if not ft_files:
+    # ===== CONFIGURATION =====
+    if not ft_files:  # Change this to your data directory
         raise FileNotFoundError(
             f"No .json files found in {data_path.resolve()}. Run the synthetic data generation cell above, or produce the files yourself with `synthetic-data-kit save-as ./logical_reasoning/data/curated/ --format ft`, before running this cell."
         )
+    # ===== STEP 1: Find all FT files =====
     all_data = []
     for file_path in ft_files:
-        with open(file_path, "r") as _f:
-            ft_data = json.load(_f)
+        with open(file_path, "r") as f_1:
+            ft_data = json.load(f_1)
         for item in ft_data:
             if "messages" not in item:
                 continue
@@ -275,15 +297,18 @@ def _(Path, json):
                     conversation.append(
                         {"role": msg["role"], "content": msg["content"]}
                     )
+            # ===== STEP 2: Load and convert all files =====
             if len(conversation) > 0:
                 all_data.append({"conversations": conversation})
     print(f"\nTotal conversations: {len(all_data)} from {len(ft_files)} file(s)")
-    if not all_data:
+    if not all_data:  # Load the JSON file
         raise ValueError(
             f"Found {len(ft_files)} file(s) in {data_path.resolve()} but none of them contained a usable record. Every record needs a `messages` list with at least one user or assistant turn, which is what the `ft` format produces. Check the files before training on an empty set."
         )
     dataset = Dataset.from_list(all_data)
-    print(json.dumps(dataset[0], indent=2))
+    print(
+        json.dumps(dataset[0], indent=2)
+    )
     return (dataset,)
 
 
