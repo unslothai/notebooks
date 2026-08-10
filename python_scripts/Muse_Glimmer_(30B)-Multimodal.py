@@ -126,7 +126,7 @@ model, processor = FastModel.from_pretrained(
 print(type(model).__name__, type(processor).__name__)
 
 
-# `Muse GlimmerProcessor` holds an `Muse GlimmerImageProcessor` and an `Muse GlimmerVideoProcessor`. There is no feature
+# `MuseGlimmerProcessor` holds a `MuseGlimmerImageProcessor` and a `MuseGlimmerVideoProcessor`. There is no feature
 # extractor, because there is no audio tower.
 # 
 # Two settings on the video processor need attention:
@@ -278,7 +278,7 @@ print(caption_of(test_row))
 # `<|start|>{role}<|message|>...<|eot|>`, and the assistant addresses a recipient: `to=self` for its
 # private reasoning, closed with `<|eom|>`, then `to=user` for the answer.
 # 
-# Media is a single placeholder in the template, and `Muse GlimmerProcessor` expands it once it sees the
+# Media is a single placeholder in the template, and `MuseGlimmerProcessor` expands it once it sees the
 # real pixels. A video expands into `<|vid_start|>`, then per frame group a `Time: Xs` stamp
 # followed by `<|video|>` tokens, separated by `<|vid_frame_separator|>` and closed with
 # `<|vid_end|>`. Let us look at both.
@@ -309,7 +309,7 @@ print(video_text)
 from unsloth.trainer import UnslothVisionDataCollator
 from unsloth_zoo.vision_utils import fetch_image
 
-class Muse GlimmerVisionDataCollator(UnslothVisionDataCollator):
+class MuseGlimmerVisionDataCollator(UnslothVisionDataCollator):
     def _extract_images_videos_for_example(self, example, messages):
         images, videos = [], []
         for message in messages:
@@ -322,7 +322,7 @@ class Muse GlimmerVisionDataCollator(UnslothVisionDataCollator):
                 if part.get("type") == "image" and part.get("image") is not None:
                     images.append(fetch_image(part, size_factor = self.patch_size * 2))
                 elif part.get("type") == "video" and part.get("video") is not None:
-                    videos.append(part["video"])   # decoded by Muse GlimmerVideoProcessor
+                    videos.append(part["video"])   # decoded by MuseGlimmerVideoProcessor
         return images, videos, {"fps": [VIDEO_FPS] * len(videos)}
 
 
@@ -383,7 +383,7 @@ from trl import SFTTrainer, SFTConfig
 instruction_part = "<|start|>user<|message|>"
 response_part    = "<|start|>assistant to=user<|message|>"
 
-collator = Muse GlimmerVisionDataCollator(
+collator = MuseGlimmerVisionDataCollator(
     model, processor,
     max_seq_length = max_seq_length,
     train_on_responses_only = True,

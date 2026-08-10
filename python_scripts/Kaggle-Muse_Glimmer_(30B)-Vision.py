@@ -117,8 +117,8 @@ print(type(model).__name__, type(processor).__name__)
 
 
 # Muse Glimmer registers as an image-text-to-text model, so `AutoModelForCausalLM` will not load it.
-# `AutoProcessor` gives you an `Muse GlimmerProcessor`, which wraps `Muse GlimmerImageProcessor` and
-# `Muse GlimmerVideoProcessor`. There is no audio tower on this model.
+# `AutoProcessor` gives you a `MuseGlimmerProcessor`, which wraps `MuseGlimmerImageProcessor` and
+# `MuseGlimmerVideoProcessor`. There is no audio tower on this model.
 
 # In[ ]:
 
@@ -249,7 +249,7 @@ converted_dataset[0]["messages"][0]["content"][1]
 # `<|start|>{role}<|message|>...<|eot|>` and the assistant can emit a private reasoning channel
 # addressed `to=self`, closed with `<|eom|>`, before the answer it addresses `to=user`.
 # 
-# The image itself is a single `<|patch|>` placeholder in the template, and `Muse GlimmerProcessor` expands
+# The image itself is a single `<|patch|>` placeholder in the template, and `MuseGlimmerProcessor` expands
 # it to one token per merged 28x28 pixel block when it sees the real image. Let us look at the
 # rendered text so the markers are not a guess.
 

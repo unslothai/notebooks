@@ -53,6 +53,13 @@ def _(mo):
     To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
 
     You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), and how to save it.
+
+    **Muse Glimmer is a 28B dense model that reads text, images and video.** This notebook fine-tunes both
+    modalities in one run: still images through `<|patch|>` tokens and video clips through
+    `<|video|>` tokens. There is no audio tower on this model, so text, image and video is the whole
+    input surface.
+
+    Muse Glimmer is private for now, so this notebook pulls the model and a matching `transformers` build
     """)
     return
 
@@ -127,10 +134,10 @@ def _(mo):
     mo.md(r"""
     ### Unsloth
 
-    `FastModel` loads Muse Glimmer through the generic vision path. The 4bit build we point at is
-    `unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit`, which is a private repo, so we pass the token explicitly.
+    `FastModel` loads Muse Glimmer through the generic vision path. The 4bit build is
+    `unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit`, a private repo, so we pass the token explicitly.
 
-    **Memory.** Muse Glimmer is a big model for a 4bit LoRA run. The resident weights split roughly like this:
+    **Memory.** The resident weights split roughly like this:
 
     | part | dtype | size |
     |---|---|---|
@@ -139,15 +146,18 @@ def _(mo):
     | vision tower, adapter and projection | 16-bit | 3.44 GiB |
     | total | | **20.68 GiB** |
 
-    The embeddings are 26% of that, and they are frozen during LoRA training, so we set
+    The embeddings are 26% of that and they are frozen during LoRA training, so we set
     `offload_embedding = True`. That keeps `embed_tokens` in CPU RAM and moves only the looked-up
-    rows to the GPU, which takes 2.5 GiB off the resident footprint. `lm_head` stays on the GPU
-    because it is needed for every logit.
+    rows to the GPU, taking 2.5 GiB off the resident footprint. `lm_head` has to stay on the GPU.
 
-    Measured on one 180 GiB card at `max_seq_length = 1024`, batch size 1, LoRA r=16:
-    weights 18.22 GiB after load with the offload on (20.72 GiB without it), and **22.57 GiB peak
-    reserved** through training. Plan for a 24 GiB card as the realistic minimum, and note that a
-    single 16 GiB card cannot hold the weights at all.
+    Video is the expensive input here. Each frame group costs up to 144 tokens, and the default
+    sampler will take up to 96 frames, so an unconstrained clip can be 6912 tokens on its own. We cap
+    it at 8 frames, which is 4 groups and at most 576 tokens.
+
+    Measured on one 180 GiB card at `max_seq_length = 2048`, batch size 1, LoRA r=16, mixed
+    image and video batches: 18.22 GiB resident after load with the offload on, 20.72 GiB without it.
+    Peak reserved through training is reported at the end of this notebook. A 24 GiB card is the
+    realistic minimum, and a single 16 GiB card cannot even hold the weights.
     """)
     return
 
@@ -157,53 +167,70 @@ def _():
     from unsloth import FastModel
     import torch
 
-    max_seq_length = 1024
+    max_seq_length = 2048
     OFFLOAD_EMBEDDING = torch.cuda.device_count() == 1
     print(
         f"visible GPUs: {torch.cuda.device_count()}, offload_embedding: {OFFLOAD_EMBEDDING}"
     )
     model, processor = FastModel.from_pretrained(
-        model_name="unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",  # The adapters you just saved
-        load_in_4bit=True,  # 4bit quantisation to reduce memory
+        model_name="unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
+        load_in_4bit=True,
         max_seq_length=max_seq_length,
-        use_gradient_checkpointing="unsloth",  # "unsloth" for long context
+        use_gradient_checkpointing="unsloth",
         offload_embedding=OFFLOAD_EMBEDDING,  # Keeps the 202048 x 6656 embedding matrix in RAM
     )
     print(
         type(model).__name__, type(processor).__name__
+    )  # Keeps the 202048 x 6656 embedding matrix in RAM
+    return (
+        FastModel,
+        OFFLOAD_EMBEDDING,
+        max_seq_length,
+        model,
+        processor,
+        torch,
     )
-    return FastModel, OFFLOAD_EMBEDDING, max_seq_length, model, torch
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Muse Glimmer registers as an image-text-to-text model, so `AutoModelForCausalLM` will not load it.
-    `AutoProcessor` gives you a `MuseGlimmerProcessor`, which wraps `MuseGlimmerImageProcessor` and
-    `MuseGlimmerVideoProcessor`. There is no audio tower on this model.
+    `MuseGlimmerProcessor` holds a `MuseGlimmerImageProcessor` and a `MuseGlimmerVideoProcessor`. There is no feature
+    extractor, because there is no audio tower.
+
+    Two settings on the video processor need attention:
+
+    - `patch_temporal` is read when the prompt is built, but the class defines the same value as
+      `temporal_patch_size`. We mirror it across so video prompts render.
+    - `num_frames` and `fps` control how many frames each clip contributes. The defaults, 96 frames
+      at 2 fps, are far too many for a fine-tuning run.
     """)
     return
 
 
 @app.cell
-def _():
-    from transformers import AutoProcessor
+def _(processor):
+    print("image token:", processor.image_token, processor.image_token_id)
+    print("video token:", processor.video_token, processor.video_token_id)
+    print("feature extractor:", getattr(processor, "feature_extractor", None))
 
-    processor_1 = AutoProcessor.from_pretrained(
-        "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit"
+    video_processor = processor.video_processor
+    video_processor.patch_temporal = video_processor.temporal_patch_size
+    video_processor.num_frames = 8  # At most 8 frames per clip
+    video_processor.fps = 1.0  # Sampled at 1 frame per second
+
+    VIDEO_FPS = video_processor.fps
+    print(
+        "frames per clip:", video_processor.num_frames, "at", video_processor.fps, "fps"
     )
-    # Same object FastModel already returned; shown here so you know what you are holding.
-    print("image token:", processor_1.image_token, processor_1.image_token_id)
-    print("video token:", processor_1.video_token, processor_1.video_token_id)
-    return (processor_1,)
+    return (VIDEO_FPS,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    We now add LoRA adapters so we only train a small fraction of the parameters. You can
-    fine-tune only the vision tower, only the language model, or both, and inside each you can pick
-    attention, MLP or both.
+    We now add LoRA adapters. Both the vision tower and the language model are trained, since the
+    video path runs through the same tower as still images.
     """)
     return
 
@@ -212,19 +239,19 @@ def _(mo):
 def _(FastModel, model):
     model_1 = FastModel.get_peft_model(
         model,
-        finetune_vision_layers=True,  # False if not finetuning vision layers
-        finetune_language_layers=True,  # False if not finetuning language layers
-        finetune_attention_modules=True,  # False if not finetuning attention layers
-        finetune_mlp_modules=True,  # False if not finetuning MLP layers
-        r=16,  # The larger, the higher the accuracy, but might overfit
-        lora_alpha=16,  # Recommended alpha == r at least
+        finetune_vision_layers=True,  # The video frames go through this tower too
+        finetune_language_layers=True,
+        finetune_attention_modules=True,
+        finetune_mlp_modules=True,
+        r=16,
+        lora_alpha=16,
         lora_dropout=0,
         bias="none",
         random_state=3407,
-        use_rslora=False,  # We support rank stabilized LoRA
-        loftq_config=None,  # And LoftQ
+        use_rslora=False,
+        loftq_config=None,
     )
-    model_1.print_trainable_parameters()
+    model_1.print_trainable_parameters()  # The video frames go through this tower too
     return (model_1,)
 
 
@@ -233,180 +260,206 @@ def _(mo):
     mo.md(r"""
     <a name="Data"></a>
     ### Data Prep
-    We use a sampled dataset of handwritten maths formulas. The task is to turn each image into
-    LaTeX so it can be rendered again.
 
-    The dataset is [here](https://huggingface.co/datasets/unsloth/LaTeX_OCR), and the full version is
-    [here](https://huggingface.co/datasets/linxy/LaTeX_OCR).
+    We use [XinNUS/Temporal_Caption_Bench](https://huggingface.co/datasets/XinNUS/Temporal_Caption_Bench),
+    2267 short clips of 3 to 12 seconds with human written descriptions of what happens in them. It is
+    CC-BY-4.0 and about 670 MB, so it downloads in a minute or so.
+
+    Each row gives us two training examples:
+
+    - the **clip**, asked for a description of what happens over time
+    - a **single frame** from the middle of the clip, asked for a description of that still image
+
+    That exercises `<|video|>` and `<|patch|>` in the same run, on the same real data.
     """)
     return
 
 
 @app.cell
 def _():
-    from datasets import load_dataset
+    from datasets import load_dataset, Video
 
-    dataset = load_dataset("unsloth/LaTeX_OCR", split="train")
+    # This dataset stores one mp4 per clip, so it is 2268 small files rather than a few
+    # shards. It is only 0.62 GiB in total, but fetched one at a time on a free cloud
+    # runtime the round trips alone can outlast the cell timeout. num_proc pulls them in
+    # parallel. The slice keeps the download honest: 64 clips is plenty to fine-tune on.
+    dataset = load_dataset(
+        "XinNUS/Temporal_Caption_Bench",
+        split="train[:64]",
+        num_proc=8,
+    )
+    # decode = False keeps the raw mp4 path, which is what we hand to the video processor.
+    dataset = dataset.cast_column("video", Video(decode=False))
     dataset
     return (dataset,)
 
 
 @app.cell
 def _(dataset):
-    dataset[2]["image"]
-    return
-
-
-@app.cell
-def _(dataset):
-    dataset[2]["text"]
+    row = dataset[0]
+    print("query:", row["query"])
+    print("clip:", row["video"]["path"])
+    print("duration:", round(row["duration"], 1), "seconds")
+    for fact in row["facts"][:3]:
+        print(" -", fact["tag"], "|", fact["text"])
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    We can render the LaTeX directly in the browser:
-    """)
-    return
-
-
-@app.cell
-def _(dataset):
-    from IPython.display import display, Math
-
-    display(Math(dataset[3]["text"]))
-    return (display,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    All vision fine-tuning data should be a list of messages, where image parts sit next to text
-    parts inside `content`:
-
-    ```python
-    [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text",  "text": instruction},
-                {"type": "image", "image": sample["image"]},
-            ],
-        },
-        {
-            "role": "assistant",
-            "content": [
-                {"type": "text", "text": sample["text"]},
-            ],
-        },
-    ]
-    ```
+    The `shared` facts are the ones every annotator agreed on, so we use those as the caption.
     """)
     return
 
 
 @app.cell
 def _():
-    instruction = "Write the LaTeX representation for this image."
+    from torchcodec.decoders import VideoDecoder
+    from PIL import Image
 
-    def convert_to_conversation(sample):
-        conversation = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": sample["image"]},
-                    {"type": "text", "text": instruction},
-                ],
-            },
-            {
-                "role": "assistant",
-                "content": [{"type": "text", "text": sample["text"]}],
-            },
-        ]
-        return {"messages": conversation}
+    VIDEO_INSTRUCTION = "Describe what happens in this video."
+    IMAGE_INSTRUCTION = "Describe what you see in this image."
 
-    pass
-    return convert_to_conversation, instruction
+    def caption_of(row):
+        shared = " ".join(f["text"] for f in row["facts"] if f["tag"] == "shared")
+        return shared or " ".join(f["text"] for f in row["facts"])
 
+    def middle_frame(path):
+        decoder = VideoDecoder(path)
+        frame = decoder[len(decoder) // 2]  # uint8, channels first
+        return Image.fromarray(frame.permute(1, 2, 0).numpy())
 
-@app.cell
-def _(convert_to_conversation, dataset):
-    converted_dataset = [convert_to_conversation(sample) for sample in dataset]
-    converted_dataset[0]["messages"][0]["content"][1]
-    return (converted_dataset,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    Muse Glimmer does not use ChatML or the Llama format. It uses ATEM, where every turn is
-    `<|start|>{role}<|message|>...<|eot|>` and the assistant can emit a private reasoning channel
-    addressed `to=self`, closed with `<|eom|>`, before the answer it addresses `to=user`.
-
-    The image itself is a single `<|patch|>` placeholder in the template, and `MuseGlimmerProcessor` expands
-    it to one token per merged 28x28 pixel block when it sees the real image. Let us look at the
-    rendered text so the markers are not a guess.
-    """)
-    return
-
-
-@app.cell
-def _(converted_dataset, processor_1):
-    example_text = processor_1.apply_chat_template(
-        converted_dataset[0]["messages"], tokenize=False, add_generation_prompt=False
-    )
-    print(example_text)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Inference before training
-
-    Let us see what the base model does with this task first.
-
-    `add_generation_prompt = True` ends the prompt at `<|start|>assistant`, which leaves the recipient
-    open, so Muse Glimmer usually opens its private `to=self` reasoning channel first and answers after
-    `<|eom|>`. Appending ` to=user<|message|>` pins it straight to the answer channel, which is the
-    channel we are about to train.
-    """)
-    return
-
-
-@app.cell
-def _(dataset, instruction, model_1, processor_1):
-    from transformers import TextStreamer
-
-    def muse_glimmer_prompt(messages, answer_directly=True):
-        text = processor_1.apply_chat_template(
-            messages, add_generation_prompt=True, tokenize=False
-        )
-        return text + " to=user<|message|>" if answer_directly else text
-
-    sample = dataset[2]
-    messages = [
-        {
-            "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": instruction}],
+    def video_example(row):
+        return {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "video", "video": row["video"]["path"]},
+                        {"type": "text", "text": VIDEO_INSTRUCTION},
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": caption_of(row)}],
+                },
+            ]
         }
-    ]
-    inputs = processor_1(
-        text=[muse_glimmer_prompt(messages)],
-        images=[[sample["image"].convert("RGB")]],
-        add_special_tokens=False,
-        return_tensors="pt",
-    ).to("cuda")
-    text_streamer = TextStreamer(processor_1.tokenizer, skip_prompt=True)
-    _ = model_1.generate(
-        **inputs,
-        streamer=text_streamer,
-        max_new_tokens=256,
-        use_cache=True,
-        do_sample=False,
+
+    def image_example(row):
+        return {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": middle_frame(row["video"]["path"])},
+                        {"type": "text", "text": IMAGE_INSTRUCTION},
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": caption_of(row)}],
+                },
+            ]
+        }
+
+    return (
+        IMAGE_INSTRUCTION,
+        VIDEO_INSTRUCTION,
+        caption_of,
+        image_example,
+        middle_frame,
+        video_example,
     )
-    return TextStreamer, muse_glimmer_prompt
+
+
+@app.cell
+def _(caption_of, dataset, image_example, video_example):
+    import random
+
+    test_row = dataset[len(dataset) - 1]
+    # Hold one clip back so the inference cells run on something the model has not seen.
+    train_rows = [dataset[i] for i in range(len(dataset) - 1)]
+    converted_dataset = [video_example(r) for r in train_rows]
+    converted_dataset = converted_dataset + [
+        image_example(r) for r in train_rows[: len(train_rows) // 2]
+    ]
+    random.Random(3407).shuffle(converted_dataset)
+    print(len(converted_dataset), "examples")
+    print(caption_of(test_row))
+    return converted_dataset, test_row, train_rows
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Muse Glimmer uses ATEM, not ChatML and not the Llama format. Turns render as
+    `<|start|>{role}<|message|>...<|eot|>`, and the assistant addresses a recipient: `to=self` for its
+    private reasoning, closed with `<|eom|>`, then `to=user` for the answer.
+
+    Media is a single placeholder in the template, and `MuseGlimmerProcessor` expands it once it sees the
+    real pixels. A video expands into `<|vid_start|>`, then per frame group a `Time: Xs` stamp
+    followed by `<|video|>` tokens, separated by `<|vid_frame_separator|>` and closed with
+    `<|vid_end|>`. Let us look at both.
+    """)
+    return
+
+
+@app.cell
+def _(converted_dataset, processor):
+    video_text = processor.apply_chat_template(
+        converted_dataset[0]["messages"],
+        tokenize=False,
+        add_generation_prompt=False,
+    )
+    print(video_text)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### A collator that lets the processor decode the video
+
+    `UnslothVisionDataCollator` normally decodes and re-samples videos itself and hands the
+    processor bare frames. Muse Glimmer needs real video metadata: it stamps each frame group with a
+    timestamp taken from the clip, and without metadata every stamp is invented. In testing that path
+    also collapsed an 8 frame clip down to 2 frames.
+
+    Passing the file path through instead lets the processor decode the clip once, with true
+    timestamps and the frame count we asked for. Everything else about the collator, including the
+    response-only masking, is unchanged.
+    """)
+    return
+
+
+@app.cell
+def _(VIDEO_FPS):
+    from unsloth.trainer import UnslothVisionDataCollator
+    from unsloth_zoo.vision_utils import fetch_image
+
+    class MuseGlimmerVisionDataCollator(UnslothVisionDataCollator):
+        def _extract_images_videos_for_example(self, example, messages):
+            images, videos = [], []
+            for message in messages:
+                content = message.get("content")
+                if not isinstance(content, (list, tuple)):
+                    continue
+                for part in content:
+                    if not isinstance(part, dict):
+                        continue
+                    if part.get("type") == "image" and part.get("image") is not None:
+                        images.append(
+                            fetch_image(part, size_factor=self.patch_size * 2)
+                        )
+                    elif part.get("type") == "video" and part.get("video") is not None:
+                        videos.append(
+                            part["video"]
+                        )  # decoded by MuseGlimmerVideoProcessor
+            return images, videos, {"fps": [VIDEO_FPS] * len(videos)}
+
+    return (MuseGlimmerVisionDataCollator,)
 
 
 @app.cell(hide_code=True)
@@ -414,20 +467,15 @@ def _(mo):
     mo.md(r"""
     <a name="Train"></a>
     ### Train the model
-    We run 30 steps to keep this quick. Set `num_train_epochs = 1` and `max_steps = None` for a full
-    run.
-
-    `UnslothVisionDataCollator` builds the batch, expands the image tokens and masks everything that
-    is not an assistant answer. The masking strings have to be the real ATEM markers, not the
-    ChatML or Llama ones other notebooks use, so we pass them explicitly.
 
     `loss_type = "nll"` is deliberate. TRL's newer default, `chunked_nll`, normalises the loss by the
-    accumulated token count on its own, and on model classes that declare
-    `accepts_loss_kwargs = False` (Muse Glimmer is one) the trainer then divides by
-    `gradient_accumulation_steps` a second time. The loss and the gradients both come out
-    `1/gradient_accumulation_steps` too small and nothing warns you. Plain `nll` is invariant to
-    gradient accumulation and also re-enables Unsloth's own fused cross-entropy, which uses less VRAM
-    here.
+    accumulated token count itself, and on model classes that declare `accepts_loss_kwargs = False`
+    (Muse Glimmer is one) the trainer then divides by `gradient_accumulation_steps` a second time. The loss
+    and the gradients both come out `1/gradient_accumulation_steps` too small and nothing warns you.
+    Plain `nll` is invariant to gradient accumulation and re-enables Unsloth's own fused
+    cross-entropy, which uses less VRAM here.
+
+    The masking strings are the real ATEM markers, read out of the rendered sample above.
     """)
     return
 
@@ -461,15 +509,16 @@ def _(mo):
 
 
 @app.cell
-def _(processor_1):
+def _(processor):
     reasoning_strength = (  # minimal, low, medium, high. The template default is high.
         "low"  # minimal, low, medium, high. The template default is high.
     )
-    messages_1 = [
+
+    messages = [
         {"role": "user", "content": "What is 2 + 2? Reply with just the number."}
     ]
-    text = processor_1.tokenizer.apply_chat_template(
-        messages_1,
+    text = processor.tokenizer.apply_chat_template(
+        messages,
         add_generation_prompt=True,
         tokenize=False,
         reasoning_strength=reasoning_strength,  # minimal, low, medium, high. The template default is high.
@@ -479,16 +528,20 @@ def _(processor_1):
 
 
 @app.cell
-def _(converted_dataset, max_seq_length, model_1, processor_1):
-    from unsloth.trainer import UnslothVisionDataCollator
+def _(
+    MuseGlimmerVisionDataCollator,
+    converted_dataset,
+    max_seq_length,
+    model_1,
+    processor,
+):
     from trl import SFTTrainer, SFTConfig
 
     instruction_part = "<|start|>user<|message|>"
-    # ATEM markers, read straight out of the rendered sample above.
     response_part = "<|start|>assistant to=user<|message|>"
-    collator = UnslothVisionDataCollator(
+    collator = MuseGlimmerVisionDataCollator(
         model_1,
-        processor_1,
+        processor,
         max_seq_length=max_seq_length,
         train_on_responses_only=True,
         instruction_part=instruction_part,
@@ -497,7 +550,7 @@ def _(converted_dataset, max_seq_length, model_1, processor_1):
     trainer = SFTTrainer(
         model=model_1,
         train_dataset=converted_dataset,
-        processing_class=processor_1.tokenizer,
+        processing_class=processor.tokenizer,
         data_collator=collator,
         args=SFTConfig(
             per_device_train_batch_size=1,
@@ -511,7 +564,7 @@ def _(converted_dataset, max_seq_length, model_1, processor_1):
             lr_scheduler_type="linear",
             seed=3407,
             output_dir="outputs",
-            report_to="none",  # For Weights and Biases or others
+            report_to="none",
             loss_type="nll",
             remove_unused_columns=False,
             dataset_text_field="",
@@ -525,17 +578,42 @@ def _(converted_dataset, max_seq_length, model_1, processor_1):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Let us check that only the assistant answer is being trained on:
+    Check that the video expands with real timestamps and that only the answer is trained on:
     """)
     return
 
 
 @app.cell
-def _(collator, converted_dataset, processor_1):
-    batch = collator([converted_dataset[0], converted_dataset[1]])
-    labels = batch["labels"][0]
-    print("trained tokens:", int((labels != -100).sum()), "of", labels.numel())
-    print(processor_1.tokenizer.decode([t for t in labels.tolist() if t != -100]))
+def _(collator, image_example, processor, train_rows, video_example):
+    import re
+
+    video_batch = collator([video_example(train_rows[0])])
+    image_batch = collator([image_example(train_rows[0])])
+
+    for name, batch in (("video", video_batch), ("image", image_batch)):
+        ids = batch["input_ids"][0].tolist()
+        print(
+            name,
+            "sequence length",
+            len(ids),
+            "| video tokens",
+            ids.count(processor.video_token_id),
+            "| image tokens",
+            ids.count(processor.image_token_id),
+        )
+        print(
+            "  grid:", batch.get("video_grid_thw", batch.get("image_grid_thw")).tolist()
+        )
+        print(
+            "  timestamps:",
+            re.findall(r"Time: [\d.]+s", processor.tokenizer.decode(ids)),
+        )
+        labels = batch["labels"][0]
+        print("  trained tokens:", int((labels != -100).sum()), "of", labels.numel())
+        print(
+            "  trained text:",
+            processor.tokenizer.decode([t for t in labels.tolist() if t != -100])[:160],
+        )
     return
 
 
@@ -578,49 +656,88 @@ def _(max_memory, start_gpu_memory, torch, trainer_stats):
 def _(mo):
     mo.md(r"""
     <a name="Inference"></a>
-    ### Inference
-    Now run the fine-tuned model on a held out image.
+    ### Inference on a video
+
+    `add_generation_prompt = True` ends the prompt at `<|start|>assistant`, which leaves the recipient
+    open, so the model usually opens its private `to=self` reasoning channel first. Appending
+    ` to=user<|message|>` pins it to the answer channel, which is what we trained.
+    """)
+    return
+
+
+@app.cell
+def _(VIDEO_FPS, VIDEO_INSTRUCTION, caption_of, model_1, processor, test_row):
+    from transformers import TextStreamer
+
+    def muse_glimmer_prompt(messages, answer_directly=True):
+        text = processor.apply_chat_template(
+            messages, add_generation_prompt=True, tokenize=False
+        )
+        return text + " to=user<|message|>" if answer_directly else text
+
+    messages_1 = [
+        {
+            "role": "user",
+            "content": [{"type": "video"}, {"type": "text", "text": VIDEO_INSTRUCTION}],
+        }
+    ]
+    inputs = processor(
+        text=[muse_glimmer_prompt(messages_1)],
+        videos=[[test_row["video"]["path"]]],
+        fps=VIDEO_FPS,
+        add_special_tokens=False,
+        return_tensors="pt",
+    ).to("cuda")
+    streamer = TextStreamer(processor.tokenizer, skip_prompt=True)
+    _ = model_1.generate(
+        **inputs, streamer=streamer, max_new_tokens=256, use_cache=True, do_sample=False
+    )
+    print("\nReference caption:", caption_of(test_row))
+    return TextStreamer, muse_glimmer_prompt
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Inference on a still image
     """)
     return
 
 
 @app.cell
 def _(
+    IMAGE_INSTRUCTION,
     TextStreamer,
-    dataset,
-    instruction,
+    middle_frame,
     model_1,
     muse_glimmer_prompt,
-    processor_1,
+    processor,
+    test_row,
 ):
-    sample_1 = dataset[10]
+    from IPython.display import display
+
+    test_frame = middle_frame(test_row["video"]["path"])
+    display(test_frame)
     messages_2 = [
         {
             "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": instruction}],
+            "content": [{"type": "image"}, {"type": "text", "text": IMAGE_INSTRUCTION}],
         }
     ]
-    inputs_1 = processor_1(
+    inputs_1 = processor(
         text=[muse_glimmer_prompt(messages_2)],
-        images=[[sample_1["image"].convert("RGB")]],
+        images=[[test_frame]],
         add_special_tokens=False,
         return_tensors="pt",
     ).to("cuda")
-    text_streamer_1 = TextStreamer(processor_1.tokenizer, skip_prompt=True)
+    streamer_1 = TextStreamer(processor.tokenizer, skip_prompt=True)
     _ = model_1.generate(
         **inputs_1,
-        streamer=text_streamer_1,
+        streamer=streamer_1,
         max_new_tokens=256,
         use_cache=True,
         do_sample=False,
     )
-    print("\nGround truth:", sample_1["text"])
-    return (sample_1,)
-
-
-@app.cell
-def _(display, sample_1):
-    display(sample_1["image"])
     return
 
 
@@ -638,9 +755,9 @@ def _(mo):
 
 
 @app.cell
-def _(model_1, processor_1):
+def _(model_1, processor):
     model_1.save_pretrained("muse_glimmer_lora")
-    processor_1.save_pretrained("muse_glimmer_lora")
+    processor.save_pretrained("muse_glimmer_lora")
     return
 
 
@@ -653,45 +770,20 @@ def _(mo):
 
 
 @app.cell
-def _(
-    OFFLOAD_EMBEDDING,
-    TextStreamer,
-    dataset,
-    instruction,
-    model_1,
-    muse_glimmer_prompt,
-    processor_1,
-):
+def _(OFFLOAD_EMBEDDING):
     if False:
         from unsloth import FastModel as _FastModel
 
         _model, _processor = _FastModel.from_pretrained(
-            model_name="muse_glimmer_lora",  # The adapters you just saved
-            load_in_4bit=True,  # 4bit quantisation to reduce memory
-            max_seq_length=1024,
+            model_name="muse_glimmer_multimodal_lora",
+            load_in_4bit=True,
+            max_seq_length=2048,
             offload_embedding=OFFLOAD_EMBEDDING,  # Keeps the 202048 x 6656 embedding matrix in RAM
         )
-    sample_2 = dataset[1]
-    messages_3 = [
-        {
-            "role": "user",
-            "content": [{"type": "image"}, {"type": "text", "text": instruction}],
-        }
-    ]
-    inputs_2 = processor_1(
-        text=[muse_glimmer_prompt(messages_3)],
-        images=[[sample_2["image"].convert("RGB")]],
-        add_special_tokens=False,
-        return_tensors="pt",
-    ).to("cuda")
-    text_streamer_2 = TextStreamer(processor_1.tokenizer, skip_prompt=True)
-    _ = model_1.generate(
-        **inputs_2,
-        streamer=text_streamer_2,
-        max_new_tokens=256,
-        use_cache=True,
-        do_sample=False,
-    )
+        _video_processor = _processor.video_processor
+        _video_processor.patch_temporal = _video_processor.temporal_patch_size
+        _video_processor.num_frames = 8
+        _video_processor.fps = 1.0
     return
 
 
@@ -715,17 +807,17 @@ def _(mo):
 
 
 @app.cell
-def _(model_1, processor_1):
+def _(model_1, processor):
     # Select ONLY 1 to save! (Both not needed!)
     model_1.config._name_or_path = "unsloth/Muse-Glimmer-30B"
     # The merge needs the 16bit base weights; Muse Glimmer is not in the 4bit-to-16bit name map yet.
     if False:
-        model_1.save_pretrained_merged("muse_glimmer_finetune", processor_1)
+        model_1.save_pretrained_merged("muse_glimmer_multimodal_finetune", processor)
     # Save locally to 16bit
     if False:
         # Push to your own private Hugging Face repo
         model_1.push_to_hub_merged(
-            "your_name/muse_glimmer_finetune", processor_1, private=True
+            "your_name/muse_glimmer_multimodal_finetune", processor, private=True
         )
     return
 

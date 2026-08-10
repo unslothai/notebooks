@@ -373,7 +373,7 @@ tokenizer.decode(trainer.train_dataset[100]["input_ids"])
 
 # Now let's print the masked out example - you should see only the answer is present.
 # 
-# Muse Glimmer is a vision capable model, so `FastModel` hands back an `Muse GlimmerProcessor` rather than a bare
+# Muse Glimmer is a vision capable model, so `FastModel` hands back a `MuseGlimmerProcessor` rather than a bare
 # tokenizer. Calling it with a single positional argument would be read as an image, so reach for the
 # inner text tokenizer when you want to tokenize a plain string.
 
