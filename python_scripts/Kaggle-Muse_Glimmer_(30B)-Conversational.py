@@ -34,24 +34,22 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
-# # Muse Glimmer is a brand new architecture, so it needs a `transformers` build that knows about it. Support was merged in [PR #47867](https://github.com/huggingface/transformers/pull/47867) but is not in a tagged release yet, so we install from the merge commit. Everything used below is public - no Hugging Face token is required.
+# # Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.
 # 
 # # In[ ]:
 # 
 # 
-# # Muse Glimmer support landed in transformers via PR #47867 but is not in a
-# # tagged release yet, so install from the merge commit. Pinned rather than
-# # tracking main so the notebook does not change underneath you. Run this BEFORE
-# # anything imports transformers.
-# get_ipython().system('pip install --no-deps --force-reinstall -q "transformers @ git+https://github.com/huggingface/transformers.git@fe95f5423d65951cf63055d519dd7fa5ae12eb8d"')
-# # This build needs safetensors >= 0.8.0; some images ship 0.7.0.
-# get_ipython().system('pip install --no-deps --upgrade -q "safetensors>=0.8.0"')
+# # Muse Glimmer support ships in transformers 5.15.0, so install the release.
+# # Pinned to that exact version so the notebook does not change underneath you.
+# # Run this BEFORE anything imports transformers.
+# get_ipython().system('pip install -q "transformers==5.15.0"')
 # 
 # import transformers
 # print("transformers:", transformers.__version__)
+# assert transformers.__version__ == "5.15.0", transformers.__version__
 # from transformers import AutoConfig
 # _cfg = AutoConfig.from_pretrained("unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit")
 # print("architecture available:", _cfg.model_type)

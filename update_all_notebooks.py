@@ -852,6 +852,24 @@ installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
     "!pip install transformers==4.57.1",
 )
 
+# Muse Glimmer is a `muse_glimmer` checkpoint, and that architecture landed in
+# transformers 5.15.0, so the canonical 4.56.2 cannot load it. Replace the
+# default pin rather than leaving it to be overridden by the notebook's own
+# install cell: two contradictory `transformers` pins in one notebook also mean
+# the molab PEP 723 header has to pick one, and it picked 4.56.2. Installing
+# with dependency resolution on is what pulls the `huggingface_hub>=1.5.0` and
+# `tokenizers>=0.22.0` that transformers 5.x requires.
+installation_muse_glimmer_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.15.0",
+)
+installation_muse_glimmer_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "transformers",
+    "!pip install transformers==5.15.0",
+)
+
 installation_qwen3_5_content = """%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
@@ -4702,6 +4720,13 @@ def update_notebook_sections(
                                 installation = installation_lfm2_vl_kaggle_content
                             else:
                                 installation = installation_lfm2_vl_content
+
+                        # MUSE GLIMMER INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["muse_glimmer"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_muse_glimmer_kaggle_content
+                            else:
+                                installation = installation_muse_glimmer_content
 
                         # Qwen3VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qwen3"]) and is_vision:

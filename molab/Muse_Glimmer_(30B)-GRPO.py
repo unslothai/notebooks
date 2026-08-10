@@ -3,12 +3,11 @@
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
 #     "marimo",
-#     "safetensors>=0.8.0",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchao>=0.16.0",
 #     "torchvision",
-#     "transformers @ git+https://github.com/huggingface/transformers.git@fe95f5423d65951cf63055d519dd7fa5ae12eb8d",
+#     "transformers==5.15.0",
 #     "triton>=3.2.0",
 #     "trl==1.9.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
@@ -129,8 +128,7 @@ def _(mo):
     mo.md(r"""
     # Installation
 
-    Muse Glimmer is not in a released `transformers` yet, so we install a private build of `transformers` that
-    has the `muse-glimmer` architecture in it. Everything else is a normal Unsloth install.
+    Muse Glimmer support ships in transformers 5.15.0, so we install that release. Everything else is a normal Unsloth install.
     """)
     return
 
@@ -147,22 +145,21 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Muse Glimmer is a brand new architecture, so it needs a `transformers` build that knows about it. Support was merged in [PR #47867](https://github.com/huggingface/transformers/pull/47867) but is not in a tagged release yet, so we install from the merge commit. Everything used below is public - no Hugging Face token is required.
+    Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.
     """)
     return
 
 
 @app.cell
 def _():
-    # Muse Glimmer support landed in transformers via PR #47867 but is not in a
-    # tagged release yet, so install from the merge commit. Pinned rather than
-    # tracking main so the notebook does not change underneath you. Run this BEFORE
-    # anything imports transformers.
-    # This build needs safetensors >= 0.8.0; some images ship 0.7.0.
+    # Muse Glimmer support ships in transformers 5.15.0, so install the release.
+    # Pinned to that exact version so the notebook does not change underneath you.
+    # Run this BEFORE anything imports transformers.
 
     import transformers
 
     print("transformers:", transformers.__version__)
+    assert transformers.__version__ == "5.15.0", transformers.__version__
     from transformers import AutoConfig
 
     _cfg = AutoConfig.from_pretrained("unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit")
@@ -229,7 +226,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Muse Glimmer is a brand new architecture, so it needs a `transformers` build that knows about it. Support was merged in [PR #47867](https://github.com/huggingface/transformers/pull/47867) but is not in a tagged release yet, so we install from the merge commit. Everything used below is public - no Hugging Face token is required.
+    Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.
     """)
     return
 

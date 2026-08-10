@@ -71,8 +71,7 @@
 
 # # Installation
 # 
-# Muse Glimmer is not in a released `transformers` yet, so we install a private build of `transformers` that
-# has the `muse-glimmer` architecture in it. Everything else is a normal Unsloth install.
+# Muse Glimmer support ships in transformers 5.15.0, so we install that release. Everything else is a normal Unsloth install.
 
 # First we pick up the token. Never paste a token into a cell. Read it from the environment, from
 # Kaggle Secrets or from Colab secrets.
@@ -83,21 +82,19 @@
 get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; _numpy = f"numpy=={numpy.__version__}"\n    except: _numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# The device map planner and the GRPO log-softmax fix are on main but not\n# yet in a PyPI release, so both packages come from git.\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==1.9.2 \\\n    "unsloth @ git+https://github.com/unslothai/unsloth" \\\n    "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
 
 
-# Muse Glimmer is a brand new architecture, so it needs a `transformers` build that knows about it. Support was merged in [PR #47867](https://github.com/huggingface/transformers/pull/47867) but is not in a tagged release yet, so we install from the merge commit. Everything used below is public - no Hugging Face token is required.
+# Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.
 
 # In[ ]:
 
 
-# Muse Glimmer support landed in transformers via PR #47867 but is not in a
-# tagged release yet, so install from the merge commit. Pinned rather than
-# tracking main so the notebook does not change underneath you. Run this BEFORE
-# anything imports transformers.
-get_ipython().system('pip install --no-deps --force-reinstall -q "transformers @ git+https://github.com/huggingface/transformers.git@fe95f5423d65951cf63055d519dd7fa5ae12eb8d"')
-# This build needs safetensors >= 0.8.0; some images ship 0.7.0.
-get_ipython().system('pip install --no-deps --upgrade -q "safetensors>=0.8.0"')
+# Muse Glimmer support ships in transformers 5.15.0, so install the release.
+# Pinned to that exact version so the notebook does not change underneath you.
+# Run this BEFORE anything imports transformers.
+get_ipython().system('pip install -q "transformers==5.15.0"')
 
 import transformers
 print("transformers:", transformers.__version__)
+assert transformers.__version__ == "5.15.0", transformers.__version__
 from transformers import AutoConfig
 _cfg = AutoConfig.from_pretrained("unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit")
 print("architecture available:", _cfg.model_type)
@@ -146,7 +143,7 @@ print("architecture available:", _cfg.model_type)
 # Muse Glimmer is registered as an image-text-to-text model, so `AutoModelForCausalLM` will not load it.
 # `FastModel` picks the right class for you.
 
-# Muse Glimmer is a brand new architecture, so it needs a `transformers` build that knows about it. Support was merged in [PR #47867](https://github.com/huggingface/transformers/pull/47867) but is not in a tagged release yet, so we install from the merge commit. Everything used below is public - no Hugging Face token is required.
+# Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.
 
 # In[ ]:
 
