@@ -156,8 +156,11 @@ QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
 # The same skew as above, reached from the other direction: the vLLM install
 # cells do not choose a torch, they inherit whichever one their pinned vLLM
 # drags in, and both of those are older than the machine's.
-#   vllm==0.9.2  (the T4 branch) -> torch 2.7.0
+#   vllm==0.11.2 (the T4 branch) -> torch 2.9.0
 #   vllm==0.15.1 (everything else) -> torch 2.9.1
+# The T4 branch was vllm==0.9.2 -> torch 2.7.0 when this was written; the pin
+# moved for the reasons set out above installation_grpo_content, and 2.9.0 is
+# still below the 2.10 ceiling below, so it still takes the capped spec.
 # torchao 0.18.0, published 2026-08-03, opens with
 #     from torch.nn.functional import ScalingType, scaled_grouped_mm
 # and neither name exists before torch 2.10, so the unbounded
@@ -331,6 +334,48 @@ installation_kaggle_content = update_or_append_pip_install(
     PIN_TRL,
 )
 
+# The four install blocks below split their vLLM pin on `is_t4`, because a free
+# Colab T4 is Turing (sm75) and recent vLLM cannot serve attention there. Four
+# constraints bracket the T4 side from both directions, and they leave exactly
+# one usable window:
+#
+# 1. At or above 0.10.0. Up to 0.9.2 `vllm/transformers_utils/configs/ovis.py`
+#    ran `AutoConfig.register("aimv2", AIMv2Config)`, and transformers took that
+#    same bare name in 4.54, so `import vllm` raises `ValueError: 'aimv2' is
+#    already used by a Transformers config` against the transformers these cells
+#    pin. 0.10.0 dropped the bare registration and kept only the
+#    `aimv2_visual_tokenizer` one. This is why the old `vllm==0.9.2` had to go.
+# 2. At or above 0.11.0, and outside `[0.14.0, 0.15.0)`. Every one of these cells
+#    sets `UNSLOTH_VLLM_STANDBY = "1"` a few lines below, and with standby on
+#    `unsloth_zoo.vllm_utils.patch_vllm` hard-raises for
+#    `Version("0.10.0") <= vllm < Version("0.11.0")` (std::bad_alloc in
+#    CuMemAllocator) and for `Version("0.14.0") <= vllm < Version("0.15.0")`
+#    (cudaErrorIllegalAddress). So the whole 0.10.x line is unusable here even
+#    though it imports cleanly, which is what a real Colab T4 run showed.
+# 3. At or below 0.11.2, because of Turing. The sm75 cubins survive further than
+#    that -- `cuobjdump --list-elf` on the published x86_64 wheels still finds
+#    `sm_75` in `_C` and `_moe_C` at 0.15.1 -- but the attention backend does
+#    not. 0.11.2 ships `vllm/v1/attention/backends/xformers.py` and
+#    `platforms/cuda.py` falls back to `XFORMERS` for "Volta/Turing GPUs or FA
+#    not supported"; 0.12.0 deleted that file, and by 0.15.1 xformers is gone
+#    from the dependency list entirely. FLASH_ATTN needs sm80, so past 0.11.2 a
+#    T4 has no backend left to fall back to.
+#
+# That leaves {0.11.0, 0.11.1, 0.11.2}, and 0.11.2 is both the newest of them and
+# the version the standby guard's own error message asks for. `triton==3.2.0`
+# rode along with the old pin and is dropped: vllm 0.11.2 pins torch==2.9.0,
+# which wants triton 3.5.0, and forcing 3.2.0 back on top breaks every compiled
+# kernel. Bare `triton` is safe because that line carries no `--upgrade`, so an
+# already-satisfied triton is left alone.
+#
+# The non-T4 side stays on 0.15.1: it is past both standby windows, and Turing
+# never applies there.
+#
+# Worth knowing that this window is the last one. 0.11.2 is the newest vLLM a T4
+# can serve attention on at all, so the next constraint that moves leaves the T4
+# branch with nothing to pin, and the answer then is a different shape for this
+# case -- keeping vLLM off the T4 path, or turning standby off there -- rather
+# than another version bump.
 installation_grpo_content = """%%capture
 import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
@@ -352,7 +397,7 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+    _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
 """ + build_vllm_torchao_spec_block("    ") + """
@@ -379,7 +424,7 @@ try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=
 except: _numpy = "numpy"; _pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
 !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
 !uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"
 """ + build_vllm_torchao_spec_block() + """
@@ -409,7 +454,7 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+    _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
     !uv pip install synthetic-data-kit==0.0.3
@@ -435,7 +480,7 @@ try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=
 except: _numpy = "numpy"; _pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
 !uv pip install -qqq --upgrade unsloth {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers
 !uv pip install -qqq {_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"

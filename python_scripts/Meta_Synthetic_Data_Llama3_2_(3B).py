@@ -36,7 +36,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n!pip install --upgrade -qqq uv\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install!\n    !pip install unsloth vllm synthetic-data-kit==0.0.3\nelse:\n    try: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\n    except: _numpy = "numpy"; _pil = "pillow"\n    try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\n    except: is_t4 = False\n    _vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.15.1\', \'triton\')\n    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n    !uv pip install -qqq {_triton}\n    !uv pip install synthetic-data-kit==0.0.3\n    try:\n        import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])\n    except Exception:\n        _torch_v = ()\n    # torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.\n    _torchao = "torchao>=0.16.0" if _torch_v >= (2, 10) else "torchao>=0.16.0,<0.18.0"\n    !uv pip install -qqq --no-deps --upgrade "{_torchao}"\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n!pip install --upgrade -qqq uv\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install!\n    !pip install unsloth vllm synthetic-data-kit==0.0.3\nelse:\n    try: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\n    except: _numpy = "numpy"; _pil = "pillow"\n    try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\n    except: is_t4 = False\n    _vllm, _triton = (\'vllm==0.11.2\', \'triton\') if is_t4 else (\'vllm==0.15.1\', \'triton\')\n    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n    !uv pip install -qqq {_triton}\n    !uv pip install synthetic-data-kit==0.0.3\n    try:\n        import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])\n    except Exception:\n        _torch_v = ()\n    # torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.\n    _torchao = "torchao>=0.16.0" if _torch_v >= (2, 10) else "torchao>=0.16.0,<0.18.0"\n    !uv pip install -qqq --no-deps --upgrade "{_torchao}"\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # In[ ]:
@@ -54,7 +54,7 @@
 #     except: _numpy = "numpy"; _pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
-#     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+#     _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
 #     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
 #     get_ipython().system('uv pip install -qqq {_triton}')
 #     try:
