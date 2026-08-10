@@ -172,6 +172,13 @@ jobs:
         run: |
           python -m pytest tests/test_transformers_main_no_deps_floors.py -q --tb=short
 
+      - name: tests/test_trackio_args_match_pinned_transformers.py
+        # A trackio TrainingArguments field is only a keyword on the
+        # transformers that declares it. Passing one under an older exact pin
+        # is a TypeError from the config, ten cells past the install cell.
+        run: |
+          python -m pytest tests/test_trackio_args_match_pinned_transformers.py -q --tb=short
+
       - name: tests/test_every_test_runs_in_ci.py
         run: |
           python -m pytest tests/test_every_test_runs_in_ci.py -q --tb=short

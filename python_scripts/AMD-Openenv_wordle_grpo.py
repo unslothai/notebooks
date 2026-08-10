@@ -524,7 +524,11 @@ grpo_config = GRPOConfig(
     # Logging / reporting
     output_dir = 'outputs',                  # Directory for checkpoints and logs
     report_to = "trackio",                      # Experiment tracking tool (integrates with HF Spaces)
-    trackio_space_id = 'outputs',            # HF Space where experiment tracking will be saved
+    # To sync runs to a Hugging Face Space, set the id the way the transformers
+    # you installed expects: TRACKIO_SPACE_ID="user/space" in the environment on
+    # 4.56 to 5.0, or trackio_space_id = "user/space" here on 4.57 and later.
+    # No single spelling works on both, and this notebook pins 4.56.2. Unset,
+    # trackio logs to a local dashboard, which needs no Hub token.
     logging_steps = 10,                        # Log metrics every N steps
     # save_steps = 10,                          # Interval for saving checkpoints
 
