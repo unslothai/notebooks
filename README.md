@@ -820,7 +820,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **Nemotron Nano 3 30B A3B** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Nemotron-Nano-3-30B-A3B_A100.py) |
 | **(OpenEnv) gpt oss** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py) |
 | **(OpenEnv) gpt oss BF16** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py) |
-| **Openenv wordle** | Wordle + vLLM | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Openenv_wordle_grpo.py) |
 | **Orpheus** **(3B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Orpheus_(3B)-TTS.py) |
 | **Oute TTS** **(1B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Oute_TTS_(1B).py) |
 | **Paddle OCR** **(1B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Paddle_OCR_(1B)_Vision.py) |
