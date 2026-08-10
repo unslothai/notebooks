@@ -48,12 +48,12 @@
 #     # If you're not in Colab, just use pip install!
 #     get_ipython().system('pip install unsloth vllm')
 # else:
-#     try: import numpy; get_numpy = f"numpy=={numpy.__version__}"
-#     except: get_numpy = "numpy"
+#     try: import numpy, PIL; get_numpy = f'numpy=={numpy.__version__}'; get_pil = f'pillow=={PIL.__version__}'
+#     except: get_numpy = "numpy"; get_pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
-#     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm", "triton")
-#     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_vllm} {get_numpy} torchvision bitsandbytes xformers')
+#     get_vllm, get_triton = ("vllm==0.10.1", "triton==3.2.0") if is_t4 else ("vllm==0.15.1", "triton")
+#     get_ipython().system('uv pip install -qqq --upgrade          unsloth {get_vllm} {get_numpy} {get_pil} torchvision bitsandbytes xformers')
 #     get_ipython().system('uv pip install -qqq {get_triton}')
 #     try:
 #         import importlib.metadata as _md; torch_version = tuple(int(p) for p in _md.version("torch").split("+")[0].split(".")[:2])
