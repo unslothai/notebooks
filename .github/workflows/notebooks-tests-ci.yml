@@ -154,6 +154,14 @@ jobs:
         run: |
           python -m pytest tests/test_saving_cell_names_a_bound_object.py -q --tb=short
 
+      - name: tests/test_pinned_vllm_can_import_pinned_transformers.py
+        # Two ways a vLLM pin can be wrong that only show up on hardware. A
+        # vLLM below 0.10.0 cannot import beside transformers 4.54+, and a
+        # vLLM inside unsloth_zoo's standby windows raises RuntimeError on the
+        # install cell. Both are checked against bounds rather than assumed.
+        run: |
+          python -m pytest tests/test_pinned_vllm_can_import_pinned_transformers.py -q --tb=short
+
       - name: tests/test_every_notebook_installs_its_stack.py
         # Colab and Kaggle ship neither unsloth nor trl, so a notebook that
         # imports them without an install cell cannot run at all.
