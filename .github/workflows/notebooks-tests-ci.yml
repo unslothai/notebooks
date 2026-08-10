@@ -158,6 +158,12 @@ jobs:
         run: |
           python -m pytest tests/test_every_notebook_installs_its_stack.py -q --tb=short
 
+      - name: tests/test_vllm_cells_resolve_torchao_against_torch.py
+        # A pinned vLLM takes torch backwards, so torchao has to be chosen
+        # against the torch that ends up installed, not against latest.
+        run: |
+          python -m pytest tests/test_vllm_cells_resolve_torchao_against_torch.py -q --tb=short
+
       - name: tests/test_amd_git_main_unsloth_install.py
         # An AMD variant must keep the git-main unsloth upgrade its CUDA source
         # uses; the ignore list hid the drop from the parity validator.
