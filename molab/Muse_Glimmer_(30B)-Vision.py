@@ -9,10 +9,9 @@
 #     "marimo",
 #     "peft",
 #     "protobuf",
-#     "safetensors>=0.8.0",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers @ git+https://github.com/huggingface/transformers.git@fe95f5423d65951cf63055d519dd7fa5ae12eb8d",
+#     "transformers==5.15.0",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
@@ -89,15 +88,14 @@ def _(mo):
 
 @app.cell
 def _():
-    # Muse Glimmer support landed in transformers via PR #47867 but is not in a
-    # tagged release yet, so install from the merge commit. Pinned rather than
-    # tracking main so the notebook does not change underneath you. Run this BEFORE
-    # anything imports transformers.
-    # This build needs safetensors >= 0.8.0; some images ship 0.7.0.
+    # Muse Glimmer support ships in transformers 5.15.0, so install the release.
+    # Pinned to that exact version so the notebook does not change underneath you.
+    # Run this BEFORE anything imports transformers.
 
     import transformers
 
     print("transformers:", transformers.__version__)
+    assert transformers.__version__ == "5.15.0", transformers.__version__
     from transformers import AutoConfig
 
     _cfg = AutoConfig.from_pretrained("unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit")
