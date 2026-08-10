@@ -57,7 +57,13 @@
 #     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 #     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
 #     get_ipython().system('uv pip install -qqq {_triton}')
-#     get_ipython().system('uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"')
+#     try:
+#         import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])
+#     except Exception:
+#         _torch_v = ()
+#     # torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.
+#     _torchao = "torchao>=0.16.0" if _torch_v >= (2, 10) else "torchao>=0.16.0,<0.18.0"
+#     get_ipython().system('uv pip install -qqq --no-deps --upgrade "{_torchao}"')
 # get_ipython().system('uv pip install transformers==4.56.2')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
 # 
