@@ -1,0 +1,642 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
+# <div class="align-center">
+# <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+# <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i>
+# </div>
+# 
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# 
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
+
+# ### News
+
+# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# 
+# <table><tr>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
+# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
+# </tr></table>
+# 
+# Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
+# 
+# Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
+
+# # ### Installation
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+# 
+# 
+# # Muse Glimmer is a brand new architecture, so it needs a `transformers` build that knows about it. Support was merged in [PR #47867](https://github.com/huggingface/transformers/pull/47867) but is not in a tagged release yet, so we install from the merge commit. Everything used below is public - no Hugging Face token is required.
+# 
+# # In[ ]:
+# 
+# 
+# # Muse Glimmer support landed in transformers via PR #47867 but is not in a
+# # tagged release yet, so install from the merge commit. Pinned rather than
+# # tracking main so the notebook does not change underneath you. Run this BEFORE
+# # anything imports transformers.
+# get_ipython().system('pip install --no-deps --force-reinstall -q "transformers @ git+https://github.com/huggingface/transformers.git@fe95f5423d65951cf63055d519dd7fa5ae12eb8d"')
+# # This build needs safetensors >= 0.8.0; some images ship 0.7.0.
+# get_ipython().system('pip install --no-deps --upgrade -q "safetensors>=0.8.0"')
+# 
+# import transformers
+# print("transformers:", transformers.__version__)
+# from transformers import AutoConfig
+# _cfg = AutoConfig.from_pretrained("unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit")
+# print("architecture available:", _cfg.model_type)
+# 
+# 
+# # ### Which repo to load
+# # 
+# # Two public repos hold the same weights, and both work with `FastModel.from_pretrained`:
+# # 
+# # | repo | precision | size | use it when |
+# # |---|---|---|---|
+# # | [`unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit`](https://huggingface.co/unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit) | 4-bit (bitsandbytes nf4) | ~21 GB | fine-tuning on one or two consumer GPUs. This is what the cells below use. |
+# # | [`unsloth/Muse-Glimmer-30B`](https://huggingface.co/unsloth/Muse-Glimmer-30B) | bf16 | ~56 GB | full-precision inference or full fine-tuning on large-memory hardware. |
+# # 
+# # GGUFs for llama.cpp are at
+# # [`unsloth/Muse-Glimmer-30B-GGUF`](https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF),
+# # from 10 GB up to bf16, plus the vision projector.
+# 
+# # ### Unsloth
+# 
+# `FastModel` supports loading nearly any model now! This includes Vision and Text models!
+# 
+# Muse Glimmer is a 28B dense text + vision model with 52 layers, a 202048 token vocabulary and untied
+# embeddings. It is registered as an image-text-to-text model, so load it with `FastModel`.
+# 
+# Two things matter a lot for memory here:
+# 
+# * `offload_embedding = True` keeps `embed_tokens` in CPU RAM and only moves the looked-up rows to
+#   the GPU. Muse Glimmer's input embedding is 202048 x 6656 in 16-bit, so this gives back 2.5 GB at load
+#   time. There is a callback further down that keeps it that way once training starts.
+# * Tesla T4s are `sm_75` and have no `bfloat16`, so we build the 4-bit config with a `float16`
+#   compute dtype whenever the GPU cannot do `bfloat16`. The skip list has to match the checkpoint
+#   exactly - the embeddings, the `lm_head` and the whole vision tower are stored unquantized.
+
+# In[ ]:
+
+
+import torch
+from transformers import BitsAndBytesConfig
+
+supports_bfloat16 = torch.cuda.is_bf16_supported()
+compute_dtype = torch.bfloat16 if supports_bfloat16 else torch.float16
+print("bfloat16 supported:", supports_bfloat16, "| compute dtype:", compute_dtype)
+
+# Mirrors the quantization_config shipped in the checkpoint, with the compute dtype swapped to
+# float16 on pre-Ampere cards. The skip list must stay identical or the unquantized tensors in
+# the checkpoint will not line up with the modules.
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit                 = True,
+    bnb_4bit_quant_type          = "nf4",
+    bnb_4bit_use_double_quant    = True,
+    bnb_4bit_compute_dtype       = compute_dtype,
+    llm_int8_skip_modules        = [
+        "model.language_model.embed_tokens",
+        "lm_head",
+        "model.vision_tower",
+        "model.vision_adapter",
+        "model.vision_projection",
+    ],
+)
+
+
+# In[ ]:
+
+
+from unsloth import FastModel
+
+max_seq_length = 1024  # Muse Glimmer supports long context, but 1024 is what fits a small card
+
+import torch
+# The embedding offload saves 2.5 GB, but it is incompatible with the multi-GPU
+# dispatch used when the model does not fit on one card, so take it only on a
+# single GPU. Two 16 GB cards hold the whole model without it.
+OFFLOAD_EMBEDDING = torch.cuda.device_count() == 1
+print(f"visible GPUs: {torch.cuda.device_count()}, "
+      f"offload_embedding: {OFFLOAD_EMBEDDING}")
+
+model, tokenizer = FastModel.from_pretrained(
+    model_name           = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
+    dtype                = compute_dtype,
+    max_seq_length       = max_seq_length,
+    load_in_4bit         = True,
+    full_finetuning      = False,
+    offload_embedding    = OFFLOAD_EMBEDDING,   # Moves the 2.5 GB input embedding to CPU RAM
+    quantization_config  = bnb_config,
+)
+
+
+# We now add LoRA adapters so we only need to update a small amount of parameters!
+# 
+# Muse Glimmer has a vision tower, but this notebook is a text conversational finetune, so we leave the
+# vision layers frozen.
+
+# In[ ]:
+
+
+model = FastModel.get_peft_model(
+    model,
+    finetune_vision_layers     = False, # Turn off for just text!
+    finetune_language_layers   = True,  # Should leave on!
+    finetune_attention_modules = True,  # Attention good for GRPO
+    finetune_mlp_modules       = True,  # Should leave on always!
+
+    r = 8,           # Larger = higher accuracy, but might overfit
+    lora_alpha = 8,  # Recommended alpha == r at least
+    lora_dropout = 0,
+    bias = "none",
+    use_gradient_checkpointing = "unsloth", # 30% less VRAM, fits 2x larger batch sizes
+    random_state = 3407,
+)
+
+
+# <a name="Data"></a>
+# ### Data Prep
+# 
+# Muse Glimmer does not use ChatML and it does not use the Llama format. It uses **ATEM**, which routes every
+# assistant turn to a named recipient. A two turn conversation renders like this:
+# 
+# ```
+# <|begin_of_text|><|start|>system<|message|>You are a helpful AI assistant.
+# Knowledge cutoff: 2026-01-04.
+# 
+# Reasoning strength: high.
+# 
+# # Valid recipients: "self", "user".<|eot|><|start|>user<|message|>What is 17 times 23?<|eot|><|start|>assistant to=self<|message|>17*23 = 391.<|eom|><|start|>assistant to=user<|message|>391<|eot|>
+# ```
+# 
+# The assistant thinks out loud on the `to=self` channel, closes it with `<|eom|>`, then answers the
+# user on the `to=user` channel and closes the turn with `<|eot|>`. `<|eot|>` ends generation,
+# `<|eom|>` deliberately does not, which is how the model flows from thinking straight into
+# answering.
+# 
+# We use [Maxime Labonne's FineTome-100k](https://huggingface.co/datasets/mlabonne/FineTome-100k)
+# dataset in ShareGPT style, the same multi turn conversational dataset the Llama conversational
+# notebook uses.
+
+# In[ ]:
+
+
+from datasets import load_dataset
+dataset = load_dataset("mlabonne/FineTome-100k", split = "train[:3000]")
+
+
+# We now use `standardize_sharegpt` to convert ShareGPT style datasets into HuggingFace's generic
+# format. This changes the dataset from looking like:
+# ```
+# {"from": "system", "value": "You are an assistant"}
+# {"from": "human", "value": "What is 2+2?"}
+# {"from": "gpt", "value": "It's 4."}
+# ```
+# to
+# ```
+# {"role": "system", "content": "You are an assistant"}
+# {"role": "user", "content": "What is 2+2?"}
+# {"role": "assistant", "content": "It's 4."}
+# ```
+
+# In[ ]:
+
+
+from unsloth.chat_templates import standardize_sharegpt
+dataset = standardize_sharegpt(dataset)
+
+
+# Let's see how row 100 looks like!
+
+# In[ ]:
+
+
+dataset[100]["conversations"]
+
+
+# Muse Glimmer ships its own ATEM chat template, so we apply the tokenizer's template directly instead of
+# calling `get_chat_template`. We strip the leading `<|begin_of_text|>` with `removeprefix`, because
+# the tokenizer adds one itself at tokenization time and the model expects exactly one.
+
+# In[ ]:
+
+
+def formatting_prompts_func(examples):
+    convos = examples["conversations"]
+    texts = [
+        tokenizer.apply_chat_template(
+            convo, tokenize = False, add_generation_prompt = False,
+        ).removeprefix(tokenizer.bos_token)
+        for convo in convos
+    ]
+    return { "text" : texts, }
+
+dataset = dataset.map(formatting_prompts_func, batched = True)
+
+
+# And we see how the chat template transformed these conversations. Notice there is no
+# `<|begin_of_text|>` token, and every answer sits on the `to=user` channel.
+
+# In[ ]:
+
+
+dataset[100]["text"]
+
+
+# <a name="Train"></a>
+# ### Train the model
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1`
+# for a full run, and turn off `max_steps=None`.
+# 
+# `loss_type = "nll"` is deliberate. TRL's newer default chunked loss divides by the token count
+# itself, and Muse Glimmer's model class also tells the trainer that it does not consume a token count, so
+# with gradient accumulation switched on the loss and the gradients both end up divided by
+# `gradient_accumulation_steps` a second time. Nothing errors, the effective learning rate is just
+# silently too small. Plain `"nll"` is invariant to gradient accumulation, and it also re-enables
+# Unsloth's own fused cross entropy, which measured 1.7 to 3.7 GiB cheaper than the chunked version
+# at every sequence length we tried.
+
+# ## Controlling how much the model thinks
+# 
+# This model reasons in a private `to=self` channel before it answers. The chat template
+# renders `Reasoning strength: <level>.` into the system block, and it defaults to `high`,
+# so if you never set it you are paying for the most expensive setting on every prompt.
+# Pass `reasoning_strength` to `apply_chat_template` to change it.
+# 
+# Measured on the 4-bit checkpoint, one multi-step word problem, greedy decoding:
+# 
+# | reasoning_strength | private reasoning tokens | total completion tokens | answer |
+# |---|---|---|---|
+# | minimal | 248 | 255 | correct |
+# | low | 247 | 254 | correct |
+# | medium | 401 | 408 | correct |
+# | high (default) | 502 | 509 | correct |
+# 
+# All four reached the same right answer, and `high` spent roughly twice the tokens of
+# `minimal` to get there. Reasoning tokens count against `max_new_tokens`, so a run that
+# hits the ceiling mid-thought returns an empty answer, which looks exactly like a wrong
+# one. Raise `max_new_tokens` before you raise the effort. One sample per setting is a
+# smoke test rather than a measurement, so sweep your own task before locking a value in.
+
+# In[ ]:
+
+
+reasoning_strength = "low"  # minimal, low, medium, high. The template default is high.
+
+messages = [{"role": "user", "content": "What is 2 + 2? Reply with just the number."}]
+text = tokenizer.apply_chat_template(
+    messages,
+    add_generation_prompt = True,
+    tokenize = False,
+    reasoning_strength = reasoning_strength,
+)
+print([line for line in text.splitlines() if "Reasoning strength" in line])
+
+
+# In[ ]:
+
+
+from trl import SFTTrainer, SFTConfig
+trainer = SFTTrainer(
+    model = model,
+    tokenizer = tokenizer,
+    train_dataset = dataset,
+    eval_dataset = None, # Can set up evaluation!
+    args = SFTConfig(
+        dataset_text_field = "text",
+        max_length = max_seq_length,
+        loss_type = "nll", # Gradient accumulation invariant, see the note above
+        per_device_train_batch_size = 1,
+        gradient_accumulation_steps = 4, # Use GA to mimic batch size!
+        warmup_steps = 5,
+        # num_train_epochs = 1, # Set this for 1 full training run.
+        max_steps = 60,
+        learning_rate = 2e-4, # Reduce to 2e-5 for long training runs
+        logging_steps = 1,
+        optim = "adamw_8bit",
+        weight_decay = 0.001,
+        lr_scheduler_type = "linear",
+        seed = 3407,
+        output_dir = "outputs",
+        report_to = "none", # Use TrackIO/WandB etc
+    ),
+)
+
+
+# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and
+# ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
+# 
+# The auto-detection built into `train_on_responses_only` is written for ChatML and Llama style
+# templates, so we pass the ATEM markers explicitly. They are not guesses - they are the exact
+# strings the template above emits, and both tokenize cleanly:
+# 
+# * `<|start|>user<|message|>` is `['<|start|>', 'user', '<|message|>']`
+# * `<|start|>assistant to=user<|message|>` is `['<|start|>', 'assistant', ' to', '=user', '<|message|>']`
+# 
+# Pointing the response marker at `to=user` rather than at bare `<|start|>assistant` is on purpose.
+# FineTome has no reasoning traces, so if we trained on everything after `<|start|>assistant` we
+# would be teaching Muse Glimmer that the correct continuation of an assistant turn is to skip thinking and
+# go straight to the answer, which erodes the `to=self` channel. Masking through the channel marker
+# means the finetune only changes the wording of the answer and leaves the reasoning behaviour
+# alone. If your dataset does carry reasoning (put it in `reasoning_content` on the assistant
+# message, which the template renders as a `to=self` segment), use `<|start|>assistant` instead so
+# the reasoning is trained too.
+
+# In[ ]:
+
+
+from unsloth.chat_templates import train_on_responses_only
+
+muse_glimmer_atem_kwargs = dict(
+    instruction_part = "<|start|>user<|message|>",
+    response_part    = "<|start|>assistant to=user<|message|>",
+)
+
+trainer = train_on_responses_only(trainer, **muse_glimmer_atem_kwargs)
+
+
+# Let's verify masking the instruction part is done! Let's print the 100th row again.
+
+# In[ ]:
+
+
+tokenizer.decode(trainer.train_dataset[100]["input_ids"])
+
+
+# Now let's print the masked out example - you should see only the answer is present.
+# 
+# Muse Glimmer is a vision capable model, so `FastModel` hands back an `Muse GlimmerProcessor` rather than a bare
+# tokenizer. Calling it with a single positional argument would be read as an image, so reach for the
+# inner text tokenizer when you want to tokenize a plain string.
+
+# In[ ]:
+
+
+text_tokenizer = getattr(tokenizer, "tokenizer", tokenizer)
+space = text_tokenizer(" ", add_special_tokens = False).input_ids[0]
+tokenizer.decode([space if x == -100 else x for x in trainer.train_dataset[100]["labels"]])
+
+
+# One more memory step. `offload_embedding = True` puts `embed_tokens` in CPU RAM at load time, but
+# the trainer moves the whole model onto the accelerator when `train()` starts, which quietly drags
+# the 2.5 GB embedding back onto the GPU. The lookup hooks Unsloth installs read the weight's device
+# live, so we can simply push it back to CPU once training has begun and it stays there.
+# 
+# Measured on this notebook at `max_seq_length = 1024`, batch size 1, over 8 steps: peak reserved
+# drops from 24.14 GB to 21.25 GB, and the per step losses match to three decimal places.
+
+# In[ ]:
+
+
+from transformers import TrainerCallback
+
+class KeepEmbeddingOffloaded(TrainerCallback):
+    # The trainer places the model on the accelerator at train() time, which undoes
+    # offload_embedding. Put the input embedding back on the CPU once, after that has happened.
+    def on_train_begin(self, args, state, control, **kwargs):
+        if not OFFLOAD_EMBEDDING:
+            return control
+        embed_tokens = kwargs["model"].get_input_embeddings()
+        if embed_tokens.weight.device.type != "cpu":
+            embed_tokens.to("cpu")
+            torch.cuda.empty_cache()
+        return control
+
+trainer.add_callback(KeepEmbeddingOffloaded())
+
+
+# In[ ]:
+
+
+# @title Show current memory stats
+gpu_stats = torch.cuda.get_device_properties(0)
+start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
+print(f"{start_gpu_memory} GB of memory reserved.")
+
+
+# # Let's train the model!
+# 
+# To resume a training run, set `trainer.train(resume_from_checkpoint = True)`
+
+# In[ ]:
+
+
+trainer_stats = trainer.train()
+
+
+# In[ ]:
+
+
+# @title Show final memory and time stats
+used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+used_memory_for_lora = round(used_memory - start_gpu_memory, 3)
+used_percentage = round(used_memory / max_memory * 100, 3)
+lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
+print(f"{trainer_stats.metrics['train_runtime']} seconds used for training.")
+print(
+    f"{round(trainer_stats.metrics['train_runtime']/60, 2)} minutes used for training."
+)
+print(f"Peak reserved memory = {used_memory} GB.")
+print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
+print(f"Peak reserved memory % of max memory = {used_percentage} %.")
+print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
+
+
+# ### What this actually costs
+# 
+# All of the numbers below are measured, on one card, with exactly the settings in this notebook -
+# 4-bit Muse Glimmer, LoRA r=8, `use_gradient_checkpointing = "unsloth"`, `max_seq_length = 1024`, batch
+# size 1, gradient accumulation 4.
+# 
+# | configuration | resident after load, GB | peak reserved while training, GB |
+# |---|---|---|
+# | no embedding offload | 20.72 | 24.14 |
+# | `offload_embedding = True` only | 18.22 | 24.14 |
+# | `offload_embedding = True` plus `KeepEmbeddingOffloaded` | 18.22 | **21.25** |
+# 
+# The 20.72 GB of resident weights break down as the 416 4-bit text linears (11.72 GB), the
+# untied `embed_tokens` and `lm_head` at 2.5 GB each in 16-bit, and the vision tower with its
+# adapter and projection (3.44 GB). Offloading `embed_tokens` removes one of those 2.5 GB blocks.
+# 
+# Note the middle row. `offload_embedding` on its own buys nothing at the peak, because the trainer
+# pulls the embedding back onto the GPU when training starts. Only the callback makes the saving
+# survive into the training loop.
+# 
+# None of these fit a single 16 GB T4. Two T4s give 32 GB in total and `device_map` sharding will
+# spread the layers across both, but this notebook has not been run that way, so treat 2x T4 as
+# untested. A single 24 GB card (RTX 3090, RTX 4090, L4, A10G) has the headroom. If you are close
+# to the limit, the levers that move the number most are lowering `max_seq_length` and turning off
+# `finetune_mlp_modules`.
+
+# <a name="Inference"></a>
+# ### Inference
+# Let's run the model via Unsloth native inference!
+# 
+# The generation prompt ends at `<|start|>assistant` and nothing more, so the model itself picks the
+# channel. Expect it to open with ` to=self<|message|>`, think, close with `<|eom|>`, then start a
+# fresh `<|start|>assistant to=user<|message|>` segment with the actual answer and stop at `<|eot|>`.
+# We pass `skip_special_tokens = False` so you can watch both channels go past.
+
+# In[ ]:
+
+
+messages = [
+    {"role": "user", "content": "Continue the fibonacci sequence: 1, 1, 2, 3, 5, 8,"},
+]
+inputs = tokenizer.apply_chat_template(
+    messages,
+    add_generation_prompt = True, # Must add for generation
+    return_tensors = "pt",
+    tokenize = True,
+    return_dict = True,
+).to("cuda")
+
+outputs = model.generate(
+    **inputs,
+    max_new_tokens = 512, # Muse Glimmer thinks at length, so give it room to reach the answer
+    temperature = 1.0, top_p = 0.95, top_k = 64,
+)
+print(tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens = False))
+
+
+# You can also use a `TextStreamer` for continuous inference - so you can see the generation token by
+# token, instead of waiting the whole time!
+
+# In[ ]:
+
+
+messages = [
+    {"role": "user", "content": "Why is the sky blue?"},
+]
+inputs = tokenizer.apply_chat_template(
+    messages,
+    add_generation_prompt = True, # Must add for generation
+    return_tensors = "pt",
+    tokenize = True,
+    return_dict = True,
+).to("cuda")
+
+from transformers import TextStreamer
+_ = model.generate(
+    **inputs,
+    max_new_tokens = 512, # Muse Glimmer thinks at length, so give it room to reach the answer
+    temperature = 1.0, top_p = 0.95, top_k = 64,
+    streamer = TextStreamer(tokenizer, skip_prompt = True, skip_special_tokens = False),
+)
+
+
+# <a name="Save"></a>
+# ### Saving, loading finetuned models
+# To save the final model as LoRA adapters, either use Hugging Face's `push_to_hub` for an online
+# save or `save_pretrained` for a local save.
+# 
+# **[NOTE]** This ONLY saves the LoRA adapters, and not the full model. To save to 16bit, scroll
+# down!
+
+# In[ ]:
+
+
+model.save_pretrained("muse_glimmer_lora")  # Local saving
+tokenizer.save_pretrained("muse_glimmer_lora")
+# model.push_to_hub("HF_ACCOUNT/muse_glimmer_lora") # Online saving
+# tokenizer.push_to_hub("HF_ACCOUNT/muse_glimmer_lora") # Online saving
+
+
+# Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
+
+# In[ ]:
+
+
+if False:
+    from unsloth import FastModel
+    model, tokenizer = FastModel.from_pretrained(
+        model_name = "muse_glimmer_lora", # YOUR MODEL YOU USED FOR TRAINING
+        max_seq_length = 1024,
+        load_in_4bit = True,
+        offload_embedding = OFFLOAD_EMBEDDING,
+    )
+
+messages = [
+    {"role": "user", "content": "Describe a tall tower in the capital of France."},
+]
+inputs = tokenizer.apply_chat_template(
+    messages,
+    add_generation_prompt = True, # Must add for generation
+    return_tensors = "pt",
+    tokenize = True,
+    return_dict = True,
+).to("cuda")
+
+from transformers import TextStreamer
+_ = model.generate(
+    **inputs,
+    max_new_tokens = 512, # Muse Glimmer thinks at length, so give it room to reach the answer
+    temperature = 1.0, top_p = 0.95, top_k = 64,
+    streamer = TextStreamer(tokenizer, skip_prompt = True, skip_special_tokens = False),
+)
+
+
+# ### Saving to float16
+# 
+# We also support saving to 16-bit directly for deployment! We save it in the folder
+# `muse-glimmer-finetune`. Set `if False` to `if True` to let it run!
+# 
+# A merged Muse Glimmer is around 56 GB on disk, so make sure you have the room. The merge itself needs
+# enough CPU RAM to hold the dequantized model, so prefer a machine with 64 GB or more, and expect
+# it to take a while.
+
+# In[ ]:
+
+
+if False: # Change to True to save finetune!
+    model.save_pretrained_merged("muse-glimmer-finetune", tokenizer)
+
+
+# If you want to upload / push to your Hugging Face account, set `if False` to `if True` and add your
+# upload location. Keep the repository private if the weights are not yours to share.
+
+# In[ ]:
+
+
+if False: # Change to True to upload finetune
+    model.push_to_hub_merged(
+        "HF_ACCOUNT/muse-glimmer-finetune", tokenizer,
+        private = True,
+    )
+
+
+# ### A note on GGUF
+# 
+# There is no GGUF export cell in this notebook on purpose. `save_pretrained_gguf` drives upstream
+# `llama.cpp`, which has no `muse-glimmer` architecture yet, so the conversion fails partway through and
+# leaves you with a broken file. Use the merged 16-bit save above for now.
+# 
+# And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
+# 
+# Some other resources:
+# 1. Train your own reasoning model - Llama GRPO notebook [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-GRPO.ipynb)
+# 2. Saving finetunes to Ollama. [Free notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3_(8B)-Ollama.ipynb)
+# 3. Llama 3.2 Vision finetuning - Radiography use case. [Free Colab](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(11B)-Vision.ipynb)
+# 4. See notebooks for DPO, ORPO, Continued pretraining, conversational finetuning and more on our [documentation](https://unsloth.ai/docs/get-started/unsloth-notebooks)!
+# 
+# <div class="align-center">
+#   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+#   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+# 
+#   Join Discord if you need help + <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i>
+# </div>
+# 
+#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
