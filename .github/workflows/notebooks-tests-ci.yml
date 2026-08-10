@@ -172,14 +172,6 @@ jobs:
         run: |
           python -m pytest tests/test_transformers_main_no_deps_floors.py -q --tb=short
 
-      - name: tests/test_force_reinstall_does_not_replace_numpy.py
-        # The other half of the floors gate above: that one matches on
-        # --no-deps and so cannot see a cell that never passed the flag.
-        # Without it pip re-resolves numpy, which Colab has already imported,
-        # and Unsloth refuses to run on a kernel holding the old C extension.
-        run: |
-          python -m pytest tests/test_force_reinstall_does_not_replace_numpy.py -q --tb=short
-
       - name: tests/test_every_test_runs_in_ci.py
         run: |
           python -m pytest tests/test_every_test_runs_in_ci.py -q --tb=short
@@ -187,6 +179,14 @@ jobs:
       - name: tests/test_qat_numpy_pin.py
         run: |
           python -m pytest tests/test_qat_numpy_pin.py -q --tb=short
+
+      - name: tests/test_force_reinstall_does_not_replace_numpy.py
+        # Same "numpy was upgraded mid-session" error as the QAT pin above,
+        # reached through a different install line. It is also the other half
+        # of the transformers-main floors gate, which matches on --no-deps and
+        # so cannot see a cell that never passed the flag.
+        run: |
+          python -m pytest tests/test_force_reinstall_does_not_replace_numpy.py -q --tb=short
 
       - name: tests/test_no_backgrounded_shell_launch.py
         # nbclient + ipykernel so the live-kernel case actually runs. Without
