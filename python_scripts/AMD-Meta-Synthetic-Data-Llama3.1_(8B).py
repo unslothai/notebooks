@@ -57,16 +57,63 @@
 # In[3]:
 
 
-# Load and run the model using vllm
-# we prepend "nohup" and postpend "&" to make the Colab cell run in background
-get_ipython().system(' nohup python -m vllm.entrypoints.openai.api_server                    --model unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit                    --trust-remote-code                    --dtype half                    --quantization bitsandbytes                    --max-model-len 10000                    --tensor-parallel-size 1                    --gpu-memory-utilization 0.7                    --enable-chunked-prefill                    --port 8000                    > vllm.log &')
+# Popen, not `!... &`: IPython's `system_piped`, which every kernel except
+# Colab's uses, raises OSError on a trailing `&`, so on Kaggle, plain Jupyter
+# or papermill this cell could never run.
+import socket, subprocess, sys
+
+# Refuse an occupied port. Otherwise the readiness probe below is answered by
+# whoever already holds 8000 -- a rerun of this cell, or another vllm with a
+# different model -- while the server we just spawned quietly dies of
+# "address already in use" and we generate against the wrong one.
+with socket.socket() as probe:
+    if probe.connect_ex(("127.0.0.1", 8000)) == 0:
+        raise RuntimeError(
+            "Something is already serving localhost:8000. Stop it first: this "
+            "cell cannot tell its replies apart from the server it starts.")
+
+server = subprocess.Popen(
+    [sys.executable, "-m", "vllm.entrypoints.openai.api_server",
+     "--model", "unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit",
+     "--trust-remote-code",
+     "--dtype", "half",
+     "--quantization", "bitsandbytes",
+     "--max-model-len", "10000",
+     "--tensor-parallel-size", "1",
+     "--gpu-memory-utilization", "0.7",
+     "--enable-chunked-prefill",
+     "--port", "8000"],
+    stdout = open("vllm.log", "w"), stderr = subprocess.STDOUT,
+)
 
 
 # In[4]:
 
 
-# tail vllm logs. Check server has been started correctly
-get_ipython().system('while ! grep -q "Application startup complete" vllm.log; do tail -n 1 vllm.log; sleep 5; done')
+# Bounded, and it notices a server that died. The old shell loop grepped
+# vllm.log with no timeout, so a start that failed hung the notebook instead
+# of reporting anything.
+import time, urllib.request
+
+deadline = time.time() + 900
+while time.time() < deadline:
+    if server.poll() is not None:
+        raise RuntimeError(
+            f"vllm exited with {server.returncode}. Last of vllm.log:\n"
+            + open("vllm.log").read()[-2000:])
+    try:
+        urllib.request.urlopen("http://localhost:8000/v1/models", timeout = 5)
+        break
+    except Exception:
+        time.sleep(5)
+else:
+    # Reap it, or it keeps the GPU and port 8000 and the next launch attempt
+    # either fails to bind or talks to the orphan.
+    server.terminate()
+    try: server.wait(timeout = 30)
+    except subprocess.TimeoutExpired: server.kill(); server.wait()
+    raise TimeoutError("vllm was not ready in 900s. See vllm.log")
+print("vllm server ready")
 
 
 # Optional: Function to check if vllm server is running. Change False to True and run cell
@@ -392,7 +439,7 @@ def formatting_prompts_func(examples):
     return { "text" : texts, }
 
 from datasets import load_dataset, Dataset
-dataset = Dataset.from_json("/content/data/final/ai_meta_com_qa_pairs_cleaned_ft.json")
+dataset = Dataset.from_json("data/final/ai_meta_com_qa_pairs_cleaned_ft.json")
 dataset = dataset.map(formatting_prompts_func, batched = True,)
 
 

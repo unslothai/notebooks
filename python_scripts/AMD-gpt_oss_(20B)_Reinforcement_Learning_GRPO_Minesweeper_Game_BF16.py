@@ -29,6 +29,7 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 # In[ ]:
 
 
+get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 get_ipython().system('uv pip install --system -qqq "transformers==4.56.2"')
 get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 
@@ -748,7 +749,7 @@ max_completion_length = max_seq_length - max_prompt_length
 training_args = GRPOConfig(
     temperature = 1.0,
     learning_rate = 5e-5,
-    weight_decay = 0.01,
+    weight_decay = 0.001,
     warmup_ratio = 0.1,
     lr_scheduler_type = "linear",
     optim = "adamw_8bit",

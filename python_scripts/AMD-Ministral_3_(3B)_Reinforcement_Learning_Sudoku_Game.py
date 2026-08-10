@@ -37,7 +37,8 @@
 # 
 # Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
 
-# # ### Installation
+# # # Installation
+# # We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Ministral. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster.
 # 
 # # In[ ]:
 # 
@@ -48,7 +49,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==5.3.0"')
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # 
 # 

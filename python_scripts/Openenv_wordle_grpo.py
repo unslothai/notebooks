@@ -27,7 +27,7 @@
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"\n    except: get_numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers==4.56.2" trackio \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth trackio\n!uv pip install --upgrade --no-deps transformers==4.56.2 "tokenizers>=0.22.0,<=0.23.0" trl==0.29.1 unsloth unsloth_zoo\n')
+get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\n# vllm is not optional here: the model below is loaded with\n# fast_inference = True and every rollout generates through the trainer\'s\n# colocated vllm engine. It is pinned in the same resolve as torch because\n# vllm==0.15.1 pins torch==2.9.1 and its torchvision/torchaudio companions.\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"\n    except: get_numpy = "numpy"\n    !uv pip install -qqq \\\n        "vllm==0.15.1" "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers==4.56.2" trackio \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth vllm trackio\n!uv pip install --upgrade --no-deps transformers==4.56.2 "tokenizers>=0.22.0,<=0.23.0" trl==0.29.1 unsloth unsloth_zoo\n')
 
 
 # We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) from source:
@@ -517,7 +517,11 @@ grpo_config = GRPOConfig(
     # Logging / reporting
     output_dir = 'outputs',                  # Directory for checkpoints and logs
     report_to = "trackio",                      # Experiment tracking tool (integrates with HF Spaces)
-    trackio_space_id = 'outputs',            # HF Space where experiment tracking will be saved
+    # To sync runs to a Hugging Face Space, set the id the way the transformers
+    # you installed expects: TRACKIO_SPACE_ID="user/space" in the environment on
+    # 4.56 to 5.0, or trackio_space_id = "user/space" here on 4.57 and later.
+    # No single spelling works on both, and this notebook pins 4.56.2. Unset,
+    # trackio logs to a local dashboard, which needs no Hub token.
     logging_steps = 10,                        # Log metrics every N steps
     # save_steps = 10,                          # Interval for saving checkpoints
 

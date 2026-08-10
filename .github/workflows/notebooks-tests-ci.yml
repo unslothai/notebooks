@@ -6,6 +6,7 @@
 #   1. notebook-lint (HARD GATE, every PR, ~2-3 min, no torch installed)
 #      tests/test_notebook_json_validity.py
 #      tests/test_notebook_pin_consistency.py
+#      tests/test_nemo_gym_uv_interpreter.py
 #      tests/test_notebook_amd_install_parity.py
 #      tests/test_upgrade_installs_pin_pillow.py
 #      tests/test_notebook_vllm_pin.py
@@ -112,9 +113,111 @@ jobs:
         run: |
           python -m pytest tests/test_notebook_amd_install_parity.py -q --tb=short
 
+      - name: tests/test_nemo_gym_uv_interpreter.py
+        # The NeMo Gym setup cell must let uv fetch the interpreter
+        # Gym/.python-version pins instead of naming one itself. Colab's
+        # preinstalled uv cannot reach that release without an upgrade
+        # first, and satisfying only the floor lands on a 3.14 that
+        # cannot build yappi.
+        run: |
+          python -m pytest tests/test_nemo_gym_uv_interpreter.py -q --tb=short
+
+      - name: tests/test_synthetic_data_hackathon_generation.py
+        # The in-notebook generator skips itself once data/final/ holds a
+        # *.json, so a run that dies mid-publish must leave nothing behind
+        # that a later run would accept and train on.
+        run: |
+          python -m pytest tests/test_synthetic_data_hackathon_generation.py -q --tb=short
+
+      - name: tests/test_amd_install_heading_adjacency.py
+        # The parity test above reads the COMMITTED nb/AMD-*.ipynb, which stay
+        # valid while stale. This one drives the collector directly, so it sees
+        # what a regeneration would produce.
+        run: |
+          python -m pytest tests/test_amd_install_heading_adjacency.py -q --tb=short
+
+      - name: tests/test_amd_source_is_nb_for_hand_maintained.py
+        run: |
+          python -m pytest tests/test_amd_source_is_nb_for_hand_maintained.py -q --tb=short
+
+      - name: tests/test_amd_news_section.py
+        # News lives only in original_template/, so an AMD variant minted from a
+        # hand-maintained nb/ source has to be handed it back.
+        run: |
+          python -m pytest tests/test_amd_news_section.py -q --tb=short
+
+      - name: tests/test_amd_moe_autotune_guard.py
+        run: |
+          python -m pytest tests/test_amd_moe_autotune_guard.py -q --tb=short
+
+      - name: tests/test_saving_cell_names_a_bound_object.py
+        run: |
+          python -m pytest tests/test_saving_cell_names_a_bound_object.py -q --tb=short
+
+      - name: tests/test_every_notebook_installs_its_stack.py
+        # Colab and Kaggle ship neither unsloth nor trl, so a notebook that
+        # imports them without an install cell cannot run at all.
+        run: |
+          python -m pytest tests/test_every_notebook_installs_its_stack.py -q --tb=short
+
+      - name: tests/test_amd_git_main_unsloth_install.py
+        # An AMD variant must keep the git-main unsloth upgrade its CUDA source
+        # uses; the ignore list hid the drop from the parity validator.
+        run: |
+          python -m pytest tests/test_amd_git_main_unsloth_install.py -q --tb=short
+
+      - name: tests/test_transformers5_hub_floor.py
+        run: |
+          python -m pytest tests/test_transformers5_hub_floor.py -q --tb=short
+
+      - name: tests/test_live_names_bound_only_in_dead_code.py
+        run: |
+          python -m pytest tests/test_live_names_bound_only_in_dead_code.py -q --tb=short
+
+      - name: tests/test_transformers_main_no_deps_floors.py
+        # A --no-deps install of transformers main has to pin every floor the
+        # base images fall short of, not only the one that broke last.
+        run: |
+          python -m pytest tests/test_transformers_main_no_deps_floors.py -q --tb=short
+
+      - name: tests/test_trackio_args_match_pinned_transformers.py
+        # A trackio TrainingArguments field is only a keyword on the
+        # transformers that declares it. Passing one under an older exact pin
+        # is a TypeError from the config, ten cells past the install cell.
+        run: |
+          python -m pytest tests/test_trackio_args_match_pinned_transformers.py -q --tb=short
+
+      - name: tests/test_every_test_runs_in_ci.py
+        run: |
+          python -m pytest tests/test_every_test_runs_in_ci.py -q --tb=short
+
       - name: tests/test_qat_numpy_pin.py
         run: |
           python -m pytest tests/test_qat_numpy_pin.py -q --tb=short
+
+      - name: tests/test_no_backgrounded_shell_launch.py
+        # nbclient + ipykernel so the live-kernel case actually runs. Without
+        # them it importorskips, and the point of that case is to measure
+        # `system_piped` on the runner rather than read it off the source.
+        run: |
+          pip install nbclient ipykernel
+          python -m pytest tests/test_no_backgrounded_shell_launch.py -q --tb=short
+
+      - name: tests/test_no_amd_variant_without_sglang.py
+        run: |
+          python -m pytest tests/test_no_amd_variant_without_sglang.py -q --tb=short
+
+      - name: tests/test_sglang_torchvision_rebuild.py
+        run: |
+          python -m pytest tests/test_sglang_torchvision_rebuild.py -q --tb=short
+
+      - name: tests/test_no_torch_import_before_torch_pin.py
+        run: |
+          python -m pytest tests/test_no_torch_import_before_torch_pin.py -q --tb=short
+
+      - name: tests/test_fast_inference_installs_vllm.py
+        run: |
+          python -m pytest tests/test_fast_inference_installs_vllm.py -q --tb=short
 
       - name: tests/test_upgrade_installs_pin_pillow.py
         run: |
@@ -142,6 +245,14 @@ jobs:
         run: |
           python -m pytest tests/test_molab_generation_parity.py -q --tb=short
 
+      - name: tests/test_molab_templated_pins.py
+        run: |
+          python -m pytest tests/test_molab_templated_pins.py -q --tb=short
+
+      - name: tests/test_amd_templated_kernel_pins.py
+        run: |
+          python -m pytest tests/test_amd_templated_kernel_pins.py -q --tb=short
+
       - name: tests/test_molab_marimo_validity.py
         run: |
           python -m pytest tests/test_molab_marimo_validity.py -q --tb=short
@@ -157,6 +268,10 @@ jobs:
       - name: tests/test_molab_no_colab_markers.py
         run: |
           python -m pytest tests/test_molab_no_colab_markers.py -q --tb=short
+
+      - name: tests/test_no_backgrounded_shell_command.py
+        run: |
+          python -m pytest tests/test_no_backgrounded_shell_command.py -q --tb=short
 
   api-drift:
     # The flagship matrix: assert every classmethod / kwarg the

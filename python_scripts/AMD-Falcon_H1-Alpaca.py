@@ -21,6 +21,7 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 # In[ ]:
 
 
+get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth.git@main git+https://github.com/unslothai/unsloth-zoo.git')
 get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer')
 get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall git+https://github.com/huggingface/transformers.git')

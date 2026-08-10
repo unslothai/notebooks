@@ -628,6 +628,7 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **CodeForces CoT Reasoning** |  | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb) |
 | **Llama3.3** **(70B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.3_(70B)_A100-Conversational.ipynb) |
 | **Synthetic Data Hackathon** | Synthetic Data | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Synthetic_Data_Hackathon.ipynb) |
+| **DiffusionGemma** **(26B A4B)** | Sudoku | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-DiffusionGemma_(26B-A4B)-Sudoku.ipynb) |
 | **Gemma3** **(4B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B).ipynb) |
 | **Gemma3** **(4B)** | Vision Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3_(4B)-Vision-GRPO.ipynb) |
 | **Phi 4** **(14B)** | GSM8K Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Phi_4_(14B)-GRPO.ipynb) |
@@ -664,7 +665,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **FunctionGemma** **(270M)** | Mobile Actions | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-FunctionGemma_(270M)-Mobile-Actions.ipynb) |
 | **Gemma3N** **(4B)** | Multimodal | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Conversational.ipynb) |
 | **Gemma3N** **(4B)** | Audio | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Audio.ipynb) |
-| **Gemma3N** **(2B)** | Inference | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(2B)-Inference.ipynb) |
 | **LFM2.5** **(1.2B)** | DAPO Math | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-GRPO.ipynb) |
 | **LFM2.5** **(1.2B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Conversational.ipynb) |
 | **Gemma4** **(E2B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Text.ipynb) |
@@ -820,7 +820,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **Nemotron Nano 3 30B A3B** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Nemotron-Nano-3-30B-A3B_A100.py) |
 | **(OpenEnv) gpt oss** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py) |
 | **(OpenEnv) gpt oss BF16** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py) |
-| **Openenv wordle** | Wordle + vLLM | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Openenv_wordle_grpo.py) |
 | **Orpheus** **(3B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Orpheus_(3B)-TTS.py) |
 | **Oute TTS** **(1B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Oute_TTS_(1B).py) |
 | **Paddle OCR** **(1B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Paddle_OCR_(1B)_Vision.py) |
