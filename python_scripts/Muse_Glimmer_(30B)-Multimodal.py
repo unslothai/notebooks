@@ -41,22 +41,20 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # In[ ]:
 # 
 # 
-# # Muse Glimmer support landed in transformers via PR #47867 but is not in a
-# # tagged release yet, so install from the merge commit. Pinned rather than
-# # tracking main so the notebook does not change underneath you. Run this BEFORE
-# # anything imports transformers.
-# get_ipython().system('pip install --no-deps --force-reinstall -q "transformers @ git+https://github.com/huggingface/transformers.git@fe95f5423d65951cf63055d519dd7fa5ae12eb8d"')
-# # This build needs safetensors >= 0.8.0; some images ship 0.7.0.
-# get_ipython().system('pip install --no-deps --upgrade -q "safetensors>=0.8.0"')
+# # Muse Glimmer support ships in transformers 5.15.0, so install the release.
+# # Pinned to that exact version so the notebook does not change underneath you.
+# # Run this BEFORE anything imports transformers.
+# get_ipython().system('pip install -q "transformers==5.15.0"')
 # 
 # import transformers
 # print("transformers:", transformers.__version__)
+# assert transformers.__version__ == "5.15.0", transformers.__version__
 # from transformers import AutoConfig
 # _cfg = AutoConfig.from_pretrained("unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit")
 # print("architecture available:", _cfg.model_type)
