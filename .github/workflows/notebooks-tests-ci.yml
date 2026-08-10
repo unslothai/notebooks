@@ -172,13 +172,13 @@ jobs:
         run: |
           python -m pytest tests/test_transformers_main_no_deps_floors.py -q --tb=short
 
-      - name: tests/test_transformers_main_installs_use_no_deps.py
+      - name: tests/test_force_reinstall_does_not_replace_numpy.py
         # The other half of the floors gate above: that one matches on
         # --no-deps and so cannot see a cell that never passed the flag.
-        # Without it pip re-resolves numpy, which the kernel has already
-        # imported, and Unsloth refuses to run.
+        # Without it pip re-resolves numpy, which Colab has already imported,
+        # and Unsloth refuses to run on a kernel holding the old C extension.
         run: |
-          python -m pytest tests/test_transformers_main_installs_use_no_deps.py -q --tb=short
+          python -m pytest tests/test_force_reinstall_does_not_replace_numpy.py -q --tb=short
 
       - name: tests/test_every_test_runs_in_ci.py
         run: |

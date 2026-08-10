@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Installing transformers main without `--no-deps` re-resolves numpy.
+"""Force-reinstalling transformers main drags numpy in behind it.
 
 `Falcon_H1-Alpaca.ipynb` installed transformers main as
 
@@ -30,7 +30,7 @@ and died two cells later on a free Colab T4:
 
 `--force-reinstall` tells pip to ignore what is installed and resolve the whole
 dependency tree from scratch, so numpy comes back at the newest release even
-though the numpy already present satisfied every requirement. Measured with
+though the numpy already there satisfied every requirement. Measured with
 `pip install --dry-run --report` against a Colab-shaped environment
 (numpy 2.0.2, transformers 4.56.2):
 
@@ -40,16 +40,25 @@ though the numpy already present satisfied every requirement. Measured with
 Colab has imported numpy before cell 1 executes, and numpy is a C extension
 that cannot be swapped under a live kernel, so no later cell can undo it. The
 only fix available to a notebook is not to change numpy on disk at all. That is
-the same reasoning `tests/test_qat_numpy_pin.py` already applies to the QAT
-install cell, which pins numpy beside `fbgemm-gpu-genai` for this exact error.
+the same reasoning `tests/test_qat_numpy_pin.py` applies to the QAT install
+cell, which pins numpy beside `fbgemm-gpu-genai` against this exact error.
 
 `tests/test_transformers_main_no_deps_floors.py` covers what a `--no-deps`
-install then owes: it matches on `--no-deps` and so cannot see a cell that
-never passed the flag. This file is the other half, the flag itself.
+install then owes. It matches on `--no-deps`, so a cell that never passed the
+flag is invisible to it; this file is the other half.
 
-Every other transformers-main install in the repo already uses `--no-deps`, for
-the related reason recorded there: without it pip also replaces the CUDA torch
-build the runtime already has.
+Scope is deliberately the pairing that was measured, `--force-reinstall`
+without `--no-deps`, and not every install that could in principle move numpy:
+
+  * a plain `pip install git+.../transformers` leaves an already-satisfied
+    numpy alone, so `GPT_OSS_*-Inference` and the `Ministral_3` Sudoku
+    notebooks, which install transformers from git that way, are not the shape
+    that broke and nothing is claimed about them here;
+  * the AMD cells that force-reinstall torch from a ROCm `--index-url` are a
+    different platform and a different resolve, unmeasured here, and belong
+    with whoever owns those images.
+
+Widening to either of those wants a measurement first, not a wider regex.
 """
 
 import json
@@ -62,11 +71,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOK_DIRS = ("nb", "kaggle", "original_template")
 SCRIPT_DIRS = ("python_scripts", "molab")
 
-_TRANSFORMERS_MAIN = re.compile(
+_TRANSFORMERS_FROM_GIT = re.compile(
     r"git\+(?:https://|ssh://git@)github\.com/huggingface/transformers"
     r"(?:\.git)?(?![\w./-])")
 
-# `-U` is pip's spelling of `--upgrade` and does not imply `--no-deps`.
+# `-U` is pip's spelling of `--upgrade` and does not imply either of these.
+_FORCE_REINSTALL = re.compile(r"(?<![\w-])--force-reinstall(?![\w-])")
 _NO_DEPS = re.compile(r"(?<![\w-])--no-deps(?![\w-])")
 
 
@@ -74,7 +84,7 @@ def _logical_lines(text):
     """Source lines with backslash continuations joined, comments dropped.
 
     An install command wrapped over several lines is one command to the shell,
-    so `--no-deps` on any of its physical lines counts.
+    so a flag on any of its physical lines counts.
     """
     joined = []
     buffer = ""
@@ -93,12 +103,14 @@ def _logical_lines(text):
 
 
 def _offending_lines(text):
-    """Install lines that fetch transformers main without `--no-deps`."""
+    """Install lines that force-reinstall transformers with its dependencies."""
     bad = []
     for line in _logical_lines(text):
-        if not _TRANSFORMERS_MAIN.search(line):
-            continue
         if "install" not in line:
+            continue
+        if not _TRANSFORMERS_FROM_GIT.search(line):
+            continue
+        if not _FORCE_REINSTALL.search(line):
             continue
         if _NO_DEPS.search(line):
             continue
@@ -133,19 +145,20 @@ def test_there_are_files_to_check():
     assert len(_CASES) > 100
 
 
-def test_some_file_still_installs_transformers_main():
+def test_some_file_still_installs_transformers_from_git():
     """Or every check below passes by matching nothing at all."""
     hits = [name for name, path in _CASES
-            if any(_TRANSFORMERS_MAIN.search(source) for source in _sources(path))]
+            if any(_TRANSFORMERS_FROM_GIT.search(source)
+                   for source in _sources(path))]
     assert hits
 
 
 @pytest.mark.parametrize("name, path", _CASES, ids = [name for name, _ in _CASES])
-def test_transformers_main_is_installed_with_no_deps(name, path):
+def test_transformers_is_not_force_reinstalled_with_its_dependencies(name, path):
     for source in _sources(path):
         bad = _offending_lines(source)
         assert not bad, (
-            f"{name} installs transformers main without --no-deps:\n"
+            f"{name} force-reinstalls transformers without --no-deps:\n"
             f"    {bad[0]}\n"
             f"pip then re-resolves the whole dependency tree and replaces "
             f"numpy, which Colab and Kaggle have already imported before the "
@@ -176,14 +189,27 @@ def test_detector_accepts_the_liquid_lfm2_line():
     assert _offending_lines(line) == []
 
 
+def test_a_plain_install_is_out_of_scope():
+    """pip leaves an already-satisfied numpy alone without --force-reinstall."""
+    line = ("!uv pip install --system -qqq "
+            "git+https://github.com/huggingface/transformers")
+    assert _offending_lines(line) == []
+
+
+def test_a_pinned_commit_is_still_transformers_from_git():
+    line = ("!pip install --force-reinstall git+https://github.com/huggingface/"
+            "transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce")
+    assert _offending_lines(line)
+
+
 def test_no_deps_anywhere_in_a_continued_command_counts():
-    text = ("!uv pip install --system -qqq --no-deps accelerate peft \\\n"
+    text = ("!uv pip install --system -qqq --force-reinstall --no-deps \\\n"
             "    git+https://github.com/huggingface/transformers.git\n")
     assert _offending_lines(text) == []
 
 
 def test_a_continued_command_without_the_flag_is_still_flagged():
-    text = ("!uv pip install --system -qqq accelerate peft \\\n"
+    text = ("!uv pip install --system -qqq --force-reinstall accelerate \\\n"
             "    git+https://github.com/huggingface/transformers.git\n")
     assert _offending_lines(text)
 
@@ -200,11 +226,15 @@ def test_another_repository_under_huggingface_is_not_transformers():
     assert _offending_lines(line) == []
 
 
-def test_a_released_pin_is_not_a_main_install():
-    assert _offending_lines('!pip install --force-reinstall transformers==4.56.2') == []
+def test_a_released_pin_is_not_a_git_install():
+    assert _offending_lines(
+        "!pip install --force-reinstall transformers==4.56.2") == []
 
 
-def test_no_deps_must_be_the_whole_flag():
-    line = ("!pip install --no-deps-please "
-            "git+https://github.com/huggingface/transformers.git")
-    assert _offending_lines(line)
+def test_the_flags_must_be_whole_flags():
+    assert _offending_lines(
+        "!pip install --no-deps-please --force-reinstall "
+        "git+https://github.com/huggingface/transformers.git")
+    assert _offending_lines(
+        "!pip install --force-reinstall-all "
+        "git+https://github.com/huggingface/transformers.git") == []
