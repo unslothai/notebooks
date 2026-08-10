@@ -153,6 +153,49 @@ QAT_TORCHAO_BY_TORCH_MINOR = {
 }
 QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
 
+# The same skew as above, reached from the other direction: the vLLM install
+# cells do not choose a torch, they inherit whichever one their pinned vLLM
+# drags in, and both of those are older than the machine's.
+#   vllm==0.9.2  (the T4 branch) -> torch 2.7.0
+#   vllm==0.15.1 (everything else) -> torch 2.9.1
+# torchao 0.18.0, published 2026-08-03, opens with
+#     from torch.nn.functional import ScalingType, scaled_grouped_mm
+# and neither name exists before torch 2.10, so the unbounded
+# "torchao>=0.16.0" those cells carried resolved to 0.18.0 and the next
+# `import transformers` stopped inside transformers/modeling_utils.py, which
+# imports torchao whenever it is installed:
+#     ImportError: cannot import name 'ScalingType' from 'torch.nn.functional'
+# In Meta-Synthetic-Data-Llama3.1 (8B) that killed the vLLM server subprocess,
+# and the notebook could only report "vllm exited with 1" plus a TensorFlow
+# banner, because the real traceback was in the server's own log.
+# `--no-deps` is what makes this ours to get right: it is exactly the flag that
+# stops the resolver from reading torchao's own torch requirement.
+TORCHAO_SCALING_TYPE_TORCH = "2.10"     # first torch with ScalingType
+TORCHAO_SCALING_TYPE_RELEASE = "0.18.0" # first torchao that imports it
+
+
+def build_vllm_torchao_spec_block(indent=""):
+    """Lines that bind `_torchao` to a spec the installed torch can import.
+
+    Read the installed distribution metadata rather than `import torch`: the
+    line above has just replaced torch on disk, and importing it here would
+    cost a multi-second CUDA import in every install cell and pin the module
+    in a kernel that is about to be told a different version is present.
+
+    An undetectable torch falls to the capped spec on purpose. The cap imports
+    on every torch these notebooks can see, so the unknown case fails safe.
+    """
+    ceiling = tuple(int(part) for part in TORCHAO_SCALING_TYPE_TORCH.split("."))
+    lines = [
+        "try:",
+        '    import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])',
+        "except Exception:",
+        "    _torch_v = ()",
+        f"# torchao {TORCHAO_SCALING_TYPE_RELEASE} imports torch.nn.functional.ScalingType, added in torch {TORCHAO_SCALING_TYPE_TORCH}; peft >= 0.19 needs the {QAT_PEFT_TORCHAO_FLOOR} floor.",
+        f'_torchao = "torchao>={QAT_PEFT_TORCHAO_FLOOR}" if _torch_v >= {ceiling} else "torchao>={QAT_PEFT_TORCHAO_FLOOR},<{TORCHAO_SCALING_TYPE_RELEASE}"',
+    ]
+    return "\n".join(indent + line for line in lines)
+
 
 def _qat_torchao_fallback_snippet(default_torchao=None):
     """Resolve an unlisted torch to a torchao that can actually import.
@@ -312,7 +355,8 @@ else:
     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
-    !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+""" + build_vllm_torchao_spec_block("    ") + """
+    !uv pip install -qqq --no-deps --upgrade "{_torchao}"
 """
 
 installation_extra_grpo_content = update_or_append_pip_install(
@@ -338,7 +382,8 @@ except: is_t4 = False
 _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
 !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
 !uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"
-!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+""" + build_vllm_torchao_spec_block() + """
+!uv pip install -qqq --no-deps --upgrade "{_torchao}"
 """
 
 installation_grpo_kaggle_content = update_or_append_pip_install(
@@ -368,7 +413,8 @@ else:
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
     !uv pip install synthetic-data-kit==0.0.3
-    !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+""" + build_vllm_torchao_spec_block("    ") + """
+    !uv pip install -qqq --no-deps --upgrade "{_torchao}"
 """
 
 installation_synthetic_data_content = update_or_append_pip_install(
@@ -394,7 +440,8 @@ _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1',
 !uv pip install -qqq {_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"
 !uv pip install synthetic-data-kit==0.0.3
-!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+""" + build_vllm_torchao_spec_block() + """
+!uv pip install -qqq --no-deps --upgrade "{_torchao}"
 """
 installation_grpo_synthetic_data_content = update_or_append_pip_install(
     installation_grpo_synthetic_data_content,
