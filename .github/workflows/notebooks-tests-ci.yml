@@ -152,6 +152,12 @@ jobs:
         run: |
           python -m pytest tests/test_saving_cell_names_a_bound_object.py -q --tb=short
 
+      - name: tests/test_every_notebook_installs_its_stack.py
+        # Colab and Kaggle ship neither unsloth nor trl, so a notebook that
+        # imports them without an install cell cannot run at all.
+        run: |
+          python -m pytest tests/test_every_notebook_installs_its_stack.py -q --tb=short
+
       - name: tests/test_amd_git_main_unsloth_install.py
         # An AMD variant must keep the git-main unsloth upgrade its CUDA source
         # uses; the ignore list hid the drop from the parity validator.
