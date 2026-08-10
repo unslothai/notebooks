@@ -16,13 +16,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Installing sglang replaces torch, so torchvision has to be replaced with it.
+"""Installing sglang replaces torch, so its companions have to be replaced too.
 
 sglang pins one exact torch (`torch==2.11.0` for 0.5.16), which resolves to the
-default PyPI wheel, a different CUDA build from the session's. torchvision is
-version-compatible either way, so pip leaves the old build in place and `import
-torchvision` fails on a CUDA mismatch. Only `--force-reinstall` replaces an
-already-satisfied requirement.
+default PyPI wheel, a different CUDA build from the session's. torchvision and
+torchaudio are version-compatible either way -- PEP 440 matches `==2.11.0`
+against a preinstalled `2.11.0+cu128` -- so pip leaves the old builds in place
+and importing them fails on a CUDA mismatch:
+
+  torchvision: "PyTorch has CUDA Version=13.0 and torchvision has CUDA
+               Version=12.8"
+  torchaudio:  "Detected that PyTorch and TorchAudio were compiled with
+               different CUDA versions"
+
+sglang imports both, so either one takes down `sglang.launch_server`. Only
+`--force-reinstall` replaces an already-satisfied requirement.
 """
 
 from __future__ import annotations
@@ -37,8 +45,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 NB_DIR = REPO_ROOT / "nb"
 
 _SGLANG_INSTALL = re.compile(r"^\s*!.*\bpip install\b.*\bsglang\b", re.MULTILINE)
-_TORCHVISION_INSTALL = re.compile(
-    r"^\s*!.*\bpip install\b.*\btorchvision\b.*$", re.MULTILINE)
+
+# The torch companions sglang drags along that ship compiled operators linked
+# against libtorch, so a CUDA build split is fatal at import.
+_COMPANIONS = ("torchvision", "torchaudio")
 
 
 def _cells_installing_sglang():
@@ -65,23 +75,27 @@ def test_some_notebook_installs_sglang():
     )
 
 
+@pytest.mark.parametrize("companion", _COMPANIONS)
 @pytest.mark.parametrize("cell_id,source", _CELLS, ids=[c for c, _ in _CELLS])
-def test_sglang_install_replaces_torchvision(cell_id, source):
-    lines = [line.strip() for line in _TORCHVISION_INSTALL.findall(source)]
+def test_sglang_install_replaces_torch_companion(cell_id, source, companion):
+    pattern = re.compile(
+        rf"^\s*!.*\bpip install\b.*\b{companion}\b.*$", re.MULTILINE
+    )
+    lines = [line.strip() for line in pattern.findall(source)]
     assert lines, (
         f"{cell_id} installs sglang, which pins one exact torch and so swaps "
-        f"the CUDA build under the session, but never reinstalls torchvision. "
-        f"`import torchvision` then fails on a CUDA version mismatch."
+        f"the CUDA build under the session, but never reinstalls {companion}. "
+        f"`import {companion}` then fails on a CUDA version mismatch."
     )
     forced = [line for line in lines if "--force-reinstall" in line]
     assert forced, (
-        f"{cell_id} reinstalls torchvision without --force-reinstall: "
+        f"{cell_id} reinstalls {companion} without --force-reinstall: "
         f"{lines}. The version constraint is already satisfied by the "
         f"pre-installed build, so pip does nothing and the mismatch survives."
     )
     for line in forced:
-        assert re.search(r"torchvision==\d", line), (
-            f"{cell_id} force-reinstalls torchvision unpinned: {line}. Pip "
-            f"would take the newest torchvision, which pairs with a newer "
+        assert re.search(rf"{companion}==\d", line), (
+            f"{cell_id} force-reinstalls {companion} unpinned: {line}. Pip "
+            f"would take the newest {companion}, which pairs with a newer "
             f"torch than sglang pinned."
         )
