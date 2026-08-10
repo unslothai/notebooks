@@ -702,14 +702,30 @@ def test_the_short_upgrade_flag_counts_as_an_upgrade():
 
 
 def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
-    """Reading `--force-reinstall` or `--index-url` as an upgrade would pull
-    unrelated commands into scope."""
+    """Reading `--index-url` as an upgrade would pull unrelated commands into
+    scope."""
     for command in (
-        '!uv pip install --system --force-reinstall torch --index-url "$URL"',
+        '!uv pip install --system torch --index-url "$URL"',
         "!uv pip install -qqq unsloth vllm",
         "!pip install --no-deps unsloth vllm",
     ):
         assert _upgrading([command]) == [], command
+
+
+def test_a_reinstall_counts_as_an_upgrade():
+    """`--force-reinstall` with no version resolves vLLM from the index, so it
+    replaces the installed one exactly as `-U` does. pip: "Reinstall all
+    packages even if they are already up-to-date"; uv spells it `--reinstall`.
+    Skipping it left an unpinned vLLM install outside both gates."""
+    for command in (
+        "!pip install --force-reinstall vllm",
+        "!uv pip install --reinstall vllm",
+        "!uv pip install --system --force-reinstall vllm --index-url $URL",
+    ):
+        assert _upgrading([command]) == [command], command
+    # `--reinstall-package` names one package, so it is not the whole-environment
+    # reinstall the flag above is, and the option boundary has to hold.
+    assert _upgrading(["!uv pip install --reinstall-package torch vllm"]) == []
 
 
 def test_a_shell_magic_cell_has_its_installs_scanned():

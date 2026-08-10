@@ -108,10 +108,26 @@ def _code(path):
 _TORCHVISION_RE = re.compile(r"torchvision", re.I)
 
 
+# Pillow reaches the kernel as torchvision's dependency, so `--no-deps` is the
+# one flag that makes a replacing install harmless: nothing but the named
+# requirements is touched. Two notebooks reinstall a pinned torchvision that
+# way. It stops protecting the moment the command names Pillow itself, which is
+# then an ordinary unpinned requirement.
+_NO_DEPS_RE = re.compile(r"(?<![\w-])--no-deps(?![\w-])")
+_PILLOW_REQ_RE = re.compile(r"(?<![\w{./-])pillow(?:\[[^\]\s]*\])?(?![\w}./-])", re.I)
+
+
+def _resolves_dependencies(command):
+    """Whether this install can land a Pillow it was not asked for."""
+    return not _NO_DEPS_RE.search(command) or bool(_PILLOW_REQ_RE.search(command))
+
+
 def _upgrades_torchvision(source):
     return [
         command for command in _pip_commands(source)
-        if ni.is_upgrading(command) and _TORCHVISION_RE.search(command)
+        if ni.is_upgrading(command)
+        and _TORCHVISION_RE.search(command)
+        and _resolves_dependencies(command)
     ]
 
 
@@ -389,13 +405,34 @@ def test_the_short_upgrade_flag_counts_as_an_upgrade():
 
 
 def test_a_flag_that_merely_contains_u_is_not_an_upgrade():
-    """Reading `--force-reinstall` or `--index-url` as an upgrade would drag
-    unrelated installs into scope."""
+    """Reading `--index-url` as an upgrade would drag unrelated installs into
+    scope."""
     for command in (
-        '!uv pip install --force-reinstall torchvision --index-url "$URL"',
+        '!uv pip install torchvision --index-url "$URL"',
         "!uv pip install -qqq torchvision",
     ):
         assert _upgrades_torchvision(command) == [], command
+
+
+def test_a_no_deps_install_cannot_pull_a_new_pillow():
+    """Pillow only arrives as torchvision's dependency, so `--no-deps` leaves it
+    alone however hard the command replaces torchvision. Two notebooks reinstall
+    a pinned torchvision that way, and demanding a Pillow pin there asks for a
+    requirement the install would ignore."""
+    for command in (
+        '!pip install --force-reinstall --no-deps "torchvision==0.26.0"',
+        "!uv pip install -U --no-deps torchvision",
+    ):
+        assert ni.is_upgrading(command), command
+        assert _upgrades_torchvision(command) == [], command
+    # Naming Pillow spends the exemption: it is a requirement of its own now,
+    # and an unpinned one resolves from the index like any other.
+    named = "!uv pip install -U --no-deps pillow torchvision"
+    assert _upgrades_torchvision(named) == [named]
+    assert not _pins_pillow(named, named)
+    pinned = "!uv pip install -U --no-deps pillow==11.3.0 torchvision"
+    assert _upgrades_torchvision(pinned) == [pinned]
+    assert _pins_pillow(pinned, pinned)
 
 
 def test_a_short_flag_upgrade_in_a_python_cell_is_still_caught(tmp_path):
@@ -547,6 +584,25 @@ def test_upgrade_strategy_is_not_an_upgrade():
     assert ni.is_upgrading("!pip install --upgrade torchvision")
     assert ni.is_upgrading(
         "!pip install --upgrade --upgrade-strategy eager torchvision")
+
+
+def test_a_reinstall_is_a_replacing_install():
+    """`--force-reinstall torchvision` carries no version, so pip resolves it
+    from the index and reinstalls Pillow underneath it: the same swap `-U`
+    makes, and the same broken `_imaging`. uv spells the flag `--reinstall`."""
+    for command in (
+        "!pip install --force-reinstall torchvision",
+        "!uv pip install --reinstall torchvision",
+    ):
+        assert ni.is_upgrading(command), command
+        assert _upgrades_torchvision(command) == [command], command
+        assert not _pins_pillow(command, command)
+    # Pinned in the same command, it is a pin rather than a resolve.
+    pinned = "!pip install --force-reinstall pillow==11.3.0 torchvision"
+    assert _upgrades_torchvision(pinned) == [pinned]
+    assert _pins_pillow(pinned, pinned)
+    # `--reinstall-package` replaces one named package, not the environment.
+    assert not ni.is_upgrading("!uv pip install --reinstall-package vllm torchvision")
 
 
 def test_only_a_real_assignment_defines_the_pin():

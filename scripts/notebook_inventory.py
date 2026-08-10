@@ -26,7 +26,8 @@ Public surface used by tests/ and CI:
   strip_jupyter_magics(source)            -> str    # cell-friendly
   extract_pip_pins_from_cell(source)      -> list[(pkg, version)]
   read_pin_constants()                    -> dict[str, str]
-  UPGRADE_FLAG_RE / is_upgrading(command) -> the `--upgrade` / `-U` test
+  UPGRADE_FLAG_RE / REINSTALL_FLAG_RE / is_upgrading(command) -> the flags
+                                            that replace an installed package
   is_shell_cell(source)                   -> whether a cell's body is shell
   strip_comment(line) / strip_comments(source) -> drop `#` comments
 """
@@ -45,19 +46,31 @@ DEFAULT_NOTEBOOK_ROOTS = ("original_template", "nb", "kaggle")
 _PIN_RE = re.compile(r"([A-Za-z][A-Za-z0-9_.\-]*)==([0-9][0-9A-Za-z.\-+_]*)")
 
 # `--upgrade` or its short form, including inside a cluster such as `-qU`. The
-# single leading `-` is required, so `--force-reinstall` and `--index-url` do not
-# read as upgrades. Shared by the vLLM and Pillow pin gates: a plain
-# `"--upgrade" in command` exempted the 152 AMD notebooks spelling it `-U`.
+# single leading `-` is required, so `--index-url` does not read as an upgrade.
+# Shared by the vLLM and Pillow pin gates: a plain `"--upgrade" in command`
+# exempted the 152 AMD notebooks spelling it `-U`.
 #
 # The long form must end the option, since `--upgrade-strategy` only picks how
 # dependencies are resolved and upgrades nothing on its own; `\b` matched it and
 # pulled ordinary installs into both gates.
 UPGRADE_FLAG_RE = re.compile(r"--upgrade(?![\w-])|(?<![\w-])-[a-zA-Z]*U")
 
+# The reinstall flags replace a package just as `-U` does, so both gates have to
+# read them the same way. pip defines `--force-reinstall` as "Reinstall all
+# packages even if they are already up-to-date", and with no version specifier
+# it resolves the requirement from the index: `pip install --force-reinstall
+# torchvision` lands the newest torchvision, and the newest Pillow beneath it,
+# exactly as `--upgrade` would. uv spells the same flag `--reinstall` and takes
+# `--force-reinstall` as an alias. The option has to end there, or
+# `--reinstall-package pillow` reads as a whole-environment reinstall.
+REINSTALL_FLAG_RE = re.compile(r"(?<![\w-])--(?:force-)?reinstall(?![\w-])")
+
 
 def is_upgrading(command: str) -> bool:
     """Whether a pip install command can replace an already-installed package."""
-    return UPGRADE_FLAG_RE.search(command) is not None
+    return bool(
+        UPGRADE_FLAG_RE.search(command) or REINSTALL_FLAG_RE.search(command)
+    )
 
 
 # A cell whose whole body is shell, so its install lines carry no `!`: 152 AMD
