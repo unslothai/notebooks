@@ -22,9 +22,8 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 
 
 get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth.git@main git+https://github.com/unslothai/unsloth-zoo.git')
-get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer')
-get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
-get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall git+https://github.com/huggingface/transformers.git')
+get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" hf_transfer "huggingface_hub>=1.5.0,<2.0" "safetensors>=0.8.0"')
+get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2" git+https://github.com/huggingface/transformers.git')
 get_ipython().system('uv pip install --system -qqq --no-build-isolation git+https://github.com/Dao-AILab/causal-conv1d.git@main git+https://github.com/state-spaces/mamba.git@main')
 
 
