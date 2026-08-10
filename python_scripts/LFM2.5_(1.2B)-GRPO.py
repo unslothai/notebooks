@@ -719,7 +719,7 @@ _ = model.generate(
     top_k = 50,
     top_p = 0.1,
     repetition_penalty = 1.05,
-    max_tokens = 1024,
+    max_new_tokens = 1024,
     use_cache = True,
     streamer = TextStreamer(tokenizer)
 )

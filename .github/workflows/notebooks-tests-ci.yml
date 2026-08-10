@@ -158,6 +158,12 @@ jobs:
         run: |
           python -m pytest tests/test_every_notebook_installs_its_stack.py -q --tb=short
 
+      - name: tests/test_generate_takes_transformers_kwargs.py
+        # `.generate()` is transformers, so a vLLM sampling name in it is a
+        # ValueError the moment the cell runs.
+        run: |
+          python -m pytest tests/test_generate_takes_transformers_kwargs.py -q --tb=short
+
       - name: tests/test_vllm_cells_resolve_torchao_against_torch.py
         # A pinned vLLM takes torch backwards, so torchao has to be chosen
         # against the torch that ends up installed, not against latest.
