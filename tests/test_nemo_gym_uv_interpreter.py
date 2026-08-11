@@ -135,6 +135,14 @@ def _holds_uv_below_min(spec):
     on endpoints that are themselves excluded. That neighbour appends a
     release segment rather than a `.post1`, because PEP 440 has `>V` reject
     post-releases of V too.
+
+    The neighbour is a version that may not exist on PyPI, which is the known
+    limit here: a spec that uses `!=` to carve out the one compatible release,
+    `<0.11.22,!=0.11.21`, is accepted on a witness pip could never install.
+    Closing that needs the published release list, so either a network call
+    from a static test or a hardcoded list that rots, and bumping the last
+    segment instead only trades it for rejecting `>0.12,<0.13`. Every form
+    anyone writes here, none, `>=X`, `==X`, `>=X,<Y`, `~=X`, is right.
     """
     try:
         specifier = SpecifierSet(spec)
