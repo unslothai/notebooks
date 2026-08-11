@@ -9,30 +9,29 @@
 # 
 # You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), and how to save it.
 
-# ## Hardware note: GRPO on this model needs more than 2x16 GB
+# ## Hardware note: GRPO on 2 x 16 GB
 # 
 # SFT, vision and multimodal fine-tuning of this checkpoint all run on a free Kaggle
-# T4 x2 kernel. GRPO does not, and the reason is specific rather than general size.
+# T4 x2 kernel. GRPO is the tight one, and the reason is specific rather than general
+# size.
 # 
-# The 4-bit weights split evenly across the two cards, measured at 10.01 GiB on cuda:0
-# and 10.30 GiB on cuda:1. The `lm_head` is 202048 x 6656 and lands on the last card,
-# and GRPO's chunked log-softmax then materialises `tokens x 202048` logits plus a
-# float32 copy of them on that same card. That leaves roughly 4.2 GiB for the logits,
-# the rollout KV cache and the gradients together, and it is not enough.
+# The 4-bit weights come to 20.31 GiB. The `lm_head` is 202048 x 6656 and is not tied,
+# so it stays in 16-bit at 2.5 GiB, and GRPO's chunked log-softmax then materialises
+# `rows x 202048` logits plus a float32 copy of them on whichever card holds it.
+# `device_map="auto"` splits the weights evenly and leaves that card no room for the
+# logits, and capping it with `max_memory` only pushes modules to CPU, which
+# bitsandbytes then refuses to load.
 # 
-# Two changes below take it as far as 2x16 GB will go, and both are worth keeping on
-# any tier: `num_generations = 2` instead of 4, and capping the log-softmax at 128
-# rows per chunk, which cuts peak logit memory from 994 MiB to 493 MiB at this vocab
-# size. With both applied the run still stops, but the failing allocation falls from
-# 260 MiB to 50 MiB, so the shortfall is small rather than structural.
+# The sizing cell below therefore builds an explicit device map with
+# `unsloth_zoo.device_map_planner`, which reserves the logit headroom on the head's
+# card and raises rather than spilling to CPU when the request cannot fit. On
+# 2 x 16 GB that means `num_generations = 2`, `max_seq_length = 1536` and a 128-row
+# cap on the log-softmax, which needs 4.10 GiB of headroom and fits. The same run at
+# 3072 tokens needs 7.57 GiB and is refused.
 # 
-# Capping the last card with `max_memory` to reserve headroom does not help: accelerate
-# balances rather than filling the first card, so the cap just pushes modules to CPU and
-# bitsandbytes refuses. Forcing it would need a hand-written `device_map`.
-# 
-# **Run this notebook on a single card with more memory** (A100 40GB, H100, or an L4 for
-# a slower run). On one GPU `offload_embedding` also switches back on, which frees a
-# further 2.5 GB, and none of the multi-GPU placement issues apply.
+# A single larger card (A100 40GB, H100, or an L4 for a slower run) takes
+# `num_generations = 4` and `max_seq_length = 3072`, and there `offload_embedding`
+# switches back on and frees a further 2.5 GB.
 
 # # Goal: teach Muse Glimmer to answer grade school maths on the right channel with Reinforcement Learning
 # 
@@ -133,12 +132,13 @@ print("architecture available:", _cfg.model_type)
 # 
 # * `load_in_4bit = True` keeps the 416 text `Linear4bit` modules at nf4 with double quant, about
 #   11.7 GB. The embeddings and the vision tower stay in 16-bit.
-# * `offload_embedding = True` moves the input embedding to CPU RAM. Muse Glimmer has a 202048 token
-#   vocabulary and untied embeddings, so `embed_tokens` alone is 2.5 GiB.
+# * `offload_embedding` moves the input embedding to CPU RAM. Muse Glimmer has a 202048 token
+#   vocabulary and untied embeddings, so `embed_tokens` alone is 2.5 GiB. It is taken only on a
+#   single card, because it cannot be combined with a multi-GPU dispatch (unslothai/unsloth#8272).
 # * `fast_inference = False` because no released vLLM carries this architecture. See the note below.
-# * `max_seq_length = 3072` is prompt plus completion. The prompts are only a couple of hundred
-#   tokens, so nearly all of that is completion budget. It has to be, see the length measurement
-#   further down.
+# * `max_seq_length` is prompt plus completion: 3072 on a single large card, 1536 on 2 x 16 GB,
+#   chosen by the sizing cell above. The prompts are only a couple of hundred tokens, so nearly
+#   all of that is completion budget. It has to be, see the length measurement further down.
 # 
 # Muse Glimmer is registered as an image-text-to-text model, so `AutoModelForCausalLM` will not load it.
 # `FastModel` picks the right class for you.
@@ -158,7 +158,8 @@ lora_rank  = 8      # Larger rank = smarter, but slower and more memory
 # memory levers: the log-softmax keeps every row's logits alive until backward
 # (the retained term scales with TOTAL rows, not chunk rows), so on 2 x 16 GB a
 # 3072-token sequence needs 7.57 GiB free on the head's card, which does not fit
-# alongside the weights. 1536 needs 4.10 GiB and leaves 1.29 GiB of margin.
+# alongside the 20.31 GiB of weights and is refused. 1536 needs 4.10 GiB, which
+# does fit.
 _n    = max(torch.cuda.device_count(), 1)
 _gib  = min(torch.cuda.get_device_properties(i).total_memory
             for i in range(_n)) / 2**30
@@ -171,8 +172,11 @@ max_completion_length = max_seq_length - max_prompt_length
 print(f"{_n} GPU(s), smallest {_gib:.1f} GiB -> num_generations={NUM_GENERATIONS}, "
       f"max_seq_length={max_seq_length}")
 
-# The offload is undone when the model is dispatched across several GPUs, so only take
-# it on a single card. See unslothai/unsloth#8272.
+# Offloading the input embedding to CPU cannot be combined with a multi-GPU
+# dispatch: accelerate's own hook re-sends the ids to the execution device it
+# recorded, after our hook already sent them to the CPU weight. unsloth turns the
+# offload off by itself in that case (unslothai/unsloth#8272), and asking for it
+# only on one card keeps that explicit here.
 OFFLOAD_EMBEDDING = _n == 1
 
 # Head-aware placement. Returns None on a single GPU, and raises rather than
@@ -183,18 +187,25 @@ if _n > 1:
     from unsloth_zoo.device_map_planner import plan_device_map_for_pretrained
     _plan = plan_device_map_for_pretrained(
         MODEL_NAME,
-        max_memory = {i: f"{_gib:.2f}GiB" for i in range(_n)},
+        # Free memory, not total: the CUDA context is already resident by now and
+        # the plan has to fit in what is actually left.
+        max_memory = {i: torch.cuda.mem_get_info(i)[0] for i in range(_n)},
         rows_per_chunk = 128,                       # matches the log-softmax cap below
         retained_rows  = BATCH_SIZE * max_seq_length,
         softcapped = True, temperature_scaled = True,
-        # Activations follow layers: each layer moved onto card 0 costs it more peak
-        # than it frees on the head card, so hold some back for card 0 itself.
-        # Left to the planner. An explicit reserve is treated as a measured
-        # figure the plan must honour exactly (unsloth_zoo sets steps = 1 when it
-        # is explicit), so on 2 x 14.6 GiB a hard 3.2 GiB request cannot be met
-        # alongside the weights and the logit headroom, and planning fails with
-        # DeviceMapInfeasible. Auto-sizing derives the reserve from the actual
-        # slack and still relaxes it on the non-head cards.
+        # Activations follow layers: every layer the packing puts on card 0 costs
+        # card 0 more peak than it frees on the head card, so card 0 needs room of
+        # its own. The default "balanced" policy cannot give it any here. Its
+        # equal-share cap is computed against HALF the weights even though the head
+        # card holds far less than half, so on 2 x 14.75 GiB the cap comes out
+        # negative (13.27 - 10.16 - 4.10 = -0.98 GiB), the reserve clamps to 0 and
+        # card 0 is packed to within 0.11 GiB of its budget.
+        # "head_max" reserves the largest placement unit instead, which leaves card
+        # 0 about 1.0 GiB. It is still a heuristic the planner may relax, unlike an
+        # explicit activation_reserve_bytes, which is treated as a measured figure
+        # the plan must honour exactly: a hard 2 GiB request plans at 14.75 GiB but
+        # fails with DeviceMapInfeasible at 14.55 GiB and below.
+        free_space_policy = "head_max",
     )
     if _plan is not None:
         print(_plan.describe())
