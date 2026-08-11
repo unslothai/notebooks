@@ -48,6 +48,8 @@ import re
 from pathlib import Path
 
 import pytest
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion, Version
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -61,7 +63,7 @@ GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
 # `uv python list --all-versions`: 0.11.20 lacks it, 0.11.21 has it. Below
 # this, uv sync exits 2 with "No interpreter found for Python 3.13.14 in
 # managed installations or search path". Bump alongside Gym/.python-version.
-MIN_UV = (0, 11, 21)
+MIN_UV = Version("0.11.21")
 
 # The checks below run over whatever discovery finds; this list only catches
 # discovery silently finding nothing, which would leave them with no cases.
@@ -111,34 +113,32 @@ def _discover():
 GYM_FILES = _discover()
 
 
-def _version_tuple(raw):
-    """`0.11.21` -> (0, 11, 21). Trailing `.*` and junk drop out."""
-    parts = []
-    for chunk in raw.strip().split("."):
-        digits = re.match(r"\d+", chunk)
-        if digits is None:
-            break
-        parts.append(int(digits.group()))
-    return tuple(parts)
+def _holds_uv_below_min(spec):
+    """Does `spec` rule out every uv that can fetch the pinned interpreter?
 
+    Answered through packaging rather than by hand so PEP 440 ordering is the
+    real one: `<=0.11.21rc1` reads as below `0.11.21`, not equal to it.
 
-def _stale_uv_clauses(spec):
-    """Clauses in `spec` that hold uv below MIN_UV.
-
-    `>=` and `>` only raise the floor and pip runs with `--upgrade`, so they
-    still land on the newest uv. Everything else caps what can be installed.
+    A spec is fine as long as SOME version it admits is at or above MIN_UV,
+    since pip is being run with `--upgrade` and takes the newest match. Three
+    probes settle that: MIN_UV covers ranges spanning it, a sentinel covers
+    specs open at the top, and the spec's own versions cover exact pins.
     """
-    stale = []
-    for clause in spec.split(","):
-        match = re.match(r"\s*(===|==|~=|<=|<)\s*([0-9][^,\s]*)", clause)
-        if match is None:
+    try:
+        specifier = SpecifierSet(spec)
+    except InvalidSpecifier:
+        return True
+
+    probes = [MIN_UV, Version("9999")]
+    for clause in specifier:
+        try:
+            probes.append(Version(clause.version.rstrip(".*")))
+        except InvalidVersion:
             continue
-        operator, version = match.group(1), match.group(2)
-        # `<X` cannot reach X itself; every other operator here can.
-        highest = _version_tuple(version)
-        if highest < MIN_UV or (operator == "<" and highest == MIN_UV):
-            stale.append(f"{operator}{version}")
-    return stale
+    return not any(
+        probe >= MIN_UV and specifier.contains(probe, prereleases = True)
+        for probe in probes
+    )
 
 
 def test_gym_bootstrap_files_are_all_present():
@@ -215,12 +215,13 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
         "3.13.14 in managed installations or search path'."
     )
 
-    # A constraint is allowed only above the release that first carries the
-    # interpreter. No constraint, which is what ships, gets the newest uv.
-    stale = _stale_uv_clauses(upgrade.group(1))
-    assert not stale, (
-        f"DRIFT DETECTED: {relpath} holds uv at {stale}, below "
-        f"{'.'.join(str(part) for part in MIN_UV)}. uv ships its list of "
+    # A constraint is allowed only if it can still reach the release that
+    # first carries the interpreter. No constraint, which is what ships,
+    # gets the newest uv.
+    spec = upgrade.group(1)
+    assert not _holds_uv_below_min(spec), (
+        f"DRIFT DETECTED: {relpath} holds uv at `uv{spec}`, entirely below "
+        f"{MIN_UV}. uv ships its list of "
         "installable Python builds inside the release, so a uv this old has "
         "no cpython-3.13.14 to fetch and uv sync exits 2 with 'No interpreter "
         "found for Python 3.13.14 in managed installations or search path' "
@@ -266,17 +267,28 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
         (">=0.10.7", False),
         ("==0.10.7", True),
         ("~=0.10.7", True),
+        # Same prefix as MIN_UV, so 0.11.21 is still in range.
+        ("~=0.11.5", False),
         ("<0.11.21", True),
+        ("<0.11.22", False),
         (">=0.10.7,<0.11", True),
         (">=0.11.21,<0.12", False),
         ("==0.12.3", False),
+        ("==0.11.*", False),
+        ("==0.10.*", True),
+        # PEP 440 sorts a release candidate below its own release, so this
+        # cap stops at 0.11.20 even though it names 0.11.21.
+        ("<=0.11.21rc1", True),
+        (">=0.11.21rc1", False),
+        ("==0.11.21rc1", True),
+        ("==0.11.21.post1", False),
+        ("not-a-specifier", True),
     ],
 )
 def test_the_stale_uv_guard_is_not_vacuous(spec, capped):
     """The guard above only helps if it can tell these specs apart."""
-    stale = _stale_uv_clauses(spec)
-    assert bool(stale) is capped, (
-        f"uv{spec} was read as {'capped' if stale else 'open'}, expected "
+    assert _holds_uv_below_min(spec) is capped, (
+        f"uv{spec} was read as {'capped' if not capped else 'open'}, expected "
         f"{'capped' if capped else 'open'}"
     )
 
