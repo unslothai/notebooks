@@ -852,6 +852,25 @@ installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
     "!pip install transformers==4.57.1",
 )
 
+# The Liquid LFM2 notebooks used to install transformers from git main, because
+# `lfm2` had no release when they were written. It does now, and main is a
+# moving target: the molab PEP 723 header installs it before a single cell runs,
+# so whatever upstream landed that hour is what the user builds. Both notebooks
+# now pin the 5.15.0 release instead, and the default 4.56.2 has to move with
+# them: two contradictory `transformers` pins in one notebook leave the molab
+# header to pick one, and both spellings are `==` of the same length, so there
+# is nothing to pick on.
+installation_liquid_lfm2_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.15.0",
+)
+installation_liquid_lfm2_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "transformers",
+    "!pip install transformers==5.15.0",
+)
+
 # Muse Glimmer is a `muse_glimmer` checkpoint, and that architecture landed in
 # transformers 5.15.0, so the canonical 4.56.2 cannot load it. Replace the
 # default pin rather than leaving it to be overridden by the notebook's own
@@ -4720,6 +4739,13 @@ def update_notebook_sections(
                                 installation = installation_lfm2_vl_kaggle_content
                             else:
                                 installation = installation_lfm2_vl_content
+
+                        # LIQUID LFM2 INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["liquid_lfm2"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_liquid_lfm2_kaggle_content
+                            else:
+                                installation = installation_liquid_lfm2_content
 
                         # MUSE GLIMMER INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["muse_glimmer"]):

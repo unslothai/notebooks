@@ -40,8 +40,8 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" hf_transfer "huggingface_hub>=1.5.0,<2.0" "safetensors>=0.8.0"')
-# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2" git+https://github.com/huggingface/transformers.git "causal-conv1d==1.5.0.post8"')
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" hf_transfer "transformers==5.15.0" "huggingface_hub>=1.5.0,<2.0" "safetensors>=0.8.0"')
+# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2" "causal-conv1d==1.5.0.post8"')
 # 
 # 
 # # ### Unsloth

@@ -8,7 +8,7 @@
 #     "safetensors>=0.8.0",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torchao>=0.16.0",
-#     "transformers @ git+https://github.com/huggingface/transformers.git",
+#     "transformers==5.15.0",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 # ]
@@ -83,26 +83,26 @@ def _():
 
 @app.cell
 def _():
-    # Need main branch for Falcon H1 models
+    # Falcon H1 needs 5.x; the release, not a moving main
     # --no-deps above is deliberate. Without it pip re-resolves the entire tree
-    # rather than only what is missing: measured, `--force-reinstall` on this URL
+    # rather than only what is missing: measured, `--force-reinstall` here
     # lands numpy 2.5.2 on top of the numpy 2.0.2 molab boots with. molab has
     # already imported numpy before cell 1 runs, and numpy is a C extension that
     # cannot be swapped under a live kernel, so the next Unsloth import stops with
     # "numpy was upgraded mid-session ... Please restart your runtime/kernel" and
     # no later cell can repair it. Same failure the QAT install cell pins numpy
     # against.
-    # The cost of --no-deps is that pip enforces nothing transformers main
+    # The cost of --no-deps is that pip enforces nothing the pinned transformers
     # declares. It only warns, and still exits 0, so every requirement it lists is
     # a delayed import error waiting to happen. The rule, rather than adding one
-    # more floor each time one surfaces: take install_requires from transformers
-    # main setup.py and raise every entry the base images fall short of. Both
+    # more floor each time one surfaces: take install_requires from the pinned
+    # release and raise every entry the base images fall short of. Both
     # images reach this cell on huggingface_hub 0.36.2 and Kaggle ships
     # safetensors 0.7.0, so those two need raising; tokenizers 0.22.2 already sits
     # inside its window and is pinned only to hold it under the 0.23.0 cap that
     # nothing else here enforces.
-    # tests/test_transformers_main_no_deps_floors.py holds this line to that rule,
-    # and tests/test_transformers_main_installs_use_no_deps.py holds the flag.
+    # tests/test_transformers5_hub_floor.py holds the hub bound on this line,
+    # and tests/test_force_reinstall_does_not_replace_numpy.py holds the flag.
 
     return
 
