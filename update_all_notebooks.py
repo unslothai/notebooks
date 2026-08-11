@@ -852,14 +852,11 @@ installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
     "!pip install transformers==4.57.1",
 )
 
-# The Liquid LFM2 notebooks used to install transformers from git main, because
-# `lfm2` had no release when they were written. It does now, and main is a
-# moving target: the molab PEP 723 header installs it before a single cell runs,
-# so whatever upstream landed that hour is what the user builds. Both notebooks
-# now pin the 5.15.0 release instead, and the default 4.56.2 has to move with
-# them: two contradictory `transformers` pins in one notebook leave the molab
-# header to pick one, and both spellings are `==` of the same length, so there
-# is nothing to pick on.
+# The Liquid LFM2 notebooks installed transformers from git main, because `lfm2`
+# had no release when they were written. It has one now, and main is a moving
+# target the molab PEP 723 header builds before a single cell runs. They pin
+# 5.15.0 instead, and the default 4.56.2 has to move with them: two `==` pins of
+# the same length in one notebook leave the molab header nothing to choose on.
 installation_liquid_lfm2_content = update_or_append_pip_install(
     installation_content,
     "transformers",

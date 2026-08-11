@@ -19,16 +19,14 @@
 """Installing transformers from git means naming the commit.
 
 `git+https://github.com/huggingface/transformers` with no `@ref` is whatever
-upstream's default branch holds the minute a reader runs the notebook. Two
-things follow. The notebook stops being reproducible, which is the ordinary
-cost. And in the molab variant the dependency is not a cell at all: it is
-declared in the PEP 723 header, which uv resolves and *builds* before the first
-line of the notebook runs, so the build backend of an unreviewed upstream
-revision executes in a runtime holding the reader's Hugging Face token.
+upstream's default branch holds the minute a reader runs the notebook. Beyond
+the reproducibility cost, in molab that dependency is not a cell at all: the
+PEP 723 header has uv *build* it before the notebook's first line, so an
+unreviewed revision's build backend runs in a runtime holding the reader's
+Hugging Face token.
 
-The Liquid LFM2 and Falcon H1 cells did this for as long as `lfm2` and
-`falcon_h1` had no tagged release. They have one now and pin it. A pinned
-`@<sha>` is fine and stays fine: it names one immutable tree.
+The Liquid LFM2 and Falcon H1 cells did this until `lfm2` and `falcon_h1` had
+a release to pin. A pinned `@<sha>` is fine: it names one immutable tree.
 """
 
 import json
@@ -38,29 +36,26 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-# The notebook roots `scripts/notebook_inventory.py` reads, plus the two
-# generated trees. `kaggle/` holds hand-committed Kaggle exports rather than
-# generated ones, which is exactly why it needs its own check.
+# `scripts/notebook_inventory.py`'s roots plus the generated trees. `kaggle/`
+# is hand-committed rather than generated, so nothing else would catch it.
 SEARCH_ROOTS = ("nb", "original_template", "kaggle", "python_scripts", "molab")
 
-# `.git` is optional, and the ref runs to whitespace, a quote or the `#` of a
-# `#subdirectory=`. Slashes are inside the ref so that `@refs/heads/main` is
-# read whole; capturing only `@refs` would read a branch as a pin. A backslash
-# ends it too: in `python_scripts/*.py` these lines sit inside a quoted string,
-# where the newline after the ref is the two characters `\` and `n`.
+# The ref runs to whitespace, a quote, or the `#` of a `#subdirectory=`.
+# Slashes stay inside it, or `@refs/heads/main` would be read as `@refs` and
+# pass as a pin. So does a backslash: in `python_scripts/*.py` the line sits in
+# a quoted string, where the trailing newline is the characters `\` and `n`.
 _TRANSFORMERS_GIT = re.compile(
     r"git\+https://github\.com/huggingface/transformers(?:\.git)?"
     r"(@[^\s\\\"'#,]+)?")
 # What is allowed, not what is forbidden: a branch moves whatever it is called,
-# so `@release-5.x` and `@refs/heads/main` have to fail the same way `@main`
-# does. That leaves a commit (a short sha is still one tree, so length is not
-# the test) or a release tag, optionally with an `-rc1` style suffix.
+# so `@release-5.x` has to fail the way `@main` does. That leaves a commit (a
+# short sha is one tree too) or a release tag, `-rc1` suffix included.
 _IMMUTABLE = re.compile(r"[0-9a-f]{7,40}|v?\d+(?:\.\d+)*(?:-[\w.]+)?",
                         re.IGNORECASE)
 
-# Still unpinned, tracked rather than silently tolerated. These predate the
-# Liquid LFM2 / Falcon H1 pin and are a separate change: their install lines
-# are hand-maintained and untested against a release.
+# Still unpinned, recorded rather than silently tolerated. They predate the
+# Liquid LFM2 / Falcon H1 pin and are a separate change: hand-maintained
+# install lines, untested against a release.
 KNOWN_UNPINNED = {
     "AMD-GPT_OSS_BNB_(20B)-Inference",
     "AMD-GPT_OSS_MXFP4_(20B)-Inference",
