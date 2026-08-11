@@ -38,16 +38,25 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SEARCH_ROOTS = ("nb", "original_template", "python_scripts", "molab")
+# The notebook roots `scripts/notebook_inventory.py` reads, plus the two
+# generated trees. `kaggle/` holds hand-committed Kaggle exports rather than
+# generated ones, which is exactly why it needs its own check.
+SEARCH_ROOTS = ("nb", "original_template", "kaggle", "python_scripts", "molab")
 
-# `.git` is optional, and the reference may be `@<sha>`, `@<tag>` or `@<branch>`
-# before an optional `#subdirectory=`. Only the first two are immutable, so the
-# ref is captured rather than merely required.
+# `.git` is optional, and the ref runs to whitespace, a quote or the `#` of a
+# `#subdirectory=`. Slashes are inside the ref so that `@refs/heads/main` is
+# read whole; capturing only `@refs` would read a branch as a pin. A backslash
+# ends it too: in `python_scripts/*.py` these lines sit inside a quoted string,
+# where the newline after the ref is the two characters `\` and `n`.
 _TRANSFORMERS_GIT = re.compile(
-    r"git\+https://github\.com/huggingface/transformers(?:\.git)?(@[\w.\-]+)?")
-# A tag or a commit. `main`, `master` and `dev` name a moving branch, and a
-# short sha is still one tree, so length is not the test.
-_MOVING = {"main", "master", "dev", "HEAD"}
+    r"git\+https://github\.com/huggingface/transformers(?:\.git)?"
+    r"(@[^\s\\\"'#,]+)?")
+# What is allowed, not what is forbidden: a branch moves whatever it is called,
+# so `@release-5.x` and `@refs/heads/main` have to fail the same way `@main`
+# does. That leaves a commit (a short sha is still one tree, so length is not
+# the test) or a release tag, optionally with an `-rc1` style suffix.
+_IMMUTABLE = re.compile(r"[0-9a-f]{7,40}|v?\d+(?:\.\d+)*(?:-[\w.]+)?",
+                        re.IGNORECASE)
 
 # Still unpinned, tracked rather than silently tolerated. These predate the
 # Liquid LFM2 / Falcon H1 pin and are a separate change: their install lines
@@ -104,9 +113,9 @@ def test_transformers_git_installs_name_a_commit(name, text):
             "happens in the PEP 723 header, before the notebook body runs. Pin a "
             "release with == or name a commit with @<sha>"
         )
-        assert ref.lstrip("@") not in _MOVING, (
-            f"{name} pins transformers to {ref}, which is a branch and moves. "
-            "Name a commit or a tag"
+        assert _IMMUTABLE.fullmatch(ref.lstrip("@")), (
+            f"{name} pins transformers to {ref}, which is a branch and moves "
+            "like the default one does. Name a commit or a release tag"
         )
 
 
@@ -122,3 +131,30 @@ def test_the_pattern_reads_a_bare_url_as_unpinned():
     """And the shape this file exists for still reports as unpinned."""
     bare = "!pip install --no-deps git+https://github.com/huggingface/transformers.git"
     assert _TRANSFORMERS_GIT.findall(bare) == [""]
+
+
+@pytest.mark.parametrize("ref", [
+    "bf3f0ae70d0e902efab4b8517fce88f6697636ce",
+    "bf3f0ae",
+    "v5.15.0",
+    "5.15.0",
+    "v5.15.0-rc1",
+])
+def test_a_commit_or_a_release_tag_is_immutable(ref):
+    assert _IMMUTABLE.fullmatch(ref)
+
+
+@pytest.mark.parametrize("ref", [
+    "main",
+    "master",
+    "release-5.x",
+    "5.x",
+    "refs/heads/main",
+    "my-branch",
+])
+def test_a_branch_is_not_immutable_whatever_it_is_called(ref):
+    """A name blacklist passed `@release-5.x` and read `@refs/heads/main` as
+    `@refs`, so the gate admitted the mutable installs it exists to stop."""
+    url = f"git+https://github.com/huggingface/transformers.git@{ref}"
+    assert _TRANSFORMERS_GIT.findall(url) == [f"@{ref}"]
+    assert not _IMMUTABLE.fullmatch(ref)
