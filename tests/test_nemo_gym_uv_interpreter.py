@@ -66,8 +66,8 @@ GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
 MIN_UV = Version("0.11.21")
 
 # `pip install --upgrade uv<spec>`, capturing <spec>. The name is anchored so
-# a package that merely starts with uv, uvicorn say, is not read as uv with a
-# trailing version spec.
+# a package that merely starts with uv, uvicorn say, is not read as uv plus a
+# version spec.
 UV_UPGRADE = re.compile(
     r"pip[\"'\s,]+.*install.*--upgrade[\"'\s,]+[\"']uv(?![A-Za-z0-9._-])([^\"']*)[\"']"
 )
@@ -123,26 +123,23 @@ GYM_FILES = _discover()
 def _holds_uv_below_min(spec):
     """Does `spec` rule out every uv that can fetch the pinned interpreter?
 
-    Answered through packaging rather than by hand so PEP 440 ordering is the
-    real one: `<=0.11.21rc1` reads as below `0.11.21`, not equal to it.
+    Ordering comes from packaging, not from parsing by hand, so `<=0.11.21rc1`
+    reads as below `0.11.21` rather than equal to it.
 
-    A spec is fine as long as SOME version it admits is at or above MIN_UV,
-    since pip is being run with `--upgrade` and takes the newest match. The
-    probes below look for one: MIN_UV covers ranges spanning it, a sentinel
-    covers specs open at the top, and each bound the spec names covers exact
-    pins. Each bound also gets the next version below its own siblings, so a
-    range between two exclusive bounds, `>0.11.21,<0.12`, is not judged empty
-    on endpoints that are themselves excluded. That neighbour appends a
-    release segment rather than a `.post1`, because PEP 440 has `>V` reject
-    post-releases of V too.
+    A spec is fine if SOME version it admits is at or above MIN_UV, since pip
+    runs with `--upgrade` and takes the newest match. The probes hunt for one:
+    MIN_UV for ranges spanning it, a sentinel for specs open at the top, each
+    named bound for exact pins, and a neighbour just above each bound so
+    `>0.11.21,<0.12` is not read as empty on endpoints it excludes. The
+    neighbour appends a release segment rather than a `.post1`, which PEP 440
+    has `>V` reject alongside V itself.
 
-    The neighbour is a version that may not exist on PyPI, which is the known
-    limit here: a spec that uses `!=` to carve out the one compatible release,
-    `<0.11.22,!=0.11.21`, is accepted on a witness pip could never install.
-    Closing that needs the published release list, so either a network call
-    from a static test or a hardcoded list that rots, and bumping the last
-    segment instead only trades it for rejecting `>0.12,<0.13`. Every form
-    anyone writes here, none, `>=X`, `==X`, `>=X,<Y`, `~=X`, is right.
+    Known limit: that neighbour need not exist on PyPI, so `<0.11.22,!=0.11.21`
+    passes on a witness pip could never install. Closing it needs the published
+    release list, a network call from a static test or a list that rots, and
+    bumping the last segment instead only trades it for rejecting
+    `>0.12,<0.13`. Every form anyone writes, none, `>=X`, `==X`, `>=X,<Y`,
+    `~=X`, is already right.
     """
     try:
         specifier = SpecifierSet(spec)
