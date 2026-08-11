@@ -34,6 +34,10 @@ Ordering matters too: uv has to be refreshed before it is asked for the
 interpreter, and called through the binary the fresh wheel ships, since the
 name `uv` still resolves to the stale copy earlier on PATH.
 
+The uv install is left unpinned on purpose. uv embeds the list of Python
+builds it can fetch, so pinning it below MIN_UV brings the failure above
+straight back: pin at or above MIN_UV, or not at all.
+
 nb/, python_scripts/ and molab/ are covered together: the last two are
 generated mirrors, so a one-layer fix disappears on the next regeneration.
 """
@@ -44,6 +48,8 @@ import re
 from pathlib import Path
 
 import pytest
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion, Version
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -51,6 +57,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SEARCH_DIRS = ["nb", "kaggle", "python_scripts", "molab", "original_template"]
 
 GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
+
+# Oldest uv carrying cpython-3.13.14, the interpreter Gym/.python-version
+# names. Measured per release in a throwaway venv against
+# `uv python list --all-versions`: 0.11.20 lacks it, 0.11.21 has it. Below
+# this, uv sync exits 2 with "No interpreter found for Python 3.13.14 in
+# managed installations or search path". Bump alongside Gym/.python-version.
+MIN_UV = Version("0.11.21")
+
+# `pip install --upgrade uv<spec>`, capturing <spec>. The name is anchored so
+# a package that merely starts with uv, uvicorn say, is not read as uv plus a
+# version spec.
+UV_UPGRADE = re.compile(
+    r"pip[\"'\s,]+.*install.*--upgrade[\"'\s,]+[\"']uv(?![A-Za-z0-9._-])([^\"']*)[\"']"
+)
 
 # The checks below run over whatever discovery finds; this list only catches
 # discovery silently finding nothing, which would leave them with no cases.
@@ -98,6 +118,46 @@ def _discover():
 
 
 GYM_FILES = _discover()
+
+
+def _holds_uv_below_min(spec):
+    """Does `spec` rule out every uv that can fetch the pinned interpreter?
+
+    Ordering comes from packaging, not from parsing by hand, so `<=0.11.21rc1`
+    reads as below `0.11.21` rather than equal to it.
+
+    A spec is fine if SOME version it admits is at or above MIN_UV, since pip
+    runs with `--upgrade` and takes the newest match. The probes hunt for one:
+    MIN_UV for ranges spanning it, a sentinel for specs open at the top, each
+    named bound for exact pins, and a neighbour just above each bound so
+    `>0.11.21,<0.12` is not read as empty on endpoints it excludes. The
+    neighbour appends a release segment rather than a `.post1`, which PEP 440
+    has `>V` reject alongside V itself.
+
+    Known limit: that neighbour need not exist on PyPI, so `<0.11.22,!=0.11.21`
+    passes on a witness pip could never install. Closing it needs the published
+    release list, a network call from a static test or a list that rots, and
+    bumping the last segment instead only trades it for rejecting
+    `>0.12,<0.13`. Every form anyone writes, none, `>=X`, `==X`, `>=X,<Y`,
+    `~=X`, is already right.
+    """
+    try:
+        specifier = SpecifierSet(spec)
+    except InvalidSpecifier:
+        return True
+
+    probes = [MIN_UV, Version("9999")]
+    for clause in specifier:
+        for candidate in (clause.version.rstrip(".*"),
+                          clause.version.rstrip(".*") + ".1"):
+            try:
+                probes.append(Version(candidate))
+            except InvalidVersion:
+                continue
+    return not any(
+        probe >= MIN_UV and specifier.contains(probe, prereleases = True)
+        for probe in probes
+    )
 
 
 def test_gym_bootstrap_files_are_all_present():
@@ -164,14 +224,32 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     """uv must be upgraded, addressed by path, and told to fetch the pin."""
     text = GYM_FILES[relpath]
 
-    upgrade = re.search(
-        r"pip[\"'\s,]+.*install.*--upgrade[\"'\s,]+[\"']uv[\"']", text
-    )
-    assert upgrade, (
+    # Every uv upgrade in the file, not just the first: the AMD artifacts
+    # already carry an earlier `pip install -qU uv`, and -U is --upgrade, so
+    # a stale constraint further down would hide behind it.
+    upgrades = list(UV_UPGRADE.finditer(text))
+    assert upgrades, (
         f"DRIFT DETECTED: {relpath} does not upgrade uv before using it. The "
         "uv preinstalled on Colab has no 3.13.14 in its embedded download "
         "list, so uv sync exits 2 with 'No interpreter found for Python "
         "3.13.14 in managed installations or search path'."
+    )
+
+    # A constraint is allowed only if it can still reach the release that
+    # first carries the interpreter. No constraint, which is what ships,
+    # gets the newest uv.
+    stale = [f"uv{u.group(1)}" for u in upgrades
+             if _holds_uv_below_min(u.group(1))]
+    assert not stale, (
+        f"DRIFT DETECTED: {relpath} holds uv at {stale}, entirely below "
+        f"{MIN_UV}. uv ships its list of "
+        "installable Python builds inside the release, so a uv this old has "
+        "no cpython-3.13.14 to fetch and uv sync exits 2 with 'No interpreter "
+        "found for Python 3.13.14 in managed installations or search path' "
+        "before the notebook gets anywhere. Pinning uv against a compromised "
+        "release is a reasonable thing to want, but it has to be a floor at "
+        "or above MIN_UV rather than a pin at a release that predates the "
+        "interpreter, and MIN_UV moves when Gym/.python-version moves."
     )
 
     assert "find_uv_bin(" in text, (
@@ -195,11 +273,93 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
         "refreshed uv binary."
     )
 
-    assert upgrade.start() < py_install.start() < sync.start(), (
+    assert (any(u.start() < py_install.start() for u in upgrades)
+            and py_install.start() < sync.start()), (
         f"DRIFT DETECTED: {relpath} runs uv before refreshing it. The order "
         "has to be upgrade uv, install the pinned interpreter, then sync."
     )
 
+
+@pytest.mark.parametrize(
+    "spec, capped",
+    [
+        ("", False),
+        (">=0.11.21", False),
+        # A bare floor still resolves to the newest uv under --upgrade.
+        (">=0.10.7", False),
+        ("==0.10.7", True),
+        ("~=0.10.7", True),
+        # Same prefix as MIN_UV, so 0.11.21 is still in range.
+        ("~=0.11.5", False),
+        ("<0.11.21", True),
+        ("<0.11.22", False),
+        (">=0.10.7,<0.11", True),
+        (">=0.11.21,<0.12", False),
+        ("==0.12.3", False),
+        ("==0.11.*", False),
+        ("==0.10.*", True),
+        # PEP 440 sorts a release candidate below its own release, so this
+        # cap stops at 0.11.20 even though it names 0.11.21.
+        ("<=0.11.21rc1", True),
+        (">=0.11.21rc1", False),
+        ("==0.11.21rc1", True),
+        ("==0.11.21.post1", False),
+        # An exclusion can empty out a range that reads as open in isolation.
+        ("<=0.11.21,!=0.11.21", True),
+        (">=0.11.21,!=0.11.21", False),
+        # Both bounds excluded, but 0.11.33 sits between them.
+        (">0.11.21,<0.12", False),
+        (">0.11.21", False),
+        (">0.10.7,<0.11", True),
+        ("not-a-specifier", True),
+    ],
+)
+def test_the_stale_uv_guard_is_not_vacuous(spec, capped):
+    """The guard above only helps if it can tell these specs apart."""
+    assert _holds_uv_below_min(spec) is capped, (
+        f"uv{spec} was read as {'capped' if not capped else 'open'}, expected "
+        f"{'capped' if capped else 'open'}"
+    )
+
+
+@pytest.mark.parametrize(
+    "package, matched",
+    [
+        ("uv", True),
+        ("uv==0.12.3", True),
+        ("uv>=0.11.21", True),
+        # Upgrading a different package leaves the stale uv on PATH in charge,
+        # so this must not read as an uv upgrade with a trailing spec.
+        ("uvicorn", False),
+        ("uv-secret", False),
+        ("uv_build", False),
+    ],
+)
+def test_only_uv_itself_counts_as_the_uv_upgrade(package, matched):
+    """A lookalike package name must not satisfy the uv upgrade check."""
+    text = (
+        'subprocess.run([sys.executable, "-m", "pip", "install", '
+        f'"--quiet", "--upgrade", "{package}"], check = True)'
+    )
+    assert bool(UV_UPGRADE.search(text)) is matched, (
+        f"{package} was read as {'an uv upgrade' if not matched else 'unrelated'}"
+    )
+
+def test_a_later_stale_upgrade_is_not_hidden_by_an_earlier_clean_one():
+    """The AMD files already install uv twice, so first-match is not enough."""
+    text = (
+        'subprocess.run([sys.executable, "-m", "pip", "install", '
+        '"--upgrade", "uv"], check = True)\n'
+        'subprocess.run([sys.executable, "-m", "pip", "install", '
+        '"--upgrade", "uv==0.10.7"], check = True)\n'
+    )
+    upgrades = list(UV_UPGRADE.finditer(text))
+    assert len(upgrades) == 2, "both uv upgrades must be seen"
+    stale = [f"uv{u.group(1)}" for u in upgrades
+             if _holds_uv_below_min(u.group(1))]
+    assert stale == ["uv==0.10.7"], (
+        f"the later stale pin must be reported, got {stale}"
+    )
 
 @pytest.mark.parametrize("relpath", sorted(GYM_FILES))
 def test_setup_is_not_skipped_by_a_venv_existence_guard(relpath):
