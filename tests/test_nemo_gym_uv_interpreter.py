@@ -224,8 +224,11 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     """uv must be upgraded, addressed by path, and told to fetch the pin."""
     text = GYM_FILES[relpath]
 
-    upgrade = UV_UPGRADE.search(text)
-    assert upgrade, (
+    # Every uv upgrade in the file, not just the first: the AMD artifacts
+    # already carry an earlier `pip install -qU uv`, and -U is --upgrade, so
+    # a stale constraint further down would hide behind it.
+    upgrades = list(UV_UPGRADE.finditer(text))
+    assert upgrades, (
         f"DRIFT DETECTED: {relpath} does not upgrade uv before using it. The "
         "uv preinstalled on Colab has no 3.13.14 in its embedded download "
         "list, so uv sync exits 2 with 'No interpreter found for Python "
@@ -235,9 +238,10 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     # A constraint is allowed only if it can still reach the release that
     # first carries the interpreter. No constraint, which is what ships,
     # gets the newest uv.
-    spec = upgrade.group(1)
-    assert not _holds_uv_below_min(spec), (
-        f"DRIFT DETECTED: {relpath} holds uv at `uv{spec}`, entirely below "
+    stale = [f"uv{u.group(1)}" for u in upgrades
+             if _holds_uv_below_min(u.group(1))]
+    assert not stale, (
+        f"DRIFT DETECTED: {relpath} holds uv at {stale}, entirely below "
         f"{MIN_UV}. uv ships its list of "
         "installable Python builds inside the release, so a uv this old has "
         "no cpython-3.13.14 to fetch and uv sync exits 2 with 'No interpreter "
@@ -269,7 +273,8 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
         "refreshed uv binary."
     )
 
-    assert upgrade.start() < py_install.start() < sync.start(), (
+    assert (any(u.start() < py_install.start() for u in upgrades)
+            and py_install.start() < sync.start()), (
         f"DRIFT DETECTED: {relpath} runs uv before refreshing it. The order "
         "has to be upgrade uv, install the pinned interpreter, then sync."
     )
@@ -338,6 +343,22 @@ def test_only_uv_itself_counts_as_the_uv_upgrade(package, matched):
     )
     assert bool(UV_UPGRADE.search(text)) is matched, (
         f"{package} was read as {'an uv upgrade' if not matched else 'unrelated'}"
+    )
+
+def test_a_later_stale_upgrade_is_not_hidden_by_an_earlier_clean_one():
+    """The AMD files already install uv twice, so first-match is not enough."""
+    text = (
+        'subprocess.run([sys.executable, "-m", "pip", "install", '
+        '"--upgrade", "uv"], check = True)\n'
+        'subprocess.run([sys.executable, "-m", "pip", "install", '
+        '"--upgrade", "uv==0.10.7"], check = True)\n'
+    )
+    upgrades = list(UV_UPGRADE.finditer(text))
+    assert len(upgrades) == 2, "both uv upgrades must be seen"
+    stale = [f"uv{u.group(1)}" for u in upgrades
+             if _holds_uv_below_min(u.group(1))]
+    assert stale == ["uv==0.10.7"], (
+        f"the later stale pin must be reported, got {stale}"
     )
 
 @pytest.mark.parametrize("relpath", sorted(GYM_FILES))
