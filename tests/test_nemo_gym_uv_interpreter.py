@@ -34,6 +34,12 @@ Ordering matters too: uv has to be refreshed before it is asked for the
 interpreter, and called through the binary the fresh wheel ships, since the
 name `uv` still resolves to the stale copy earlier on PATH.
 
+The uv install is deliberately left unpinned, and a version constraint added
+here has to clear MIN_UV below. Pinning uv reads like supply-chain hardening,
+but the list of Python downloads uv can fetch is embedded in the uv release
+itself, so a pin at a stale release is the Colab failure this file exists to
+prevent, reintroduced on purpose.
+
 nb/, python_scripts/ and molab/ are covered together: the last two are
 generated mirrors, so a one-layer fix disappears on the next regeneration.
 """
@@ -51,6 +57,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SEARCH_DIRS = ["nb", "kaggle", "python_scripts", "molab", "original_template"]
 
 GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
+
+# Oldest uv release whose embedded download list carries cpython-3.13.14, the
+# interpreter Gym/.python-version names. Measured by installing each release
+# into a throwaway venv and grepping `uv python list --all-versions`: 0.11.20
+# is the last one without it, 0.11.21 the first one with it. Anything below
+# this fails `uv sync` with "No interpreter found for Python 3.13.14 in
+# managed installations or search path" no matter how new pip is.
+#
+# Bump this alongside Gym/.python-version, not on its own.
+MIN_UV = (0, 11, 21)
 
 # The checks below run over whatever discovery finds; this list only catches
 # discovery silently finding nothing, which would leave them with no cases.
@@ -98,6 +114,38 @@ def _discover():
 
 
 GYM_FILES = _discover()
+
+
+def _version_tuple(raw):
+    """`0.11.21` -> (0, 11, 21). Trailing `.*` and junk drop out."""
+    parts = []
+    for chunk in raw.strip().split("."):
+        digits = re.match(r"\d+", chunk)
+        if digits is None:
+            break
+        parts.append(int(digits.group()))
+    return tuple(parts)
+
+
+def _stale_uv_clauses(spec):
+    """Clauses in `spec` that hold uv below MIN_UV.
+
+    `>=` and `>` only raise the floor, and pip is being run with `--upgrade`,
+    so they still resolve to the newest uv on the index. Everything else caps
+    what can be installed, which is what MIN_UV has to be checked against.
+    """
+    stale = []
+    for clause in spec.split(","):
+        match = re.match(r"\s*(===|==|~=|<=|<)\s*([0-9][^,\s]*)", clause)
+        if match is None:
+            continue
+        operator, version = match.group(1), match.group(2)
+        # `<X` admits nothing above X, so X itself being the floor is already
+        # too low; every other operator here can still reach X.
+        highest = _version_tuple(version)
+        if highest < MIN_UV or (operator == "<" and highest == MIN_UV):
+            stale.append(f"{operator}{version}")
+    return stale
 
 
 def test_gym_bootstrap_files_are_all_present():
@@ -165,13 +213,29 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     text = GYM_FILES[relpath]
 
     upgrade = re.search(
-        r"pip[\"'\s,]+.*install.*--upgrade[\"'\s,]+[\"']uv[\"']", text
+        r"pip[\"'\s,]+.*install.*--upgrade[\"'\s,]+[\"']uv([^\"']*)[\"']", text
     )
     assert upgrade, (
         f"DRIFT DETECTED: {relpath} does not upgrade uv before using it. The "
         "uv preinstalled on Colab has no 3.13.14 in its embedded download "
         "list, so uv sync exits 2 with 'No interpreter found for Python "
         "3.13.14 in managed installations or search path'."
+    )
+
+    # A version constraint is allowed, but only above the release that first
+    # carries the interpreter Gym pins. `--upgrade` with no constraint, which
+    # is what the notebooks ship, lands on the newest uv and is always fine.
+    stale = _stale_uv_clauses(upgrade.group(1))
+    assert not stale, (
+        f"DRIFT DETECTED: {relpath} holds uv at {stale}, below "
+        f"{'.'.join(str(part) for part in MIN_UV)}. uv ships its list of "
+        "installable Python builds inside the release, so a uv this old has "
+        "no cpython-3.13.14 to fetch and uv sync exits 2 with 'No interpreter "
+        "found for Python 3.13.14 in managed installations or search path' "
+        "before the notebook gets anywhere. Pinning uv against a compromised "
+        "release is a reasonable thing to want, but it has to be a floor at "
+        "or above MIN_UV rather than a pin at a release that predates the "
+        "interpreter, and MIN_UV moves when Gym/.python-version moves."
     )
 
     assert "find_uv_bin(" in text, (
@@ -198,6 +262,31 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     assert upgrade.start() < py_install.start() < sync.start(), (
         f"DRIFT DETECTED: {relpath} runs uv before refreshing it. The order "
         "has to be upgrade uv, install the pinned interpreter, then sync."
+    )
+
+
+@pytest.mark.parametrize(
+    "spec, capped",
+    [
+        ("", False),
+        (">=0.11.21", False),
+        # A bare floor below MIN_UV still resolves to the newest uv, because
+        # pip is being run with --upgrade.
+        (">=0.10.7", False),
+        ("==0.10.7", True),
+        ("~=0.10.7", True),
+        ("<0.11.21", True),
+        (">=0.10.7,<0.11", True),
+        (">=0.11.21,<0.12", False),
+        ("==0.12.3", False),
+    ],
+)
+def test_the_stale_uv_guard_is_not_vacuous(spec, capped):
+    """The guard above only helps if it can tell these specs apart."""
+    stale = _stale_uv_clauses(spec)
+    assert bool(stale) is capped, (
+        f"uv{spec} was read as {'capped' if stale else 'open'}, expected "
+        f"{'capped' if capped else 'open'}"
     )
 
 
