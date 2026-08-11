@@ -127,9 +127,14 @@ def _holds_uv_below_min(spec):
     real one: `<=0.11.21rc1` reads as below `0.11.21`, not equal to it.
 
     A spec is fine as long as SOME version it admits is at or above MIN_UV,
-    since pip is being run with `--upgrade` and takes the newest match. Three
-    probes settle that: MIN_UV covers ranges spanning it, a sentinel covers
-    specs open at the top, and the spec's own versions cover exact pins.
+    since pip is being run with `--upgrade` and takes the newest match. The
+    probes below look for one: MIN_UV covers ranges spanning it, a sentinel
+    covers specs open at the top, and each bound the spec names covers exact
+    pins. Each bound also gets the next version below its own siblings, so a
+    range between two exclusive bounds, `>0.11.21,<0.12`, is not judged empty
+    on endpoints that are themselves excluded. That neighbour appends a
+    release segment rather than a `.post1`, because PEP 440 has `>V` reject
+    post-releases of V too.
     """
     try:
         specifier = SpecifierSet(spec)
@@ -138,10 +143,12 @@ def _holds_uv_below_min(spec):
 
     probes = [MIN_UV, Version("9999")]
     for clause in specifier:
-        try:
-            probes.append(Version(clause.version.rstrip(".*")))
-        except InvalidVersion:
-            continue
+        for candidate in (clause.version.rstrip(".*"),
+                          clause.version.rstrip(".*") + ".1"):
+            try:
+                probes.append(Version(candidate))
+            except InvalidVersion:
+                continue
     return not any(
         probe >= MIN_UV and specifier.contains(probe, prereleases = True)
         for probe in probes
@@ -290,6 +297,10 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
         # An exclusion can empty out a range that reads as open in isolation.
         ("<=0.11.21,!=0.11.21", True),
         (">=0.11.21,!=0.11.21", False),
+        # Both bounds excluded, but 0.11.33 sits between them.
+        (">0.11.21,<0.12", False),
+        (">0.11.21", False),
+        (">0.10.7,<0.11", True),
         ("not-a-specifier", True),
     ],
 )
