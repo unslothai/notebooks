@@ -34,11 +34,9 @@ Ordering matters too: uv has to be refreshed before it is asked for the
 interpreter, and called through the binary the fresh wheel ships, since the
 name `uv` still resolves to the stale copy earlier on PATH.
 
-The uv install is deliberately left unpinned, and a version constraint added
-here has to clear MIN_UV below. Pinning uv reads like supply-chain hardening,
-but the list of Python downloads uv can fetch is embedded in the uv release
-itself, so a pin at a stale release is the Colab failure this file exists to
-prevent, reintroduced on purpose.
+The uv install is left unpinned on purpose. uv embeds the list of Python
+builds it can fetch, so pinning it below MIN_UV brings the failure above
+straight back: pin at or above MIN_UV, or not at all.
 
 nb/, python_scripts/ and molab/ are covered together: the last two are
 generated mirrors, so a one-layer fix disappears on the next regeneration.
@@ -58,14 +56,11 @@ SEARCH_DIRS = ["nb", "kaggle", "python_scripts", "molab", "original_template"]
 
 GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
 
-# Oldest uv release whose embedded download list carries cpython-3.13.14, the
-# interpreter Gym/.python-version names. Measured by installing each release
-# into a throwaway venv and grepping `uv python list --all-versions`: 0.11.20
-# is the last one without it, 0.11.21 the first one with it. Anything below
-# this fails `uv sync` with "No interpreter found for Python 3.13.14 in
-# managed installations or search path" no matter how new pip is.
-#
-# Bump this alongside Gym/.python-version, not on its own.
+# Oldest uv carrying cpython-3.13.14, the interpreter Gym/.python-version
+# names. Measured per release in a throwaway venv against
+# `uv python list --all-versions`: 0.11.20 lacks it, 0.11.21 has it. Below
+# this, uv sync exits 2 with "No interpreter found for Python 3.13.14 in
+# managed installations or search path". Bump alongside Gym/.python-version.
 MIN_UV = (0, 11, 21)
 
 # The checks below run over whatever discovery finds; this list only catches
@@ -130,9 +125,8 @@ def _version_tuple(raw):
 def _stale_uv_clauses(spec):
     """Clauses in `spec` that hold uv below MIN_UV.
 
-    `>=` and `>` only raise the floor, and pip is being run with `--upgrade`,
-    so they still resolve to the newest uv on the index. Everything else caps
-    what can be installed, which is what MIN_UV has to be checked against.
+    `>=` and `>` only raise the floor and pip runs with `--upgrade`, so they
+    still land on the newest uv. Everything else caps what can be installed.
     """
     stale = []
     for clause in spec.split(","):
@@ -140,8 +134,7 @@ def _stale_uv_clauses(spec):
         if match is None:
             continue
         operator, version = match.group(1), match.group(2)
-        # `<X` admits nothing above X, so X itself being the floor is already
-        # too low; every other operator here can still reach X.
+        # `<X` cannot reach X itself; every other operator here can.
         highest = _version_tuple(version)
         if highest < MIN_UV or (operator == "<" and highest == MIN_UV):
             stale.append(f"{operator}{version}")
@@ -222,9 +215,8 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
         "3.13.14 in managed installations or search path'."
     )
 
-    # A version constraint is allowed, but only above the release that first
-    # carries the interpreter Gym pins. `--upgrade` with no constraint, which
-    # is what the notebooks ship, lands on the newest uv and is always fine.
+    # A constraint is allowed only above the release that first carries the
+    # interpreter. No constraint, which is what ships, gets the newest uv.
     stale = _stale_uv_clauses(upgrade.group(1))
     assert not stale, (
         f"DRIFT DETECTED: {relpath} holds uv at {stale}, below "
@@ -270,8 +262,7 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     [
         ("", False),
         (">=0.11.21", False),
-        # A bare floor below MIN_UV still resolves to the newest uv, because
-        # pip is being run with --upgrade.
+        # A bare floor still resolves to the newest uv under --upgrade.
         (">=0.10.7", False),
         ("==0.10.7", True),
         ("~=0.10.7", True),
