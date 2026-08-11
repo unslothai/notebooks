@@ -41,13 +41,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SEARCH_ROOTS = ("nb", "original_template", "kaggle", "python_scripts", "molab")
 
 # Transport and boundary follow `test_force_reinstall_does_not_replace_numpy.py`:
-# pip takes `git+ssh://git@` too, and without the lookahead
-# `transformers-neuronx` reads as an unpinned transformers.
-#
-# The ref runs to whitespace, a quote, or the `#` of a `#subdirectory=`.
-# Slashes stay inside it, or `@refs/heads/main` would be read as `@refs` and
-# pass as a pin. So does a backslash: in `python_scripts/*.py` the line sits in
-# a quoted string, where the trailing newline is the characters `\` and `n`.
+# pip takes `git+ssh://git@`, and without the lookahead `transformers-neuronx`
+# reads as an unpinned transformers. The ref then runs to whitespace, a quote
+# or the `#` of a `#subdirectory=`. Slashes stay inside it, or
+# `@refs/heads/main` would be read as `@refs` and pass as a pin; so does a
+# backslash, since in `python_scripts/*.py` the line sits in a quoted string
+# where the trailing newline is the characters `\` and `n`.
 _TRANSFORMERS_GIT = re.compile(
     r"git\+(?:https://|ssh://git@)github\.com/huggingface/transformers"
     r"(?:\.git)?(?![\w./-])(@[^\s\\\"'#,]+)?")
