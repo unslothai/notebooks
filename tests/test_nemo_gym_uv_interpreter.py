@@ -65,6 +65,13 @@ GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
 # managed installations or search path". Bump alongside Gym/.python-version.
 MIN_UV = Version("0.11.21")
 
+# `pip install --upgrade uv<spec>`, capturing <spec>. The name is anchored so
+# a package that merely starts with uv, uvicorn say, is not read as uv with a
+# trailing version spec.
+UV_UPGRADE = re.compile(
+    r"pip[\"'\s,]+.*install.*--upgrade[\"'\s,]+[\"']uv(?![A-Za-z0-9._-])([^\"']*)[\"']"
+)
+
 # The checks below run over whatever discovery finds; this list only catches
 # discovery silently finding nothing, which would leave them with no cases.
 EXPECTED_FILES = {
@@ -205,9 +212,7 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
     """uv must be upgraded, addressed by path, and told to fetch the pin."""
     text = GYM_FILES[relpath]
 
-    upgrade = re.search(
-        r"pip[\"'\s,]+.*install.*--upgrade[\"'\s,]+[\"']uv([^\"']*)[\"']", text
-    )
+    upgrade = UV_UPGRADE.search(text)
     assert upgrade, (
         f"DRIFT DETECTED: {relpath} does not upgrade uv before using it. The "
         "uv preinstalled on Colab has no 3.13.14 in its embedded download "
@@ -282,6 +287,9 @@ def test_uv_is_refreshed_then_asked_for_the_interpreter(relpath):
         (">=0.11.21rc1", False),
         ("==0.11.21rc1", True),
         ("==0.11.21.post1", False),
+        # An exclusion can empty out a range that reads as open in isolation.
+        ("<=0.11.21,!=0.11.21", True),
+        (">=0.11.21,!=0.11.21", False),
         ("not-a-specifier", True),
     ],
 )
@@ -292,6 +300,29 @@ def test_the_stale_uv_guard_is_not_vacuous(spec, capped):
         f"{'capped' if capped else 'open'}"
     )
 
+
+@pytest.mark.parametrize(
+    "package, matched",
+    [
+        ("uv", True),
+        ("uv==0.12.3", True),
+        ("uv>=0.11.21", True),
+        # Upgrading a different package leaves the stale uv on PATH in charge,
+        # so this must not read as an uv upgrade with a trailing spec.
+        ("uvicorn", False),
+        ("uv-secret", False),
+        ("uv_build", False),
+    ],
+)
+def test_only_uv_itself_counts_as_the_uv_upgrade(package, matched):
+    """A lookalike package name must not satisfy the uv upgrade check."""
+    text = (
+        'subprocess.run([sys.executable, "-m", "pip", "install", '
+        f'"--quiet", "--upgrade", "{package}"], check = True)'
+    )
+    assert bool(UV_UPGRADE.search(text)) is matched, (
+        f"{package} was read as {'an uv upgrade' if not matched else 'unrelated'}"
+    )
 
 @pytest.mark.parametrize("relpath", sorted(GYM_FILES))
 def test_setup_is_not_skipped_by_a_venv_existence_guard(relpath):
