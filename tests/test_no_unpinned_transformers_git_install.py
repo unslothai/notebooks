@@ -40,13 +40,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # is hand-committed rather than generated, so nothing else would catch it.
 SEARCH_ROOTS = ("nb", "original_template", "kaggle", "python_scripts", "molab")
 
+# Transport and boundary follow `test_force_reinstall_does_not_replace_numpy.py`:
+# pip takes `git+ssh://git@` too, and without the lookahead
+# `transformers-neuronx` reads as an unpinned transformers.
+#
 # The ref runs to whitespace, a quote, or the `#` of a `#subdirectory=`.
 # Slashes stay inside it, or `@refs/heads/main` would be read as `@refs` and
 # pass as a pin. So does a backslash: in `python_scripts/*.py` the line sits in
 # a quoted string, where the trailing newline is the characters `\` and `n`.
 _TRANSFORMERS_GIT = re.compile(
-    r"git\+https://github\.com/huggingface/transformers(?:\.git)?"
-    r"(@[^\s\\\"'#,]+)?")
+    r"git\+(?:https://|ssh://git@)github\.com/huggingface/transformers"
+    r"(?:\.git)?(?![\w./-])(@[^\s\\\"'#,]+)?")
 # What is allowed, not what is forbidden: a branch moves whatever it is called,
 # so `@release-5.x` has to fail the way `@main` does. That leaves a commit (a
 # short sha is one tree too) or a release tag, `-rc1` suffix included.
@@ -126,6 +130,20 @@ def test_the_pattern_reads_a_bare_url_as_unpinned():
     """And the shape this file exists for still reports as unpinned."""
     bare = "!pip install --no-deps git+https://github.com/huggingface/transformers.git"
     assert _TRANSFORMERS_GIT.findall(bare) == [""]
+
+
+def test_the_ssh_transport_is_read_too():
+    """pip takes `git+ssh://git@`, and an HTTPS-only pattern would skip the
+    file entirely rather than report it unpinned."""
+    ssh = "!pip install git+ssh://git@github.com/huggingface/transformers.git"
+    assert _TRANSFORMERS_GIT.findall(ssh) == [""]
+    assert _TRANSFORMERS_GIT.findall(ssh + "@bf3f0ae7") == ["@bf3f0ae7"]
+
+
+def test_another_repository_under_huggingface_is_not_transformers():
+    """`transformers-neuronx` shares the prefix and is a different project."""
+    assert _TRANSFORMERS_GIT.findall(
+        "!pip install git+https://github.com/huggingface/transformers-neuronx.git") == []
 
 
 @pytest.mark.parametrize("ref", [
