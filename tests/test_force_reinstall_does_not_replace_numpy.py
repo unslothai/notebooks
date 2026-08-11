@@ -43,9 +43,9 @@ only fix available to a notebook is not to change numpy on disk at all. That is
 the same reasoning `tests/test_qat_numpy_pin.py` applies to the QAT install
 cell, which pins numpy beside `fbgemm-gpu-genai` against this exact error.
 
-`tests/test_transformers_main_no_deps_floors.py` covers what a `--no-deps`
-install then owes. It matches on `--no-deps`, so a cell that never passed the
-flag is invisible to it; this file is the other half.
+`tests/test_transformers5_hub_floor.py` covers what a `--no-deps` install then
+owes. It matches on `--no-deps`, so a cell that never passed the flag is
+invisible to it; this file is the other half.
 
 Scope is deliberately the pairing that was measured, `--force-reinstall`
 without `--no-deps`, and not every install that could in principle move numpy:

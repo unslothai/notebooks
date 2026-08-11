@@ -194,11 +194,12 @@ jobs:
         run: |
           python -m pytest tests/test_live_names_bound_only_in_dead_code.py -q --tb=short
 
-      - name: tests/test_transformers_main_no_deps_floors.py
-        # A --no-deps install of transformers main has to pin every floor the
-        # base images fall short of, not only the one that broke last.
+      - name: tests/test_no_unpinned_transformers_git_install.py
+        # A transformers git install with no @ref builds whatever upstream's
+        # default branch holds at run time, and in molab it does so from the
+        # PEP 723 header, before the notebook body runs.
         run: |
-          python -m pytest tests/test_transformers_main_no_deps_floors.py -q --tb=short
+          python -m pytest tests/test_no_unpinned_transformers_git_install.py -q --tb=short
 
       - name: tests/test_trackio_args_match_pinned_transformers.py
         # A trackio TrainingArguments field is only a keyword on the

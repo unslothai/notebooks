@@ -14,7 +14,7 @@
 #     "sentencepiece",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torchao>=0.16.0",
-#     "transformers @ git+https://github.com/huggingface/transformers.git",
+#     "transformers==5.15.0",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
@@ -91,18 +91,18 @@ def _(mo):
 
 @app.cell
 def _():
-    # Need main branch for Liquid LFM2 models
+    # Liquid LFM2 needs 5.x; the release, not a moving main
     # --no-deps above is deliberate: without it pip re-resolves torch and replaces
     # the CUDA build the runtime already has. The cost is that pip enforces nothing
-    # transformers main declares. It only warns, and still exits 0, so every
-    # requirement it lists is a delayed import error waiting to happen. The rule,
-    # rather than adding one more floor each time one surfaces: take
-    # install_requires from transformers main setup.py and raise every entry the
+    # the pinned transformers declares. It only warns, and still exits 0, so
+    # every requirement it lists is a delayed import error waiting to happen. The
+    # rule, rather than adding one more floor each time one surfaces: take
+    # install_requires from the pinned release and raise every entry the
     # base images fall short of. Measured on hardware, both images reach this cell
     # on huggingface_hub 0.36.2 and Kaggle ships safetensors 0.7.0, so those two
     # need raising; tokenizers 0.22.2 already sits inside its window and is pinned
     # only to hold it under the 0.23.0 cap that nothing else here enforces.
-    # tests/test_transformers_main_no_deps_floors.py holds this line to that rule.
+    # tests/test_transformers5_hub_floor.py holds the hub bound on this line.
     # Install Mamba kernels
     return
 
