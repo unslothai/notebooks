@@ -791,6 +791,7 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **Gemma4** **(31B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(31B)-Vision.py) |
 | **Gemma4** **(E2B)** | Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Audio.py) |
 | **Gemma4** **(E2B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Text.py) |
+| **Gemma4** **(E2B)** | GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_GRPO.py) |
 | **Gemma4** **(E2B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_Reinforcement_Learning_2048_Game.py) |
 | **Gemma4** **(E2B)** | Sudoku | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.py) |
 | **Gemma4** **(E4B)** | Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E4B)-Audio.py) |
