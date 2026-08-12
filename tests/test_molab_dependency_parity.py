@@ -287,6 +287,159 @@ _DEP_MOD = _import_dependencies()
 # ---------------------------------------------------------------------------
 
 
+def test_parse_pip_line_drops_chained_command_words() -> None:
+    """A chained ``&& pip install`` must not leak its command words.
+
+    ``!pip install a && pip install --no-deps b`` is one logical line, so the
+    parser sees the whole thing.  Both packages belong in the plan; ``pip`` and
+    ``install`` do not.  A bare ``install`` in a PEP 723 block makes uv fetch an
+    unrelated PyPI project into the molab runtime.
+    """
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    parsed = _DEP_MOD._parse_pip_line(
+        "!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2"
+    )
+
+    assert parsed is not None
+    assert parsed.specs == ["transformers==4.55.4", "trl==0.22.2"]
+
+
+def test_parse_pip_line_splits_separators_glued_to_arguments() -> None:
+    """``foo&&pip install bar`` is valid shell and must segment the same way.
+
+    Without shell-aware tokenization ``foo&&pip`` arrives as one token, which
+    is emitted verbatim as a dependency and leaves the PEP 723 block
+    unresolvable.
+    """
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    parsed = _DEP_MOD._parse_pip_line("!pip install foo&&pip install bar")
+
+    assert parsed is not None
+    assert parsed.specs == ["foo", "bar"]
+
+
+def test_split_args_keeps_unquoted_version_specifiers_intact() -> None:
+    """Shell-aware tokenization must not break ``>=`` in an unquoted pin."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    assert _DEP_MOD._split_args("torchao>=0.16.0 triton>=3.2.0") == [
+        "torchao>=0.16.0", "triton>=3.2.0",
+    ]
+    assert _DEP_MOD._split_args("\"pkg; python_version<'3.11'\"") == [
+        "pkg; python_version<'3.11'",
+    ]
+
+
+def test_parse_pip_line_reads_chained_interpreter_pip_invocations() -> None:
+    """``python3.12 -m pip install`` is a pip install however it is spelled."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    for chained, expected in (
+        ("python3.12 -m pip install bar", ["foo", "bar"]),
+        ("/usr/bin/python3 -m pip install bar", ["foo", "bar"]),
+        ("python -c 'import foo'", ["foo"]),
+    ):
+        parsed = _DEP_MOD._parse_pip_line(f"!pip install foo && {chained}")
+        assert parsed is not None
+        assert parsed.specs == expected, chained
+
+
+def test_parse_pip_line_keeps_packages_named_like_shell_commands() -> None:
+    """``sh`` is a real distribution: position decides, never the name."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    parsed = _DEP_MOD._parse_pip_line("!pip install sh install pip")
+
+    assert parsed is not None
+    assert parsed.specs == ["sh", "install", "pip"]
+
+
+def test_parse_pip_line_ignores_chained_non_pip_command() -> None:
+    """Only chained pip-install segments may contribute dependencies."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    parsed = _DEP_MOD._parse_pip_line(
+        "!pip install transformers==4.55.4 && echo trl==0.22.2"
+    )
+
+    assert parsed is not None
+    assert parsed.specs == ["transformers==4.55.4"]
+
+
+# Shell command words, normalised the way ``_extract_pep723_packages``
+# normalises a package name (lowercase, ``-`` folded to ``_``).  Every one of
+# these is also a real project on PyPI, so the name alone proves nothing: the
+# check below only complains when the source notebook never asked for it.
+_SHELL_COMMAND_WORDS = frozenset({
+    "pip", "pip3", "install", "uninstall", "python", "python3", "echo",
+    "sudo", "apt", "apt_get", "bash", "sh", "cd", "true", "false",
+})
+
+
+@pytest.mark.parametrize("py_file", _GENERATED_FILES, ids=lambda p: p.stem)
+def test_no_shell_command_word_as_dependency(py_file: Path) -> None:
+    """A command word may only be a dependency if the source notebook asked.
+
+    Catalog-wide backstop for the parser: whatever install-line shape shows up
+    in ``nb/``, a name like ``pip`` or ``install`` appearing in the PEP 723
+    block *without* a matching request in the source notebook means the parser
+    turned an install command into a dependency, and molab would install an
+    unrelated project into the user's runtime.  A notebook that genuinely pins
+    such a distribution (``sh`` is a real one) is left alone.
+    """
+    if not py_file.exists():
+        pytest.skip(f"{py_file.name} is not generated (generation fails).")
+
+    nb = _STEM_TO_NB.get(py_file.stem)
+    nb_name = nb.source.name if nb is not None else f"{py_file.stem}.ipynb"
+    source_nb_path = REPO_ROOT / "nb" / nb_name
+    if not source_nb_path.exists():
+        pytest.skip(f"Source notebook {nb_name} not found.")
+
+    packages = _extract_pep723_packages(py_file.read_text(encoding="utf-8"))
+    requested = _extract_pip_packages_from_nb(source_nb_path)
+    leaked = sorted(packages & _SHELL_COMMAND_WORDS - requested)
+
+    assert not leaked, (
+        f"{py_file.name}: PEP 723 dependencies contain shell command "
+        f"word(s) {leaked} that {nb_name} never installs.  These are "
+        f"install-command tokens, not packages; fix the parse in "
+        f"scripts/molab_dependencies.py and re-run scripts/molab_generate.py."
+    )
+
+
+def test_shell_command_word_guard_catches_a_leak() -> None:
+    """The backstop must still fire on the leak it was written for."""
+    leaked_header = (
+        "# /// script\n"
+        '# requires-python = ">=3.10,<3.14"\n'
+        "# dependencies = [\n"
+        '#     "install",\n'
+        '#     "pip",\n'
+        '#     "trl==0.22.2",\n'
+        "# ]\n"
+        "# ///\n"
+    )
+    source_nb = REPO_ROOT / "nb" / "Qwen3_(4B)_Instruct-QAT.ipynb"
+    if not source_nb.exists():
+        pytest.skip("source notebook not present")
+
+    packages = _extract_pep723_packages(leaked_header)
+    requested = _extract_pip_packages_from_nb(source_nb)
+
+    assert sorted(packages & _SHELL_COMMAND_WORDS - requested) == [
+        "install", "pip",
+    ]
+
+
 def test_molab_forces_unsloth_git_for_phone_notebooks() -> None:
     """Phone deployment notebooks use Colab --no-deps pins; molab cannot."""
     if _DEP_MOD is _DEP_MOD_ABSENT:

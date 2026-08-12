@@ -134,6 +134,44 @@ _RE_PIP_INSTALL = re.compile(
     r"^\s*[!%]?\s*(?:uv\s+)?pip\s+install\s+(?P<args>.+?)\s*$"
 )
 
+# Shell operator characters that end one command and start the next; a chained
+# line reaches the parser whole and is segmented on them.  ``_split_args`` gives
+# shlex the same set, and shlex returns a RUN of them as one token, so a
+# separator is tested character-wise: that covers ``&&``, ``||`` and ``|&``.
+_SHELL_OPERATOR_CHARS = "&|;"
+
+
+def _is_shell_separator(token: str) -> bool:
+    """True if ``token`` is a run of shell operator characters."""
+    return bool(token) and set(token) <= set(_SHELL_OPERATOR_CHARS)
+
+
+# A python interpreter, however it is spelled: ``python``, ``python3``,
+# ``python3.12``, ``py``, or any of those behind a path.
+_RE_PYTHON_EXE = re.compile(
+    r"^(?:.*[/\\])?(?:python|py)[0-9.]*(?:\.exe)?$", re.IGNORECASE
+)
+
+
+def _pip_install_prefix_len(segment: list[str]) -> int:
+    """Length of ``segment``'s leading pip install command, 0 if it is not one.
+
+    A chained segment contributes packages only through this: anything else
+    (``echo ...``, ``python -c ...``) is not an install and adds nothing.
+    """
+    if (
+        len(segment) >= 4
+        and _RE_PYTHON_EXE.match(segment[0])
+        and segment[1] == "-m"
+        and segment[2:4] == ["pip", "install"]
+    ):
+        return 4
+    if len(segment) >= 3 and segment[:3] == ["uv", "pip", "install"]:
+        return 3
+    if len(segment) >= 2 and segment[0] in {"pip", "pip3"} and segment[1] == "install":
+        return 2
+    return 0
+
 
 # ===========================================================================
 # Data structures
@@ -328,6 +366,12 @@ def _split_args(arg_string: str) -> list[str]:
     ``#`` and silently drops ``#subdirectory=...`` etc.  So we cut the
     comment ourselves at the first whitespace-then-``#`` and call
     ``shlex.split`` with ``comments=False`` — URL fragments survive intact.
+
+    ``punctuation_chars`` tokenizes ``&``, ``|`` and ``;`` as a shell does, so a
+    separator glued to its neighbours (``foo&&pip``) still splits.  Narrowed
+    from shlex's default ``();<>|&``: ``<`` and ``>`` belong to an unquoted
+    version specifier (``torchao>=0.16.0``), which must stay one token.  Quoted
+    text is untouched, so ``"pkg; python_version<'3.11'"`` survives too.
     """
     import shlex
 
@@ -335,7 +379,12 @@ def _split_args(arg_string: str) -> list[str]:
     if cut is not None:
         arg_string = arg_string[: cut.start()]
     try:
-        return shlex.split(arg_string, comments=False, posix=True)
+        lexer = shlex.shlex(
+            arg_string, posix=True, punctuation_chars=_SHELL_OPERATOR_CHARS
+        )
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        return list(lexer)
     except ValueError:
         return arg_string.split()
 
@@ -350,6 +399,37 @@ class _PipLine:
     templated: list[str]        # specs containing an unresolved ``{var}``
 
 
+def _pip_install_args(tokens: list[str]) -> list[str]:
+    """Keep only the tokens that are arguments to a ``pip install`` command.
+
+    ``_RE_PIP_INSTALL`` hands back everything after the FIRST
+    ``[uv ]pip install``, separators included, so a chained line such as
+    ``!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2``
+    arrives whole.  Re-checking each later segment for its own prefix keeps that
+    segment's packages and drops its command words, which would otherwise become
+    PEP 723 dependencies and install unrelated projects in the molab runtime.
+    """
+    segments: list[list[str]] = [[]]
+    for tok in tokens:
+        if _is_shell_separator(tok):
+            segments.append([])
+            continue
+        segments[-1].append(tok)
+
+    args: list[str] = []
+    for index, segment in enumerate(segments):
+        if not segment:
+            continue
+        if index == 0:
+            # The regex already consumed this segment's ``pip install`` prefix.
+            args.extend(segment)
+            continue
+        prefix_len = _pip_install_prefix_len(segment)
+        if prefix_len:
+            args.extend(segment[prefix_len:])
+    return args
+
+
 def _parse_pip_line(line: str) -> Optional[_PipLine]:
     """Parse a single logical line if it is a pip install command."""
     m = _RE_PIP_INSTALL.match(line)
@@ -358,7 +438,7 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
     flags: list[str] = []
     specs: list[str] = []
     templated: list[str] = []
-    tokens = _split_args(m.group("args"))
+    tokens = _pip_install_args(_split_args(m.group("args")))
     skip_next = False
     for tok in tokens:
         if skip_next:
@@ -371,7 +451,7 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
         if tok.startswith("-"):
             flags.append(tok)
             continue
-        if tok in {"&&", "@", "\\"}:
+        if tok in {"@", "\\"} or _is_shell_separator(tok):
             continue
         # IPython expansion brace, e.g. {xformers} -> a runtime-resolved spec.
         if "{" in tok and "}" in tok:
