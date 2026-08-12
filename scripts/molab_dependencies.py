@@ -135,12 +135,10 @@ _RE_PIP_INSTALL = re.compile(
 )
 
 # Shell operators that end one command and start the next.  ``_RE_PIP_INSTALL``
-# matches greedily to end of line, so a chained line arrives here whole and the
-# parser has to segment it itself.
+# matches to end of line, so a chained line arrives whole and is segmented here.
 _SHELL_SEPARATORS = frozenset({"&&", "||", ";", "|", "&"})
 
-# The command prefixes a chained segment must start with for its arguments to
-# count as pip packages.
+# A chained segment contributes packages only if it starts with one of these.
 _PIP_INSTALL_PREFIXES = (
     ["uv", "pip", "install"],
     ["pip", "install"],
@@ -149,9 +147,8 @@ _PIP_INSTALL_PREFIXES = (
     ["python3", "-m", "pip", "install"],
 )
 
-# Bare shell/command words that must never be emitted as a dependency, no
-# matter how they reach the token loop.  Only exact, unversioned tokens are
-# listed: a real pin such as ``pip==25.0`` is still honoured.
+# Never a dependency, however it reaches the token loop.  Exact, unversioned
+# tokens only, so a real pin such as ``pip==25.0`` is still honoured.
 _NEVER_A_PACKAGE = frozenset({
     "pip", "pip3", "install", "uninstall", "python", "python3", "echo",
     "sudo", "apt", "apt-get", "bash", "sh", "cd", "true", "false",
@@ -352,14 +349,12 @@ def _split_args(arg_string: str) -> list[str]:
     comment ourselves at the first whitespace-then-``#`` and call
     ``shlex.split`` with ``comments=False`` — URL fragments survive intact.
 
-    ``punctuation_chars`` makes shlex tokenize ``&``, ``|`` and ``;`` the way a
-    shell does, so a separator glued to its neighbours (``foo&&pip``, valid
-    shell) still comes back as ``foo``, ``&&``, ``pip`` and the segmenter in
-    :func:`_pip_install_args` can see it.  The set is narrowed from shlex's
-    default ``();<>|&`` because ``<`` and ``>`` carry meaning inside an
-    unquoted version specifier (``torchao>=0.16.0``), which must stay one
-    token.  Quoted text is untouched, so an environment marker such as
-    ``"pkg; python_version<'3.11'"`` also survives.
+    ``punctuation_chars`` tokenizes ``&``, ``|`` and ``;`` as a shell does, so a
+    separator glued to its neighbours (``foo&&pip``) still splits and
+    :func:`_pip_install_args` can see it.  Narrowed from shlex's default
+    ``();<>|&``: ``<`` and ``>`` belong to an unquoted version specifier
+    (``torchao>=0.16.0``), which must stay one token.  Quoted text is untouched,
+    so ``"pkg; python_version<'3.11'"`` survives too.
     """
     import shlex
 
@@ -388,16 +383,14 @@ class _PipLine:
 def _pip_install_args(tokens: list[str]) -> list[str]:
     """Keep only the tokens that are arguments to a ``pip install`` command.
 
-    A source notebook may chain shell commands on one logical line, e.g.
-    ``!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2``.
-    ``_RE_PIP_INSTALL`` consumes the FIRST ``[uv ]pip install`` prefix and hands
-    back everything after it, separators included.  Splitting on the shell
-    separators and re-checking each following segment for its own
-    ``pip install`` prefix keeps the second command's packages (``trl``) while
-    dropping its command words (``pip``, ``install``).  Those would otherwise
-    become real PEP 723 dependencies and pull unrelated PyPI projects into the
-    molab runtime.  A chained command that is not a pip install (``echo ...``,
-    ``python -c ...``) contributes nothing.
+    A source notebook may chain commands on one logical line, e.g.
+    ``!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2``,
+    and ``_RE_PIP_INSTALL`` hands back everything after the FIRST
+    ``[uv ]pip install``, separators included.  Re-checking each later segment
+    for its own ``pip install`` prefix keeps that segment's packages (``trl``)
+    and drops its command words, which would otherwise become PEP 723
+    dependencies and pull unrelated PyPI projects into the molab runtime.  A
+    chained non-pip command (``echo ...``) contributes nothing.
     """
     segments: list[list[str]] = [[]]
     for tok in tokens:
