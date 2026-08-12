@@ -147,13 +147,6 @@ _PIP_INSTALL_PREFIXES = (
     ["python3", "-m", "pip", "install"],
 )
 
-# Never a dependency, however it reaches the token loop.  Exact, unversioned
-# tokens only, so a real pin such as ``pip==25.0`` is still honoured.
-_NEVER_A_PACKAGE = frozenset({
-    "pip", "pip3", "install", "uninstall", "python", "python3", "echo",
-    "sudo", "apt", "apt-get", "bash", "sh", "cd", "true", "false",
-})
-
 
 # ===========================================================================
 # Data structures
@@ -436,10 +429,6 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
             flags.append(tok)
             continue
         if tok in {"@", "\\"} or tok in _SHELL_SEPARATORS:
-            continue
-        # Defence in depth: a bare shell command word is never a package, even
-        # if some future line shape slips one past the segmenter above.
-        if tok in _NEVER_A_PACKAGE:
             continue
         # IPython expansion brace, e.g. {xformers} -> a runtime-resolved spec.
         if "{" in tok and "}" in tok:

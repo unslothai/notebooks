@@ -335,6 +335,17 @@ def test_split_args_keeps_unquoted_version_specifiers_intact() -> None:
     ]
 
 
+def test_parse_pip_line_keeps_packages_named_like_shell_commands() -> None:
+    """``sh`` is a real distribution: position decides, never the name."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    parsed = _DEP_MOD._parse_pip_line("!pip install sh install pip")
+
+    assert parsed is not None
+    assert parsed.specs == ["sh", "install", "pip"]
+
+
 def test_parse_pip_line_ignores_chained_non_pip_command() -> None:
     """Only chained pip-install segments may contribute dependencies."""
     if _DEP_MOD is _DEP_MOD_ABSENT:
