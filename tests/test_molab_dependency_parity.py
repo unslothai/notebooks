@@ -287,6 +287,67 @@ _DEP_MOD = _import_dependencies()
 # ---------------------------------------------------------------------------
 
 
+def test_parse_pip_line_drops_chained_command_words() -> None:
+    """A chained ``&& pip install`` must not leak its command words.
+
+    ``!pip install a && pip install --no-deps b`` is one logical line, so the
+    parser sees the whole thing.  Both packages belong in the plan; ``pip`` and
+    ``install`` do not.  A bare ``install`` in a PEP 723 block makes uv fetch an
+    unrelated PyPI project into the molab runtime.
+    """
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    parsed = _DEP_MOD._parse_pip_line(
+        "!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2"
+    )
+
+    assert parsed is not None
+    assert parsed.specs == ["transformers==4.55.4", "trl==0.22.2"]
+
+
+def test_parse_pip_line_ignores_chained_non_pip_command() -> None:
+    """Only chained pip-install segments may contribute dependencies."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    parsed = _DEP_MOD._parse_pip_line(
+        "!pip install transformers==4.55.4 && echo trl==0.22.2"
+    )
+
+    assert parsed is not None
+    assert parsed.specs == ["transformers==4.55.4"]
+
+
+@pytest.mark.parametrize("py_file", _GENERATED_FILES, ids=lambda p: p.stem)
+def test_no_shell_command_word_as_dependency(py_file: Path) -> None:
+    """No generated PEP 723 block may depend on a bare shell command word.
+
+    Catalog-wide backstop for the parser: whatever new install-line shape shows
+    up in ``nb/``, a name like ``pip`` or ``install`` reaching the dependency
+    block means an unintended third-party package gets installed in the user's
+    runtime.
+    """
+    if not py_file.exists():
+        pytest.skip(f"{py_file.name} is not generated (generation fails).")
+
+    forbidden = {
+        # ``_extract_pep723_packages`` normalises names (lowercase, ``-``
+        # folded to ``_``), so compare against normalised words.
+        "pip", "pip3", "install", "uninstall", "python", "python3", "echo",
+        "sudo", "apt", "apt_get", "bash", "sh", "cd", "true", "false",
+    }
+    packages = _extract_pep723_packages(py_file.read_text(encoding="utf-8"))
+    leaked = sorted(packages & forbidden)
+
+    assert not leaked, (
+        f"{py_file.name}: PEP 723 dependencies contain shell command "
+        f"word(s) {leaked}.  These are install-command tokens, not packages; "
+        f"fix the parse in scripts/molab_dependencies.py and re-run "
+        f"scripts/molab_generate.py."
+    )
+
+
 def test_molab_forces_unsloth_git_for_phone_notebooks() -> None:
     """Phone deployment notebooks use Colab --no-deps pins; molab cannot."""
     if _DEP_MOD is _DEP_MOD_ABSENT:

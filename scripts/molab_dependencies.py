@@ -134,6 +134,29 @@ _RE_PIP_INSTALL = re.compile(
     r"^\s*[!%]?\s*(?:uv\s+)?pip\s+install\s+(?P<args>.+?)\s*$"
 )
 
+# Shell operators that end one command and start the next.  ``_RE_PIP_INSTALL``
+# matches greedily to end of line, so a chained line arrives here whole and the
+# parser has to segment it itself.
+_SHELL_SEPARATORS = frozenset({"&&", "||", ";", "|", "&"})
+
+# The command prefixes a chained segment must start with for its arguments to
+# count as pip packages.
+_PIP_INSTALL_PREFIXES = (
+    ["uv", "pip", "install"],
+    ["pip", "install"],
+    ["pip3", "install"],
+    ["python", "-m", "pip", "install"],
+    ["python3", "-m", "pip", "install"],
+)
+
+# Bare shell/command words that must never be emitted as a dependency, no
+# matter how they reach the token loop.  Only exact, unversioned tokens are
+# listed: a real pin such as ``pip==25.0`` is still honoured.
+_NEVER_A_PACKAGE = frozenset({
+    "pip", "pip3", "install", "uninstall", "python", "python3", "echo",
+    "sudo", "apt", "apt-get", "bash", "sh", "cd", "true", "false",
+})
+
 
 # ===========================================================================
 # Data structures
@@ -350,6 +373,42 @@ class _PipLine:
     templated: list[str]        # specs containing an unresolved ``{var}``
 
 
+def _pip_install_args(tokens: list[str]) -> list[str]:
+    """Keep only the tokens that are arguments to a ``pip install`` command.
+
+    A source notebook may chain shell commands on one logical line, e.g.
+    ``!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2``.
+    ``_RE_PIP_INSTALL`` consumes the FIRST ``[uv ]pip install`` prefix and hands
+    back everything after it, separators included.  Splitting on the shell
+    separators and re-checking each following segment for its own
+    ``pip install`` prefix keeps the second command's packages (``trl``) while
+    dropping its command words (``pip``, ``install``).  Those would otherwise
+    become real PEP 723 dependencies and pull unrelated PyPI projects into the
+    molab runtime.  A chained command that is not a pip install (``echo ...``,
+    ``python -c ...``) contributes nothing.
+    """
+    segments: list[list[str]] = [[]]
+    for tok in tokens:
+        if tok in _SHELL_SEPARATORS:
+            segments.append([])
+            continue
+        segments[-1].append(tok)
+
+    args: list[str] = []
+    for index, segment in enumerate(segments):
+        if not segment:
+            continue
+        if index == 0:
+            # The regex already consumed this segment's ``pip install`` prefix.
+            args.extend(segment)
+            continue
+        for prefix in _PIP_INSTALL_PREFIXES:
+            if segment[:len(prefix)] == prefix:
+                args.extend(segment[len(prefix):])
+                break
+    return args
+
+
 def _parse_pip_line(line: str) -> Optional[_PipLine]:
     """Parse a single logical line if it is a pip install command."""
     m = _RE_PIP_INSTALL.match(line)
@@ -358,7 +417,7 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
     flags: list[str] = []
     specs: list[str] = []
     templated: list[str] = []
-    tokens = _split_args(m.group("args"))
+    tokens = _pip_install_args(_split_args(m.group("args")))
     skip_next = False
     for tok in tokens:
         if skip_next:
@@ -371,7 +430,11 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
         if tok.startswith("-"):
             flags.append(tok)
             continue
-        if tok in {"&&", "@", "\\"}:
+        if tok in {"@", "\\"} or tok in _SHELL_SEPARATORS:
+            continue
+        # Defence in depth: a bare shell command word is never a package, even
+        # if some future line shape slips one past the segmenter above.
+        if tok in _NEVER_A_PACKAGE:
             continue
         # IPython expansion brace, e.g. {xformers} -> a runtime-resolved spec.
         if "{" in tok and "}" in tok:
