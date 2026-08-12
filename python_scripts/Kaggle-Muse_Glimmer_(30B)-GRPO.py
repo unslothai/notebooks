@@ -193,19 +193,24 @@ if _n > 1:
         rows_per_chunk = 128,                       # matches the log-softmax cap below
         retained_rows  = BATCH_SIZE * max_seq_length,
         softcapped = True, temperature_scaled = True,
-        # Activations follow layers: every layer the packing puts on card 0 costs
-        # card 0 more peak than it frees on the head card, so card 0 needs room of
-        # its own. The default "balanced" policy cannot give it any here. Its
-        # equal-share cap is computed against HALF the weights even though the head
-        # card holds far less than half, so on 2 x 14.75 GiB the cap comes out
-        # negative (13.27 - 10.16 - 4.10 = -0.98 GiB), the reserve clamps to 0 and
-        # card 0 is packed to within 0.11 GiB of its budget.
-        # "head_max" reserves the largest placement unit instead, which leaves card
-        # 0 about 1.0 GiB. It is still a heuristic the planner may relax, unlike an
-        # explicit activation_reserve_bytes, which is treated as a measured figure
-        # the plan must honour exactly: a hard 2 GiB request plans at 14.75 GiB but
-        # fails with DeviceMapInfeasible at 14.55 GiB and below.
-        free_space_policy = "head_max",
+        # No free_space_policy: the default "balanced" is the right one, and on
+        # this model it is also the roomier one. Measured on the real Kaggle
+        # budgets (14.411 / 14.460 GiB free, which the bnb quantiser cuts to
+        # 12.970 / 13.014), spare memory after every reserve and the 4.104 GiB
+        # of head headroom:
+        #
+        #                       card 0        card 1 (head)
+        #   balanced            0.144 GiB     0.641 GiB
+        #   head_max            0.049 GiB     0.019 GiB
+        #
+        # head_max is worse on both cards because it claims an activation
+        # reserve on the head's card too, on top of the logit headroom that card
+        # already owes, which double-books the same memory.
+        #
+        # An explicit activation_reserve_bytes is a third option and the wrong
+        # one here: it is treated as a measured figure the plan must honour
+        # exactly, so a hard 2 GiB request plans at 14.75 GiB but fails with
+        # DeviceMapInfeasible at 14.55 GiB and below.
     )
     if _plan is not None:
         print(_plan.describe())
