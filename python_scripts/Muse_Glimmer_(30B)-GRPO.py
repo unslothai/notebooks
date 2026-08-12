@@ -203,9 +203,15 @@ if _n > 1:
         #   balanced            0.144 GiB     0.641 GiB
         #   head_max            0.049 GiB     0.019 GiB
         #
-        # head_max is worse on both cards because it claims an activation
-        # reserve on the head's card too, on top of the logit headroom that card
-        # already owes, which double-books the same memory.
+        # Not because head_max double-books anything: both policies stack a
+        # reserve on top of the head's logit headroom when there is room, and
+        # the planner refuses any plan where the two together do not fit. The
+        # difference is how the reserve is sized. "balanced" derives it from the
+        # slack actually left after the weights, then clamps per device, so on a
+        # tight fit it shrinks to what is really spare. "head_max" reserves the
+        # largest single placement unit on every card, a fixed figure that owes
+        # nothing to how much room there is, and on 2 x 14.6 GiB that fixed
+        # figure is most of what is left.
         #
         # An explicit activation_reserve_bytes is a third option and the wrong
         # one here: it is treated as a measured figure the plan must honour
