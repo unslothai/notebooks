@@ -29,9 +29,11 @@
 # cap on the log-softmax, which needs 4.10 GiB of headroom and fits. The same run at
 # 3072 tokens needs 7.57 GiB and is refused.
 # 
-# A single larger card (A100 40GB, H100, or an L4 for a slower run) takes
-# `num_generations = 4` and `max_seq_length = 3072`, and there `offload_embedding`
-# switches back on and frees a further 2.5 GB.
+# A single A100 40GB or H100 takes `num_generations = 4` and
+# `max_seq_length = 3072`. A single L4 has 24 GB, so it sizes exactly like the
+# 2 x 16 GB case, `num_generations = 2` and `max_seq_length = 1536`, and just runs
+# slower. On one card `offload_embedding` switches back on either way and frees a
+# further 2.5 GB.
 
 # # Goal: teach Muse Glimmer to answer grade school maths on the right channel with Reinforcement Learning
 # 
