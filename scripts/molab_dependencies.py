@@ -134,12 +134,10 @@ _RE_PIP_INSTALL = re.compile(
     r"^\s*[!%]?\s*(?:uv\s+)?pip\s+install\s+(?P<args>.+?)\s*$"
 )
 
-# Shell operator characters that end one command and start the next.
-# ``_RE_PIP_INSTALL`` matches to end of line, so a chained line arrives whole
-# and is segmented here.  ``_split_args`` hands shlex the same set, and shlex
-# returns a RUN of them as one token, so the test is "every character is an
-# operator" rather than a list of spellings: that covers ``&&``, ``||`` and
-# bash's mixed ``|&`` alike.
+# Shell operator characters that end one command and start the next; a chained
+# line reaches the parser whole and is segmented on them.  ``_split_args`` gives
+# shlex the same set, and shlex returns a RUN of them as one token, so a
+# separator is tested character-wise: that covers ``&&``, ``||`` and ``|&``.
 _SHELL_OPERATOR_CHARS = "&|;"
 
 
@@ -370,11 +368,10 @@ def _split_args(arg_string: str) -> list[str]:
     ``shlex.split`` with ``comments=False`` — URL fragments survive intact.
 
     ``punctuation_chars`` tokenizes ``&``, ``|`` and ``;`` as a shell does, so a
-    separator glued to its neighbours (``foo&&pip``) still splits and
-    :func:`_pip_install_args` can see it.  Narrowed from shlex's default
-    ``();<>|&``: ``<`` and ``>`` belong to an unquoted version specifier
-    (``torchao>=0.16.0``), which must stay one token.  Quoted text is untouched,
-    so ``"pkg; python_version<'3.11'"`` survives too.
+    separator glued to its neighbours (``foo&&pip``) still splits.  Narrowed
+    from shlex's default ``();<>|&``: ``<`` and ``>`` belong to an unquoted
+    version specifier (``torchao>=0.16.0``), which must stay one token.  Quoted
+    text is untouched, so ``"pkg; python_version<'3.11'"`` survives too.
     """
     import shlex
 
@@ -405,14 +402,12 @@ class _PipLine:
 def _pip_install_args(tokens: list[str]) -> list[str]:
     """Keep only the tokens that are arguments to a ``pip install`` command.
 
-    A source notebook may chain commands on one logical line, e.g.
-    ``!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2``,
-    and ``_RE_PIP_INSTALL`` hands back everything after the FIRST
-    ``[uv ]pip install``, separators included.  Re-checking each later segment
-    for its own ``pip install`` prefix keeps that segment's packages (``trl``)
-    and drops its command words, which would otherwise become PEP 723
-    dependencies and pull unrelated PyPI projects into the molab runtime.  A
-    chained non-pip command (``echo ...``) contributes nothing.
+    ``_RE_PIP_INSTALL`` hands back everything after the FIRST
+    ``[uv ]pip install``, separators included, so a chained line such as
+    ``!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2``
+    arrives whole.  Re-checking each later segment for its own prefix keeps that
+    segment's packages and drops its command words, which would otherwise become
+    PEP 723 dependencies and install unrelated projects in the molab runtime.
     """
     segments: list[list[str]] = [[]]
     for tok in tokens:
