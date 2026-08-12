@@ -78,9 +78,17 @@ def test_extractor_is_empty_for_released_installs():
 
 
 def test_compose_reemits_the_git_main_upgrade():
+    # Synthetic source: no shipped template installs unsloth from git main today
+    # (DiffusionGemma moved onto the released build), but the re-emit path still
+    # has to work for the next source that needs unreleased code.
+    source = GEN.installation_diffusiongemma_content.replace(
+        '!pip install --no-deps --upgrade "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"',
+        f"!pip install --no-deps --upgrade {ZOO_GIT} {UNSLOTH_GIT}",
+    )
+    assert UNSLOTH_GIT in source, "synthetic source lost its git main upgrade"
     install, extras = GEN._compose_amd_installation(
         "nb/AMD-DiffusionGemma_(26B-A4B)-Sudoku.ipynb",
-        [GEN.installation_diffusiongemma_content],
+        [source],
     )
     assert UNSLOTH_GIT not in install, "the shared %%bash base cell must stay literal"
     assert extras is not None
