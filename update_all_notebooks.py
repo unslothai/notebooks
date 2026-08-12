@@ -3210,6 +3210,36 @@ def _extract_git_main_unsloth_specs(source_install_texts):
     return specs
 
 
+def _extract_forced_unsloth_release_specs(source_install_texts):
+    """Released unsloth / unsloth_zoo specs the source force-reinstalls.
+
+    A source passes ``--force-reinstall`` when it means to replace whatever
+    build is already installed. The AMD base cell installs the same two
+    packages with a plain ``-U``, which leaves an equal-or-newer build (a
+    leftover git one) in place, so those specs are re-emitted like the git
+    ones. Only lines carrying the flag count; a plain install is already
+    covered by the base cell.
+    """
+    specs = []
+    seen = set()
+    for text in source_install_texts:
+        if not text:
+            continue
+        for arg_string in _iter_pip_install_arg_strings(text):
+            if "--force-reinstall" not in arg_string:
+                continue
+            for token in _split_pip_args(arg_string):
+                spec = _clean_install_spec(token)
+                if spec.startswith("git+") or " @ " in spec:
+                    continue
+                if _package_key_from_install_token(spec) not in _AMD_GIT_MAIN_PROJECTS:
+                    continue
+                if spec not in seen:
+                    seen.add(spec)
+                    specs.append(spec)
+    return specs
+
+
 _AMD_SHELL_BARE_RE = re.compile(r'^[A-Za-z0-9_\-./+:@]+$')
 
 
@@ -3410,14 +3440,16 @@ def _compose_amd_installation(notebook_path, source_install_texts):
         _pin_qat_numpy_beside_fbgemm(merged_groups)
     if setup_lines:
         extra_blocks.append("\n".join(setup_lines))
-    git_main_specs = _extract_git_main_unsloth_specs(source_install_texts)
-    if git_main_specs:
+    replace_specs = _extract_git_main_unsloth_specs(source_install_texts)
+    if not replace_specs:
+        replace_specs = _extract_forced_unsloth_release_specs(source_install_texts)
+    if replace_specs:
         # --no-deps keeps the ROCm stack the base cell just installed. That
-        # cell's own "unsloth[amd]" is --no-deps too, so overwriting it with
-        # main loses nothing.
+        # cell's own "unsloth[amd]" is --no-deps too, so overwriting it loses
+        # nothing.
         extra_blocks.append(
             _format_amd_pip_call(
-                ("--upgrade", "--force-reinstall", "--no-deps"), git_main_specs
+                ("--upgrade", "--force-reinstall", "--no-deps"), replace_specs
             )
         )
     for flags, specs in merged_groups.items():
