@@ -57,6 +57,14 @@ _KNOWN_PIN_OUTLIERS: set[tuple[str, str, str]] = {
     ("nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb", "trl", "0.26.2"),
     # Minted from the nb/ copy above, so it inherits that pin.
     ("nb/AMD-Qwen3_VL_(8B)-Vision-GRPO.ipynb", "trl", "0.26.2"),
+    # The Muse Glimmer GRPO cell installs unsloth and unsloth_zoo from git for
+    # the GRPO log-softmax fix, and pins the matching trl. The generator only
+    # swaps the transformers pin for muse_glimmer, so the trl pin lives in the
+    # notebook and has no counterpart in update_all_notebooks.py.
+    ("original_template/Muse_Glimmer_(30B)-GRPO.ipynb", "trl", "1.9.2"),
+    ("nb/Muse_Glimmer_(30B)-GRPO.ipynb", "trl", "1.9.2"),
+    ("nb/Kaggle-Muse_Glimmer_(30B)-GRPO.ipynb", "trl", "1.9.2"),
+    ("nb/HuggingFace Course-Muse_Glimmer_(30B)-GRPO.ipynb", "trl", "1.9.2"),
 }
 
 
