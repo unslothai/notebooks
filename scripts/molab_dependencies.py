@@ -134,9 +134,19 @@ _RE_PIP_INSTALL = re.compile(
     r"^\s*[!%]?\s*(?:uv\s+)?pip\s+install\s+(?P<args>.+?)\s*$"
 )
 
-# Shell operators that end one command and start the next.  ``_RE_PIP_INSTALL``
-# matches to end of line, so a chained line arrives whole and is segmented here.
-_SHELL_SEPARATORS = frozenset({"&&", "||", ";", "|", "&"})
+# Shell operator characters that end one command and start the next.
+# ``_RE_PIP_INSTALL`` matches to end of line, so a chained line arrives whole
+# and is segmented here.  ``_split_args`` hands shlex the same set, and shlex
+# returns a RUN of them as one token, so the test is "every character is an
+# operator" rather than a list of spellings: that covers ``&&``, ``||`` and
+# bash's mixed ``|&`` alike.
+_SHELL_OPERATOR_CHARS = "&|;"
+
+
+def _is_shell_separator(token: str) -> bool:
+    """True if ``token`` is a run of shell operator characters."""
+    return bool(token) and set(token) <= set(_SHELL_OPERATOR_CHARS)
+
 
 # A chained segment contributes packages only if it starts with one of these.
 _PIP_INSTALL_PREFIXES = (
@@ -355,7 +365,9 @@ def _split_args(arg_string: str) -> list[str]:
     if cut is not None:
         arg_string = arg_string[: cut.start()]
     try:
-        lexer = shlex.shlex(arg_string, posix=True, punctuation_chars="&|;")
+        lexer = shlex.shlex(
+            arg_string, posix=True, punctuation_chars=_SHELL_OPERATOR_CHARS
+        )
         lexer.whitespace_split = True
         lexer.commenters = ""
         return list(lexer)
@@ -387,7 +399,7 @@ def _pip_install_args(tokens: list[str]) -> list[str]:
     """
     segments: list[list[str]] = [[]]
     for tok in tokens:
-        if tok in _SHELL_SEPARATORS:
+        if _is_shell_separator(tok):
             segments.append([])
             continue
         segments[-1].append(tok)
@@ -428,7 +440,7 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
         if tok.startswith("-"):
             flags.append(tok)
             continue
-        if tok in {"@", "\\"} or tok in _SHELL_SEPARATORS:
+        if tok in {"@", "\\"} or _is_shell_separator(tok):
             continue
         # IPython expansion brace, e.g. {xformers} -> a runtime-resolved spec.
         if "{" in tok and "}" in tok:

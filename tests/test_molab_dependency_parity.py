@@ -359,33 +359,70 @@ def test_parse_pip_line_ignores_chained_non_pip_command() -> None:
     assert parsed.specs == ["transformers==4.55.4"]
 
 
+# Shell command words, normalised the way ``_extract_pep723_packages``
+# normalises a package name (lowercase, ``-`` folded to ``_``).  Every one of
+# these is also a real project on PyPI, so the name alone proves nothing: the
+# check below only complains when the source notebook never asked for it.
+_SHELL_COMMAND_WORDS = frozenset({
+    "pip", "pip3", "install", "uninstall", "python", "python3", "echo",
+    "sudo", "apt", "apt_get", "bash", "sh", "cd", "true", "false",
+})
+
+
 @pytest.mark.parametrize("py_file", _GENERATED_FILES, ids=lambda p: p.stem)
 def test_no_shell_command_word_as_dependency(py_file: Path) -> None:
-    """No generated PEP 723 block may depend on a bare shell command word.
+    """A command word may only be a dependency if the source notebook asked.
 
-    Catalog-wide backstop for the parser: whatever new install-line shape shows
-    up in ``nb/``, a name like ``pip`` or ``install`` reaching the dependency
-    block means an unintended third-party package gets installed in the user's
-    runtime.
+    Catalog-wide backstop for the parser: whatever install-line shape shows up
+    in ``nb/``, a name like ``pip`` or ``install`` appearing in the PEP 723
+    block *without* a matching request in the source notebook means the parser
+    turned an install command into a dependency, and molab would install an
+    unrelated project into the user's runtime.  A notebook that genuinely pins
+    such a distribution (``sh`` is a real one) is left alone.
     """
     if not py_file.exists():
         pytest.skip(f"{py_file.name} is not generated (generation fails).")
 
-    forbidden = {
-        # ``_extract_pep723_packages`` normalises names (lowercase, ``-``
-        # folded to ``_``), so compare against normalised words.
-        "pip", "pip3", "install", "uninstall", "python", "python3", "echo",
-        "sudo", "apt", "apt_get", "bash", "sh", "cd", "true", "false",
-    }
+    nb = _STEM_TO_NB.get(py_file.stem)
+    nb_name = nb.source.name if nb is not None else f"{py_file.stem}.ipynb"
+    source_nb_path = REPO_ROOT / "nb" / nb_name
+    if not source_nb_path.exists():
+        pytest.skip(f"Source notebook {nb_name} not found.")
+
     packages = _extract_pep723_packages(py_file.read_text(encoding="utf-8"))
-    leaked = sorted(packages & forbidden)
+    requested = _extract_pip_packages_from_nb(source_nb_path)
+    leaked = sorted(packages & _SHELL_COMMAND_WORDS - requested)
 
     assert not leaked, (
         f"{py_file.name}: PEP 723 dependencies contain shell command "
-        f"word(s) {leaked}.  These are install-command tokens, not packages; "
-        f"fix the parse in scripts/molab_dependencies.py and re-run "
-        f"scripts/molab_generate.py."
+        f"word(s) {leaked} that {nb_name} never installs.  These are "
+        f"install-command tokens, not packages; fix the parse in "
+        f"scripts/molab_dependencies.py and re-run scripts/molab_generate.py."
     )
+
+
+def test_shell_command_word_guard_catches_a_leak() -> None:
+    """The backstop must still fire on the leak it was written for."""
+    leaked_header = (
+        "# /// script\n"
+        '# requires-python = ">=3.10,<3.14"\n'
+        "# dependencies = [\n"
+        '#     "install",\n'
+        '#     "pip",\n'
+        '#     "trl==0.22.2",\n'
+        "# ]\n"
+        "# ///\n"
+    )
+    source_nb = REPO_ROOT / "nb" / "Qwen3_(4B)_Instruct-QAT.ipynb"
+    if not source_nb.exists():
+        pytest.skip("source notebook not present")
+
+    packages = _extract_pep723_packages(leaked_header)
+    requested = _extract_pip_packages_from_nb(source_nb)
+
+    assert sorted(packages & _SHELL_COMMAND_WORDS - requested) == [
+        "install", "pip",
+    ]
 
 
 def test_molab_forces_unsloth_git_for_phone_notebooks() -> None:
