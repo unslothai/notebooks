@@ -41,7 +41,7 @@
 # 
 # 
 # import torch; torch._dynamo.config.recompile_limit = 64;
-# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git')
+# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"')
 # get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" hf_transfer "huggingface_hub>=1.5.0,<2.0"')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft trl "transformers==5.11.0"')
 # 

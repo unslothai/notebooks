@@ -711,19 +711,22 @@ installation_gemma4_12b_content = installation_gemma4_content.replace(
     "transformers==5.5.0", "transformers==5.10.1"
 )
 
-# DiffusionGemma: FastDiffusionModel is in unsloth main (not a release yet), so install unsloth +
-# unsloth_zoo from main. transformers 5.11.0 ships the diffusion_gemma architecture (model saved at 5.8.0.dev0).
+# DiffusionGemma: FastDiffusionModel shipped in unsloth 2026.6.5, so install the PyPI releases
+# instead of the git main branches (unsloth/models/diffusion.py is absent before 2026.6.5).
+# transformers 5.11.0 ships the diffusion_gemma architecture (model saved at 5.8.0.dev0).
 installation_diffusiongemma_content = """%%capture
 import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
-    !pip install unsloth  # local & cloud: pull deps, then upgrade unsloth + unsloth_zoo to main below
-    !pip install --no-deps --upgrade --force-reinstall git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git
+    !pip install "unsloth>=2026.6.5"  # local & cloud: pull deps, then upgrade unsloth + unsloth_zoo below
+    # --force-reinstall replaces a git build left by the old cell, whose version already satisfies
+    # the floor; --no-deps keeps that reinstall off numpy.
+    !pip install --no-deps --upgrade --force-reinstall "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"
 else:
     import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
     __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
     !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton
-    !pip install --no-deps --upgrade git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git
+    !pip install --no-deps --upgrade "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.11.0 "tokenizers>=0.22.0,<=0.23.0"
 !pip install "huggingface_hub>=1.5.0,<2.0"
@@ -3207,6 +3210,36 @@ def _extract_git_main_unsloth_specs(source_install_texts):
     return specs
 
 
+def _extract_forced_unsloth_release_specs(source_install_texts):
+    """Released unsloth / unsloth_zoo specs the source force-reinstalls.
+
+    A source passes ``--force-reinstall`` when it means to replace whatever
+    build is already installed. The AMD base cell installs the same two
+    packages with a plain ``-U``, which leaves an equal-or-newer build (a
+    leftover git one) in place, so those specs are re-emitted like the git
+    ones. Only lines carrying the flag count; a plain install is already
+    covered by the base cell.
+    """
+    specs = []
+    seen = set()
+    for text in source_install_texts:
+        if not text:
+            continue
+        for arg_string in _iter_pip_install_arg_strings(text):
+            if "--force-reinstall" not in arg_string:
+                continue
+            for token in _split_pip_args(arg_string):
+                spec = _clean_install_spec(token)
+                if spec.startswith("git+") or " @ " in spec:
+                    continue
+                if _package_key_from_install_token(spec) not in _AMD_GIT_MAIN_PROJECTS:
+                    continue
+                if spec not in seen:
+                    seen.add(spec)
+                    specs.append(spec)
+    return specs
+
+
 _AMD_SHELL_BARE_RE = re.compile(r'^[A-Za-z0-9_\-./+:@]+$')
 
 
@@ -3407,14 +3440,16 @@ def _compose_amd_installation(notebook_path, source_install_texts):
         _pin_qat_numpy_beside_fbgemm(merged_groups)
     if setup_lines:
         extra_blocks.append("\n".join(setup_lines))
-    git_main_specs = _extract_git_main_unsloth_specs(source_install_texts)
-    if git_main_specs:
+    replace_specs = _extract_git_main_unsloth_specs(source_install_texts)
+    if not replace_specs:
+        replace_specs = _extract_forced_unsloth_release_specs(source_install_texts)
+    if replace_specs:
         # --no-deps keeps the ROCm stack the base cell just installed. That
-        # cell's own "unsloth[amd]" is --no-deps too, so overwriting it with
-        # main loses nothing.
+        # cell's own "unsloth[amd]" is --no-deps too, so overwriting it loses
+        # nothing.
         extra_blocks.append(
             _format_amd_pip_call(
-                ("--upgrade", "--force-reinstall", "--no-deps"), git_main_specs
+                ("--upgrade", "--force-reinstall", "--no-deps"), replace_specs
             )
         )
     for flags, specs in merged_groups.items():
@@ -4709,7 +4744,7 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma4_content
 
-                        # DIFFUSIONGEMMA INSTALLATION: unsloth + unsloth_zoo from main, transformers 5.11.0.
+                        # DIFFUSIONGEMMA INSTALLATION: unsloth + unsloth_zoo from PyPI, transformers 5.11.0.
                         if is_path_contains_any(notebook_path.lower(), ["diffusiongemma"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_diffusiongemma_kaggle_content

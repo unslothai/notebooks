@@ -78,9 +78,16 @@ def test_extractor_is_empty_for_released_installs():
 
 
 def test_compose_reemits_the_git_main_upgrade():
+    # Synthetic source: no shipped template installs from git main today, but the
+    # re-emit path still has to work for the next one that needs unreleased code.
+    source = GEN.installation_diffusiongemma_content.replace(
+        '--force-reinstall "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"',
+        f"--force-reinstall {ZOO_GIT} {UNSLOTH_GIT}",
+    )
+    assert UNSLOTH_GIT in source, "synthetic source lost its git main upgrade"
     install, extras = GEN._compose_amd_installation(
         "nb/AMD-DiffusionGemma_(26B-A4B)-Sudoku.ipynb",
-        [GEN.installation_diffusiongemma_content],
+        [source],
     )
     assert UNSLOTH_GIT not in install, "the shared %%bash base cell must stay literal"
     assert extras is not None
@@ -90,6 +97,38 @@ def test_compose_reemits_the_git_main_upgrade():
     # --no-deps protects the ROCm stack installed above.
     assert "--no-deps" in line
     assert "--force-reinstall" in line
+
+
+def test_compose_reemits_a_forced_release_reinstall():
+    """A source that force-reinstalls released unsloth must keep doing so on AMD.
+
+    The base cell installs the same two packages with a plain -U, which leaves an
+    equal-or-newer build (a leftover git one) in place, so the AMD variant needs
+    its own reinstall or a rerun keeps executing the old build.
+    """
+    install, extras = GEN._compose_amd_installation(
+        "nb/AMD-DiffusionGemma_(26B-A4B)-Sudoku.ipynb",
+        [GEN.installation_diffusiongemma_content],
+    )
+    assert "unsloth>=" not in install, "the shared %%bash base cell must stay literal"
+    assert extras is not None
+    line = next(
+        (text for text in extras.splitlines() if "--force-reinstall" in text), None
+    )
+    assert line is not None, f"release reinstall dropped from extras cell:\n{extras}"
+    assert "unsloth>=2026.6.5" in line and "unsloth_zoo>=2026.6.5" in line
+    # --no-deps protects the ROCm stack installed above.
+    assert "--no-deps" in line
+
+
+def test_forced_release_extractor_ignores_plain_installs():
+    """Only a --force-reinstall line counts; a plain install needs no re-emit."""
+    assert GEN._extract_forced_unsloth_release_specs(
+        ['!pip install --no-deps --upgrade "unsloth>=2026.6.5"']
+    ) == []
+    assert GEN._extract_forced_unsloth_release_specs(
+        ['!pip install --no-deps --force-reinstall "unsloth>=2026.6.5" trl==1.9.2']
+    ) == ["unsloth>=2026.6.5"]
 
 
 def test_compose_adds_nothing_for_a_released_source():
