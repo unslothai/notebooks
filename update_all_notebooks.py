@@ -718,7 +718,9 @@ installation_diffusiongemma_content = """%%capture
 import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install "unsloth>=2026.6.5"  # local & cloud: pull deps, then upgrade unsloth + unsloth_zoo below
-    !pip install --no-deps --upgrade "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"
+    # --force-reinstall replaces a git build left by the old cell, whose version already satisfies
+    # the floor; --no-deps keeps that reinstall off numpy.
+    !pip install --no-deps --upgrade --force-reinstall "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"
 else:
     import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
     __XFORMERS_INSTALL__
