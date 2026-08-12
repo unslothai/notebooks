@@ -351,6 +351,15 @@ def _split_args(arg_string: str) -> list[str]:
     ``#`` and silently drops ``#subdirectory=...`` etc.  So we cut the
     comment ourselves at the first whitespace-then-``#`` and call
     ``shlex.split`` with ``comments=False`` — URL fragments survive intact.
+
+    ``punctuation_chars`` makes shlex tokenize ``&``, ``|`` and ``;`` the way a
+    shell does, so a separator glued to its neighbours (``foo&&pip``, valid
+    shell) still comes back as ``foo``, ``&&``, ``pip`` and the segmenter in
+    :func:`_pip_install_args` can see it.  The set is narrowed from shlex's
+    default ``();<>|&`` because ``<`` and ``>`` carry meaning inside an
+    unquoted version specifier (``torchao>=0.16.0``), which must stay one
+    token.  Quoted text is untouched, so an environment marker such as
+    ``"pkg; python_version<'3.11'"`` also survives.
     """
     import shlex
 
@@ -358,7 +367,10 @@ def _split_args(arg_string: str) -> list[str]:
     if cut is not None:
         arg_string = arg_string[: cut.start()]
     try:
-        return shlex.split(arg_string, comments=False, posix=True)
+        lexer = shlex.shlex(arg_string, posix=True, punctuation_chars="&|;")
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        return list(lexer)
     except ValueError:
         return arg_string.split()
 

@@ -306,6 +306,35 @@ def test_parse_pip_line_drops_chained_command_words() -> None:
     assert parsed.specs == ["transformers==4.55.4", "trl==0.22.2"]
 
 
+def test_parse_pip_line_splits_separators_glued_to_arguments() -> None:
+    """``foo&&pip install bar`` is valid shell and must segment the same way.
+
+    Without shell-aware tokenization ``foo&&pip`` arrives as one token, which
+    is emitted verbatim as a dependency and leaves the PEP 723 block
+    unresolvable.
+    """
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    parsed = _DEP_MOD._parse_pip_line("!pip install foo&&pip install bar")
+
+    assert parsed is not None
+    assert parsed.specs == ["foo", "bar"]
+
+
+def test_split_args_keeps_unquoted_version_specifiers_intact() -> None:
+    """Shell-aware tokenization must not break ``>=`` in an unquoted pin."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    assert _DEP_MOD._split_args("torchao>=0.16.0 triton>=3.2.0") == [
+        "torchao>=0.16.0", "triton>=3.2.0",
+    ]
+    assert _DEP_MOD._split_args("\"pkg; python_version<'3.11'\"") == [
+        "pkg; python_version<'3.11'",
+    ]
+
+
 def test_parse_pip_line_ignores_chained_non_pip_command() -> None:
     """Only chained pip-install segments may contribute dependencies."""
     if _DEP_MOD is _DEP_MOD_ABSENT:
