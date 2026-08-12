@@ -54,30 +54,31 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Hardware note: GRPO on this model needs more than 2x16 GB
+    ## Hardware note: GRPO on 2 x 16 GB
 
     SFT, vision and multimodal fine-tuning of this checkpoint all run on a free Kaggle
-    T4 x2 kernel. GRPO does not, and the reason is specific rather than general size.
+    T4 x2 kernel. GRPO is the tight one, and the reason is specific rather than general
+    size.
 
-    The 4-bit weights split evenly across the two cards, measured at 10.01 GiB on cuda:0
-    and 10.30 GiB on cuda:1. The `lm_head` is 202048 x 6656 and lands on the last card,
-    and GRPO's chunked log-softmax then materialises `tokens x 202048` logits plus a
-    float32 copy of them on that same card. That leaves roughly 4.2 GiB for the logits,
-    the rollout KV cache and the gradients together, and it is not enough.
+    The 4-bit weights come to 20.31 GiB. The `lm_head` is 202048 x 6656 and is not tied,
+    so it stays in 16-bit at 2.5 GiB, and GRPO's chunked log-softmax then materialises
+    `rows x 202048` logits plus a float32 copy of them on whichever card holds it.
+    `device_map="auto"` splits the weights evenly and leaves that card no room for the
+    logits, and capping it with `max_memory` only pushes modules to CPU, which
+    bitsandbytes then refuses to load.
 
-    Two changes below take it as far as 2x16 GB will go, and both are worth keeping on
-    any tier: `num_generations = 2` instead of 4, and capping the log-softmax at 128
-    rows per chunk, which cuts peak logit memory from 994 MiB to 493 MiB at this vocab
-    size. With both applied the run still stops, but the failing allocation falls from
-    260 MiB to 50 MiB, so the shortfall is small rather than structural.
+    The sizing cell below therefore builds an explicit device map with
+    `unsloth_zoo.device_map_planner`, which reserves the logit headroom on the head's
+    card and raises rather than spilling to CPU when the request cannot fit. On
+    2 x 16 GB that means `num_generations = 2`, `max_seq_length = 1536` and a 128-row
+    cap on the log-softmax, which needs 4.10 GiB of headroom and fits. The same run at
+    3072 tokens needs 7.57 GiB and is refused.
 
-    Capping the last card with `max_memory` to reserve headroom does not help: accelerate
-    balances rather than filling the first card, so the cap just pushes modules to CPU and
-    bitsandbytes refuses. Forcing it would need a hand-written `device_map`.
-
-    **Run this notebook on a single card with more memory** (A100 40GB, H100, or an L4 for
-    a slower run). On one GPU `offload_embedding` also switches back on, which frees a
-    further 2.5 GB, and none of the multi-GPU placement issues apply.
+    A single A100 40GB or H100 takes `num_generations = 4` and
+    `max_seq_length = 3072`. A single L4 has 24 GB, so it sizes exactly like the
+    2 x 16 GB case, `num_generations = 2` and `max_seq_length = 1536`, and just runs
+    slower. On one card `offload_embedding` switches back on either way and frees a
+    further 2.5 GB.
     """)
     return
 
@@ -210,12 +211,13 @@ def _(mo):
 
     * `load_in_4bit = True` keeps the 416 text `Linear4bit` modules at nf4 with double quant, about
       11.7 GB. The embeddings and the vision tower stay in 16-bit.
-    * `offload_embedding = True` moves the input embedding to CPU RAM. Muse Glimmer has a 202048 token
-      vocabulary and untied embeddings, so `embed_tokens` alone is 2.5 GiB.
+    * `offload_embedding` moves the input embedding to CPU RAM. Muse Glimmer has a 202048 token
+      vocabulary and untied embeddings, so `embed_tokens` alone is 2.5 GiB. It is taken only on a
+      single card, because it cannot be combined with a multi-GPU dispatch (unslothai/unsloth#8272).
     * `fast_inference = False` because no released vLLM carries this architecture. See the note below.
-    * `max_seq_length = 3072` is prompt plus completion. The prompts are only a couple of hundred
-      tokens, so nearly all of that is completion budget. It has to be, see the length measurement
-      further down.
+    * `max_seq_length` is prompt plus completion: 3072 on a single large card, 1536 on 2 x 16 GB,
+      chosen by the sizing cell above. The prompts are only a couple of hundred tokens, so nearly
+      all of that is completion budget. It has to be, see the length measurement further down.
 
     Muse Glimmer is registered as an image-text-to-text model, so `AutoModelForCausalLM` will not load it.
     `FastModel` picks the right class for you.
@@ -243,7 +245,8 @@ def _():
     # memory levers: the log-softmax keeps every row's logits alive until backward
     # (the retained term scales with TOTAL rows, not chunk rows), so on 2 x 16 GB a
     # 3072-token sequence needs 7.57 GiB free on the head's card, which does not fit
-    # alongside the weights. 1536 needs 4.10 GiB and leaves 1.29 GiB of margin.
+    # alongside the 20.31 GiB of weights and is refused. 1536 needs 4.10 GiB, which
+    # does fit.
     _n = max(torch.cuda.device_count(), 1)
     _gib = (
         min(torch.cuda.get_device_properties(i).total_memory for i in range(_n)) / 2**30
@@ -269,19 +272,35 @@ def _():
 
         _plan = plan_device_map_for_pretrained(
             MODEL_NAME,
-            max_memory={i: f"{_gib:.2f}GiB" for i in range(_n)},
+            # Free memory, not total: the CUDA context is already resident by now and
+            # the plan has to fit in what is actually left.
+            max_memory={i: torch.cuda.mem_get_info(i)[0] for i in range(_n)},
             rows_per_chunk=128,  # matches the log-softmax cap below
             retained_rows=BATCH_SIZE * max_seq_length,
             softcapped=True,
             temperature_scaled=True,
-            # Activations follow layers: each layer moved onto card 0 costs it more peak
-            # than it frees on the head card, so hold some back for card 0 itself.
-            # Left to the planner. An explicit reserve is treated as a measured
-            # figure the plan must honour exactly (unsloth_zoo sets steps = 1 when it
-            # is explicit), so on 2 x 14.6 GiB a hard 3.2 GiB request cannot be met
-            # alongside the weights and the logit headroom, and planning fails with
-            # DeviceMapInfeasible. Auto-sizing derives the reserve from the actual
-            # slack and still relaxes it on the non-head cards.
+            # No free_space_policy: the default "balanced" is the right one, and on
+            # this model it is also the roomier one. Measured on the real Kaggle
+            # budgets (14.411 / 14.460 GiB free, which the bnb quantiser cuts to
+            # 12.970 / 13.014), spare memory after every reserve and the 4.104 GiB
+            # of head headroom:
+            #
+            #                       card 0        card 1 (head)
+            #
+            # Not because head_max double-books anything: both policies stack a
+            # reserve on top of the head's logit headroom when there is room, and
+            # the planner refuses any plan where the two together do not fit. The
+            # difference is how the reserve is sized. "balanced" derives it from the
+            # slack actually left after the weights, then clamps per device, so on a
+            # tight fit it shrinks to what is really spare. "head_max" reserves the
+            # largest single placement unit on every card, a fixed figure that owes
+            # nothing to how much room there is, and on 2 x 14.6 GiB that fixed
+            # figure is most of what is left.
+            #
+            # An explicit activation_reserve_bytes is a third option and the wrong
+            # one here: it is treated as a measured figure the plan must honour
+            # exactly, so a hard 2 GiB request plans at 14.75 GiB but fails with
+            # DeviceMapInfeasible at 14.55 GiB and below.
         )
         if _plan is not None:
             print(_plan.describe())
