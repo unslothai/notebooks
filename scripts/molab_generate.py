@@ -1301,15 +1301,38 @@ def _studio_codes() -> list[str]:
         \"\"\")""")
 
     _install_cell = textwrap.dedent("""\
+        import hashlib
         import os
         import pathlib
         import re
+        import shutil
         import stat
         import subprocess
         import sys
         import tarfile
         import time
         import urllib.request
+
+        def _sha256(_path):
+            _digest = hashlib.sha256()
+            with open(_path, "rb") as _handle:
+                for _chunk in iter(lambda: _handle.read(1 << 20), b""):
+                    _digest.update(_chunk)
+            return _digest.hexdigest()
+
+        def download_verified(_url, _dest, _sha):
+            # Only hand back bytes that hash to _sha. A good file on disk is
+            # kept, a bad or partial one is refetched, so reruns stay cheap.
+            if _dest.exists() and _sha256(_dest) == _sha:
+                return _dest
+            _dest.unlink(missing_ok=True)
+            urllib.request.urlretrieve(_url, _dest)
+            _got = _sha256(_dest)
+            if _got != _sha:
+                _dest.unlink(missing_ok=True)
+                raise RuntimeError(
+                    f"Refusing to use {_url}: expected sha256 {_sha}, got {_got}")
+            return _dest
 
         # Grab the repo if it isn't here yet.
         if not pathlib.Path("unsloth").exists():
@@ -1320,23 +1343,41 @@ def _studio_codes() -> list[str]:
             )
         repo = pathlib.Path("unsloth").resolve()
 
-        # The UI ships unbuilt and there's no Node here, so fetch one to build with.
+        # The UI ships unbuilt and there's no Node here, so fetch one to build
+        # with. The SHA256 is the one nodejs.org publishes for this release, so
+        # a tampered mirror fails closed instead of landing on PATH.
         _node = pathlib.Path("node-v22.12.0-linux-x64")
-        if not _node.exists():
-            _tar = pathlib.Path(f"{_node}.tar.xz")
-            urllib.request.urlretrieve(
-                f"https://nodejs.org/dist/v22.12.0/{_node}.tar.xz", _tar)
+        _node_sha = "22982235e1b71fa8850f82edd09cdae7e3f32df1764a9ec298c72d25ef2c164f"
+        # molab storage persists across sessions, so a tree may already be here
+        # from an earlier run, including the unverified download this replaces.
+        # Trust it only if it carries the hash we expect, else rebuild it.
+        _stamp = _node / ".verified-sha256"
+        if not _stamp.is_file() or _stamp.read_text().strip() != _node_sha:
+            _tar = download_verified(
+                f"https://nodejs.org/dist/v22.12.0/{_node}.tar.xz",
+                pathlib.Path(f"{_node}.tar.xz"), _node_sha)
+            # Only once the replacement is in hand, so a failed fetch cannot
+            # leave the runtime with no Node at all.
+            shutil.rmtree(_node, ignore_errors=True)
             with tarfile.open(_tar) as _t:
-                _t.extractall()
+                # Reject members that escape the extraction dir. data_filter
+                # exists exactly where extractall(filter=) does.
+                if hasattr(tarfile, "data_filter"):
+                    _t.extractall(filter="data")
+                else:
+                    _t.extractall()
+            _stamp.write_text(_node_sha)
         os.environ["PATH"] = str((_node / "bin").resolve()) + os.pathsep + os.environ["PATH"]
 
         # Build the UI and install into system Python. setup.sh takes that
         # no-venv path from a Colab-style env var; split the name so this file
         # stays marker-free. Drop when setup.sh learns molab.
         _hosted_tag = "COLAB" + "_RELEASE_TAG"
+        _setup = repo / "studio" / "setup.sh"
+        _setup.chmod(_setup.stat().st_mode | stat.S_IEXEC)
         subprocess.run(
-            "chmod +x studio/setup.sh && ./studio/setup.sh --local",
-            shell=True, check=True, cwd=str(repo),
+            ["./studio/setup.sh", "--local"],
+            check=True, cwd=str(repo),
             env={**os.environ, _hosted_tag: "molab"},
         )""")
 
@@ -1361,12 +1402,15 @@ def _studio_codes() -> list[str]:
                 time.sleep(1)
 
         # Reach the server from the browser through a cloudflared quick tunnel
-        # (a public *.trycloudflare.com URL).
-        _cf = pathlib.Path("cloudflared")
-        if not _cf.exists():
-            urllib.request.urlretrieve(
-                "https://github.com/cloudflare/cloudflared/releases/latest"
-                "/download/cloudflared-linux-amd64", _cf)
+        # (a public *.trycloudflare.com URL). releases/latest and its assets are
+        # both mutable, so pin the release and its SHA256 rather than chmod +x
+        # whatever came back. Bump the two together.
+        _cf = download_verified(
+            "https://github.com/cloudflare/cloudflared/releases/download/"
+            "2026.7.3/cloudflared-linux-amd64",
+            pathlib.Path("cloudflared-2026.7.3-linux-amd64"),
+            "9d71c677db00134c1bd4144b7783486b654ad281b1ea62b4972098d19f770f17",
+        )
         _cf.chmod(_cf.stat().st_mode | stat.S_IEXEC)
         _proc = subprocess.Popen(  # full path, else it won't be found
             [str(_cf.resolve()), "tunnel", "--url", "http://localhost:8888"],
