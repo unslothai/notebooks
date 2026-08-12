@@ -1305,6 +1305,7 @@ def _studio_codes() -> list[str]:
         import os
         import pathlib
         import re
+        import shutil
         import stat
         import subprocess
         import sys
@@ -1346,12 +1347,18 @@ def _studio_codes() -> list[str]:
         # with. The SHA256 is the one nodejs.org publishes for this release, so
         # a tampered mirror fails closed instead of landing on PATH.
         _node = pathlib.Path("node-v22.12.0-linux-x64")
-        if not _node.exists():
+        _node_sha = "22982235e1b71fa8850f82edd09cdae7e3f32df1764a9ec298c72d25ef2c164f"
+        # molab storage persists across sessions, so a tree may already be here
+        # from an earlier run, including the unverified download this replaces.
+        # Trust it only if it carries the hash we expect, else rebuild it.
+        _stamp = _node / ".verified-sha256"
+        if not _stamp.is_file() or _stamp.read_text().strip() != _node_sha:
             _tar = download_verified(
                 f"https://nodejs.org/dist/v22.12.0/{_node}.tar.xz",
-                pathlib.Path(f"{_node}.tar.xz"),
-                "22982235e1b71fa8850f82edd09cdae7e3f32df1764a9ec298c72d25ef2c164f",
-            )
+                pathlib.Path(f"{_node}.tar.xz"), _node_sha)
+            # Only once the replacement is in hand, so a failed fetch cannot
+            # leave the runtime with no Node at all.
+            shutil.rmtree(_node, ignore_errors=True)
             with tarfile.open(_tar) as _t:
                 # Reject members that escape the extraction dir. data_filter
                 # exists exactly where extractall(filter=) does.
@@ -1359,6 +1366,7 @@ def _studio_codes() -> list[str]:
                     _t.extractall(filter="data")
                 else:
                     _t.extractall()
+            _stamp.write_text(_node_sha)
         os.environ["PATH"] = str((_node / "bin").resolve()) + os.pathsep + os.environ["PATH"]
 
         # Build the UI and install into system Python. setup.sh takes that
