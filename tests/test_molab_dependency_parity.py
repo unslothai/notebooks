@@ -335,6 +335,21 @@ def test_split_args_keeps_unquoted_version_specifiers_intact() -> None:
     ]
 
 
+def test_parse_pip_line_reads_chained_interpreter_pip_invocations() -> None:
+    """``python3.12 -m pip install`` is a pip install however it is spelled."""
+    if _DEP_MOD is _DEP_MOD_ABSENT:
+        pytest.skip("scripts/molab_dependencies.py not yet committed.")
+
+    for chained, expected in (
+        ("python3.12 -m pip install bar", ["foo", "bar"]),
+        ("/usr/bin/python3 -m pip install bar", ["foo", "bar"]),
+        ("python -c 'import foo'", ["foo"]),
+    ):
+        parsed = _DEP_MOD._parse_pip_line(f"!pip install foo && {chained}")
+        assert parsed is not None
+        assert parsed.specs == expected, chained
+
+
 def test_parse_pip_line_keeps_packages_named_like_shell_commands() -> None:
     """``sh`` is a real distribution: position decides, never the name."""
     if _DEP_MOD is _DEP_MOD_ABSENT:

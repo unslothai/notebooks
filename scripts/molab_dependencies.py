@@ -148,14 +148,31 @@ def _is_shell_separator(token: str) -> bool:
     return bool(token) and set(token) <= set(_SHELL_OPERATOR_CHARS)
 
 
-# A chained segment contributes packages only if it starts with one of these.
-_PIP_INSTALL_PREFIXES = (
-    ["uv", "pip", "install"],
-    ["pip", "install"],
-    ["pip3", "install"],
-    ["python", "-m", "pip", "install"],
-    ["python3", "-m", "pip", "install"],
+# A python interpreter, however it is spelled: ``python``, ``python3``,
+# ``python3.12``, ``py``, or any of those behind a path.
+_RE_PYTHON_EXE = re.compile(
+    r"^(?:.*[/\\])?(?:python|py)[0-9.]*(?:\.exe)?$", re.IGNORECASE
 )
+
+
+def _pip_install_prefix_len(segment: list[str]) -> int:
+    """Length of ``segment``'s leading pip install command, 0 if it is not one.
+
+    A chained segment contributes packages only through this: anything else
+    (``echo ...``, ``python -c ...``) is not an install and adds nothing.
+    """
+    if (
+        len(segment) >= 4
+        and _RE_PYTHON_EXE.match(segment[0])
+        and segment[1] == "-m"
+        and segment[2:4] == ["pip", "install"]
+    ):
+        return 4
+    if len(segment) >= 3 and segment[:3] == ["uv", "pip", "install"]:
+        return 3
+    if len(segment) >= 2 and segment[0] in {"pip", "pip3"} and segment[1] == "install":
+        return 2
+    return 0
 
 
 # ===========================================================================
@@ -412,10 +429,9 @@ def _pip_install_args(tokens: list[str]) -> list[str]:
             # The regex already consumed this segment's ``pip install`` prefix.
             args.extend(segment)
             continue
-        for prefix in _PIP_INSTALL_PREFIXES:
-            if segment[:len(prefix)] == prefix:
-                args.extend(segment[len(prefix):])
-                break
+        prefix_len = _pip_install_prefix_len(segment)
+        if prefix_len:
+            args.extend(segment[prefix_len:])
     return args
 
 
