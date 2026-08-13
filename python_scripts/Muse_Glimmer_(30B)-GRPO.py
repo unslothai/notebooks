@@ -80,7 +80,7 @@
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; _numpy = f"numpy=={numpy.__version__}"\n    except: _numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# The device map planner and the GRPO log-softmax fix are on main but not\n# yet in a PyPI release, so both packages come from git.\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==1.9.2 \\\n    "unsloth @ git+https://github.com/unslothai/unsloth" \\\n    "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
+get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; _numpy = f"numpy=={numpy.__version__}"\n    except: _numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# The device map planner and the GRPO log-softmax fix are not in a release yet\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==1.9.2 \\\n    "unsloth @ git+https://github.com/unslothai/unsloth" \\\n    "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
 
 
 # Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.
@@ -88,9 +88,7 @@ get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip ins
 # In[ ]:
 
 
-# Muse Glimmer support ships in transformers 5.15.0, so install the release.
-# Pinned to that exact version so the notebook does not change underneath you.
-# Run this BEFORE anything imports transformers.
+# Muse Glimmer needs transformers 5.15.0. Run before anything imports transformers
 get_ipython().system('pip install -q "transformers==5.15.0"')
 
 import transformers
@@ -120,8 +118,7 @@ print("architecture available:", _cfg.model_type)
 import transformers
 print("transformers", transformers.__version__)
 
-# Resolving the config through AutoConfig is a stronger check than importing
-# a module path: it only succeeds if the architecture is actually registered.
+# AutoConfig only resolves if the architecture is actually registered
 from transformers import AutoConfig
 _cfg = AutoConfig.from_pretrained("unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit")
 print("architecture available:", _cfg.model_type)
@@ -156,12 +153,8 @@ import sys, torch
 MODEL_NAME = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit"
 lora_rank  = 8      # Larger rank = smarter, but slower and more memory
 
-# Size the run from the hardware. Rollout width and sequence length are the two
-# memory levers: the log-softmax keeps every row's logits alive until backward
-# (the retained term scales with TOTAL rows, not chunk rows), so on 2 x 16 GB a
-# 3072-token sequence needs 7.57 GiB free on the head's card, which does not fit
-# alongside the 20.31 GiB of weights and is refused. 1536 needs 4.10 GiB, which
-# does fit.
+# Size the run from the hardware. On 2 x 16 GB, 3072 tokens needs 7.57 GiB free on
+# the head's card and is refused; 1536 needs 4.10 GiB and fits
 _n    = max(torch.cuda.device_count(), 1)
 _gib  = min(torch.cuda.get_device_properties(i).total_memory
             for i in range(_n)) / 2**30
@@ -174,51 +167,23 @@ max_completion_length = max_seq_length - max_prompt_length
 print(f"{_n} GPU(s), smallest {_gib:.1f} GiB -> num_generations={NUM_GENERATIONS}, "
       f"max_seq_length={max_seq_length}")
 
-# Offloading the input embedding to CPU cannot be combined with a multi-GPU
-# dispatch: accelerate's own hook re-sends the ids to the execution device it
-# recorded, after our hook already sent them to the CPU weight. unsloth turns the
-# offload off by itself in that case (unslothai/unsloth#8272), and asking for it
-# only on one card keeps that explicit here.
+# Embedding offload cannot be combined with a multi-GPU dispatch (unslothai/unsloth#8272)
 OFFLOAD_EMBEDDING = _n == 1
 
-# Head-aware placement. Returns None on a single GPU, and raises rather than
-# silently spilling to CPU when the request cannot fit.
+# Head-aware placement. None on a single GPU; raises rather than spilling to CPU
 DEVICE_MAP = None
 if _n > 1:
     sys.path.insert(0, ".")
     from unsloth_zoo.device_map_planner import plan_device_map_for_pretrained
     _plan = plan_device_map_for_pretrained(
         MODEL_NAME,
-        # Free memory, not total: the CUDA context is already resident by now and
-        # the plan has to fit in what is actually left.
+        # Free memory, not total: the CUDA context is already resident
         max_memory = {i: torch.cuda.mem_get_info(i)[0] for i in range(_n)},
         rows_per_chunk = 128,                       # matches the log-softmax cap below
         retained_rows  = BATCH_SIZE * max_seq_length,
         softcapped = True, temperature_scaled = True,
-        # No free_space_policy: the default "balanced" is the right one, and on
-        # this model it is also the roomier one. Measured on the real Kaggle
-        # budgets (14.411 / 14.460 GiB free, which the bnb quantiser cuts to
-        # 12.970 / 13.014), spare memory after every reserve and the 4.104 GiB
-        # of head headroom:
-        #
-        #                       card 0        card 1 (head)
-        #   balanced            0.144 GiB     0.641 GiB
-        #   head_max            0.049 GiB     0.019 GiB
-        #
-        # Not because head_max double-books anything: both policies stack a
-        # reserve on top of the head's logit headroom when there is room, and
-        # the planner refuses any plan where the two together do not fit. The
-        # difference is how the reserve is sized. "balanced" derives it from the
-        # slack actually left after the weights, then clamps per device, so on a
-        # tight fit it shrinks to what is really spare. "head_max" reserves the
-        # largest single placement unit on every card, a fixed figure that owes
-        # nothing to how much room there is, and on 2 x 14.6 GiB that fixed
-        # figure is most of what is left.
-        #
-        # An explicit activation_reserve_bytes is a third option and the wrong
-        # one here: it is treated as a measured figure the plan must honour
-        # exactly, so a hard 2 GiB request plans at 14.75 GiB but fails with
-        # DeviceMapInfeasible at 14.55 GiB and below.
+        # No free_space_policy: the default "balanced" sizes the reserve from the
+        # slack left after the weights, which is the roomier fit on 2 x 16 GB
     )
     if _plan is not None:
         print(_plan.describe())
@@ -346,11 +311,7 @@ USER_CHANNEL   = "to=" + RECIPIENT_USER
 print("splitting the reply channel on", repr(USER_CHANNEL))
 
 def split_channels(text):
-    """Return (reasoning, answer) from an Muse Glimmer completion.
-
-    Works whether or not the ATEM special tokens survived decoding. The reply is whatever
-    follows the last to = user marker; anything before the first one is private reasoning.
-    """
+    """Return (reasoning, answer): the reply follows the last to=user marker."""
     if text is None: return "", ""
     idx = text.rfind(USER_CHANNEL)
     if idx == -1:
@@ -367,7 +328,7 @@ def split_channels(text):
 
 # sanity check on both decodings of the same completion
 _with    = " to=self<|message|>48/2 = 24, 48+24 = 72.<|eom|>" + ANSWER_PREFIX + "72" + ANSWER_SUFFIX
-# tokenizer is a MuseGlimmerProcessor, so text has to be passed by keyword
+# tokenizer is a MuseGlimmerProcessor, so text is passed by keyword
 _ids     = tokenizer(text = _with, add_special_tokens = False)["input_ids"]
 if len(_ids) and isinstance(_ids[0], (list, tuple)): _ids = _ids[0]
 _without = tokenizer.decode(_ids, skip_special_tokens = True)
@@ -416,9 +377,7 @@ dataset = raw.map(lambda x: {
         {"role": "user",   "content": x["problem"]},
     ],
     "answer": str(x["answer"]).strip().replace(",", ""),
-    # the Muse Glimmer chat template takes a reasoning_strength, default "high". TRL forwards anything in
-    # chat_template_kwargs straight to apply_chat_template, and "low" keeps the private reasoning
-    # channel short enough that the reply fits inside max_completion_length
+    # "low" keeps the private reasoning short enough to fit max_completion_length
     "chat_template_kwargs": {"reasoning_strength": REASONING_STRENGTH},
 }, remove_columns = raw.column_names)
 
@@ -450,11 +409,7 @@ print("gold:", dataset[0]["answer"])
 import numpy as np
 
 def prompt_length(messages):
-    """Token count of a rendered prompt.
-
-    tokenizer is a MuseGlimmerProcessor, and its apply_chat_template returns a string here rather
-    than ids, so render first and tokenize explicitly instead of taking len() of the result.
-    """
+    """Token count of a rendered prompt. apply_chat_template returns a string here."""
     text = tokenizer.apply_chat_template(messages, tokenize = False, add_generation_prompt = True,
                                          reasoning_strength = REASONING_STRENGTH)
     ids  = tokenizer(text = text, add_special_tokens = False)["input_ids"]
@@ -638,8 +593,7 @@ training_args = GRPOConfig(
     gradient_accumulation_steps = 1,   # Increase to 4 for smoother training
     num_generations = NUM_GENERATIONS,
 
-    # GRPOConfig in TRL 1.9 no longer takes max_prompt_length, so the prompt cap is enforced
-    # by the dataset filter above rather than by silent truncation here
+    # TRL 1.9 dropped max_prompt_length: the dataset filter above caps the prompt
     max_completion_length = max_completion_length,
     mask_truncated_completions = True,
 
@@ -703,8 +657,7 @@ training_args = GRPOConfig(
 import torch
 from unsloth_zoo.rl_replacements import _maybe_compile, torch_compile_options
 
-# Keep upstream's decorator: without it this runs eager and the fp16 matmul takes a
-# different cuBLAS path, which shifts the logprobs by ~1e-2 for no reason.
+# Keep upstream's decorator: eager takes a different cuBLAS path and shifts logprobs
 @_maybe_compile(dynamic = True, fullgraph = True, options = torch_compile_options,)
 def chunked_hidden_states_selective_log_softmax(
     hidden_states, lm_head, index, chunks = 4,
@@ -713,12 +666,8 @@ def chunked_hidden_states_selective_log_softmax(
 ):
     flat_hidden_states = hidden_states.reshape(-1, hidden_states.shape[-1])
     flat_index = index.reshape(-1)
-    # Muse Glimmer's vocab is 202048 wide, so each chunk materialises tokens x 202048 logits
-    # and then a float32 copy of them, all on whichever card holds the lm_head. At the
-    # stock chunks = 4 that is hundreds of MB landing on one GPU, which is what runs a
-    # 2x16 GB kernel out of memory while the other card still has room. Cap the chunk
-    # at TOKENS_PER_CHUNK rows instead. Pure loop splitting: the concatenated result is
-    # unchanged, only the peak is lower.
+    # The vocab is 202048 wide, so stock chunks = 4 lands hundreds of MB of logits on the
+    # lm_head's card. Cap the chunk instead: pure loop splitting, same result, lower peak
     TOKENS_PER_CHUNK = 128
     rows = flat_hidden_states.shape[0]
     chunks = max(chunks, -(-rows // TOKENS_PER_CHUNK))
@@ -727,8 +676,7 @@ def chunked_hidden_states_selective_log_softmax(
     chunked_index = torch.chunk(flat_index, chunks = chunks, dim = 0)
     all_per_token_logps = []
     for chunk_hidden_states, chunk_index in zip(chunked_hidden_states, chunked_index):
-        # The only change from upstream: co-locate with the lm_head before the
-        # matmul, and send the result back. On one GPU every .to() is a no-op.
+        # Co-locate with the lm_head before the matmul. No-op on one GPU
         chunk_hidden_states = chunk_hidden_states.to(device = lm_head.device, dtype = lm_head.dtype)
         chunk_index = chunk_index.to(lm_head.device)
         chunk_logits = chunk_hidden_states @ lm_head.t()
