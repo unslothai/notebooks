@@ -195,7 +195,7 @@ trainer = Seq2SeqTrainer(
     train_dataset = train_dataset,
     data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor = tokenizer),
     eval_dataset = test_dataset,
-    tokenizer = tokenizer.feature_extractor,
+    processing_class = tokenizer.feature_extractor,
     compute_metrics = compute_metrics,
     args = Seq2SeqTrainingArguments(
         # predict_with_generate = True,
