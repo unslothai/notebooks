@@ -1989,14 +1989,47 @@ def _owns_extra_grpo_install_cell(notebook_path, cells, idx):
     2. The Qwen3.5 / Qwen3.6 family is excluded. Those notebooks use
        ``installation_qwen3_5_content``, which pins transformers 5.x and needs no
        separate vLLM install cell.
+    3. Gemma4 is excluded for the same reason. ``installation_gemma4_content``
+       installs ``transformers==5.5.0``, but the extra block's own
+       ``uv pip install transformers==4.56.2`` (from ``UV_PIN_TRANSFORMERS``,
+       there because vLLM requires transformers<5) ran after it and won, so
+       ``Gemma4_(E2B)_GRPO.ipynb`` died on
+
+           `unsloth/gemma-4-E2B-it` is not supported yet in `transformers==4.56.2`
+
+       and it never used that vLLM anyway: the notebook sets
+       ``fast_inference = False``.
+
+    Unlike Qwen3.5, the Gemma4 cell at ``idx`` is real code with no
+    ``original_template`` to regenerate from, so the caller deletes it.
     """
     if is_path_contains_any(
-        notebook_path.lower(), ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6"]
+        notebook_path.lower(),
+        ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6", "gemma4"],
     ):
         return False
     if idx < 0 or idx >= len(cells):
         return False
     return cells[idx].get("cell_type") == "code"
+
+
+# Recognises a generated extra GRPO block without matching a hand-written install cell.
+_EXTRA_GRPO_INSTALL_MARKERS = ("Colab Extra Install", "vllm==")
+
+
+def _is_extra_grpo_install_cell(cells, idx):
+    """Is ``cells[idx]`` a previously generated GRPO extra install cell?
+
+    Only asked before deleting one. The excluded families still carry the block
+    from before they were excluded, and leaving it keeps the pin that broke
+    them; deleting whatever happens to sit at ``i + 2`` would be worse.
+    """
+    if idx < 0 or idx >= len(cells):
+        return False
+    if cells[idx].get("cell_type") != "code":
+        return False
+    text = _cell_source_text(cells[idx])
+    return all(marker in text for marker in _EXTRA_GRPO_INSTALL_MARKERS)
 
 
 # `import torch` as a statement, including after a `;` or as the body of a
@@ -4632,6 +4665,13 @@ def update_notebook_sections(
                                 ):
                                     notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
                                     extra_grpo_install_idx = i + 2
+                                elif is_path_contains_any(notebook_path.lower(), ["gemma4"]) and \
+                                    _is_extra_grpo_install_cell(notebook_content["cells"], i + 2):
+                                    # Not writing the block is not enough: the cell already
+                                    # holds it from a previous generation and there is no
+                                    # original_template to regenerate a clean one from. The
+                                    # marker guard keeps a hand-placed cell safe.
+                                    del notebook_content["cells"][i + 2]
 
                         # META INSTALLATION
                         elif is_path_contains_any(notebook_path.lower(), ["Meta"]):
