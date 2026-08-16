@@ -263,12 +263,12 @@ def _():
         offload_embedding=True,  # 202048 token vocabulary off the GPU, auto-declined on multi-GPU
         fast_inference=False,  # no released vllm has this architecture
         device_map="unsloth",  # Head-aware placement across GPUs, a no-op on one card
-        device_map_planner_kwargs={
-            "rows_per_chunk": 128,  # matches the log-softmax cap below
-            "retained_rows": BATCH_SIZE * max_seq_length,
-            "softcapped": True,
-            "temperature_scaled": True,
-        },
+        # Only what the loader cannot know. The planner reads the soft cap off
+        # text_config.final_logit_softcapping, and rows_per_chunk already defaults
+        # to the 128 used below. retained_rows has to be passed: it defaults to 0,
+        # which models inference under no_grad, and a GRPO backward keeps every
+        # chunk alive until backward.
+        device_map_planner_kwargs={"retained_rows": BATCH_SIZE * max_seq_length},
     )
     print(model.config.model_type, type(model).__name__)
     return (
