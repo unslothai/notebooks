@@ -260,11 +260,9 @@ def _():
         model_name=MODEL_NAME,
         max_seq_length=max_seq_length,  # prompt + completion
         load_in_4bit=True,  # 4-bit QLoRA. False needs an 80GB card
-        # Declined automatically once the model is dispatched across cards.
-        offload_embedding=True,  # 202048 token vocabulary, keep it off the GPU
+        offload_embedding=True,  # 202048 token vocabulary off the GPU, auto-declined on multi-GPU
         fast_inference=False,  # no released vllm has this architecture
-        # Head-aware placement across every visible GPU. A no-op on one card.
-        device_map="unsloth",
+        device_map="unsloth",  # Head-aware placement across GPUs, a no-op on one card
         device_map_planner_kwargs={
             "rows_per_chunk": 128,  # matches the log-softmax cap below
             "retained_rows": BATCH_SIZE * max_seq_length,

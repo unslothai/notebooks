@@ -367,10 +367,9 @@ class KeepEmbeddingOffloaded(TrainerCallback):
     # offload_embedding. Put the input embedding back on the CPU once, after that has happened.
     def on_train_begin(self, args, state, control, **kwargs):
         embed_tokens = kwargs["model"].get_input_embeddings()
-        # Leave it alone when accelerate owns placement, which is exactly when the
-        # embedding carries a dispatch hook, and is why the loader declined the offload.
-        # hf_device_map cannot be the test: a single-GPU load is device_map = "sequential",
-        # which still gives {"": 0} rather than None.
+        # Skip when accelerate owns placement: the embedding then carries a dispatch
+        # hook, which is why the loader declined the offload. hf_device_map cannot be
+        # the test, since a single-GPU load is device_map = "sequential" -> {"": 0}.
         hook = getattr(embed_tokens, "_hf_hook", None)
         if getattr(hook, "execution_device", None) is not None:
             return control

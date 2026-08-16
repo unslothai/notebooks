@@ -518,12 +518,12 @@ def _(torch, trainer_1):
             hook = getattr(embed_tokens, "_hf_hook", None)
             if (
                 getattr(hook, "execution_device", None) is not None
-            ):  # Leave it alone when accelerate owns placement, which is exactly when the
-                return control  # embedding carries a dispatch hook, and is why the loader declined the offload.
+            ):  # Skip when accelerate owns placement: the embedding then carries a dispatch
+                return control  # hook, which is why the loader declined the offload. hf_device_map cannot be
             if (
                 embed_tokens.weight.device.type != "cpu"
-            ):  # hf_device_map cannot be the test: a single-GPU load is device_map = "sequential",
-                embed_tokens.to("cpu")  # which still gives {"": 0} rather than None.
+            ):  # the test, since a single-GPU load is device_map = "sequential" -> {"": 0}.
+                embed_tokens.to("cpu")
                 torch.cuda.empty_cache()
             return control
 
