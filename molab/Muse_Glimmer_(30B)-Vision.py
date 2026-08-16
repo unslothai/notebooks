@@ -158,21 +158,16 @@ def _():
     import torch
 
     max_seq_length = 1024
-    OFFLOAD_EMBEDDING = torch.cuda.device_count() == 1
-    print(
-        f"visible GPUs: {torch.cuda.device_count()}, offload_embedding: {OFFLOAD_EMBEDDING}"
-    )
+
     model, processor = FastModel.from_pretrained(
         model_name="unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",  # The adapters you just saved
         load_in_4bit=True,  # 4bit quantisation to reduce memory
         max_seq_length=max_seq_length,
         use_gradient_checkpointing="unsloth",  # "unsloth" for long context
-        offload_embedding=OFFLOAD_EMBEDDING,  # Keeps the 202048 x 6656 embedding matrix in RAM
+        offload_embedding=True,  # Keeps the 202048 x 6656 embedding matrix in RAM
     )
-    print(
-        type(model).__name__, type(processor).__name__
-    )
-    return FastModel, OFFLOAD_EMBEDDING, max_seq_length, model, torch
+    print(type(model).__name__, type(processor).__name__)
+    return FastModel, max_seq_length, model, torch
 
 
 @app.cell(hide_code=True)
@@ -654,7 +649,6 @@ def _(mo):
 
 @app.cell
 def _(
-    OFFLOAD_EMBEDDING,
     TextStreamer,
     dataset,
     instruction,
@@ -669,7 +663,7 @@ def _(
             model_name="muse_glimmer_lora",  # The adapters you just saved
             load_in_4bit=True,  # 4bit quantisation to reduce memory
             max_seq_length=1024,
-            offload_embedding=OFFLOAD_EMBEDDING,  # Keeps the 202048 x 6656 embedding matrix in RAM
+            offload_embedding=True,  # Keeps the 202048 x 6656 embedding matrix in RAM
         )
     sample_2 = dataset[1]
     messages_3 = [

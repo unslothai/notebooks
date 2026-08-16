@@ -168,28 +168,16 @@ def _():
     import torch
 
     max_seq_length = 2048
-    OFFLOAD_EMBEDDING = torch.cuda.device_count() == 1
-    print(
-        f"visible GPUs: {torch.cuda.device_count()}, offload_embedding: {OFFLOAD_EMBEDDING}"
-    )
+
     model, processor = FastModel.from_pretrained(
         model_name="unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
         load_in_4bit=True,
         max_seq_length=max_seq_length,
         use_gradient_checkpointing="unsloth",
-        offload_embedding=OFFLOAD_EMBEDDING,  # Keeps the 202048 x 6656 embedding matrix in RAM
+        offload_embedding=True,  # Keeps the 202048 x 6656 embedding matrix in RAM
     )
-    print(
-        type(model).__name__, type(processor).__name__
-    )  # Keeps the 202048 x 6656 embedding matrix in RAM
-    return (
-        FastModel,
-        OFFLOAD_EMBEDDING,
-        max_seq_length,
-        model,
-        processor,
-        torch,
-    )
+    print(type(model).__name__, type(processor).__name__)
+    return FastModel, max_seq_length, model, processor, torch
 
 
 @app.cell(hide_code=True)
@@ -770,7 +758,7 @@ def _(mo):
 
 
 @app.cell
-def _(OFFLOAD_EMBEDDING):
+def _():
     if False:
         from unsloth import FastModel as _FastModel
 
@@ -778,7 +766,7 @@ def _(OFFLOAD_EMBEDDING):
             model_name="muse_glimmer_multimodal_lora",
             load_in_4bit=True,
             max_seq_length=2048,
-            offload_embedding=OFFLOAD_EMBEDDING,  # Keeps the 202048 x 6656 embedding matrix in RAM
+            offload_embedding=True,  # Keeps the 202048 x 6656 embedding matrix in RAM
         )
         _video_processor = _processor.video_processor
         _video_processor.patch_temporal = _video_processor.temporal_patch_size

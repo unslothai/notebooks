@@ -80,61 +80,25 @@
 # * `offload_embedding = True` keeps `embed_tokens` in CPU RAM and only moves the looked-up rows to
 #   the GPU. Muse Glimmer's input embedding is 202048 x 6656 in 16-bit, so this gives back 2.5 GB at load
 #   time. There is a callback further down that keeps it that way once training starts.
-# * Tesla T4s are `sm_75` and have no `bfloat16`, so we build the 4-bit config with a `float16`
-#   compute dtype whenever the GPU cannot do `bfloat16`. The skip list has to match the checkpoint
-#   exactly - the embeddings, the `lm_head` and the whole vision tower are stored unquantized.
-
-# In[ ]:
-
-
-import torch
-from transformers import BitsAndBytesConfig
-
-supports_bfloat16 = torch.cuda.is_bf16_supported()
-compute_dtype = torch.bfloat16 if supports_bfloat16 else torch.float16
-print("bfloat16 supported:", supports_bfloat16, "| compute dtype:", compute_dtype)
-
-# Mirrors the quantization_config shipped in the checkpoint, with the compute dtype swapped to
-# float16 on pre-Ampere cards. The skip list must stay identical or the unquantized tensors in
-# the checkpoint will not line up with the modules.
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit                 = True,
-    bnb_4bit_quant_type          = "nf4",
-    bnb_4bit_use_double_quant    = True,
-    bnb_4bit_compute_dtype       = compute_dtype,
-    llm_int8_skip_modules        = [
-        "model.language_model.embed_tokens",
-        "lm_head",
-        "model.vision_tower",
-        "model.vision_adapter",
-        "model.vision_projection",
-    ],
-)
-
+# * The checkpoint is already 4-bit, and its own `quantization_config` is what transformers uses.
+#   That config leaves the embeddings, the `lm_head` and the whole vision tower unquantized, so there
+#   is nothing to restate here. Tesla T4s are `sm_75` and have no `bfloat16`; the loader falls back to
+#   `float16` on its own when the card cannot do it.
 
 # In[ ]:
 
 
 from unsloth import FastModel
+import torch
 
 max_seq_length = 1024  # Muse Glimmer supports long context, but 1024 is what fits a small card
 
-import torch
-# The embedding offload saves 2.5 GB, but it is incompatible with the multi-GPU
-# dispatch used when the model does not fit on one card, so take it only on a
-# single GPU. Two 16 GB cards hold the whole model without it.
-OFFLOAD_EMBEDDING = torch.cuda.device_count() == 1
-print(f"visible GPUs: {torch.cuda.device_count()}, "
-      f"offload_embedding: {OFFLOAD_EMBEDDING}")
-
 model, tokenizer = FastModel.from_pretrained(
     model_name           = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
-    dtype                = compute_dtype,
     max_seq_length       = max_seq_length,
     load_in_4bit         = True,
     full_finetuning      = False,
-    offload_embedding    = OFFLOAD_EMBEDDING,   # Moves the 2.5 GB input embedding to CPU RAM
-    quantization_config  = bnb_config,
+    offload_embedding    = True,   # Moves the 2.5 GB input embedding to CPU RAM
 )
 
 
@@ -402,9 +366,13 @@ class KeepEmbeddingOffloaded(TrainerCallback):
     # The trainer places the model on the accelerator at train() time, which undoes
     # offload_embedding. Put the input embedding back on the CPU once, after that has happened.
     def on_train_begin(self, args, state, control, **kwargs):
-        if not OFFLOAD_EMBEDDING:
-            return control
         embed_tokens = kwargs["model"].get_input_embeddings()
+        # Skip when accelerate owns placement: the embedding then carries a dispatch
+        # hook, which is why the loader declined the offload. hf_device_map cannot be
+        # the test, since a single-GPU load is device_map = "sequential" -> {"": 0}.
+        hook = getattr(embed_tokens, "_hf_hook", None)
+        if getattr(hook, "execution_device", None) is not None:
+            return control
         if embed_tokens.weight.device.type != "cpu":
             embed_tokens.to("cpu")
             torch.cuda.empty_cache()
@@ -563,7 +531,7 @@ if False:
         model_name = "muse_glimmer_lora", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 1024,
         load_in_4bit = True,
-        offload_embedding = OFFLOAD_EMBEDDING,
+        offload_embedding = True,
     )
 
 messages = [
