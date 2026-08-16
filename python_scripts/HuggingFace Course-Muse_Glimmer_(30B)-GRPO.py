@@ -148,7 +148,7 @@ print("architecture available:", _cfg.model_type)
 
 
 from unsloth import FastModel
-import sys, torch
+import torch
 
 MODEL_NAME = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit"
 lora_rank  = 8      # Larger rank = smarter, but slower and more memory
@@ -167,35 +167,20 @@ max_completion_length = max_seq_length - max_prompt_length
 print(f"{_n} GPU(s), smallest {_gib:.1f} GiB -> num_generations={NUM_GENERATIONS}, "
       f"max_seq_length={max_seq_length}")
 
-# Embedding offload cannot be combined with a multi-GPU dispatch (unslothai/unsloth#8272)
-OFFLOAD_EMBEDDING = _n == 1
-
-# Head-aware placement. None on a single GPU; raises rather than spilling to CPU
-DEVICE_MAP = None
-if _n > 1:
-    sys.path.insert(0, ".")
-    from unsloth_zoo.device_map_planner import plan_device_map_for_pretrained
-    _plan = plan_device_map_for_pretrained(
-        MODEL_NAME,
-        # Free memory, not total: the CUDA context is already resident
-        max_memory = {i: torch.cuda.mem_get_info(i)[0] for i in range(_n)},
-        rows_per_chunk = 128,                       # matches the log-softmax cap below
-        retained_rows  = BATCH_SIZE * max_seq_length,
-        softcapped = True, temperature_scaled = True,
-        # No free_space_policy: the default "balanced" sizes the reserve from the
-        # slack left after the weights, which is the roomier fit on 2 x 16 GB
-    )
-    if _plan is not None:
-        print(_plan.describe())
-        DEVICE_MAP = _plan.device_map
-
 model, tokenizer = FastModel.from_pretrained(
     model_name        = MODEL_NAME,
     max_seq_length    = max_seq_length,
     load_in_4bit      = True,   # 4-bit QLoRA. False needs an 80GB card
-    offload_embedding = OFFLOAD_EMBEDDING,  # 202048 token vocabulary, keep it off the GPU
+    # Declined automatically once the model is dispatched across cards.
+    offload_embedding = True,   # 202048 token vocabulary, keep it off the GPU
     fast_inference    = False,  # no released vllm has this architecture
-    device_map        = DEVICE_MAP,
+    # Head-aware placement across every visible GPU. A no-op on one card.
+    device_map        = "unsloth",
+    device_map_planner_kwargs = {
+        "rows_per_chunk": 128,                      # matches the log-softmax cap below
+        "retained_rows": BATCH_SIZE * max_seq_length,
+        "softcapped": True, "temperature_scaled": True,
+    },
 )
 print(model.config.model_type, type(model).__name__)
 

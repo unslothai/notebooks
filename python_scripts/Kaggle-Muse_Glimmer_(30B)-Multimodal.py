@@ -108,20 +108,12 @@ import torch
 
 max_seq_length = 2048
 
-import torch
-# The embedding offload saves 2.5 GB, but it is incompatible with the multi-GPU
-# dispatch used when the model does not fit on one card, so take it only on a
-# single GPU. Two 16 GB cards hold the whole model without it.
-OFFLOAD_EMBEDDING = torch.cuda.device_count() == 1
-print(f"visible GPUs: {torch.cuda.device_count()}, "
-      f"offload_embedding: {OFFLOAD_EMBEDDING}")
-
 model, processor = FastModel.from_pretrained(
     model_name = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
     load_in_4bit = True,
     max_seq_length = max_seq_length,
     use_gradient_checkpointing = "unsloth",
-    offload_embedding = OFFLOAD_EMBEDDING,   # Keeps the 202048 x 6656 embedding matrix in RAM
+    offload_embedding = True,   # Keeps the 202048 x 6656 embedding matrix in RAM
 )
 print(type(model).__name__, type(processor).__name__)
 
@@ -572,7 +564,7 @@ if False:
         model_name = "muse_glimmer_multimodal_lora",
         load_in_4bit = True,
         max_seq_length = 2048,
-        offload_embedding = OFFLOAD_EMBEDDING,
+        offload_embedding = True,
     )
     video_processor = processor.video_processor
     video_processor.patch_temporal = video_processor.temporal_patch_size
