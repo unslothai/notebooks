@@ -80,14 +80,16 @@
 # * `offload_embedding = True` keeps `embed_tokens` in CPU RAM and only moves the looked-up rows to
 #   the GPU. Muse Glimmer's input embedding is 202048 x 6656 in 16-bit, so this gives back 2.5 GB at load
 #   time. There is a callback further down that keeps it that way once training starts.
-# * Tesla T4s are `sm_75` and have no `bfloat16`, so we build the 4-bit config with a `float16`
-#   compute dtype whenever the GPU cannot do `bfloat16`. The skip list has to match the checkpoint
-#   exactly - the embeddings, the `lm_head` and the whole vision tower are stored unquantized.
+# * The checkpoint is already 4-bit, and its own `quantization_config` is what transformers uses.
+#   That config leaves the embeddings, the `lm_head` and the whole vision tower unquantized, so there
+#   is nothing to restate here. Tesla T4s are `sm_75` and have no `bfloat16`; the loader falls back to
+#   `float16` on its own when the card cannot do it.
 
 # In[ ]:
 
 
 from unsloth import FastModel
+import torch
 
 max_seq_length = 1024  # Muse Glimmer supports long context, but 1024 is what fits a small card
 
@@ -364,12 +366,14 @@ class KeepEmbeddingOffloaded(TrainerCallback):
     # The trainer places the model on the accelerator at train() time, which undoes
     # offload_embedding. Put the input embedding back on the CPU once, after that has happened.
     def on_train_begin(self, args, state, control, **kwargs):
-        model = kwargs["model"]
-        # Not when the model is spread over several cards: accelerate owns placement
-        # there, and the loader already declined the offload for exactly that reason.
-        if getattr(model, "hf_device_map", None) is not None:
+        embed_tokens = kwargs["model"].get_input_embeddings()
+        # Leave it alone when accelerate owns placement, which is exactly when the
+        # embedding carries a dispatch hook, and is why the loader declined the offload.
+        # hf_device_map cannot be the test: a single-GPU load is device_map = "sequential",
+        # which still gives {"": 0} rather than None.
+        hook = getattr(embed_tokens, "_hf_hook", None)
+        if getattr(hook, "execution_device", None) is not None:
             return control
-        embed_tokens = model.get_input_embeddings()
         if embed_tokens.weight.device.type != "cpu":
             embed_tokens.to("cpu")
             torch.cuda.empty_cache()
