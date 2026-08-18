@@ -16,8 +16,8 @@
 
 # Introducing **Unsloth Desktop**, the first desktop app to run and train models. It is free and open source for macOS, Windows, and Linux, and runs on your own local hardware. [Learn more](https://unsloth.ai/docs/desktop) • [Download](https://unsloth.ai/download)
 # 
-# <p align="center">
-# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-desktop.jpg" width="900" alt="Introducing Unsloth Desktop"></a>
+# <p>
+# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-desktop.jpg" width="350" alt="Introducing Unsloth Desktop"></a>
 # </p>
 # 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)

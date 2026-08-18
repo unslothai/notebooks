@@ -30,6 +30,7 @@ DESKTOP_IMAGE = (
     "https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/"
     "assets/unsloth-desktop.jpg"
 )
+DESKTOP_IMAGE_WIDTH = 'width="350"'
 DESKTOP_COPY = (
     "Introducing **Unsloth Desktop**, the first desktop app to run and train "
     "models. It is free and open source for macOS, Windows, and Linux, and runs "
@@ -108,6 +109,8 @@ def test_desktop_news_promo_has_copy_screenshot_and_links(
     assert DESKTOP_DOCS in promo
     assert DESKTOP_DOWNLOAD in promo
     assert DESKTOP_IMAGE in promo
+    assert DESKTOP_IMAGE_WIDTH in promo
+    assert 'align="center"' not in promo
     assert "\u2014" not in promo and "\u2013" not in promo
 
 
@@ -116,5 +119,6 @@ def test_notebook_generator_owns_the_desktop_news_promo() -> None:
     assert 'new_announcement = """' + DESKTOP_INTRO in generator
     assert 'new_announcement = """' + OLD_STUDIO_INTRO not in generator
     assert DESKTOP_IMAGE in generator
+    assert DESKTOP_IMAGE_WIDTH in generator
     assert DESKTOP_DOCS in generator
     assert DESKTOP_DOWNLOAD in generator
