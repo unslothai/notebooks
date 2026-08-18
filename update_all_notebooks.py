@@ -50,10 +50,10 @@ try:
 except Exception:
     _tqdm = None
 
-new_announcement = """Introducing **Unsloth Desktop**, the first desktop app to run and train models. It is free and open source for macOS, Windows, and Linux, and runs on your own local hardware. [Learn more](https://unsloth.ai/docs/desktop) • [Download](https://unsloth.ai/download)
+new_announcement = """Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 
 <p>
-<a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-desktop.jpg" width="350" alt="Introducing Unsloth Desktop"></a>
+<a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
 </p>
 
 Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
