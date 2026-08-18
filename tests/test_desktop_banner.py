@@ -23,18 +23,22 @@ import notebook_inventory as ni  # noqa: E402
 
 OLD_TOP_BANNER = "<!-- unsloth-desktop-banner -->"
 OLD_STUDIO_INTRO = "Introducing **Unsloth Studio**"
-DESKTOP_INTRO = "Introducing **Unsloth Desktop**"
+DESKTOP_INTRO = (
+    "Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**"
+)
 DESKTOP_DOCS = "https://unsloth.ai/docs/desktop"
+DESKTOP_GITHUB = "https://github.com/unslothai/unsloth"
 DESKTOP_DOWNLOAD = "https://unsloth.ai/download"
 DESKTOP_IMAGE = (
     "https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/"
-    "assets/unsloth-desktop.jpg"
+    "assets/unsloth-qwen3-8.png"
 )
 DESKTOP_IMAGE_WIDTH = 'width="350"'
 DESKTOP_COPY = (
-    "Introducing **Unsloth Desktop**, the first desktop app to run and train "
-    "models. It is free and open source for macOS, Windows, and Linux, and runs "
-    "on your own local hardware."
+    "Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the "
+    "first desktop app to run and train models. Free and open-source for macOS, "
+    "Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • "
+    "[Download](https://unsloth.ai/download)"
 )
 NOTEBOOKS = [REPO_ROOT / "Template_Notebook.ipynb", *ni.iter_notebooks()]
 
@@ -67,11 +71,12 @@ DESKTOP_NEWS = [
 
 
 def test_desktop_screenshot_asset_exists() -> None:
-    asset = REPO_ROOT / "assets" / "unsloth-desktop.jpg"
+    asset = REPO_ROOT / "assets" / "unsloth-qwen3-8.png"
     assert asset.is_file(), "The Desktop banner screenshot is missing."
-    assert asset.read_bytes().startswith(b"\xff\xd8\xff"), (
-        "assets/unsloth-desktop.jpg is not a JPEG file."
+    assert asset.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"), (
+        "assets/unsloth-qwen3-8.png is not a PNG file."
     )
+    assert not (REPO_ROOT / "assets" / "unsloth-desktop.jpg").exists()
 
 
 @pytest.mark.parametrize(
@@ -105,8 +110,9 @@ def test_desktop_news_promo_has_copy_screenshot_and_links(
     path: Path, announcement: str
 ) -> None:
     promo = announcement.split("\n\nTrain MoEs -", 1)[0]
-    assert DESKTOP_COPY in promo, path.relative_to(REPO_ROOT)
+    assert promo.splitlines()[0] == DESKTOP_COPY, path.relative_to(REPO_ROOT)
     assert DESKTOP_DOCS in promo
+    assert DESKTOP_GITHUB in promo
     assert DESKTOP_DOWNLOAD in promo
     assert DESKTOP_IMAGE in promo
     assert DESKTOP_IMAGE_WIDTH in promo
@@ -116,9 +122,10 @@ def test_desktop_news_promo_has_copy_screenshot_and_links(
 
 def test_notebook_generator_owns_the_desktop_news_promo() -> None:
     generator = (REPO_ROOT / "update_all_notebooks.py").read_text(encoding="utf-8")
-    assert 'new_announcement = """' + DESKTOP_INTRO in generator
+    assert 'new_announcement = """' + DESKTOP_COPY in generator
     assert 'new_announcement = """' + OLD_STUDIO_INTRO not in generator
     assert DESKTOP_IMAGE in generator
     assert DESKTOP_IMAGE_WIDTH in generator
     assert DESKTOP_DOCS in generator
+    assert DESKTOP_GITHUB in generator
     assert DESKTOP_DOWNLOAD in generator
