@@ -184,23 +184,27 @@ assert torch.cuda.device_count() >= 2, (
 #
 # unsloth_zoo's forced-float32 pass (which qwen3_5 reaches, because it is in
 # FORCE_FLOAT32) casts every module and calls torch.cuda.empty_cache() after each one -
-# 1297 times for this model. Those casts are asynchronous, and empty_cache() releases
-# cached blocks against the CURRENT device without synchronising the others. On a model
-# dispatched across two cards it can therefore reclaim memory that in-flight work on the
-# other card is still writing into, which corrupts and surfaces later as
+# 1297 times for this model. Those casts are asynchronous, and empty_cache() cudaFrees
+# cached blocks on every device with no device guard, while cudaFree only synchronises
+# the current one. On a model dispatched across two cards, blocks on the other card go
+# back to the driver while it is still writing into them, surfacing later as
 # "CUDA error: an illegal memory access was encountered".
 #
 # Reproduced and fixed on Kaggle T4 x2. Synchronising before each release costs nothing
 # at run time (559 s against 587 s for five steps under CUDA_LAUNCH_BLOCKING, which
 # merely hid the race) and leaves peak memory unchanged.
 #
-# Self-disabling: once the fix ships in unsloth_zoo this becomes a no-op.
+# Self-disabling: once unslothai/unsloth-zoo#1100 ships this becomes a no-op. The probe
+# looks for any synchronise inside patch_model_and_tokenizer rather than a literal line,
+# so a rename upstream cannot leave the workaround stuck on.
 import inspect
 import torch
 import unsloth.models.vision as _uv
 import unsloth_zoo.patching_utils as _pu
 
-_needs_workaround = "torch.cuda.synchronize(_device_index)" not in inspect.getsource(_pu)
+_needs_workaround = "torch.cuda.synchronize" not in inspect.getsource(
+    _pu.patch_model_and_tokenizer
+)
 if not _needs_workaround:
     print("unsloth_zoo already synchronises before empty_cache; workaround not needed")
 elif torch.cuda.device_count() < 2:
