@@ -80,41 +80,6 @@ print("loading from:", MODEL_NAME)
 # In[ ]:
 
 
-# Before unslothai/unsloth-zoo#1100, the forced-float32 pass called empty_cache()
-# once per module, which frees blocks on every card while cudaFree only synchronises
-# the current one - an illegal memory access on a model split across two GPUs.
-# Self-disabling once that fix is installed.
-import inspect
-import torch
-import unsloth.models.vision as _uv
-import unsloth_zoo.patching_utils as _pu
-
-if ("torch.cuda.synchronize" in inspect.getsource(_pu.patch_model_and_tokenizer)
-        or torch.cuda.device_count() < 2):
-    print("multi-GPU load workaround not needed")
-else:
-    _orig_empty, _orig_patch = torch.cuda.empty_cache, _uv.patch_model_and_tokenizer
-
-    def _synchronised_empty_cache():
-        for _i in range(torch.cuda.device_count()):
-            torch.cuda.synchronize(_i)
-        return _orig_empty()
-
-    def _patched(*args, **kwargs):
-        torch.cuda.empty_cache = _synchronised_empty_cache
-        try:
-            return _orig_patch(*args, **kwargs)
-        finally:
-            torch.cuda.empty_cache = _orig_empty
-
-    # vision.py imported the name by value, so it has to be replaced there.
-    _uv.patch_model_and_tokenizer = _patched
-    print("multi-GPU load workaround installed")
-
-
-# In[ ]:
-
-
 from unsloth import FastModel
 
 max_seq_length = 1024  # Qwen3.8 goes to 262144, but 1024 is what two T4s train on
