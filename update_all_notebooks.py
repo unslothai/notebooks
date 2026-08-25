@@ -914,6 +914,66 @@ else:
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
+# Qwen3.8 is a `qwen3_5` checkpoint but does NOT reuse the block above, for two
+# reasons that both cost a Kaggle kernel real time.
+#
+# 1. No `flash-linear-attention` from PyPI. Unsloth Zoo vendors an fla snapshot
+#    (0.5.1) and injects it as a real top-level `fla`, but its selection rule
+#    defers to a user install that is *strictly newer* -- and PyPI is on 0.5.2.
+#    Installing it therefore shadows the vendored kernels with the ones that do
+#    not carry Unsloth's post-0.5.1 backports. Leaving it out is what keeps the
+#    vendored copy live; `is_flash_linear_attention_available()` is true either
+#    way, so the notebook asserts on which copy answered, not merely that one did.
+# 2. No `causal_conv1d`. Its wheels track one exact torch, so on any other torch
+#    the cell builds from source for ~10 minutes. transformers falls back to a
+#    plain conv1d for the gated delta net's depthwise convolution, which is a
+#    small part of the step -- the measured numbers in the notebook were taken
+#    without it.
+#
+# transformers 5.15.1 rather than the 5.2.0 the Qwen3.5 block pins: that is the
+# release this notebook was actually run against end to end. Note the two are not
+# equivalent for fla. 5.2.0 does `from fla.ops.gated_delta_rule import ...` at
+# module scope, which Unsloth's vendor patch can rebind; 5.15.x resolves the
+# kernels through `use_kernel_func_from_hub_with_fallback` at import time instead.
+installation_qwen3_8_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.15.1",
+)
+# Written out rather than derived from installation_kaggle_content. That one opens
+# with `pip install torch torchvision torchaudio xformers --index-url .../cu128`,
+# which replaces Kaggle's entire preinstalled torch stack; on a T4 x2 kernel that
+# spent 20 minutes and then left `import unsloth` failing. The GRPO Kaggle
+# notebooks use uv and leave Kaggle's torch alone, which is what works there.
+#
+# flash-linear-attention is deliberately absent: unsloth_zoo vendors 0.5.1 and
+# injects it as a real top-level `fla`, and a pip copy would shadow the vendored
+# one. Pip installing it is how you end up NOT running the vendored kernels.
+installation_qwen3_8_kaggle_content = """%%capture
+import os
+
+!pip install --upgrade -qqq uv
+try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
+except: _numpy = "numpy"; _pil = "pillow"
+# Pin Kaggle's preinstalled torch and torchvision instead of upgrading them.
+# `--upgrade torchvision` pulls a CUDA 13.0 torch on top of Kaggle's CUDA 12.8
+# torchaudio, and torchaudio then refuses to import: "PyTorch and TorchAudio were
+# compiled with different CUDA versions". Pin on the base version, not
+# torch.__version__, so the local +cu128 label does not have to exist on the index;
+# PEP 440 treats 2.9.1+cu128 as satisfying ==2.9.1.
+try:
+    import torch, torchvision
+    _torch = f'torch=={torch.__version__.split("+")[0]}'
+    _tv = f'torchvision=={torchvision.__version__.split("+")[0]}'
+except Exception:
+    _torch, _tv = "torch", "torchvision"
+!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth
+!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"
+!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+!uv pip install -qqq transformers==5.15.1
+!uv pip install -qqq --no-deps trl==0.22.2
+"""
+
 # A wheel, not a source build of `main`: every sglang release pins ONE exact
 # transformers, so cloning main and then forcing transformers==4.53.0 left the
 # two disagreeing.
@@ -4844,6 +4904,21 @@ def update_notebook_sections(
                                 installation = installation_qwen3_5_kaggle_content
                             else:
                                 installation = installation_qwen3_5_content
+
+                        # Qwen3.8 INSTALLATION. The escaped dot is load-bearing
+                        # twice over. is_path_contains_any is re.search, not a
+                        # substring test, so an unescaped "qwen3.8" has "." match
+                        # the underscore in "Qwen3_8B_FP8_GRPO" -- an unrelated
+                        # Qwen3 *8B* notebook whose install block builds vLLM,
+                        # which then silently gets this block instead. Spelling it
+                        # "qwen3_8" collides with the same name directly. Every
+                        # Qwen3.5-family upload writes the minor version with a
+                        # dot, so match exactly that, escaped.
+                        if is_path_contains_any(notebook_path.lower(), [r"qwen3\.8"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_qwen3_8_kaggle_content
+                            else:
+                                installation = installation_qwen3_8_content
 
                         # Nemotron Nano 3 INSTALLATION also Granite has mamba
                         if is_path_contains_any(notebook_path.lower(), ["nemotron-3-nano","nemotron-nano-3", "granite4"]):
