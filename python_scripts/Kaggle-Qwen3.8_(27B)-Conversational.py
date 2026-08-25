@@ -130,7 +130,6 @@ model, tokenizer = FastModel.from_pretrained(
     max_seq_length    = max_seq_length,
     load_in_4bit      = True,
     full_finetuning   = False,
-    offload_embedding = True,        # keeps the 2.37 GiB embedding in CPU RAM
 )
 print(f"placed over {len(set(model.hf_device_map.values()))} devices")
 
@@ -337,35 +336,6 @@ print(tokenizer.decode([space if x == -100 else x
                         for x in trainer.train_dataset[100]["labels"]]))
 
 
-# `offload_embedding = True` puts `embed_tokens` in CPU RAM at load time, but the trainer
-# moves the model onto the accelerator when `train()` starts, dragging 2.37 GiB back onto
-# a card. Unsloth's lookup hooks read the weight's device live, so pushing it back once
-# after training begins is enough. The callback returns early when accelerate owns
-# placement, since moving it by hand would strand the dispatch hook.
-
-# In[ ]:
-
-
-from transformers import TrainerCallback
-
-class KeepEmbeddingOffloaded(TrainerCallback):
-    # The trainer places the model on the accelerator at train() time, which undoes
-    # offload_embedding. Put the input embedding back on the CPU once, after that.
-    def on_train_begin(self, args, state, control, **kwargs):
-        embed_tokens = kwargs["model"].get_input_embeddings()
-        # Skip when accelerate owns placement: the embedding then carries a dispatch
-        # hook, which is why the loader declined the offload.
-        hook = getattr(embed_tokens, "_hf_hook", None)
-        if getattr(hook, "execution_device", None) is not None:
-            return control
-        if embed_tokens.weight.device.type != "cpu":
-            embed_tokens.to("cpu")
-            torch.cuda.empty_cache()
-        return control
-
-trainer.add_callback(KeepEmbeddingOffloaded())
-
-
 # In[ ]:
 
 
@@ -473,7 +443,6 @@ if False:
         model_name = "qwen_lora", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 1024,
         load_in_4bit = True,
-        offload_embedding = True,
     )
 
 messages = [
