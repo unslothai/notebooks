@@ -955,12 +955,9 @@ import os
 !pip install --upgrade -qqq uv
 try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
 except: _numpy = "numpy"; _pil = "pillow"
-# Pin Kaggle's preinstalled torch and torchvision instead of upgrading them.
-# `--upgrade torchvision` pulls a CUDA 13.0 torch on top of Kaggle's CUDA 12.8
-# torchaudio, and torchaudio then refuses to import: "PyTorch and TorchAudio were
-# compiled with different CUDA versions". Pin on the base version, not
-# torch.__version__, so the local +cu128 label does not have to exist on the index;
-# PEP 440 treats 2.9.1+cu128 as satisfying ==2.9.1.
+# Pin Kaggle's torch and torchvision: upgrading them pulls a CUDA 13.0 torch onto
+# Kaggle's CUDA 12.8 torchaudio, which then refuses to import. Pin the base version,
+# since the local +cu128 label does not exist on the index.
 try:
     import torch, torchvision
     _torch = f'torch=={torch.__version__.split("+")[0]}'
@@ -971,8 +968,7 @@ except Exception:
 !uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"
 !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
 !uv pip install -qqq transformers==5.15.1
-!uv pip install -qqq --no-deps trl==0.22.2
-"""
+!uv pip install -qqq --no-deps trl==0.22.2"""
 
 # A wheel, not a source build of `main`: every sglang release pins ONE exact
 # transformers, so cloning main and then forcing transformers==4.53.0 left the
