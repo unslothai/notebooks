@@ -71,7 +71,10 @@
 
 # ### Which repo to load
 # 
-# `unsloth/Qwen3.8-27B-unsloth-bnb-4bit` is nf4 with the parts that do not survive 4-bit
+# Loading `unsloth/Qwen3.8-27B` with `load_in_4bit` gets you
+# `unsloth/Qwen3.8-27B-unsloth-bnb-4bit`, which unsloth substitutes for you.
+# 
+# That repo is nf4 with the parts that do not survive 4-bit
 # left in float16: `lm_head`, `embed_tokens`, the vision tower, and inside every gated
 # delta net the `in_proj_qkv`, `in_proj_a` and `in_proj_b` projections.
 # 
@@ -104,8 +107,7 @@
 # In[ ]:
 
 
-MODEL_NAME      = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
-MODEL_NAME_BF16 = "unsloth/Qwen3.8-27B"  # fallback, quantised on the fly
+MODEL_NAME = "unsloth/Qwen3.8-27B"  # unsloth resolves this to its 4-bit build
 
 
 # In[ ]:
@@ -139,30 +141,16 @@ assert is_flash_linear_attention_available(), (
     "Python loop. Re-run the install cell."
 )
 
-# Decide here rather than 40 minutes into a download. A repo can exist and still
-# hold no weights, in which case from_pretrained's error names a missing file
-# instead of the missing upload. The prebuilt 4-bit repo is a ~21 GB pull; the
-# bf16 source is ~52 GB and is quantised on the way in, so prefer the former when
-# it is populated and fall back rather than fail.
-from huggingface_hub import HfApi
+# unsloth relocates MODEL_NAME to unsloth/Qwen3.8-27B-unsloth-bnb-4bit when
+# load_in_4bit is set, via the mapper entry added in unslothai/unsloth#9682. On a
+# release that predates it the name does not relocate and you silently get the
+# ~52 GB bf16 repo quantised on the way in, so name the 4-bit repo ourselves in
+# that case. Self-disabling: once #9682 is on PyPI this branch stops firing.
+from unsloth.models.mapper import FLOAT_TO_INT_MAPPER
 
-def _has_weights(repo):
-    # A local directory is a legitimate MODEL_NAME (a copy you quantised yourself),
-    # and model_info would just 404 on it, so check the filesystem first.
-    import glob, os
-    if os.path.isdir(repo):
-        return bool(glob.glob(os.path.join(repo, "*.safetensors")))
-    try:
-        info = HfApi().model_info(repo, files_metadata = False)
-    except Exception:
-        return False
-    return any(f.rfilename.endswith(".safetensors") for f in info.siblings)
-
-if not _has_weights(MODEL_NAME):
-    print(f"{MODEL_NAME} holds no weights yet - falling back to {MODEL_NAME_BF16}.")
-    print("That is a ~52 GB download quantised on the fly, so the load cell is slow.")
-    MODEL_NAME = MODEL_NAME_BF16
-assert _has_weights(MODEL_NAME), f"neither 4-bit nor bf16 repo has weights: {MODEL_NAME}"
+if MODEL_NAME not in FLOAT_TO_INT_MAPPER:
+    MODEL_NAME = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
+    print(f"installed unsloth predates the Qwen3.8 mapping; pinning {MODEL_NAME}")
 print("loading from:", MODEL_NAME)
 
 from transformers import AutoConfig
