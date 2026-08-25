@@ -62,19 +62,11 @@ MODEL_NAME = "unsloth/Qwen3.8-27B"  # unsloth resolves this to its 4-bit build
 
 
 import torch
-from unsloth.models.mapper import FLOAT_TO_INT_MAPPER
 
 assert torch.cuda.device_count() >= 2, (
     "Qwen3.8-27B in 4-bit needs more than one 16 GB card. On Kaggle pick the "
     "T4 x2 accelerator (Settings -> Accelerator -> GPU T4 x2)."
 )
-
-# unslothai/unsloth#9682 relocates MODEL_NAME to the 4-bit repo. On a release that
-# predates it you would silently get the ~52 GB bf16 one, so name it ourselves. Only
-# the default is rewritten, so pointing MODEL_NAME somewhere else still works.
-if MODEL_NAME == "unsloth/Qwen3.8-27B" and MODEL_NAME not in FLOAT_TO_INT_MAPPER:
-    MODEL_NAME = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
-print("loading from:", MODEL_NAME)
 
 
 # In[ ]:
