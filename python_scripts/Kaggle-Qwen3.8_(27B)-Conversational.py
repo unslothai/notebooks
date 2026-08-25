@@ -33,7 +33,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\n# Pin Kaggle\'s preinstalled torch and torchvision instead of upgrading them.\n# `--upgrade torchvision` pulls a CUDA 13.0 torch on top of Kaggle\'s CUDA 12.8\n# torchaudio, and torchaudio then refuses to import: "PyTorch and TorchAudio were\n# compiled with different CUDA versions". Pin on the base version, not\n# torch.__version__, so the local +cu128 label does not have to exist on the index;\n# PEP 440 treats 2.9.1+cu128 as satisfying ==2.9.1.\ntry:\n    import torch, torchvision\n    _torch = f\'torch=={torch.__version__.split("+")[0]}\'\n    _tv = f\'torchvision=={torchvision.__version__.split("+")[0]}\'\nexcept Exception:\n    _torch, _tv = "torch", "torchvision"\n!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth\n!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"\n!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install -qqq transformers==5.15.1\n!uv pip install -qqq --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\n# Pin Kaggle\'s torch and torchvision: upgrading them pulls a CUDA 13.0 torch onto\n# Kaggle\'s CUDA 12.8 torchaudio, which then refuses to import. Pin the base version,\n# since the local +cu128 label does not exist on the index.\ntry:\n    import torch, torchvision\n    _torch = f\'torch=={torch.__version__.split("+")[0]}\'\n    _tv = f\'torchvision=={torchvision.__version__.split("+")[0]}\'\nexcept Exception:\n    _torch, _tv = "torch", "torchvision"\n!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth\n!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"\n!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install -qqq transformers==5.15.1\n!uv pip install -qqq --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -51,12 +51,6 @@
 # not pass `device_map` - unsloth's `"sequential"` default fills one card then the other.
 # `"balanced"` looks right and is not: it caps cuda:0 below cuda:1, leaves the 2.37 GiB
 # `lm_head` without a home, and bitsandbytes then refuses the CPU entry.
-
-# `unsloth/Qwen3.8-27B` with `load_in_4bit` resolves to
-# [`unsloth/Qwen3.8-27B-unsloth-bnb-4bit`](https://huggingface.co/unsloth/Qwen3.8-27B-unsloth-bnb-4bit):
-# nf4, with `lm_head`, `embed_tokens`, the vision tower and the gated delta net's
-# `in_proj_qkv` / `in_proj_a` / `in_proj_b` left in float16. GGUFs are at
-# [`unsloth/Qwen3.8-27B-GGUF`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF).
 
 # In[ ]:
 
@@ -311,11 +305,7 @@ trainer = SFTTrainer(
 
 from unsloth.chat_templates import train_on_responses_only
 
-trainer = train_on_responses_only(
-    trainer,
-    instruction_part = "<|im_start|>user\n",
-    response_part    = "<|im_start|>assistant\n",
-)
+trainer = train_on_responses_only(trainer)
 
 
 # Let's verify masking the instruction part is done. Row 100, then the same row with

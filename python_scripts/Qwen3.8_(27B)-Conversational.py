@@ -52,12 +52,6 @@
 # `"balanced"` looks right and is not: it caps cuda:0 below cuda:1, leaves the 2.37 GiB
 # `lm_head` without a home, and bitsandbytes then refuses the CPU entry.
 
-# `unsloth/Qwen3.8-27B` with `load_in_4bit` resolves to
-# [`unsloth/Qwen3.8-27B-unsloth-bnb-4bit`](https://huggingface.co/unsloth/Qwen3.8-27B-unsloth-bnb-4bit):
-# nf4, with `lm_head`, `embed_tokens`, the vision tower and the gated delta net's
-# `in_proj_qkv` / `in_proj_a` / `in_proj_b` left in float16. GGUFs are at
-# [`unsloth/Qwen3.8-27B-GGUF`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF).
-
 # In[ ]:
 
 
@@ -311,11 +305,7 @@ trainer = SFTTrainer(
 
 from unsloth.chat_templates import train_on_responses_only
 
-trainer = train_on_responses_only(
-    trainer,
-    instruction_part = "<|im_start|>user\n",
-    response_part    = "<|im_start|>assistant\n",
-)
+trainer = train_on_responses_only(trainer)
 
 
 # Let's verify masking the instruction part is done. Row 100, then the same row with
