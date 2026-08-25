@@ -22,9 +22,10 @@
 # logits, and capping it with `max_memory` only pushes modules to CPU, which
 # bitsandbytes then refuses to load.
 # 
-# The sizing cell below therefore builds an explicit device map with
-# `unsloth_zoo.device_map_planner`, which reserves the logit headroom on the head's
-# card and raises rather than spilling to CPU when the request cannot fit. On
+# The loader therefore places the weights with `unsloth_zoo.device_map_planner`,
+# which reserves the logit headroom on the head's card and raises rather than
+# spilling to CPU when the request cannot fit. That happens on its own; the only
+# thing the cell below has to say is how many rows GRPO will keep alive. On
 # 2 x 16 GB that means `num_generations = 2`, `max_seq_length = 1536` and a 128-row
 # cap on the log-softmax, which needs 4.10 GiB of headroom and fits. The same run at
 # 3072 tokens needs 7.57 GiB and is refused.
@@ -32,7 +33,7 @@
 # A single A100 40GB or H100 takes `num_generations = 4` and
 # `max_seq_length = 3072`. A single L4 has 24 GB, so it sizes exactly like the
 # 2 x 16 GB case, `num_generations = 2` and `max_seq_length = 1536`, and just runs
-# slower. On one card `offload_embedding` switches back on either way and frees a
+# slower. On one card the embedding offload switches back on either way and frees a
 # further 2.5 GB.
 
 # # Goal: teach Muse Glimmer to answer grade school maths on the right channel with Reinforcement Learning
@@ -80,7 +81,7 @@
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; _numpy = f"numpy=={numpy.__version__}"\n    except: _numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# The device map planner and the GRPO log-softmax fix are not in a release yet\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==1.9.2 \\\n    "unsloth @ git+https://github.com/unslothai/unsloth" \\\n    "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
+get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; _numpy = f"numpy=={numpy.__version__}"\n    except: _numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# Track main: the device map planner and the GRPO log-softmax fix are newer than the release\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==1.9.2 \\\n    "unsloth @ git+https://github.com/unslothai/unsloth" \\\n    "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
 
 
 # Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.
@@ -112,29 +113,23 @@ print("architecture available:", _cfg.model_type)
 # [`unsloth/Muse-Glimmer-30B-GGUF`](https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF),
 # from 10 GB up to bf16, plus the vision projector.
 
-# In[ ]:
-
-
-import transformers
-print("transformers", transformers.__version__)
-
-# AutoConfig only resolves if the architecture is actually registered
-from transformers import AutoConfig
-_cfg = AutoConfig.from_pretrained("unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit")
-print("architecture available:", _cfg.model_type)
-
-
 # ### Load Muse Glimmer
 # 
 # Muse Glimmer is a 28B dense text and vision model. In 4-bit the weights are about 20.7 GiB before anything
 # else, so we load the pre-quantised repository directly rather than quantising at load time.
 # 
-# * `load_in_4bit = True` keeps the 416 text `Linear4bit` modules at nf4 with double quant, about
-#   11.7 GB. The embeddings and the vision tower stay in 16-bit.
-# * `offload_embedding` moves the input embedding to CPU RAM. Muse Glimmer has a 202048 token
-#   vocabulary and untied embeddings, so `embed_tokens` alone is 2.5 GiB. It is taken only on a
-#   single card, because it cannot be combined with a multi-GPU dispatch (unslothai/unsloth#8272).
-# * `fast_inference = False` because no released vLLM carries this architecture. See the note below.
+# The load takes no options beyond the model name and a length, because everything else is now
+# worked out for you:
+# 
+# * 4-bit is the default, keeping the 416 text `Linear4bit` modules at nf4 with double quant,
+#   about 11.7 GB. The embeddings and the vision tower stay in 16-bit.
+# * The input embedding is moved to CPU RAM when that is worth doing. Muse Glimmer has a 202048
+#   token vocabulary and untied embeddings, so `embed_tokens` alone is 2.5 GiB, which is 16% of a
+#   16 GB card. It is taken only on a single card, because it cannot be combined with a multi-GPU
+#   dispatch (unslothai/unsloth#8272).
+# * On more than one GPU the weights are placed head-aware automatically, reserving room on the
+#   card holding `lm_head` for the logits GRPO materialises there.
+# * vLLM is off, because no released vLLM carries this architecture. See the note below.
 # * `max_seq_length` is prompt plus completion: 3072 on a single large card, 1536 on 2 x 16 GB,
 #   chosen by the sizing cell above. The prompts are only a couple of hundred tokens, so nearly
 #   all of that is completion budget. It has to be, see the length measurement further down.
@@ -146,6 +141,13 @@ print("architecture available:", _cfg.model_type)
 
 # In[ ]:
 
+
+import os
+
+# The device-map planner sizes the logit headroom for 128 rows per log-softmax chunk;
+# this makes the GRPO kernel use the same boundary. It is read as a default argument when
+# unsloth_zoo is imported, so it has to be set before the import below.
+os.environ["UNSLOTH_GRPO_MAX_ROWS_PER_CHUNK"] = "128"
 
 from unsloth import FastModel
 import torch
@@ -168,17 +170,12 @@ print(f"{_n} GPU(s), smallest {_gib:.1f} GiB -> num_generations={NUM_GENERATIONS
       f"max_seq_length={max_seq_length}")
 
 model, tokenizer = FastModel.from_pretrained(
-    model_name        = MODEL_NAME,
-    max_seq_length    = max_seq_length,
-    load_in_4bit      = True,   # 4-bit QLoRA. False needs an 80GB card
-    offload_embedding = True,   # 202048 token vocabulary off the GPU, auto-declined on multi-GPU
-    fast_inference    = False,  # no released vllm has this architecture
-    device_map        = "unsloth",   # Head-aware placement across GPUs, a no-op on one card
-    # Only what the loader cannot know. The planner reads the soft cap off
-    # text_config.final_logit_softcapping, and rows_per_chunk already defaults
-    # to the 128 used below. retained_rows has to be passed: it defaults to 0,
-    # which models inference under no_grad, and a GRPO backward keeps every
-    # chunk alive until backward.
+    model_name     = MODEL_NAME,
+    max_seq_length = max_seq_length,
+    # The one thing the loader cannot work out for itself. GRPO's backward keeps every
+    # log-softmax chunk alive, and how many rows that is depends on the batch, which does
+    # not exist yet at load time. Everything else -- 4bit, the head-aware split across the
+    # two cards, the embedding offload -- is now decided automatically.
     device_map_planner_kwargs = {"retained_rows": BATCH_SIZE * max_seq_length},
 )
 print(model.config.model_type, type(model).__name__)
@@ -622,75 +619,6 @@ training_args = GRPOConfig(
 # `rewards/answer_is_correct/mean` is the one that actually means the model got the maths right. The
 # other two only tell you it is formatting its reply properly.
 
-# ## Multi-GPU fix for GRPO's chunked log-softmax
-# 
-# On a 2x16 GB kernel this 28B checkpoint is sharded across both cards, so the
-# `lm_head` can sit on `cuda:1` while the hidden states are still on `cuda:0`.
-# `chunked_hidden_states_selective_log_softmax` matmuls the two directly, and the
-# step dies with `found two different devices cuda:0, cuda:1`. The cell below
-# co-locates the operands on the head's device and sends the result back.
-# 
-# Verified on two GPUs: bitwise identical to upstream when everything is already on
-# one device, and bitwise identical again when the head is moved to a second card.
-# Keeping upstream's `_maybe_compile` decorator matters; running it eager instead
-# shifts the logprobs by about 1e-2 through a different fp16 matmul path.
-
-# In[ ]:
-
-
-import torch
-from unsloth_zoo.rl_replacements import _maybe_compile, torch_compile_options
-
-# Keep upstream's decorator: eager takes a different cuBLAS path and shifts logprobs
-@_maybe_compile(dynamic = True, fullgraph = True, options = torch_compile_options,)
-def chunked_hidden_states_selective_log_softmax(
-    hidden_states, lm_head, index, chunks = 4,
-    logit_scale_multiply = 0.0, logit_scale_divide = 0.0,
-    logit_softcapping = 0.0, temperature = 1.0,
-):
-    flat_hidden_states = hidden_states.reshape(-1, hidden_states.shape[-1])
-    flat_index = index.reshape(-1)
-    # The vocab is 202048 wide, so stock chunks = 4 lands hundreds of MB of logits on the
-    # lm_head's card. Cap the chunk instead: pure loop splitting, same result, lower peak
-    TOKENS_PER_CHUNK = 128
-    rows = flat_hidden_states.shape[0]
-    chunks = max(chunks, -(-rows // TOKENS_PER_CHUNK))
-    chunks = min(chunks, max(rows, 1))
-    chunked_hidden_states = torch.chunk(flat_hidden_states, chunks = chunks, dim = 0)
-    chunked_index = torch.chunk(flat_index, chunks = chunks, dim = 0)
-    all_per_token_logps = []
-    for chunk_hidden_states, chunk_index in zip(chunked_hidden_states, chunked_index):
-        # Co-locate with the lm_head before the matmul. No-op on one GPU
-        chunk_hidden_states = chunk_hidden_states.to(device = lm_head.device, dtype = lm_head.dtype)
-        chunk_index = chunk_index.to(lm_head.device)
-        chunk_logits = chunk_hidden_states @ lm_head.t()
-        if logit_scale_multiply != 0.0:
-            chunk_logits = chunk_logits * logit_scale_multiply
-        if logit_scale_divide != 0.0:
-            chunk_logits = chunk_logits / logit_scale_divide
-        if logit_softcapping != 0.0:
-            chunk_logits = logit_softcapping * torch.tanh(chunk_logits / logit_softcapping)
-        chunk_logits = chunk_logits.to(torch.float32)
-        if temperature != 1.0:
-            chunk_logits = chunk_logits / temperature
-        selected_logits = torch.gather(chunk_logits, dim = -1, index = chunk_index.unsqueeze(-1)).squeeze(-1)
-        logsumexp_values = torch.logsumexp(chunk_logits, dim = -1)
-        all_per_token_logps.append((selected_logits - logsumexp_values).to(hidden_states.device))
-    all_per_token_logps = torch.concat(all_per_token_logps)
-    return all_per_token_logps.reshape((hidden_states.shape[0], hidden_states.shape[1]))
-
-import sys
-import unsloth_zoo.rl_replacements as _rl
-_rl.chunked_hidden_states_selective_log_softmax = chunked_hidden_states_selective_log_softmax
-_rl.RL_REPLACEMENTS["grpo_selective_log_softmax"] = chunked_hidden_states_selective_log_softmax
-_n = 1
-for _name, _mod in list(sys.modules.items()):
-    if "UnslothGRPOTrainer" in _name and hasattr(_mod, "chunked_hidden_states_selective_log_softmax"):
-        _mod.chunked_hidden_states_selective_log_softmax = chunked_hidden_states_selective_log_softmax
-        _n += 1
-print("patched chunked log-softmax in", _n, "module(s)")
-
-
 # In[ ]:
 
 
@@ -805,7 +733,7 @@ if False:
 # 
 # Muse Glimmer in 4-bit is 20.68 GiB of weights before a single token is generated: 11.72 GB of nf4 text
 # `Linear4bit` modules, 5.38 GB of 16-bit embeddings and `lm_head` at 202048 x 6656 each and untied,
-# and 3.44 GB of 16-bit vision tower. `offload_embedding = True` moves 2.7 GB of that to CPU RAM.
+# and 3.44 GB of 16-bit vision tower. The embedding offload moves 2.7 GB of that to CPU RAM.
 # 
 # The KV cache is small, which is unusual for a model this size and is worth knowing before you tune
 # `num_generations`. Muse Glimmer has 52 layers but only 2 key value heads at head_dim 128, so one token of

@@ -76,7 +76,7 @@
 # 
 # Two things matter a lot for memory here:
 # 
-# * `offload_embedding = True` keeps `embed_tokens` in CPU RAM and only moves the looked-up rows to
+# * The embedding offload keeps `embed_tokens` in CPU RAM and only moves the looked-up rows to
 #   the GPU. Muse Glimmer's input embedding is 202048 x 6656 in 16-bit, so this gives back 2.5 GB at load
 #   time. There is a callback further down that keeps it that way once training starts.
 # * The checkpoint is already 4-bit, and its own `quantization_config` is what transformers uses.
@@ -93,11 +93,8 @@ import torch
 max_seq_length = 1024  # Muse Glimmer supports long context, but 1024 is what fits a small card
 
 model, tokenizer = FastModel.from_pretrained(
-    model_name           = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
-    max_seq_length       = max_seq_length,
-    load_in_4bit         = True,
-    full_finetuning      = False,
-    offload_embedding    = True,   # Moves the 2.5 GB input embedding to CPU RAM
+    model_name     = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
+    max_seq_length = max_seq_length,
 )
 
 
@@ -348,7 +345,7 @@ space = text_tokenizer(" ", add_special_tokens = False).input_ids[0]
 tokenizer.decode([space if x == -100 else x for x in trainer.train_dataset[100]["labels"]])
 
 
-# One more memory step. `offload_embedding = True` puts `embed_tokens` in CPU RAM at load time, but
+# One more memory step. The embedding offload puts `embed_tokens` in CPU RAM at load time, but
 # the trainer moves the whole model onto the accelerator when `train()` starts, which quietly drags
 # the 2.5 GB embedding back onto the GPU. The lookup hooks Unsloth installs read the weight's device
 # live, so we can simply push it back to CPU once training has begun and it stays there.
@@ -428,14 +425,14 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 # | configuration | resident after load, GB | peak reserved while training, GB |
 # |---|---|---|
 # | no embedding offload | 20.72 | 24.14 |
-# | `offload_embedding = True` only | 18.22 | 24.14 |
-# | `offload_embedding = True` plus `KeepEmbeddingOffloaded` | 18.22 | **21.25** |
+# | embedding offload only | 18.22 | 24.14 |
+# | embedding offload plus `KeepEmbeddingOffloaded` | 18.22 | **21.25** |
 # 
 # The 20.72 GB of resident weights break down as the 416 4-bit text linears (11.72 GB), the
 # untied `embed_tokens` and `lm_head` at 2.5 GB each in 16-bit, and the vision tower with its
 # adapter and projection (3.44 GB). Offloading `embed_tokens` removes one of those 2.5 GB blocks.
 # 
-# Note the middle row. `offload_embedding` on its own buys nothing at the peak, because the trainer
+# Note the middle row. The offload on its own buys nothing at the peak, because the trainer
 # pulls the embedding back onto the GPU when training starts. Only the callback makes the saving
 # survive into the training loop.
 # 
@@ -529,8 +526,6 @@ if False:
     model, tokenizer = FastModel.from_pretrained(
         model_name = "muse_glimmer_lora", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 1024,
-        load_in_4bit = True,
-        offload_embedding = True,
     )
 
 messages = [
