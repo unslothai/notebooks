@@ -42,67 +42,21 @@
 
 # ### What you are about to load
 # 
-# Qwen3.8-27B is a `qwen3_5` checkpoint: 27.8B parameters, 64 decoder layers, a vision
-# tower, a 248320 token vocabulary and untied embeddings. Three layers out of every four
-# are **linear attention** (a gated delta net, the `linear_attn.*` modules) and the fourth
-# is ordinary full attention. That ratio is the whole reason a 27B model is tractable
-# here - the linear layers keep a fixed size recurrent state instead of a KV cache that
-# grows with the sequence.
+# Qwen3.8-27B is a `qwen3_5` checkpoint: 27.8B parameters, 64 layers, a vision tower and a
+# 248320 token vocabulary. Three layers in four are linear attention (a gated delta net),
+# which keeps a fixed size recurrent state instead of a growing KV cache, and that is what
+# makes a 27B model tractable here.
 # 
-# The gated delta net runs on `flash-linear-attention`'s Triton kernels. Unsloth ships a
-# pruned copy of fla inside `unsloth_zoo`, so there is nothing to install for the fast
-# path; the cell below prints which copy is live and confirms it before any weight is
-# loaded. Without it, transformers silently falls back to a float32 Python loop over
-# chunks, which is several times slower and never says so.
-# 
-# **Two Tesla T4s, not one.** One T4 cannot hold this model in 4-bit. Two can, and Kaggle
-# gives you two. Everything below is written for that, and it deliberately does NOT pass
-# `device_map`. Unsloth defaults to `"sequential"`, which fills the first card and then
-# the second; that is what the Muse Glimmer notebooks rely on.
-# 
-# `device_map = "balanced"` looks like the right choice here and is not. It routes through
-# `get_balanced_memory`, which caps cuda:0 at 9.12 GiB while giving cuda:1 13.01 GiB. The
-# model needs 19.63 GiB once quantised, which fits in 22.13 GiB of budget only if nothing
-# large is left over -- and the 2.37 GiB fp16 `lm_head` is. It gets assigned to CPU, and
-# bitsandbytes refuses any device map containing CPU or disk entries, so the load dies with
-# "Some modules are dispatched on the CPU or the disk". Measured on a real Kaggle T4 x2.
-# 
-# `offload_embedding = True` keeps the 2.37 GiB input embedding in CPU RAM.
+# **Two Tesla T4s, not one.** One T4 cannot hold this in 4-bit; Kaggle gives you two. Do
+# not pass `device_map` - unsloth's `"sequential"` default fills one card then the other.
+# `"balanced"` looks right and is not: it caps cuda:0 below cuda:1, leaves the 2.37 GiB
+# `lm_head` without a home, and bitsandbytes then refuses the CPU entry.
 
-# ### Which repo to load
-# 
-# Loading `unsloth/Qwen3.8-27B` with `load_in_4bit` gets you
-# `unsloth/Qwen3.8-27B-unsloth-bnb-4bit`, which unsloth substitutes for you.
-# 
-# That repo is nf4 with the parts that do not survive 4-bit
-# left in float16: `lm_head`, `embed_tokens`, the vision tower, and inside every gated
-# delta net the `in_proj_qkv`, `in_proj_a` and `in_proj_b` projections.
-# 
-# That last group is a deliberate choice, and it is worth knowing why, because the obvious
-# alternative does not fit. Measured on wikitext-2 against the bfloat16 checkpoint:
-# 
-# | what stays in float16 inside `linear_attn` | weights | perplexity | KL vs bf16 | spare room on the card holding `lm_head` |
-# |---|---|---|---|---|
-# | everything | 22.97 GiB | 6.2259 | 0.02435 | **1.33 GiB - does not fit** |
-# | `in_proj_qkv`, `in_proj_a`, `in_proj_b` (this repo) | 18.80 GiB | 6.2221 | 0.03063 | 3.24 GiB |
-# | `in_proj_a`, `in_proj_b` only | 15.32 GiB | 6.2474 | 0.03390 | 4.90 GiB |
-# | nothing | 15.29 GiB | 6.2440 | 0.03449 | 4.92 GiB |
-# | *(bfloat16, for reference)* | *51.70 GiB* | *6.1206* | *-* | *-* |
-# 
-# Keeping the whole of `linear_attn` in float16 costs 7.7 GiB and buys 0.006 nats. Every
-# 4-bit layout lands within 0.03 perplexity of every other, while all four sit about 2%
-# above bfloat16 - which is to say the 4-bit floor dominates, not where inside the gated
-# delta net you spend the 16 bits. What the 7.7 GiB does change is whether the model fits
-# at all: two T4s hold 29.2 GiB between them once the CUDA context is out, and the card
-# that ends up with `lm_head` needs a couple of GiB for logits.
-# 
-# `in_proj_a` and `in_proj_b` stay 16-bit for a different reason: they are 5120 -> 48
-# projections, 0.025 GiB across all 48 layers. Quantizing them saves nothing measurable
-# and still pays a dequantisation on every call - twice per step, because gradient
-# checkpointing recomputes the forward.
-# 
-# The bfloat16 original is at [`unsloth/Qwen3.8-27B`](https://huggingface.co/unsloth/Qwen3.8-27B)
-# and GGUFs are at [`unsloth/Qwen3.8-27B-GGUF`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF).
+# `unsloth/Qwen3.8-27B` with `load_in_4bit` resolves to
+# [`unsloth/Qwen3.8-27B-unsloth-bnb-4bit`](https://huggingface.co/unsloth/Qwen3.8-27B-unsloth-bnb-4bit):
+# nf4, with `lm_head`, `embed_tokens`, the vision tower and the gated delta net's
+# `in_proj_qkv` / `in_proj_a` / `in_proj_b` left in float16. GGUFs are at
+# [`unsloth/Qwen3.8-27B-GGUF`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF).
 
 # In[ ]:
 
@@ -113,111 +67,53 @@ MODEL_NAME = "unsloth/Qwen3.8-27B"  # unsloth resolves this to its 4-bit build
 # In[ ]:
 
 
-# The install cell above runs under %%capture, so a pip failure there leaves no
-# trace and surfaces here as a bare ModuleNotFoundError twenty minutes in. Say what
-# actually happened instead.
-import importlib.util
-_missing = [m for m in ("unsloth", "unsloth_zoo", "bitsandbytes", "transformers")
-            if importlib.util.find_spec(m) is None]
-assert not _missing, (
-    f"the install cell did not finish: {_missing} missing. Re-run it with the "
-    f"%%capture line deleted to see what pip said."
-)
-
-# Unsloth first, before transformers. It injects its vendored copy of
-# flash-linear-attention into sys.modules as a real top-level `fla`, and the
-# gated-delta modeling module binds whichever kernels exist at *its* import time.
-# Import transformers first and that binding is already made, silently, against
-# the pure-PyTorch fallback - several times slower, and nothing says so.
-from unsloth import FastModel
-import fla
-print("fla:", fla.__version__, "| vendored:", getattr(fla, "_UNSLOTH_VENDORED_FLA", False))
-
-import transformers
-print("transformers:", transformers.__version__)
-from transformers.utils import is_flash_linear_attention_available
-assert is_flash_linear_attention_available(), (
-    "fla is not available - the gated delta net would fall back to a float32 "
-    "Python loop. Re-run the install cell."
-)
-
-# unsloth relocates MODEL_NAME to unsloth/Qwen3.8-27B-unsloth-bnb-4bit when
-# load_in_4bit is set, via the mapper entry added in unslothai/unsloth#9682. On a
-# release that predates it the name does not relocate and you silently get the
-# ~52 GB bf16 repo quantised on the way in, so name the 4-bit repo ourselves in
-# that case. Self-disabling: once #9682 is on PyPI this branch stops firing.
+import torch
 from unsloth.models.mapper import FLOAT_TO_INT_MAPPER
 
-if MODEL_NAME not in FLOAT_TO_INT_MAPPER:
-    MODEL_NAME = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
-    print(f"installed unsloth predates the Qwen3.8 mapping; pinning {MODEL_NAME}")
-print("loading from:", MODEL_NAME)
-
-from transformers import AutoConfig
-print("architecture:", AutoConfig.from_pretrained(MODEL_NAME).model_type)
-
-import torch
-print("GPUs:", torch.cuda.device_count(),
-      "->", [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())])
 assert torch.cuda.device_count() >= 2, (
     "Qwen3.8-27B in 4-bit needs more than one 16 GB card. On Kaggle pick the "
     "T4 x2 accelerator (Settings -> Accelerator -> GPU T4 x2)."
 )
 
+# unslothai/unsloth#9682 relocates MODEL_NAME to the 4-bit repo. On a release that
+# predates it you would silently get the ~52 GB bf16 one, so name it ourselves. Only
+# the default is rewritten, so pointing MODEL_NAME somewhere else still works.
+if MODEL_NAME == "unsloth/Qwen3.8-27B" and MODEL_NAME not in FLOAT_TO_INT_MAPPER:
+    MODEL_NAME = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
+print("loading from:", MODEL_NAME)
+
 
 # In[ ]:
 
 
-# Workaround for a CUDA illegal memory access when loading across two GPUs.
-#
-# unsloth_zoo's forced-float32 pass (which qwen3_5 reaches, because it is in
-# FORCE_FLOAT32) casts every module and calls torch.cuda.empty_cache() after each one -
-# 1297 times for this model. Those casts are asynchronous, and empty_cache() cudaFrees
-# cached blocks on every device with no device guard, while cudaFree only synchronises
-# the current one. On a model dispatched across two cards, blocks on the other card go
-# back to the driver while it is still writing into them, surfacing later as
-# "CUDA error: an illegal memory access was encountered".
-#
-# Reproduced and fixed on Kaggle T4 x2. Synchronising before each release costs nothing
-# at run time (559 s against 587 s for five steps under CUDA_LAUNCH_BLOCKING, which
-# merely hid the race) and leaves peak memory unchanged.
-#
-# Self-disabling: once unslothai/unsloth-zoo#1100 ships this becomes a no-op. The probe
-# looks for any synchronise inside patch_model_and_tokenizer rather than a literal line,
-# so a rename upstream cannot leave the workaround stuck on.
+# Before unslothai/unsloth-zoo#1100, the forced-float32 pass called empty_cache()
+# once per module, which frees blocks on every card while cudaFree only synchronises
+# the current one - an illegal memory access on a model split across two GPUs.
+# Self-disabling once that fix is installed.
 import inspect
 import torch
 import unsloth.models.vision as _uv
 import unsloth_zoo.patching_utils as _pu
 
-_needs_workaround = "torch.cuda.synchronize" not in inspect.getsource(
-    _pu.patch_model_and_tokenizer
-)
-if not _needs_workaround:
-    print("unsloth_zoo already synchronises before empty_cache; workaround not needed")
-elif torch.cuda.device_count() < 2:
-    print("single GPU: workaround not needed")
+if ("torch.cuda.synchronize" in inspect.getsource(_pu.patch_model_and_tokenizer)
+        or torch.cuda.device_count() < 2):
+    print("multi-GPU load workaround not needed")
 else:
-    _orig_empty = torch.cuda.empty_cache
+    _orig_empty, _orig_patch = torch.cuda.empty_cache, _uv.patch_model_and_tokenizer
 
     def _synchronised_empty_cache():
         for _i in range(torch.cuda.device_count()):
             torch.cuda.synchronize(_i)
         return _orig_empty()
 
-    _orig_patch = _uv.patch_model_and_tokenizer
-
     def _patched(*args, **kwargs):
-        # Scoped to this call and restored in a finally, so nothing else in the
-        # process sees a patched empty_cache.
         torch.cuda.empty_cache = _synchronised_empty_cache
         try:
             return _orig_patch(*args, **kwargs)
         finally:
             torch.cuda.empty_cache = _orig_empty
 
-    # vision.py did `from ... import patch_model_and_tokenizer`, so the name has to be
-    # replaced there; patching the defining module would silently do nothing.
+    # vision.py imported the name by value, so it has to be replaced there.
     _uv.patch_model_and_tokenizer = _patched
     print("multi-GPU load workaround installed")
 
@@ -225,48 +121,9 @@ else:
 # In[ ]:
 
 
-# `is_flash_linear_attention_available()` says fla could be used, not that it was.
-# The gated-delta module resolves its kernels at import time and falls back silently
-# to a float32 torch loop, so the only honest check is to count calls. Wrap the entry
-# points BEFORE the model is built -- the modeling module binds these by value.
-import fla.ops.gated_delta_rule as _gdr
-
-FLA_CALLS = {"chunk": 0, "recurrent": 0}
-
-def _count(fn, key):
-    import functools
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        FLA_CALLS[key] += 1
-        return fn(*args, **kwargs)
-    wrapper._unsloth_counted = True
-    return wrapper
-
-for _attr, _key in (("chunk_gated_delta_rule", "chunk"),
-                    ("fused_recurrent_gated_delta_rule", "recurrent")):
-    _fn = getattr(_gdr, _attr, None)
-    if _fn is not None and not getattr(_fn, "_unsloth_counted", False):
-        setattr(_gdr, _attr, _count(_fn, _key))
-print("fla call counters installed:", list(FLA_CALLS))
-
-
-# In[ ]:
-
-
 from unsloth import FastModel
-import torch
 
 max_seq_length = 1024  # Qwen3.8 goes to 262144, but 1024 is what two T4s train on
-
-# Keep the gated delta net's projections in 16-bit. There is no from_pretrained
-# argument for this - FastModel builds its BitsAndBytesConfig from this list - so
-# append to the list itself, in place: unsloth.models.vision imported the name by
-# reference, and rebinding it here would not be seen there. Loading a repo that is
-# already 4-bit ignores this, since nothing is quantised on the way in.
-import unsloth_zoo.peft_utils as _peft_utils
-for _keep in ("in_proj_qkv", "in_proj_a", "in_proj_b"):
-    if _keep not in _peft_utils.SKIP_QUANTIZATION_MODULES:
-        _peft_utils.SKIP_QUANTIZATION_MODULES.append(_keep)
 
 model, tokenizer = FastModel.from_pretrained(
     model_name        = MODEL_NAME,
@@ -275,34 +132,19 @@ model, tokenizer = FastModel.from_pretrained(
     full_finetuning   = False,
     offload_embedding = True,        # keeps the 2.37 GiB embedding in CPU RAM
 )
-
 print(f"placed over {len(set(model.hf_device_map.values()))} devices")
 
-# Confirm the layout is what was asked for rather than assuming the skip list took.
-import bitsandbytes as bnb
-_n4 = sum(1 for _, m in model.named_modules() if isinstance(m, bnb.nn.Linear4bit))
-_qkv = model.get_submodule("model.language_model.layers.0.linear_attn.in_proj_qkv")
-print(f"Linear4bit modules: {_n4} | linear_attn.in_proj_qkv: "
-      f"{type(_qkv).__name__} {_qkv.weight.dtype}")
-for _i in range(torch.cuda.device_count()):
-    print(f"  cuda:{_i} {torch.cuda.memory_allocated(_i) / 2**30:5.2f} GiB allocated")
 
-
-# Do not pass `dtype = torch.float16` here, and do not set `fp16 = True` on the trainer
-# further down. Qwen3.5's gated delta net produces NaN gradients in pure float16, so
-# Unsloth keeps this architecture on a float32 autocast path and picks the loading dtype
-# itself. Asking for float16 explicitly gets you `Unsloth: Model is in bfloat16 precision
-# but you want to use float16 precision`, which reads like a configuration mistake rather
-# than the architecture constraint it is. The heavy matmuls still run on the T4's float16
-# tensor cores - `bnb_4bit_compute_dtype` is float16 either way.
+# Do not pass `dtype = torch.float16`, and do not set `fp16 = True` on the trainer below.
+# The gated delta net produces NaN gradients in pure float16, so Unsloth keeps this
+# architecture on a float32 autocast path and picks the loading dtype itself. The heavy
+# matmuls still use the T4's float16 tensor cores either way.
 
 # We now add LoRA adapters so we only need to update a small amount of parameters.
 # 
-# The adapters land on **every** linear in the language model, the gated delta net
-# included: 240 modules inside `linear_attn`, 192 in the MLPs and 64 in the full attention
-# layers, 496 in total, 58.4M trainable parameters, 0.21% of the model. Unsloth's target
-# matcher reaches the `linear_attn.*` leaves through the `attn` tag, so nothing special
-# has to be listed. The vision tower is left frozen because this is a text finetune.
+# They land on every linear in the language model, the gated delta net included: 496
+# modules, 58.4M trainable parameters, 0.21% of the model. The vision tower stays frozen
+# because this is a text finetune.
 
 # In[ ]:
 
@@ -321,17 +163,6 @@ model = FastModel.get_peft_model(
     use_gradient_checkpointing = "unsloth", # 30% less VRAM, fits 2x larger batch sizes
     random_state = 3407,
 )
-
-# Confirm the gated delta net really is being trained, not just the MLPs.
-import collections
-where = collections.Counter()
-for name, _ in model.named_modules():
-    if name.endswith("lora_A.default"):
-        parent = name.rsplit(".lora_A", 1)[0]
-        where["linear_attn" if ".linear_attn." in parent else
-              "self_attn"   if ".self_attn."   in parent else
-              "mlp"         if ".mlp."         in parent else "other"] += 1
-print(dict(where), "->", sum(where.values()), "adapters")
 
 
 # <a name="Data"></a>
@@ -434,20 +265,13 @@ print(text)
 # <a name="Train"></a>
 # ### Train the model
 # 
-# Now let's train our model. We do 30 steps to speed things up, but you can set
-# `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
+# We do 30 steps to keep this quick; set `num_train_epochs = 1` and `max_steps = None` for
+# a full run.
 # 
-# Two settings are worth understanding rather than copying.
-# 
-# `per_device_train_batch_size = 1` with `gradient_accumulation_steps = 4` is not
-# timidity. A 248320 token vocabulary makes the logits the single largest allocation in
-# the step - one sequence of 1024 positions is already 1024 x 248320 floats before the
-# cross entropy touches them - and they land on whichever card holds `lm_head`, which is
-# the card with the least room left. Raising the batch size is the fastest way to run out
-# of memory here; raising gradient accumulation costs time instead, which you have.
-# 
-# `optim = "adamw_8bit"` matters less than usual, because LoRA r=8 over 496 modules is
-# only 58.4M trainable parameters, but it is free to keep.
+# `per_device_train_batch_size = 1` with `gradient_accumulation_steps = 4` is deliberate.
+# A 248320 token vocabulary makes the logits the largest allocation in the step, and they
+# land on whichever card holds `lm_head`, which is the one with least room. Raising the
+# batch size is the fastest way to run out of memory here.
 
 # In[ ]:
 
@@ -513,15 +337,11 @@ print(tokenizer.decode([space if x == -100 else x
                         for x in trainer.train_dataset[100]["labels"]]))
 
 
-# One more memory step. `offload_embedding = True` puts `embed_tokens` in CPU RAM at load
-# time, but the trainer moves the model onto the accelerator when `train()` starts, which
-# quietly drags the 2.37 GiB embedding back onto a card. The lookup hooks Unsloth installs
-# read the weight's device live, so we can simply push it back to CPU once training has
-# begun and it stays there.
-# 
-# The callback returns early when accelerate owns the placement, which is what happens on
-# the sharded multi-GPU load: the embedding then carries a dispatch hook and moving it
-# by hand would strand the hook's execution device.
+# `offload_embedding = True` puts `embed_tokens` in CPU RAM at load time, but the trainer
+# moves the model onto the accelerator when `train()` starts, dragging 2.37 GiB back onto
+# a card. Unsloth's lookup hooks read the weight's device live, so pushing it back once
+# after training begins is enough. The callback returns early when accelerate owns
+# placement, since moving it by hand would strand the dispatch hook.
 
 # In[ ]:
 
@@ -574,19 +394,6 @@ trainer_stats = trainer.train()
 # In[ ]:
 
 
-# Training is done, so the counters have seen the real forward and backward.
-print("fla kernel calls during training:", FLA_CALLS)
-assert FLA_CALLS["chunk"] > 0, (
-    "the vendored fla chunk kernel was never called - the gated delta net ran on the "
-    "float32 torch fallback, which is several times slower. Check that unsloth was "
-    "imported before transformers."
-)
-print(f"  {FLA_CALLS['chunk']} chunk calls across the training run")
-
-
-# In[ ]:
-
-
 # @title Show final memory and time stats
 print(f"{trainer_stats.metrics['train_runtime']} seconds used for training.")
 print(f"{round(trainer_stats.metrics['train_runtime'] / 60, 2)} minutes used for training.")
@@ -600,29 +407,15 @@ for i in range(torch.cuda.device_count()):
 
 # ### What this actually costs
 # 
-# Measured with exactly the settings above - 4-bit, LoRA r=8 on all 496 language linears,
-# `use_gradient_checkpointing = "unsloth"`, `max_seq_length = 1024`, batch size 1,
-# gradient accumulation 4, `offload_embedding = True` plus the callback:
+# With the settings above: 18.80 GiB of weights resident, 1.23 GiB of activations,
+# gradients and optimiser at the peak, and 23.71 GiB peak **reserved** - the number that
+# OOMs you, since it includes fragmentation. Over two T4s that is 7.08 GiB on the first
+# card and 11.36 GiB on the second, which is the tight one because it carries `lm_head`.
 # 
-# | | GiB |
-# |---|---|
-# | weights resident once training is running | 18.80 |
-# | activations, gradients, optimiser at the peak | 1.23 |
-# | peak **reserved**, i.e. what the allocator holds | 23.71 |
+# If you are close to the limit, lower `max_seq_length` or turn off `finetune_mlp_modules`.
 # 
-# Split over two T4s, accelerate puts 7.08 GiB on the first card and 11.36 GiB on the
-# second, leaving 7.52 and 3.24 GiB of headroom respectively. The second card is the tight
-# one: it carries `lm_head`, so the logits land there.
-# 
-# If you are close to the limit, the levers that move the number most are lowering
-# `max_seq_length` and turning off `finetune_mlp_modules`. Raising
-# `per_device_train_batch_size` above 1 is the fastest way to run out.
-# 
-# Two caveats on these figures. They were measured on one large card with the allocator
-# capped to what two T4s add up to, and with the float16 loading path a T4 takes - so the
-# memory numbers transfer but **the step time was not measured on a T4** and is not quoted
-# here. And `peak reserved` is what the allocator holds including fragmentation, which is
-# the number that OOMs you, not the 18.80 GiB of weights.
+# These were measured on one large card with the allocator capped to what two T4s add up
+# to, so the memory transfers but the step time was not measured on a T4.
 
 # <a name="Inference"></a>
 # ### Inference
