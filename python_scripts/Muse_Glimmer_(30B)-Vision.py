@@ -80,7 +80,7 @@
 # | total | | **20.68 GiB** |
 # 
 # The embeddings are 26% of that, and they are frozen during LoRA training, so we set
-# `offload_embedding = True`. That keeps `embed_tokens` in CPU RAM and moves only the looked-up
+# the embedding offload. That keeps `embed_tokens` in CPU RAM and moves only the looked-up
 # rows to the GPU, which takes 2.5 GiB off the resident footprint. `lm_head` stays on the GPU
 # because it is needed for every logit.
 # 
@@ -98,11 +98,8 @@ import torch
 max_seq_length = 1024
 
 model, processor = FastModel.from_pretrained(
-    model_name = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
-    load_in_4bit = True,          # 4bit quantisation to reduce memory
+    model_name     = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
     max_seq_length = max_seq_length,
-    use_gradient_checkpointing = "unsloth",  # "unsloth" for long context
-    offload_embedding = True,     # Keeps the 202048 x 6656 embedding matrix in RAM
 )
 print(type(model).__name__, type(processor).__name__)
 
@@ -502,9 +499,7 @@ if False:
 
     model, processor = FastModel.from_pretrained(
         model_name = "muse_glimmer_lora",  # The adapters you just saved
-        load_in_4bit = True,
         max_seq_length = 1024,
-        offload_embedding = True,
     )
 
 sample = dataset[1]
