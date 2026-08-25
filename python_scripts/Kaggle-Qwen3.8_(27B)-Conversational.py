@@ -62,54 +62,11 @@ MODEL_NAME = "unsloth/Qwen3.8-27B"  # unsloth resolves this to its 4-bit build
 
 
 import torch
-from unsloth.models.mapper import FLOAT_TO_INT_MAPPER
 
 assert torch.cuda.device_count() >= 2, (
     "Qwen3.8-27B in 4-bit needs more than one 16 GB card. On Kaggle pick the "
     "T4 x2 accelerator (Settings -> Accelerator -> GPU T4 x2)."
 )
-
-# unslothai/unsloth#9682 relocates MODEL_NAME to the 4-bit repo. On a release that
-# predates it you would silently get the ~52 GB bf16 one, so name it ourselves. Only
-# the default is rewritten, so pointing MODEL_NAME somewhere else still works.
-if MODEL_NAME == "unsloth/Qwen3.8-27B" and MODEL_NAME not in FLOAT_TO_INT_MAPPER:
-    MODEL_NAME = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
-print("loading from:", MODEL_NAME)
-
-
-# In[ ]:
-
-
-# Before unslothai/unsloth-zoo#1100, the forced-float32 pass called empty_cache()
-# once per module, which frees blocks on every card while cudaFree only synchronises
-# the current one - an illegal memory access on a model split across two GPUs.
-# Self-disabling once that fix is installed.
-import inspect
-import torch
-import unsloth.models.vision as _uv
-import unsloth_zoo.patching_utils as _pu
-
-if ("torch.cuda.synchronize" in inspect.getsource(_pu.patch_model_and_tokenizer)
-        or torch.cuda.device_count() < 2):
-    print("multi-GPU load workaround not needed")
-else:
-    _orig_empty, _orig_patch = torch.cuda.empty_cache, _uv.patch_model_and_tokenizer
-
-    def _synchronised_empty_cache():
-        for _i in range(torch.cuda.device_count()):
-            torch.cuda.synchronize(_i)
-        return _orig_empty()
-
-    def _patched(*args, **kwargs):
-        torch.cuda.empty_cache = _synchronised_empty_cache
-        try:
-            return _orig_patch(*args, **kwargs)
-        finally:
-            torch.cuda.empty_cache = _orig_empty
-
-    # vision.py imported the name by value, so it has to be replaced there.
-    _uv.patch_model_and_tokenizer = _patched
-    print("multi-GPU load workaround installed")
 
 
 # In[ ]:
