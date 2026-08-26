@@ -146,6 +146,13 @@ jobs:
         run: |
           python -m pytest tests/test_amd_news_section.py -q --tb=short
 
+      - name: tests/test_desktop_banner.py
+        # The Desktop promo is rewritten into every News section by the
+        # generator, so a partial regen leaves some notebooks on the old Studio
+        # copy.
+        run: |
+          python -m pytest tests/test_desktop_banner.py -q --tb=short
+
       - name: tests/test_amd_moe_autotune_guard.py
         run: |
           python -m pytest tests/test_amd_moe_autotune_guard.py -q --tb=short

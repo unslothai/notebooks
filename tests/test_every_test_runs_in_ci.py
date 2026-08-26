@@ -231,6 +231,21 @@ def test_a_url_fragment_is_not_read_as_a_comment():
     assert any("subdirectory=y" in c for c in _shell_commands(block))
 
 
+@pytest.mark.parametrize(
+    "name", sorted(_named_in_workflow()), ids=lambda n: n)
+def test_every_ci_step_names_a_test_that_exists(name):
+    """The other direction: a step outliving the file it ran.
+
+    A rename or delete that misses the workflow leaves a step invoking a path
+    that is gone. pytest exits 4 on that, which reads as a broken workflow
+    rather than the missing coverage it actually is, so name it here.
+    """
+    assert (TESTS / name).is_file(), (
+        f"notebooks-tests-ci.yml runs tests/{name}, which does not exist. "
+        f"Drop the step, or restore the file."
+    )
+
+
 def test_the_real_workflow_still_reports_its_pytest_files():
     """A fold or split that stopped matching would leave the gate asserting
     against an empty set."""
