@@ -315,12 +315,10 @@ except Exception as e:
 # In[ ]:
 
 
-def create_locked_down_function(function):
-    output_function = {}
-    exec(function, {}, output_function)
-    new_matmul = output_function["matmul"]
-    new_matmul = types.FunctionType(new_matmul.__code__, {})
-    return new_matmul
+# Unsloth's create_locked_down_function executes the generated code with a
+# restricted set of builtins and a restricted importer, so a reward hacking
+# completion cannot reach os, subprocess, sockets or the filesystem.
+from unsloth import create_locked_down_function
 
 
 # # Countering Reward Hacking 3: Stop caching

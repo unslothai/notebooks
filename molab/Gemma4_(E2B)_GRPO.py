@@ -428,17 +428,15 @@ def _(np, output_function):
         import_numpy()
     except Exception as e:
         print(str(e))
-    return (types,)
+    return
 
 
 @app.cell
-def _(types):
-    def create_locked_down_function(function):
-        output_function = {}
-        exec(function, {}, output_function)
-        new_matmul = output_function["matmul"]
-        new_matmul = types.FunctionType(new_matmul.__code__, {})
-        return new_matmul
+def _():
+    # Unsloth's create_locked_down_function executes the generated code with a
+    # restricted set of builtins and a restricted importer, so a reward hacking
+    # completion cannot reach os, subprocess, sockets or the filesystem.
+    from unsloth import create_locked_down_function
 
     return (create_locked_down_function,)
 
