@@ -194,6 +194,9 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a string.Template substitution splices like format': 'import string\ndef f(name):\n    exec(string.Template("import $module").substitute(module = name))\n',
+    'a bound builder method keeps its template': 'def f(name):\n    formatter = "import {}".format\n    exec(formatter(name))\n',
+    'a sink handed to a consumed map is still called': 'def f(name):\n    list(map(exec, [f"import {name}"]))\n',
     'a stdlib alias imported below a function still binds for it': 'def f(name):\n    exec(clean(f"result = {name}"))\nfrom textwrap import dedent as clean\nf("42")\n',
     'a signed zero and a signed step still slice the whole string': 'def f(name, scope):\n    exec(f"result = {name}"[-0::+1], scope)\n',
     'a template held by a name still splices its field': 'def f(user):\n    template = "import {m}"\n    exec(template.format(m = user))\n',
@@ -331,6 +334,8 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'an attribute holds the source it was given': 'def f(self, name):\n    self.payload = f"import {name}"\n    exec(self.payload)\n',
+    'a literal subscript holds the source it was given': 'def f(name, payloads):\n    payloads["run"] = f"import {name}"\n    exec(payloads["run"])\n',
     'an unpacking binds each element before the next target runs': 'def f(name, table):\n    payload, table[exec(payload)] = (f"import {name}", None)\n',
     'an augmented subscript evaluates its target first': 'def f(name, table):\n    payload = f"import {name}"\n    table[exec(payload)] += (payload := "pass")\n',
     'a dict evaluates each key beside its own value': 'def f(name):\n    {0: (payload := f"import {name}"), exec(payload): None}\n',
@@ -364,6 +369,10 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a format method on a locally defined class is not a builder': 'class Safe:\n    def format(self, value):\n        return "pass"\ndef f(name):\n    exec(Safe().format(name))\n',
+    'a written-out expansion says how many arguments it supplies': 'def f(name):\n    compile(*[f"import {name}"])\n',
+    'a written-out mapping expansion names the keys it supplies': 'def f(name):\n    compile(**{"source": f"import {name}"})\n',
+    'an async with stops at the context it cannot enter': 'import contextlib\nasync def f(name, manager):\n    async with contextlib.nullcontext(), manager(exec(f"import {name}")):\n        pass\n',
     'a field-free template held by a name ignores its arguments': 'def f(user):\n    template = "pass"\n    exec(template.format(user))\n',
     'a field-free format_map template ignores its mapping': 'def f(name):\n    exec("pass".format_map({"x": name}))\n',
     'compile without a filename and a mode raises first': 'def f(name):\n    compile(f"import {name}")\n',
