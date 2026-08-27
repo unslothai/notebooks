@@ -194,6 +194,11 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a sink stored on an attribute is still the builtin': 'import builtins, types\ndef f(name):\n    obj = types.SimpleNamespace()\n    obj.run = builtins.exec\n    obj.run(f"import {name}")\n',
+    'a sink stored under a literal key is still the builtin': 'import builtins\ndef f(name):\n    table = {}\n    table["run"] = builtins.exec\n    table["run"](f"import {name}")\n',
+    'vars of the builtins module is the same namespace mapping': 'import builtins\ndef f(name):\n    vars(builtins)["exec"](f"import {name}")\n',
+    'filter calls its callback with each element too': 'def f(name):\n    list(filter(exec, [f"import {name}"]))\n',
+    'an unpacking target consumes the map that fills it': 'def f(name):\n    [result] = map(exec, [f"import {name}"])\n',
     'map with a second iterable still calls the sink': 'def f(name):\n    list(map(exec, [f"import {name}"], [{}]))\n',
     'a for loop over a map consumes it': 'def f(name):\n    for _ in map(exec, [f"import {name}"]):\n        pass\n',
     'a starred display of a map consumes it': 'def f(name):\n    [*map(exec, [f"import {name}"])]\n',
@@ -291,6 +296,18 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'an f-string removed from an equal f-string is two evaluations': 'def f(name):\n    exec(f"import {name}".removeprefix(f"import {name}"))\n',
+    'a string Formatter vformat is the format method spelled apart': 'import string\ndef f(name):\n    payload = f"import {name}"\n    exec(string.Formatter().vformat("{}", (payload,), {}))\n',
+    'an unbound string add takes its receiver as an argument': 'def f(name):\n    payload = f"import {name}"\n    exec(str.__add__("", payload))\n',
+    'an unbound string modulo splices the same way': 'def f(name):\n    exec(str.__mod__("%s", name))\n',
+    'a literal mapping pop selects the value a get would': 'def f(name):\n    exec({"source": f"import {name}"}.pop("source"))\n',
+    'next over a written-out iterator selects the first element': 'def f(name):\n    exec(next(iter([f"import {name}"])))\n',
+    'two classes under one name earn no exemption': 'class Template(str):\n    pass\ndef unused():\n    class Template:\n        def format(self, value):\n            return "pass"\ndef f(name):\n    exec(Template("import {}").format(name))\n',
+    'a written-out expansion pairs with the lambda parameters': 'def f(name):\n    exec((lambda source: source)(*[f"import {name}"]))\n',
+    'a written-out mapping names the lambda parameter it fills': 'def f(name):\n    exec((lambda source: source)(**{"source": f"import {name}"}))\n',
+    'a formatted value is not stable across two evaluations': 'def f(value):\n    exec(f"{value}".removeprefix(f"{value}"))\n',
+    'a parsed tree is still source for compile': 'import ast\ndef f(name):\n    compile(ast.parse(f"import {name}"), "<x>", "exec")\n',
+    'an unbound replace still splices into its template': 'def f(name):\n    exec(str.replace("import MODULE", "MODULE", name))\n',
     'a class name rebound elsewhere is no longer that class': 'class Safe:\n    def format(self, value):\n        return "pass"\nSafe = lambda: "import {}"\ndef f(name):\n    exec(Safe().format(name))\n',
     'a set expanded into compile can yield any element first': 'def f(name):\n    compile(*{"exec", "<x>", f"import {name}"})\n',
     'an invoked lambda hands its argument to its body': 'def f(name):\n    exec((lambda source: source)(f"import {name}"))\n',
@@ -389,6 +406,14 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'textwrap indent without its prefix raises first': 'import textwrap\ndef f(name):\n    exec(textwrap.indent(f"import {name}"))\n',
+    'a search text absent from the literal replaces nothing': 'def f(name):\n    exec("pass".replace("MISSING", name))\n',
+    'an unbound replace with an absent search text changes nothing': 'def f(name):\n    exec(str.replace("pass", "MISSING", name))\n',
+    'a parsed tree is not source for exec': 'import ast\ndef f(name):\n    exec(ast.parse(f"import {name}"))\n',
+    'a compile callback needs three iterables': 'def f(name):\n    list(map(compile, [f"import {name}"]))\n',
+    'sum raises on the first mapped result': 'def f(name):\n    sum(map(exec, ["pass", f"import {name}"]))\n',
+    'dict raises on the first mapped result': 'def f(name):\n    dict(map(exec, ["pass", f"import {name}"]))\n',
+    'a local consumer is not the builtin one': 'def f(list, name):\n    list(map(exec, [f"import {name}"]))\n',
     'a replace between two literals splices nothing': 'def f():\n    exec("pass".replace("x", "y"))\n',
     'a replace with a zero count performs no replacement': 'def f(name):\n    exec("pass".replace("x", name, 0))\n',
     'a leading literal separator leaves the first piece empty': 'def f(name):\n    exec(f"PREFIX{name}".partition("PREFIX")[0])\n',
@@ -419,7 +444,7 @@ _NOTHING_REACHES_THE_SINK = {
     'an async loop over a synchronous literal never reaches its else': 'async def f(name):\n    async for _ in []:\n        pass\n    else:\n        exec(f"import {name}")\n',
     'a deleted nonlocal cell is empty, not the builtin': 'def outer(name):\n    exec = print\n    def inner():\n        nonlocal exec\n        del exec\n        exec(f"import {name}")\n    return inner\n',
     'a zero precision format spec keeps nothing': 'def f(name):\n    exec(format(f"import {name}", ".0"))\n',
-    'removing the receiver as its own prefix leaves nothing': 'def f(name):\n    exec(f"import {name}".removeprefix(f"import {name}"))\n',
+    'removing a name as its own prefix leaves nothing': 'def f(name):\n    payload = f"import {name}"\n    exec(payload.removeprefix(payload))\n',
     'a written-out expansion supplies the source itself': 'def f(name):\n    exec(compile(*["pass"], f"<{name}>", "exec"))\n',
     'an unpacked number stays a number': 'def f(name):\n    payload, = (1,)\n    payload += 2\n    exec(payload)\n',
     'a walrus number stays a number': 'def f(name):\n    (payload := 1)\n    payload += 2\n    exec(payload)\n',
