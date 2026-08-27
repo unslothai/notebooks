@@ -63,6 +63,16 @@ jobs:
             update_max_seq_length.py \
             scripts tests
 
+      - name: Dynamic-execution lint self-test
+        run: python scripts/lint_dynamic_exec.py --self-test
+
+      - name: No exec/eval/compile of an interpolated string
+        # unsloth-zoo PR #1083: a model_type off a downloaded config.json was
+        # interpolated into an exec'd import. Bare exec(inspect.getsource(...)) is
+        # normal here and is not flagged; a built string is, unless it carries a
+        # written justification in scripts/dynamic_exec_allowlist.json.
+        run: python scripts/lint_dynamic_exec.py
+
       - name: No leftover debugger / pdb / breakpoint calls
         continue-on-error: true
         run: |

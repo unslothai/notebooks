@@ -1,0 +1,4 @@
+{
+  "_comment": "Reviewed exec/eval/compile calls whose first argument is a built string. Keyed on a hash of the call's own source, so editing the call requires re-reviewing it. Regenerate with scripts/lint_dynamic_exec.py --update, then replace every REVIEW ME with why the interpolated value cannot be attacker controlled.",
+  "allowed": []
+}
