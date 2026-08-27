@@ -194,6 +194,12 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a field between escaped braces is still a field': 'def f(name):\n    exec("{{{x}}}".format(x = name))\n',
+    'a directly imported ast.parse still preserves its source': 'from ast import parse\ndef f(name):\n    compile(parse(f"import {name}"), "<x>", "exec")\n',
+    'getattr reads the implicit builtins module too': 'def f(name):\n    getattr(__builtins__, "exec")(f"import {name}")\n',
+    'an aliased importlib still names the builtins module': 'import importlib as il\ndef f(name):\n    il.import_module("builtins").exec(f"import {name}")\n',
+    'an aliased contextlib still hands its argument over': 'import builtins\nimport contextlib as ctx\ndef f(name):\n    with ctx.nullcontext(builtins.exec) as run:\n        run(f"import {name}")\n',
+    'a literal sequence subject hands a sink to its capture': 'import builtins\ndef f(name):\n    match [builtins.exec]:\n        case [run]:\n            run(f"import {name}")\n',
     'an aliased textwrap wrapper still hands the source through': 'from textwrap import dedent as clean\ndef f(name):\n    exec(clean(f"import {name}"))\n',
     'operator.mod is percent formatting written as a call': 'import operator\ndef f(name):\n    exec(operator.mod("import %s", name))\n',
     'the in-place operator spellings concatenate too': 'import operator\ndef f(name):\n    exec(operator.iadd("import ", name))\n',
@@ -270,6 +276,7 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'an identity translation table changes nothing': 'def f(name):\n    exec(f"import {name}".translate({0: 0}))\n',
     'an ordinary async context manager still runs its body': 'async def f(name, manager):\n    async with manager as payload:\n        exec(f"import {name}")\n',
     'format_map with an empty mapping returns the receiver': 'def f(name):\n    exec(f"import {name}".format_map({}))\n',
     'an opaque expansion leaves compile its source keyword': 'def f(name, args = ()):\n    exec(compile(*args, source = f"import {name}", filename = "<x>", mode = "exec"))\n',
@@ -319,6 +326,9 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'an unpacking binds each element before the next target runs': 'def f(name, table):\n    payload, table[exec(payload)] = (f"import {name}", None)\n',
+    'an augmented subscript evaluates its target first': 'def f(name, table):\n    payload = f"import {name}"\n    table[exec(payload)] += (payload := "pass")\n',
+    'a dict evaluates each key beside its own value': 'def f(name):\n    {0: (payload := f"import {name}"), exec(payload): None}\n',
     'a while suite ends at an unconditional break': 'def f(name):\n    payload = f"import {name}"\n    while True:\n        break\n        payload = "pass"\n    exec(payload)\n',
     'a jump under a decidable test ends the suite as well': 'def f(name):\n    payload = f"import {name}"\n    for _ in [0]:\n        if True:\n            continue\n        payload = "pass"\n    exec(payload)\n',
     'a statically false case guard runs no body': 'def f(name, value):\n    payload = f"import {name}"\n    match value:\n        case _ if False:\n            payload = "pass"\n    exec(payload)\n',
@@ -349,6 +359,11 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a field-free format_map template ignores its mapping': 'def f(name):\n    exec("pass".format_map({"x": name}))\n',
+    'compile without a filename and a mode raises first': 'def f(name):\n    compile(f"import {name}")\n',
+    'a bare partial is only functools.partial when imported': 'def partial(callback, source):\n    return lambda: None\ndef f(name):\n    partial(exec, f"import {name}")()\n',
+    'a dedent on something other than textwrap is not the helper': 'def f(cleaner, name):\n    exec(cleaner.dedent(f"import {name}"))\n',
+    'a class-body lambda parameter shadows the builtin': 'class C:\n    f = lambda exec, name: exec(f"import {name}")\n',
     'async with cannot enter a synchronous nullcontext': 'import builtins, contextlib\nasync def f(name):\n    async with contextlib.nullcontext(builtins.exec) as run:\n        run(f"import {name}")\n',
     'False is a zero repetition count': 'def f(name):\n    exec(f"import {name}" * False)\n',
     'two written-out containers add to a list, not to source': 'def f(name):\n    exec([f"import {name}"] + [])\n',

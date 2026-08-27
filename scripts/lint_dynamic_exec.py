@@ -35,6 +35,7 @@ import ast
 import hashlib
 import json
 import re
+import string
 import shlex
 import sys
 import warnings
@@ -186,6 +187,11 @@ _MODULE_RECEIVERS = frozenset({
 # `operator` functions that build a string out of two values, and the operator each
 # one is. The in-place spellings return the same concatenation for a str, which has no
 # in-place add, and `mod` is `%`, which the binary form already reports as formatting.
+# Stdlib helpers that hand their source through and can be imported directly, as
+# `<module>.<name>`. `visit_ImportFrom` records `from ast import parse as p` against
+# these, and `_interpolated_call` rewrites such a call to the qualified spelling.
+_DIRECT_HELPERS = frozenset({"ast.parse", "codeop.compile_command"})
+
 _OPERATOR_BUILDERS = {
     "add": ast.Add, "concat": ast.Add, "iadd": ast.Add, "iconcat": ast.Add,
     "mod": ast.Mod, "imod": ast.Mod,
@@ -388,8 +394,10 @@ def _partial_call(node: ast.AST, aliases = None, shadowed = None) -> ast.Call | 
         return None
     if shadowed is not None and shadowed(function.id):
         return None
-    if function.id == "partial":
-        return node
+    # A bare `partial` has no builtin meaning: it only means `functools.partial` if
+    # this file imported it, and that import is exactly what the `partial:` alias
+    # records. Accepting the spelling unconditionally reported an application-defined
+    # `def partial(...)` that never invokes what it was handed.
     if aliases is not None and aliases(f"partial:{function.id}"):
         return node
     return None
@@ -769,7 +777,11 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
     if isinstance(function, ast.Name):
         preserving = function.id
     elif isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name):
-        preserving = function.attr
+        # The OWNER has to be `textwrap`, or a recorded alias of it. Reading the
+        # attribute name alone treated `cleaner.dedent(...)` on an application object
+        # as the stdlib helper and reported a call that may return anything.
+        if _names_module(function.value, "textwrap", shadowed, resolve_alias):
+            preserving = function.attr
     if preserving not in _TEXT_PRESERVING_FUNCTIONS and isinstance(function, ast.Name):
         # `from textwrap import dedent as clean` binds the same function under a
         # different name, and matching on the spelling alone stopped before the
@@ -793,6 +805,28 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             _is_interpolated(text, resolve, shadowed, resolve_alias)
             if text is not None else None
         )
+    if isinstance(function, ast.Name) and resolve_alias is not None and not (
+        shadowed is not None and shadowed(function.id)
+    ):
+        # `from ast import parse` binds the helper directly, with no module attribute
+        # to match on, so the source-preserving branches below never saw it. Rewritten
+        # as the qualified spelling and read there, which keeps one implementation of
+        # each rule rather than a second copy for the direct-import form.
+        named = resolve_alias(f"stdlibfunc:{function.id}")
+        if named in _DIRECT_HELPERS:
+            module, _, attribute = named.partition(".")
+            equivalent = ast.Call(
+                func = ast.Attribute(
+                    value = ast.Name(id = module, ctx = ast.Load()),
+                    attr = attribute,
+                    ctx = ast.Load(),
+                ),
+                args = list(node.args),
+                keywords = list(node.keywords),
+            )
+            return _is_interpolated(
+                ast.copy_location(equivalent, node), resolve, shadowed, resolve_alias,
+            )
     if isinstance(function, ast.Attribute):
         literal_mapping = (
             _mapping_literal(function.value, shadowed)
@@ -848,7 +882,9 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             return _is_interpolated(
                 ast.copy_location(inner, node), resolve, shadowed, resolve_alias,
             )
-        if function.attr == "compile_command" and isinstance(function.value, ast.Name):
+        if _names_module_function(
+            function, "codeop", "compile_command", shadowed, resolve_alias,
+        ):
             # `exec(codeop.compile_command(f"..."))` hands back a code object compiled
             # FROM the interpolated source, so the source survives the conversion
             # exactly as `ast.parse` does. Checked against the stdlib:
@@ -860,9 +896,7 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                     if keyword.arg == "source":
                         compiled = keyword.value
                         break
-            if compiled is not None and _names_module(
-                function.value, "codeop", shadowed, resolve_alias,
-            ):
+            if compiled is not None:
                 return _is_interpolated(compiled, resolve, shadowed, resolve_alias)
         if function.attr in _OPERATOR_BUILDERS and isinstance(function.value, ast.Name):
             # `exec(operator.add("import ", name))` builds the same string the `+`
@@ -884,7 +918,7 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                 return _is_interpolated(
                     ast.copy_location(equivalent, node), resolve, shadowed, resolve_alias,
                 )
-        if function.attr == "parse" and isinstance(function.value, ast.Name):
+        if _names_module_function(function, "ast", "parse", shadowed, resolve_alias):
             # `compile(ast.parse(f"..."), "<x>", "exec")` compiles the tree that
             # was parsed FROM the interpolated source, so the source survives the
             # conversion exactly as `str()` and `.encode()` do. The receiver is
@@ -897,9 +931,7 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                     if keyword.arg == "source":
                         parsed = keyword.value
                         break
-            if parsed is not None and _names_module(
-                function.value, "ast", shadowed, resolve_alias,
-            ):
+            if parsed is not None:
                 return _is_interpolated(parsed, resolve, shadowed, resolve_alias)
         if (
             function.attr in ("__add__", "__mod__")
@@ -941,6 +973,11 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             ) or (
                 isinstance(argument, ast.Constant) and argument.value in ("", b"")
             )
+            # A table that maps every code point it names to ITSELF changes nothing,
+            # so the receiver comes through unaltered: `f"...".translate({0: 0})` is
+            # the f-string. Reading only an EMPTY table dropped the source there.
+            if not empty and _identity_translation(argument):
+                empty = True
             if empty:
                 return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
             return None
@@ -992,12 +1029,16 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                 if function.attr in ("format", "format_map"):
                     return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
                 return None
-            if function.attr == "format" and _visibly_literal_text(function.value):
+            if function.attr in ("format", "format_map") and _visibly_literal_text(
+                function.value
+            ):
                 # `"pass".format(name)` has no replacement field, so the arguments
                 # change nothing and the result is the literal. Only a written-out
                 # template is read this way; a variable receiver may well hold one.
+                # `format_map` never consults its mapping for such a template either,
+                # so both spellings take the same answer.
                 template = function.value.value
-                if isinstance(template, str) and not _FORMAT_FIELD.search(template):
+                if isinstance(template, str) and not _has_format_field(template):
                     return None
             return f".{function.attr}()"
         if function.attr == "decode" and _visibly_text(function.value):
@@ -1195,7 +1236,7 @@ def _pattern_bindings(pattern: ast.AST, captures_subject: bool = True):
                 yield child.rest, False
 
 
-def _literal_builtins_import(node: ast.AST, shadowed = None) -> bool:
+def _literal_builtins_import(node: ast.AST, shadowed = None, aliases = None) -> bool:
     """Whether `node` is written out as `__import__("builtins")`.
 
     The module is named inline rather than bound to a name, so nothing is guessed at:
@@ -1217,9 +1258,13 @@ def _literal_builtins_import(node: ast.AST, shadowed = None) -> bool:
         owner = function.value.id
         if shadowed is not None and shadowed(owner):
             return False
-        return (
-            (function.attr == "__import__" and owner == "builtins") or
-            (function.attr == "import_module" and owner == "importlib")
+        if function.attr == "__import__" and owner == "builtins":
+            return True
+        # `import importlib as il` records a `stdlib:` alias, and requiring the
+        # literal spelling meant `il.import_module("builtins").exec(...)` resolved to
+        # nothing at all.
+        return function.attr == "import_module" and _names_module(
+            function.value, "importlib", shadowed, aliases,
         )
     return False
 
@@ -1255,7 +1300,7 @@ def _getattr_sink_name(function: ast.Call, aliases = None, shadowed = None) -> s
         ):
             owner, attribute = function.args[0], function.args[1]
             if isinstance(attribute, ast.Constant) and attribute.value in SINKS:
-                if _literal_builtins_import(owner, shadowed):
+                if _literal_builtins_import(owner, shadowed, aliases):
                     # `getattr(__import__("builtins"), "exec")` names the module
                     # inline, so the owner is a Call rather than a Name and the
                     # branch below never ran. Same reasoning as the attribute
@@ -1270,7 +1315,11 @@ def _getattr_sink_name(function: ast.Call, aliases = None, shadowed = None) -> s
                         # reporting it failed the gate on code that cannot be
                         # changed to pass.
                         return None
-                    if module == "builtins" or (
+                    # `__builtins__` too: CPython binds it to the builtins MODULE in
+                    # `__main__`, so `getattr(__builtins__, "exec")(...)` runs in a
+                    # script that is executed directly. The attribute spelling already
+                    # read it; this owner check did not.
+                    if module in ("builtins", "__builtins__") or (
                         aliases is not None and aliases(f"module:{module}")
                     ):
                         return f"builtins.{attribute.value}"
@@ -1314,7 +1363,7 @@ def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None
         # what `exec(source)` does; the attribute is written out, so nothing is guessed.
         return _sink_name(function.value, aliases, shadowed)
     if isinstance(function, ast.Attribute) and function.attr in SINKS:
-        if _literal_builtins_import(function.value, shadowed):
+        if _literal_builtins_import(function.value, shadowed, aliases):
             # `__import__("builtins").exec(f"...")` names the module inline, so the
             # owner is a Call rather than a Name and the branch below never ran.
             return f"builtins.{function.attr}"
@@ -1536,8 +1585,9 @@ def _nullcontext_value(node: ast.AST, aliases = None, shadowed = None) -> ast.AS
     if isinstance(function, ast.Attribute):
         if function.attr != "nullcontext" or not isinstance(function.value, ast.Name):
             return None
-        owner = function.value.id
-        if owner != "contextlib" or (shadowed is not None and shadowed(owner)):
+        if not _names_module(function.value, "contextlib", shadowed, aliases):
+            # `import contextlib as ctx` records a `stdlib:` alias, and requiring the
+            # literal spelling read `ctx.nullcontext(...)` as an opaque manager.
             return None
         return node.args[0]
     if isinstance(function, ast.Name) and function.id == "nullcontext":
@@ -1629,9 +1679,59 @@ def _has_computed_key(mapping: ast.Dict) -> bool:
     )
 
 
-# A `str.format` replacement field. `{{` and `}}` are escapes for a literal brace, so
-# they are stepped over before a real field is looked for.
-_FORMAT_FIELD = re.compile(r"(?<!\{)\{(?!\{)[^{}]*\}")
+def _names_module_function(
+    function: ast.AST, module: str, name: str, shadowed = None, aliases = None,
+) -> bool:
+    """Whether a callee is `<module>.<name>`, however it was imported.
+
+    `ast.parse(...)`, `alias.parse(...)` through a recorded module alias, and the
+    direct `from ast import parse [as p]` form, which `visit_ImportFrom` records under
+    `stdlibfunc:`. Reading only the attribute spelling let the direct import through.
+    """
+    if isinstance(function, ast.Attribute):
+        return function.attr == name and _names_module(
+            function.value, module, shadowed, aliases,
+        )
+    if isinstance(function, ast.Name):
+        if shadowed is not None and shadowed(function.id):
+            return False
+        return aliases is not None and aliases(f"stdlibfunc:{function.id}") == f"{module}.{name}"
+    return False
+
+
+def _identity_translation(table: ast.AST) -> bool:
+    """Whether a written-out `translate` table maps every key to itself.
+
+    Both sides written out as the same integer, for every entry. Anything else - a
+    computed key, a name, a `**` - is unknown and the table may well remove the text.
+    """
+    if not isinstance(table, ast.Dict) or not table.keys:
+        return False
+    for key, value in zip(table.keys, table.values):
+        if not (isinstance(key, ast.Constant) and isinstance(key.value, int)):
+            return False
+        if not (isinstance(value, ast.Constant) and isinstance(value.value, int)):
+            return False
+        if key.value != value.value:
+            return False
+    return True
+
+
+def _has_format_field(template: str) -> bool:
+    """Whether a `str.format` template has a replacement field to splice into.
+
+    `string.Formatter().parse` is what `str.format` itself uses, so `{{` and `}}` are
+    escapes and `{{{x}}}` really does have the field `x` between two literal braces.
+    A brace-adjacency regex read that template as field-free and let the splice
+    through. A template `format` itself rejects is unknown, so it keeps the source.
+    """
+    try:
+        return any(field is not None for _, field, _, _ in _FORMATTER.parse(template))
+    except ValueError:
+        return True
+
+
+_FORMATTER = string.Formatter()
 
 
 def _truncating_format_spec(node: ast.Call) -> bool:
@@ -1752,6 +1852,25 @@ def _mapping_lookup(mapping: ast.Dict, wanted: str) -> ast.AST | None:
     return None
 
 
+def _compile_call_is_complete(node: ast.Call, skip: int = 0) -> bool:
+    """Whether a visible `compile(...)` supplies the three arguments it requires.
+
+    `compile(source, filename, mode)` has no defaults for any of them. A `*` or `**`
+    in the call may supply what is missing, so those are unknown and count as
+    complete: this only ever declines to report a call CPython refuses outright.
+    """
+    if any(isinstance(argument, ast.Starred) for argument in node.args):
+        return True
+    if any(keyword.arg is None for keyword in node.keywords):
+        return True
+    positional = len(node.args) - skip
+    named = {keyword.arg for keyword in node.keywords}
+    return all(
+        positional > index or wanted in named
+        for index, wanted in enumerate(("source", "filename", "mode"))
+    )
+
+
 def _compile_keyword_source(node: ast.Call, shadowed = None) -> ast.AST | None:
     """The `source=` argument of a `compile` call, however the keyword is spelled."""
     for keyword in node.keywords:
@@ -1792,6 +1911,12 @@ def _source_argument(node: ast.Call, sink: str, shadowed = None, skip: int = 0) 
     was skipped entirely. `studio/backend/core/inference/tools.py` already resolves
     sink arguments this way.
     """
+    if sink.rpartition(".")[2] == "compile" and not _compile_call_is_complete(node, skip):
+        # `compile(f"import {name}")` raises TypeError for the missing `filename` and
+        # `mode` before it compiles anything, so reporting it failed the gate on a
+        # call that cannot execute. Only a call whose arguments are all visible is
+        # judged this way; an opaque expansion may supply the rest.
+        return None
     if node.args[skip:]:
         # `exec(*[], *[f"..."])` is valid, and the first AST argument contributes no
         # values. Statically visible empty expansions are stepped over so the real
@@ -2183,6 +2308,29 @@ class _Visitor(ast.NodeVisitor):
         numeric = _visibly_numeric(node.value)
         literal_text = reason is None and _visibly_literal_text(node.value)
         for target in node.targets:
+            # An unpacking assigns each element before the NEXT target is evaluated,
+            # so `payload, table[exec(payload)] = (f"import {name}", None)` executes
+            # the f-string it has just bound. Visiting the whole tuple first read that
+            # subscript while `payload` still looked clean. Only a pairing this can
+            # read is walked element by element; anything else keeps the old order.
+            paired = self._unpacked_pairs(target, node.value) if isinstance(
+                target, (ast.Tuple, ast.List)
+            ) else []
+            if paired and len(paired) == len(target.elts):
+                for element, item in paired:
+                    self.visit(element)
+                    element_reason = _is_interpolated(
+                        item, self.tainted[-1].get, self._is_shadowed, self._alias,
+                    )
+                    self._bind(
+                        element,
+                        element_reason,
+                        numeric = _visibly_numeric(item),
+                        literal_text = element_reason is None and _visibly_literal_text(item),
+                    )
+                    self._bind_unpacked(element, item)
+                    self._shadow_assignment(element, item)
+                continue
             self.visit(target)
             self._bind(target, reason, numeric, literal_text)
             self._bind_unpacked(target, node.value)
@@ -2251,6 +2399,12 @@ class _Visitor(ast.NodeVisitor):
         statements. The remaining augmented operators do not build source out of a
         value, so they are left alone.
         """
+        # The TARGET is evaluated first for a subscript or an attribute: Python reads
+        # the object and the index, then the right-hand side. Visiting the value first
+        # let a walrus in it clear taint that the index had already executed.
+        # A bare Name target loads nothing, so it stays where it was, after the value.
+        if not isinstance(node.target, ast.Name):
+            self.visit(node.target)
         self.visit(node.value)
         if isinstance(node.op, ast.Mult) and not (
             _visibly_numeric(node.value) and _visibly_numeric_name(node.target, self.tainted[-1])
@@ -2273,7 +2427,8 @@ class _Visitor(ast.NodeVisitor):
                 if held is not None and _positive_repetition(node.value):
                     reason = held
             self._bind(node.target, f"{reason} repeated" if reason else None)
-            self.visit(node.target)
+            if isinstance(node.target, ast.Name):
+                self.visit(node.target)
             return
         if isinstance(node.op, (ast.Add, ast.Mod)):
             if isinstance(node.op, ast.Mod):
@@ -2302,7 +2457,8 @@ class _Visitor(ast.NodeVisitor):
                 self._bind(node.target, None, numeric = True)
             else:
                 self._bind(node.target, f"{reason} {verb}")
-        self.visit(node.target)
+        if isinstance(node.target, ast.Name):
+            self.visit(node.target)
 
     @staticmethod
     def _literal_elements(iterable):
@@ -2541,16 +2697,30 @@ class _Visitor(ast.NodeVisitor):
             # whole-subject capture, where the value is the subject itself.
             # The sink NAME, so a FRESH capture such as `case check:` is registered as
             # an alias for it. Marking it "not shadowed" left it resolving to nothing.
+            paired = self._sequence_pattern_pairs(node.subject, case.pattern)
+            # A paired element can BE a sink or a constructor: `match [builtins.exec]:
+            # case [run]:` leaves `run` the builtin as plainly as the whole-subject
+            # capture does. Marking every sequence capture an opaque shadow hid the
+            # call in the body.
+            element_callables = {}
+            for name, element in paired.items():
+                resolved = _sink_name(element, self._alias, self._is_shadowed)
+                element_callables[name] = resolved.rpartition(".")[2] if resolved else (
+                    _prefixed_constructor(
+                        _constructor_name(element, self._is_shadowed, self._alias)
+                    )
+                )
             shadow = {
-                name: subject_sink if captures_subject else None
+                name: subject_sink if captures_subject else element_callables.get(name)
                 for name, captures_subject in _pattern_bindings(case.pattern)
             }
-            saved_scope = self._shadow_locals(shadow if subject_sink else bound)
+            saved_scope = self._shadow_locals(
+                shadow if subject_sink or any(element_callables.values()) else bound
+            )
             # `match [f"import {name}"]: case [payload]:` pairs element for element,
             # exactly as an unpacking assignment does, so the capture holds the
             # f-string and `exec(payload)` runs it. Clearing every sequence capture
             # read that as binding nothing.
-            paired = self._sequence_pattern_pairs(node.subject, case.pattern)
             for name, captures_subject in _pattern_bindings(case.pattern):
                 element_reason = None
                 if reason is not None and captures_subject:
@@ -2776,6 +2946,7 @@ class _Visitor(ast.NodeVisitor):
                 table[-1].pop(f"partial:{target.id}", None)
                 table[-1].pop(f"text:{target.id}", None)
                 table[-1].pop(f"stdlib:{target.id}", None)
+                table[-1].pop(f"stdlibfunc:{target.id}", None)
             level = self._binding_level(target.id)
             if level != len(self.scope_kinds) - 1:
                 # `global exec; del exec` deletes the MODULE binding, so the shadow an
@@ -2790,6 +2961,7 @@ class _Visitor(ast.NodeVisitor):
                     table[level].pop(f"partial:{target.id}", None)
                     table[level].pop(f"text:{target.id}", None)
                     table[level].pop(f"stdlib:{target.id}", None)
+                    table[level].pop(f"stdlibfunc:{target.id}", None)
                 self.shadowed_sinks[level].discard(target.id)
                 if target.id in self.nonlocal_names[-1]:
                     # A deleted NONLOCAL cell is empty, and the name does not fall
@@ -2852,7 +3024,7 @@ class _Visitor(ast.NodeVisitor):
                     table[-1].pop(node.name, None)
                     for prefix in (
                         "module:", "constructor:", "partial:", "functools:", "text:",
-                        "stdlib:",
+                        "stdlib:", "stdlibfunc:",
                     ):
                         table[-1].pop(f"{prefix}{node.name}", None)
         for statement in node.body:
@@ -2948,6 +3120,19 @@ class _Visitor(ast.NodeVisitor):
     # `visit_AsyncWith` is defined on its own above: `async with` cannot enter a
     # synchronous context manager, so the `nullcontext` inference here does not apply
     # to it.
+
+    def visit_Dict(self, node: ast.Dict):
+        """Each key is evaluated immediately before its own value.
+
+        `NodeVisitor` walks every key and then every value, so
+        `{0: (payload := f"import {name}"), exec(payload): None}` had the second key
+        read before the first value had bound anything. Runtime order is pairwise,
+        left to right; a `**` entry has a `None` key and only its value runs.
+        """
+        for key, value in zip(node.keys, node.values):
+            if key is not None:
+                self.visit(key)
+            self.visit(value)
 
     def visit_NamedExpr(self, node: ast.NamedExpr):
         """`(payload := f"import {name}")` as a statement, then `exec(payload)`.
@@ -3383,6 +3568,16 @@ class _Visitor(ast.NodeVisitor):
                 # exists at all. Nested scopes still see the binding, because they
                 # are deferred - that is `_collect_aliases` on their own body plus
                 # the outward walk, not this shadow.
+                #
+                # A later rebinding here is NOT applied to deferred bodies either,
+                # though a `def exec` written below one is. Tried and reverted: five
+                # corpus cases re-establish the builtin AFTER such an assignment -
+                # `global exec; exec = builtins.exec` inside the function, a module
+                # `for exec in [builtins.exec]`, a class body's `global exec; from
+                # builtins import exec`, and `global exec; del exec` - and a deferred
+                # shadow is consulted ahead of the alias table and never cleared, so
+                # it turned all five real findings into misses. The `def` form does
+                # not have that problem: a name given a `def` is not handed back.
                 return
             for target in targets:
                 for child in ast.walk(target):
@@ -3504,6 +3699,18 @@ class _Visitor(ast.NodeVisitor):
                     self.sink_aliases[-1][f"constructor:{constructor}"] = constructor
                     self.collected_aliases[-1][f"constructor:{constructor}"] = constructor
                     self.shadowed_sinks[-1].discard(constructor)
+                continue
+            if (
+                node.module is not None
+                and not node.level
+                and f"{node.module}.{alias.name}" in _DIRECT_HELPERS
+            ):
+                # `from ast import parse as p` binds the helper itself, and matching
+                # on a module attribute alone meant `compile(p(f"..."), ...)` read
+                # nothing at all.
+                self.sink_aliases[-1][f"stdlibfunc:{bound}"] = f"{node.module}.{alias.name}"
+                self.collected_aliases[-1][f"stdlibfunc:{bound}"] = f"{node.module}.{alias.name}"
+                self.shadowed_sinks[-1].discard(bound)
                 continue
             if (
                 node.module == "textwrap"
@@ -3629,6 +3836,7 @@ class _Visitor(ast.NodeVisitor):
             or self._alias(f"partial:{name}") is not None
             # And a `textwrap` function alias, for the same reason.
             or self._alias(f"text:{name}") is not None
+            or self._alias(f"stdlibfunc:{name}") is not None
             # A name already recorded as shadowed still counts, so a second assignment
             # can hand it back: `run = print` then `run = builtins.exec` has to make
             # `run` an alias again, and by then the alias entry is gone.
@@ -4121,6 +4329,14 @@ class _Visitor(ast.NodeVisitor):
             self.sink_aliases[-1][f"constructor:{name}"] = constructor
             self.collected_aliases[-1][f"constructor:{name}"] = constructor
             self.shadowed_sinks[-1].discard(name)
+        # And the ordinary parameter shadows, in the lambda's OWN scope as well.
+        # `_shadow_locals` above put them in the scope the lambda is WRITTEN in, and
+        # when that is a class body `_visible_scopes` skips it once this function
+        # level is on top - so `class C: f = lambda exec, name: exec(...)` read the
+        # parameter as the builtin. Same argument the default aliases just made.
+        for name in shadowed:
+            if name not in default_sinks and name not in default_constructors:
+                self.shadowed_sinks[-1].add(name)
         self.visit(node.body)
         self.scope_kinds.pop()
         self.collected_aliases.pop()
