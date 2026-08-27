@@ -194,6 +194,11 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a constant f-string names the same builtin': 'import builtins\ndef f(name):\n    getattr(builtins, f"{\'exec\'}")(f"import {name}")\n',
+    'a sink selected from a written-out iterator is still the builtin': 'def f(name):\n    next(iter([exec]))(f"import {name}")\n',
+    'a helper hands back the sink it was given': 'import builtins\ndef choose(run):\n    return run\ndef f(name):\n    choose(builtins.exec)(f"import {name}")\n',
+    'a sink stored on a class is still the builtin': 'class Runner:\n    run = exec\ndef f(name):\n    Runner.run(f"import {name}")\n',
+    'an undecided choice of callee reports the arm that can run': 'def f(name, flag):\n    (compile if flag else exec)(f"import {name}")\n',
     'a helper that returns the sink is still the builtin': 'def runner():\n    return exec\ndef f(name):\n    runner()(f"import {name}")\n',
     'a sink stored in a written-out list is still the builtin': 'def f(name):\n    runners = [exec]\n    runners[0](f"import {name}")\n',
     'a builtins-qualified map still consumes its callback': 'import builtins\ndef f(name):\n    list(builtins.map(exec, [f"import {name}"]))\n',
@@ -306,6 +311,7 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'a default cannot be reached past a written-out element': 'def f(name):\n    exec(next(iter([f"import {name}"]), "pass"))\n',
     'a nested container element is still addressable': 'def f(name):\n    payloads = {"run": [f"import {name}"]}\n    exec(payloads["run"][0])\n',
     'a slice that cuts only the literal tail keeps the value': 'def f(name):\n    exec(f"import {name}#"[:-1])\n',
     'a slice that cuts only the literal head keeps the value': 'def f(name):\n    exec(f"Ximport {name}"[1:])\n',
@@ -393,6 +399,9 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'a helper local carries the string to the return': 'def build(name):\n    source = f"import {name}"\n    return source\ndef f(name):\n    exec(build(name))\n',
+    'get reads the same element the subscript reads': 'def f(name):\n    payloads = {"x": f"import {name}"}\n    exec(payloads.get("x"))\n',
+    'pop reads it too': 'def f(name):\n    payloads = {"x": f"import {name}"}\n    exec(payloads.pop("x"))\n',
     'an augmented write below the def is read by the closure': 'def f(name):\n    payload = "pass\\n"\n    def inner():\n        exec(payload)\n    payload += f"import {name}"\n    inner()\n',
     'enumerate over a written-out list still pairs its elements': 'def f(name):\n    for _, payload in enumerate([f"import {name}"]):\n        exec(payload)\n',
     'an iter around a written-out list still yields its elements': 'def f(name):\n    for payload in iter([f"import {name}"]):\n        exec(payload)\n',
@@ -435,6 +444,9 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a tuple has no pop to select with': 'def f(name):\n    exec((f"import {name}",).pop())\n',
+    'exec given more arguments than it takes raises first': 'def f(name):\n    exec(f"import {name}", {}, {}, 1)\n',
+    'compile given a seventh argument raises first': 'def f(name):\n    compile(f"import {name}", "<x>", "exec", 0, False, -1, 1)\n',
     'a conversion given more arguments than it takes raises first': 'def f(name):\n    exec(f"import {name}".encode("utf-8", "strict", "extra"))\n',
     'a partition index outside its three elements raises first': 'def f(name):\n    exec(f"import {name}".partition("#")[3])\n',
     'a slice that cuts into the spliced value says nothing': 'def f(name):\n    exec(f"import {name}"[:3])\n',
@@ -773,3 +785,49 @@ def test_the_origin_of_a_built_source_is_recorded(tmp_path):
         "two different source-building expressions produced the same origin, so an "
         "edit to the line above an allowlisted sink would inherit its review"
     )
+
+
+_SHELL_RUNS_PYTHON = """#!/usr/bin/env bash
+set -euo pipefail
+name="$1"
+python - <<'PY'
+exec(f"import {name}")
+PY
+"""
+
+_SHELL_IS_DATA = """#!/usr/bin/env bash
+cat <<'EOF' > note.txt
+exec(f"import {name}")
+EOF
+"""
+
+
+def test_a_python_heredoc_in_a_shell_script_is_scanned(tmp_path):
+    """A committed `.sh` runs Python the same way a workflow step does."""
+    sample = tmp_path / "setup.sh"
+    sample.write_text(_SHELL_RUNS_PYTHON)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+    assert "exec()" in proc.stderr, proc.stderr
+
+
+def test_a_shell_heredoc_that_is_not_python_is_left_alone(tmp_path):
+    sample = tmp_path / "setup.sh"
+    sample.write_text(_SHELL_IS_DATA)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 0, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_a_one_line_python_command_in_a_shell_script_is_scanned(tmp_path):
+    sample = tmp_path / "setup.sh"
+    sample.write_text('#!/bin/sh\npython3 -c \'exec(f"import {name}")\'\n')
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_a_shell_script_under_a_directory_target_is_collected(tmp_path):
+    """The capability has to be reached by the sweep, not only by an explicit path."""
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "nested" / "setup.sh").write_text(_SHELL_RUNS_PYTHON)
+    proc = _run("--paths", str(tmp_path))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"

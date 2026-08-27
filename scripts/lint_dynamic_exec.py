@@ -1367,6 +1367,65 @@ def _interpolated_binop(node, resolve = None, shadowed = None, resolve_alias = N
     return None
 
 
+def _first_from_iterator(node: ast.AST, shadowed = None):
+    """The element `next(iter([...]))` necessarily selects, when it is written out.
+
+    The first element of a container written out right here, which is the subscript
+    spelling with the index implied. Both calls are the builtins and both are
+    shadow-tested.
+
+    A default is allowed: `next(iterator, "pass")` hands back the default only when the
+    iterator is EXHAUSTED, and this reads a container with at least one element written
+    into it, so the default is unreachable. Requiring exactly one argument skipped that
+    call and its selected source went unreported.
+    """
+    if not (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "next"
+        and not (shadowed is not None and shadowed("next"))
+        and 1 <= len(node.args) <= 2
+        and not node.keywords
+        and not any(isinstance(argument, ast.Starred) for argument in node.args)
+    ):
+        return None
+    inner = node.args[0]
+    if (
+        isinstance(inner, ast.Call)
+        and isinstance(inner.func, ast.Name)
+        and inner.func.id == "iter"
+        and not (shadowed is not None and shadowed("iter"))
+        and len(inner.args) == 1
+        and not inner.keywords
+        and isinstance(inner.args[0], (ast.List, ast.Tuple))
+        and inner.args[0].elts
+        and not isinstance(inner.args[0].elts[0], ast.Starred)
+    ):
+        return inner.args[0].elts[0]
+    return None
+
+
+def _assigned_names(node: ast.AST) -> list:
+    """The names this ONE node binds, whatever the spelling.
+
+    Every binding form, not only assignment: an `import`, a `def`, a `for` target, a
+    `with ... as`, an `except ... as` and a walrus all rebind a name, and a local read
+    below must not be answered from an assignment somewhere else that shares its
+    spelling.
+    """
+    if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+        return [node.id]
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return [node.name]
+    if isinstance(node, ast.alias):
+        return [(node.asname or node.name).partition(".")[0]]
+    if isinstance(node, ast.ExceptHandler) and node.name:
+        return [node.name]
+    if isinstance(node, ast.arg):
+        return [node.arg]
+    return []
+
+
 def _helper_scope(node: ast.Call, helper, resolve, shadowed, resolve_alias):
     """A `resolve` for a visible helper's body: its parameters, then nothing local.
 
@@ -1385,13 +1444,41 @@ def _helper_scope(node: ast.Call, helper, resolve, shadowed, resolve_alias):
         if argument is not None
     }
 
+    # A local the body assigns ONCE, at the top level of its own suite, with a plain
+    # name target. `def build(name): source = f"import {name}"; return source` hands
+    # back the string it just built, and answering "local, so nothing" for `source`
+    # lost it between the assignment and the `return`. Assigned twice, assigned under a
+    # condition, or assigned by any other kind of statement and it stays unresolved -
+    # the single visible value is the whole of what is being read here.
+    stores: dict = {}
+    for statement in helper.body:
+        for child in _walk_this_scope(statement):
+            for target in _assigned_names(child):
+                stores[target] = statement if target not in stores else None
+    single_value: dict = {}
+    for name, statement in stores.items():
+        if statement is None or statement not in helper.body:
+            continue
+        if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
+            single_value[name] = statement.value
+        elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
+            single_value[name] = statement.value
+    resolving: set = set()
+
     def resolve_in_helper(name):
         if name in parameters:
             # `_lambda_scope` hands back the enclosing resolver when the call cannot
             # be paired up, and that resolver may be None.
             return paired(name) if callable(paired) else None
         if name in bound_here:
-            return None
+            value = single_value.get(name)
+            if value is None or name in resolving:
+                return None
+            resolving.add(name)
+            try:
+                return _is_interpolated(value, resolve_in_helper, shadowed, resolve_alias)
+            finally:
+                resolving.discard(name)
         return resolve(name) if resolve is not None else None
 
     return resolve_in_helper
@@ -1496,32 +1583,9 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             shadowed,
             resolve_alias,
         )
-    if (
-        isinstance(function, ast.Name)
-        and function.id == "next"
-        and not (shadowed is not None and shadowed("next"))
-        and len(node.args) == 1
-        and not node.keywords
-    ):
-        # `next(iter([f"import {name}"]))` selects the first element of a container
-        # written out right here, which is the subscript spelling with the index
-        # implied. Both calls are the builtins, both are shadow-tested, and only a
-        # written-out container is read.
-        inner = node.args[0]
-        if (
-            isinstance(inner, ast.Call)
-            and isinstance(inner.func, ast.Name)
-            and inner.func.id == "iter"
-            and not (shadowed is not None and shadowed("iter"))
-            and len(inner.args) == 1
-            and not inner.keywords
-            and isinstance(inner.args[0], (ast.List, ast.Tuple))
-            and inner.args[0].elts
-            and not isinstance(inner.args[0].elts[0], ast.Starred)
-        ):
-            return _is_interpolated(
-                inner.args[0].elts[0], resolve, shadowed, resolve_alias,
-            )
+    selected = _first_from_iterator(node, shadowed)
+    if selected is not None:
+        return _is_interpolated(selected, resolve, shadowed, resolve_alias)
     helper = _visible_helper(function, shadowed)
     if helper is not None and helper.name not in _HELPER_STACK:
         # `def build(): return f"import {name}"` followed by `exec(build())` executes
@@ -1622,7 +1686,10 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
     if (
         isinstance(function, ast.Attribute)
         and function.attr == "pop"
-        and isinstance(function.value, (ast.List, ast.Tuple))
+        # A list, not a tuple: a tuple has no `pop`, so `(f"...",).pop()` raises
+        # AttributeError before the sink is reached and reporting it failed the gate
+        # on a call that cannot execute.
+        and isinstance(function.value, ast.List)
         and function.value.elts
         and not any(isinstance(element, ast.Starred) for element in function.value.elts)
         and not node.keywords
@@ -1642,6 +1709,42 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             _mapping_literal(function.value, shadowed)
             if function.attr in ("get", "pop") else None
         )
+        if (
+            literal_mapping is None
+            and function.attr in ("get", "pop")
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and _compound_key(
+                ast.Subscript(
+                    value = function.value,
+                    slice = ast.Constant(value = node.args[0].value),
+                    ctx = ast.Load(),
+                )
+            ) is not None
+        ):
+            # `payloads = {"x": f"..."}` then `payloads.get("x")` reads the same element
+            # the subscript spelling reads, and the element was already recorded under
+            # its compound path when the container was bound. Only the exact accessor
+            # spelling was preserved, so the `get` and `pop` forms selected and executed
+            # stored source with nothing reported. Rewritten as the subscript and read
+            # there, which keeps one implementation of the lookup.
+            equivalent = ast.copy_location(
+                ast.Subscript(
+                    value = function.value,
+                    slice = ast.Constant(value = node.args[0].value),
+                    ctx = ast.Load(),
+                ),
+                node,
+            )
+            found = _is_interpolated(equivalent, resolve, shadowed, resolve_alias)
+            if found is not None:
+                return found
+            # Nothing recorded under that key is a MISS as far as this can tell, and a
+            # miss returns the default: `payloads.get("absent", f"...")` executes the
+            # f-string.
+            if len(node.args) > 1:
+                return _is_interpolated(node.args[1], resolve, shadowed, resolve_alias)
+            return None
         if (
             literal_mapping is not None
             and node.args
@@ -2317,28 +2420,18 @@ def _visibly_unaddable(left: ast.AST, right: ast.AST) -> bool:
     return left_kind != right_kind
 
 
-def _lambda_result(call: ast.Call):
-    """What an immediately invoked lambda hands back, when that is written out.
+def _paired_arguments(call: ast.Call, arguments: ast.arguments) -> dict | None:
+    """Parameter name to the expression the call gives it, or None when it cannot pair.
 
-    The body itself, or - when the body is one of the parameters - the argument that
-    parameter was given. Only a straightforward pairing: a `*` or `**` at the call site
-    can supply anything, and nothing is guessed there.
+    Positional arguments in order, keywords by name, and a parameter nobody supplied
+    falls back to its default. Only a straightforward pairing: a `*` or `**` at the
+    call site can supply anything, and nothing is guessed there.
     """
-    lambda_node = call.func
-    if not isinstance(lambda_node, ast.Lambda):
-        return None
-    body = lambda_node.body
-    if not isinstance(body, ast.Name):
-        return body
-    arguments = lambda_node.args
-    positional = [*arguments.posonlyargs, *arguments.args]
-    names = {argument.arg for argument in positional}
-    if body.id not in names:
-        return None
     if any(isinstance(argument, ast.Starred) for argument in call.args):
         return None
     if any(keyword.arg is None for keyword in call.keywords):
         return None
+    positional = [*arguments.posonlyargs, *arguments.args]
     bound = {}
     for index, argument in enumerate(call.args):
         if index < len(positional):
@@ -2349,7 +2442,30 @@ def _lambda_result(call: ast.Call):
     if defaults:
         for parameter, default in zip(positional[len(positional) - len(defaults):], defaults):
             bound.setdefault(parameter.arg, default)
-    return bound.get(body.id)
+    for parameter, default in zip(arguments.kwonlyargs, arguments.kw_defaults):
+        if default is not None:
+            bound.setdefault(parameter.arg, default)
+    return bound
+
+
+def _lambda_result(call: ast.Call):
+    """What an immediately invoked lambda hands back, when that is written out.
+
+    The body itself, or - when the body is one of the parameters - the argument that
+    parameter was given.
+    """
+    lambda_node = call.func
+    if not isinstance(lambda_node, ast.Lambda):
+        return None
+    body = lambda_node.body
+    if not isinstance(body, ast.Name):
+        return body
+    arguments = lambda_node.args
+    names = {argument.arg for argument in (*arguments.posonlyargs, *arguments.args)}
+    if body.id not in names:
+        return None
+    bound = _paired_arguments(call, arguments)
+    return None if bound is None else bound.get(body.id)
 
 
 def _folded_text(node: ast.AST) -> ast.AST:
@@ -2357,7 +2473,30 @@ def _folded_text(node: ast.AST) -> ast.AST:
 
     Only `+` between literals, and only when every piece is one: nothing here
     evaluates a name or calls anything. Anything else is handed back unchanged.
+
+    An f-string whose replacements are all string literals is written-out text too:
+    `f"{'exec'}"` is `"exec"` however it is spelled, so `getattr(builtins, f"{'exec'}")`
+    names the sink as plainly as the constant does and used to resolve to nothing. Only
+    a plain replacement of a string constant counts - no conversion, no format spec -
+    so the folded value is the one CPython produces rather than a guess at one.
     """
+    if isinstance(node, ast.JoinedStr):
+        pieces = []
+        for piece in node.values:
+            if isinstance(piece, ast.Constant) and isinstance(piece.value, str):
+                pieces.append(piece.value)
+                continue
+            if (
+                isinstance(piece, ast.FormattedValue)
+                and piece.conversion in (-1, None)
+                and piece.format_spec is None
+                and isinstance(piece.value, ast.Constant)
+                and isinstance(piece.value.value, str)
+            ):
+                pieces.append(piece.value.value)
+                continue
+            return node
+        return ast.copy_location(ast.Constant(value = "".join(pieces)), node)
     if not isinstance(node, ast.BinOp) or not isinstance(node.op, ast.Add):
         return node
     left = _folded_text(node.left)
@@ -2430,6 +2569,26 @@ def _getattr_sink_name(function: ast.Call, aliases = None, shadowed = None) -> s
     return None
 
 
+def _sink_candidates(function: ast.AST, aliases = None, shadowed = None) -> list:
+    """Every sink this callee can select, most likely first.
+
+    One, for everything written out as a single callee. A conditional whose test cannot
+    be decided is the exception: both arms are reachable, they may have different
+    signatures, and answering with the first that resolved let the other one's call go
+    unreported when the first was rejected as unable to run.
+    """
+    if isinstance(function, ast.IfExp) and _constant_truth(function.test) is None:
+        found = []
+        for arm in (function.body, function.orelse):
+            resolved = _sink_name(arm, aliases, shadowed)
+            if resolved is not None and resolved not in found:
+                found.append(resolved)
+        if found:
+            return found
+    resolved = _sink_name(function, aliases, shadowed)
+    return [] if resolved is None else [resolved]
+
+
 def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None:
     """The sink this call target names, if any.
 
@@ -2467,14 +2626,32 @@ def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None
         # reads, same guards: a `def` bound to nothing else, and a recursion stack.
         helper = _visible_helper(function.func, shadowed)
         if helper is not None and helper.name not in _HELPER_STACK:
+            # `def choose(run): return run` hands back whatever the CALL supplied, so
+            # `choose(builtins.exec)(f"...")` runs the builtin. Resolving the returned
+            # name against the caller's aliases read nothing, since `run` means nothing
+            # out here. The parameters are paired to the arguments exactly as an
+            # immediately invoked lambda's are.
+            bound = _paired_arguments(function, helper.args) or {}
             _HELPER_STACK.add(helper.name)
             try:
                 for value in _returned_expressions(helper):
+                    if isinstance(value, ast.Name) and value.id in bound:
+                        value = bound[value.id]
                     resolved = _sink_name(value, aliases, shadowed)
                     if resolved is not None:
                         return resolved
             finally:
                 _HELPER_STACK.discard(helper.name)
+    if isinstance(function, ast.Call):
+        # `next(iter([exec]))(f"...")` selects the callee out of a container written out
+        # right here, exactly as `[exec][0](...)` does. The unwrapping was only applied
+        # to source values, so the callee side fell through to the `getattr` resolver
+        # and read nothing.
+        picked = _first_from_iterator(function, shadowed)
+        if picked is not None:
+            resolved = _sink_name(picked, aliases, shadowed)
+            if resolved is not None:
+                return resolved
     if isinstance(function, ast.Call) and isinstance(function.func, ast.Lambda):
         # `(lambda run: run)(exec)(f"...")` calls whatever the lambda hands back, which
         # is written out right here. The source side already binds arguments to
@@ -3082,6 +3259,41 @@ def _mapping_lookup(mapping: ast.Dict, wanted: str) -> ast.AST | None:
     return None
 
 
+# How many positional arguments each sink accepts. `exec(source, globals, locals)` and
+# `eval(source, globals, locals)` take three; `compile(source, filename, mode, flags,
+# dont_inherit, optimize)` takes six.
+_SINK_ARITY = {"exec": 3, "eval": 3, "compile": 6}
+
+
+def _visibly_too_many_arguments(node: ast.Call, sink: str, skip: int = 0) -> bool:
+    """Whether the call plainly hands the sink more positional arguments than it takes.
+
+    `exec(f"import {name}", {}, {}, 1)` raises TypeError before anything is executed,
+    so reporting it failed the gate on a call that cannot reach the sink. Only when
+    every argument is visible: an opaque `*expansion` says nothing about how many
+    values it contributes, and stays unknown, which is the reporting side.
+    """
+    ceiling = _SINK_ARITY.get(sink.rpartition(".")[2])
+    if ceiling is None:
+        return False
+    positional = 0
+    for argument in node.args[skip:]:
+        if isinstance(argument, ast.Starred):
+            inner = argument.value
+            if isinstance(inner, (ast.Tuple, ast.List, ast.Set)) and not any(
+                isinstance(element, ast.Starred) for element in inner.elts
+            ):
+                positional += len(inner.elts)
+                continue
+            if isinstance(inner, ast.Dict) and not any(key is None for key in inner.keys):
+                # `*mapping` iterates its keys, so it contributes one value per key.
+                positional += len(inner.keys)
+                continue
+            return False
+        positional += 1
+    return positional > ceiling
+
+
 def _compile_call_is_complete(node: ast.Call, shadowed = None, skip: int = 0) -> bool:
     """Whether a visible `compile(...)` supplies the three arguments it requires.
 
@@ -3200,6 +3412,10 @@ def _source_argument(node: ast.Call, sink: str, shadowed = None, skip: int = 0) 
     was skipped entirely. `studio/backend/core/inference/tools.py` already resolves
     sink arguments this way.
     """
+    if _visibly_too_many_arguments(node, sink, skip):
+        # More positional arguments than the sink has parameters is a TypeError raised
+        # before any source is executed, exactly like the missing-argument case below.
+        return None
     if sink.rpartition(".")[2] == "compile" and not _compile_call_is_complete(
         node, shadowed, skip,
     ):
@@ -3676,6 +3892,19 @@ class _Visitor(ast.NodeVisitor):
         # and reporting it failed the gate on code that does nothing.
         self._visit_suite(node.body)
         self.collected_aliases.pop()
+        if isinstance(node, ast.ClassDef):
+            # The same export the taint map gets just below, for the same reason: a
+            # class body's locals become the class object's attributes.
+            # `class Runner: run = exec` leaves `Runner.run` directly callable, so
+            # `Runner.run(f"import {name}")` executes, and popping the alias map with
+            # the scope discarded the only record that the attribute names a sink.
+            exported_sinks = {
+                f"path>{node.name}.{name}": sink
+                for name, sink in self.sink_aliases[-1].items()
+                if isinstance(name, str) and not name.startswith("path>")
+            }
+        else:
+            exported_sinks = {}
         self.sink_aliases.pop()
         self.shadowed_sinks.pop()
         self.deferred_shadows.pop()
@@ -3710,6 +3939,13 @@ class _Visitor(ast.NodeVisitor):
             self.shadowed_sinks[:] = shadows
             self.sink_aliases[:] = sinks
             self.collected_aliases[:] = collected
+        # After that rollback, so a class body's exported aliases survive it. Into the
+        # deferred view as well: a class body RUNS where it is written, so a function
+        # body - which runs later, whether it is written above or below - sees the
+        # attribute. `_alias` reads the deferred map for every scope but the innermost,
+        # so recording only the executed one left the call inside `def f` unresolved.
+        self.sink_aliases[-1].update(exported_sinks)
+        self.collected_aliases[-1].update(exported_sinks)
         # The statement ends by binding its own name out here, to a function or a
         # class. Leaving the old entry in place reported
         # `payload = f"import {user}"; def payload(): pass; exec(payload)`, where the
@@ -6606,33 +6842,42 @@ class _Visitor(ast.NodeVisitor):
                     "line": inner.lineno,
                     "hash": _call_hash(inner),
                 })
-        sink = _sink_name(node.func, self._alias, self._is_shadowed)
+        candidates = _sink_candidates(node.func, self._alias, self._is_shadowed)
         # A shadowed base name applies to `b.exec(...)` as well as a bare call: with
         # `import builtins as b` visible, `def f(b, name)` supplies its own `b`.
         base = node.func
         if isinstance(base, ast.Attribute):
             base = base.value
         if isinstance(base, ast.Name) and self._is_shadowed(base.id):
-            sink = None
-        if sink is not None and _partial_sink(node.func, self._alias, self._is_shadowed):
-            # The source of `functools.partial(exec, f"...")()` was bound when the
-            # partial was built, so the outer call carries no arguments at all - but
-            # `functools.partial(exec)(f"...")` supplies it at call time instead, and
-            # asking only the inner call read that as having no source.
-            argument = _source_argument(
-                _partial_call(node.func, self._alias, self._is_shadowed),
-                sink, self._is_shadowed, skip = 1,
-            )
-            if argument is None:
-                argument = _source_argument(node, sink, self._is_shadowed)
-        else:
-            argument = _source_argument(node, sink, self._is_shadowed) if sink is not None else None
-        if (
-            argument is not None
-            and sink.rpartition(".")[2] in ("exec", "eval")
-            and self._yields_a_tree(argument)
-        ):
-            argument = None
+            candidates = []
+        sink, argument = None, None
+        # EVERY sink an undecidable choice of callee can select, not just the first
+        # that resolved: `(compile if flag else exec)(f"import {name}")` resolved to
+        # `compile`, whose single argument is then rejected as incomplete, and the
+        # `exec` the other branch really does reach was never asked about.
+        for candidate in candidates:
+            if _partial_sink(node.func, self._alias, self._is_shadowed):
+                # The source of `functools.partial(exec, f"...")()` was bound when the
+                # partial was built, so the outer call carries no arguments at all - but
+                # `functools.partial(exec)(f"...")` supplies it at call time instead, and
+                # asking only the inner call read that as having no source.
+                found = _source_argument(
+                    _partial_call(node.func, self._alias, self._is_shadowed),
+                    candidate, self._is_shadowed, skip = 1,
+                )
+                if found is None:
+                    found = _source_argument(node, candidate, self._is_shadowed)
+            else:
+                found = _source_argument(node, candidate, self._is_shadowed)
+            if (
+                found is not None
+                and candidate.rpartition(".")[2] in ("exec", "eval")
+                and self._yields_a_tree(found)
+            ):
+                found = None
+            if found is not None:
+                sink, argument = candidate, found
+                break
         if argument is not None:
             # The taint lookup has to happen wherever the unwrapping stops, not only
             # when the argument is a bare name: `payload = f"import {name}"` followed
@@ -6688,6 +6933,12 @@ NOTEBOOK_SUFFIX = ".ipynb"
 # is its own module, an unparseable one is counted rather than failing the file, since
 # a heredoc may be shell or YAML templating rather than Python.
 WORKFLOW_SUFFIXES = (".yml", ".yaml")
+
+# A committed shell script runs Python the same way a workflow step does: a heredoc fed
+# to `python -`, or a one-line `python -c`. `studio/setup.sh` and the ROCm installer both
+# do it, and a sink written inside one of those programs was covered by nothing, so the
+# hard gate stayed green over executable source the repository ships.
+SHELL_SUFFIXES = (".sh",)
 
 # `<<EOF`, `<<'PY'`, `<<-"EOF"`: the delimiter, quoted or not.
 _HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
@@ -7776,7 +8027,11 @@ def _python_dash_c_commands(text: str):
 
 
 def _scan_workflow(path: Path) -> list[dict]:
-    """Findings in the Python heredocs a workflow file runs.
+    """Findings in the Python heredocs a workflow file or shell script runs.
+
+    A committed `.sh` is read the same way: the whole file is shell, so the heredoc and
+    `python -c` patterns apply to it directly rather than to a `run:` block lifted out
+    of YAML.
 
     One visitor for the file, as for a notebook, and one qualname prefix per block.
     A block that will not parse is counted in NOTEBOOK_SKIPPED rather than failing the
@@ -7827,7 +8082,7 @@ def scan_file(path: Path) -> list[dict]:
     # nothing to do with dynamic execution.
     if path.suffix == NOTEBOOK_SUFFIX:
         return _scan_notebook(path)
-    if path.suffix in WORKFLOW_SUFFIXES:
+    if path.suffix in (*WORKFLOW_SUFFIXES, *SHELL_SUFFIXES):
         return _scan_workflow(path)
     try:
         # Bytes, not text. `ast.parse` applies the PEP 263 coding declaration itself,
@@ -7906,13 +8161,18 @@ def collect_paths(targets: list[str]) -> tuple[list[Path], list[str]]:
     paths, missing = [], []
     for target in targets:
         root = REPO_ROOT / target
-        if root.is_file() and root.suffix in (".py", NOTEBOOK_SUFFIX, *WORKFLOW_SUFFIXES):
+        if root.is_file() and root.suffix in (
+            ".py", NOTEBOOK_SUFFIX, *WORKFLOW_SUFFIXES, *SHELL_SUFFIXES,
+        ):
             paths.append(root)
         elif root.is_dir():
             # `is_file()` on each hit, so a directory named `foo.py` and a symlink that
             # points at one are skipped rather than read.
             before = len(paths)
-            for pattern in ("*.py", f"*{NOTEBOOK_SUFFIX}", *(f"*{x}" for x in WORKFLOW_SUFFIXES)):
+            for pattern in (
+                "*.py", f"*{NOTEBOOK_SUFFIX}",
+                *(f"*{x}" for x in (*WORKFLOW_SUFFIXES, *SHELL_SUFFIXES)),
+            ):
                 paths.extend(
                     p for p in root.rglob(pattern)
                     if p.is_file() and not _EXCLUDED_PARTS & set(_exclusion_parts(p, root))
