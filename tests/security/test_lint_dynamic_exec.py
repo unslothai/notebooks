@@ -291,6 +291,12 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'a class name rebound elsewhere is no longer that class': 'class Safe:\n    def format(self, value):\n        return "pass"\nSafe = lambda: "import {}"\ndef f(name):\n    exec(Safe().format(name))\n',
+    'a set expanded into compile can yield any element first': 'def f(name):\n    compile(*{"exec", "<x>", f"import {name}"})\n',
+    'an invoked lambda hands its argument to its body': 'def f(name):\n    exec((lambda source: source)(f"import {name}"))\n',
+    'a computed comprehension target is evaluated on every pass': 'def f(name, table):\n    [None for table[exec(f"import {name}")] in [1]]\n',
+    'a piece after the first separator can carry the spliced value': 'def f(name):\n    exec(f"{name}#pass".partition("#")[2])\n',
+    'a zero maxsplit hands back the whole receiver': 'def f(name):\n    exec(f"PREFIX{name}".split("PREFIX", 0)[0])\n',
     'a piece of a split string still holds the interpolation': 'def f(name):\n    exec(f"import {name}".partition("#")[0])\n',
     'an immediately invoked lambda returns what its body builds': 'def f(name):\n    exec((lambda: f"import {name}")())\n',
     'two calls that read the same source are not the same value': 'def f(values, scope):\n    exec(f"{next(values)}".removeprefix(f"{next(values)}"), scope)\n',
@@ -344,6 +350,9 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'a global declaration leaves the name in the enclosing scope': 'payload = f"import {name}"\ndef f():\n    global payload\n    exec(payload)\n    payload = "pass"\nf()\n',
+    'a nonlocal declaration leaves the name in the enclosing scope': 'def outer(name):\n    payload = f"import {name}"\n    def f():\n        nonlocal payload\n        exec(payload)\n        payload = "pass"\n    f()\n',
+    'a closure reads what its scope binds after the def': 'def f(name):\n    payload = "pass"\n    def inner():\n        exec(payload)\n    payload = f"import {name}"\n    inner()\n',
     'a nested function closes over the enclosing source': 'def f(name):\n    payload = f"import {name}"\n    def inner():\n        exec(payload)\n    inner()\n',
     'an attribute holds the source it was given': 'def f(self, name):\n    self.payload = f"import {name}"\n    exec(self.payload)\n',
     'a literal subscript holds the source it was given': 'def f(name, payloads):\n    payloads["run"] = f"import {name}"\n    exec(payloads["run"])\n',
@@ -380,6 +389,11 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a replace between two literals splices nothing': 'def f():\n    exec("pass".replace("x", "y"))\n',
+    'a replace with a zero count performs no replacement': 'def f(name):\n    exec("pass".replace("x", name, 0))\n',
+    'a leading literal separator leaves the first piece empty': 'def f(name):\n    exec(f"PREFIX{name}".partition("PREFIX")[0])\n',
+    'a trailing literal separator leaves the last piece fixed': 'def f(name):\n    exec(f"{name}#pass".rpartition("#")[2])\n',
+    'a compile that binds one parameter twice raises first': 'def f(name):\n    compile(f"import {name}", "<x>", "exec", source = "pass")\n',
     'a local map is not the builtin': 'def f(map, name):\n    list(map(exec, [f"import {name}"]))\n',
     'map takes no keyword arguments': 'def f(name):\n    list(map(exec, [f"import {name}"], nope = True))\n',
     'a partial consumer never reaches the later element': 'def f(name):\n    next(map(exec, ["pass", f"import {name}"]))\n',
@@ -472,6 +486,7 @@ def test_code_that_cannot_execute_a_built_string_is_quiet(description, tmp_path)
 
 # A magic or interpreter invocation that really does execute the cell body.
 _NOTEBOOK_RUNS_PYTHON = {
+    'an unrecognised automagic does not hide the rest of the cell': '{"cells": [{"cell_type": "code", "metadata": {}, "source": "pip install requests\\nname = input()\\nexec(f\\"import {name}\\")\\n", "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'an interactive command still reads the cell body': '{"cells": [{"cell_type": "code", "metadata": {}, "source": ["%%script python -i -c \\"pass\\"\\n", "exec(f\\"import {name}\\")\\n"], "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'a shell escape running python -c carries a program': '{"cells": [{"cell_type": "code", "source": "!python -c \'name=input(); exec(f\\"import {name}\\")\'\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'a bundled short option carries its attached program': '{"cells": [{"cell_type": "code", "source": "%%script python -uc\'name=\\"x\\";exec(f\\"import {name}\\")\'\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',

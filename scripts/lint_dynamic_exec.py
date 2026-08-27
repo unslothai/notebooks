@@ -769,6 +769,82 @@ def _interpolated_starred(node, resolve = None, shadowed = None, resolve_alias =
 _SPLITTERS = ("split", "rsplit", "partition", "rpartition", "splitlines")
 
 
+def _constant_integer(node) -> int | None:
+    """A written-out `int`, including the `-1` spelling that is a `UnaryOp`."""
+    sign = 1
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+        sign = -1 if isinstance(node.op, ast.USub) else 1
+        node = node.operand
+    if isinstance(node, ast.Constant) and isinstance(node.value, int):
+        if isinstance(node.value, bool):
+            return None
+        return sign * node.value
+    return None
+
+
+def _split_piece_is_literal(inner: ast.Call, index_node) -> bool:
+    """Whether the selected piece of a split receiver is fixed text whatever is spliced.
+
+    `f"PREFIX{name}".partition("PREFIX")[0]` is the empty string however `name` is
+    spelled: the separator sits in the receiver's own leading literal, so the first
+    split point falls inside that literal and everything before it is literal too. The
+    mirror holds for the LAST piece of `rpartition` and `rsplit` against the trailing
+    literal.
+
+    Only that case. `f"{name}#pass".partition("#")[2]` looks fixed and is not: a `name`
+    containing `#` moves the first separator into the spliced value and the piece after
+    it carries the rest of that value.
+    """
+    receiver = inner.func.value
+    if not isinstance(receiver, ast.JoinedStr):
+        return False
+    separator = inner.args[0] if inner.args else None
+    for keyword in inner.keywords:
+        if keyword.arg == "sep":
+            separator = keyword.value
+    if not (
+        isinstance(separator, ast.Constant)
+        and isinstance(separator.value, str)
+        and separator.value
+    ):
+        return False
+    index = _constant_integer(index_node)
+    if index is None:
+        return False
+    leading, trailing = "", ""
+    for value in receiver.values:
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            leading += value.value
+        else:
+            break
+    for value in reversed(receiver.values):
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            trailing = value.value + trailing
+        else:
+            break
+    method = inner.func.attr
+    if method in ("partition", "rpartition"):
+        if method == "partition" and index == 0:
+            return separator.value in leading
+        if method == "rpartition" and index == 2:
+            return separator.value in trailing
+        return False
+    # `split` and `rsplit` take a maxsplit, and a maxsplit of zero performs no split
+    # at all: the single piece is the WHOLE receiver, interpolation included. A
+    # maxsplit this cannot read is treated the same way.
+    maxsplit = inner.args[1] if len(inner.args) > 1 else None
+    for keyword in inner.keywords:
+        if keyword.arg == "maxsplit":
+            maxsplit = keyword.value
+    if maxsplit is not None and _constant_integer(maxsplit) == 0:
+        return False
+    if method == "split" and index == 0:
+        return separator.value in leading
+    if method == "rsplit" and index == -1:
+        return separator.value in trailing
+    return False
+
+
 def _interpolated_split_element(node, resolve = None, shadowed = None, resolve_alias = None):
     """The source a `s.split(...)[i]` selection still carries, if any."""
     if not isinstance(node, ast.Subscript):
@@ -777,6 +853,8 @@ def _interpolated_split_element(node, resolve = None, shadowed = None, resolve_a
     if not (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Attribute)):
         return None
     if inner.func.attr not in _SPLITTERS:
+        return None
+    if _split_piece_is_literal(inner, node.slice):
         return None
     return _is_interpolated(inner.func.value, resolve, shadowed, resolve_alias)
 
@@ -822,6 +900,10 @@ def _interpolated_subscript(node, resolve = None, shadowed = None, resolve_alias
 # one file is scanned at a time, and `_Visitor` sets it before it walks anything.
 _LOCAL_CLASSES: dict = {}
 
+# Class names the file also binds to something else. Read alongside the table above:
+# a name that is a class in one place and a lambda in another is no evidence at all.
+_REBOUND_CLASS_NAMES: set = set()
+
 
 def _visibly_local_instance(node: ast.AST, shadowed = None) -> bool:
     """Whether `node` is written out as an instance of a class defined in this file.
@@ -832,6 +914,8 @@ def _visibly_local_instance(node: ast.AST, shadowed = None) -> bool:
     if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
         return False
     if shadowed is not None and shadowed(node.func.id):
+        return False
+    if node.func.id in _REBOUND_CLASS_NAMES:
         return False
     # A class that SUBCLASSES `str` or `bytes` inherits the real builder unless it
     # overrides it, so `class Template(str): pass` followed by
@@ -1021,16 +1105,76 @@ def _interpolated_binop(node, resolve = None, shadowed = None, resolve_alias = N
     return None
 
 
+def _lambda_scope(node: ast.Call, function: ast.Lambda, resolve, shadowed, resolve_alias):
+    """A `resolve` that answers for an immediately invoked lambda's parameters.
+
+    Positional arguments pair with the parameters in order, keywords by name, and a
+    parameter nobody supplied falls back to its default. A parameter is answered from
+    the CALL, never from the enclosing scope, since it shadows whatever that name
+    meant outside. Every other name is passed straight through.
+    """
+    arguments = function.args
+    positional = [*arguments.posonlyargs, *arguments.args]
+    names = {
+        argument.arg
+        for argument in (
+            *positional, *arguments.kwonlyargs, arguments.vararg, arguments.kwarg,
+        )
+        if argument is not None
+    }
+    bound: dict = {}
+    # `*args` at the call site moves every later argument, so nothing after it pairs
+    # up: those parameters stay unresolved rather than being paired with the wrong
+    # value.
+    for index, argument in enumerate(node.args):
+        if isinstance(argument, ast.Starred):
+            break
+        if index < len(positional):
+            bound[positional[index].arg] = argument
+    for keyword in node.keywords:
+        if keyword.arg is None:
+            # `**mapping` can supply any parameter with anything, so no parameter it
+            # could reach is answered from the call.
+            return resolve
+        if keyword.arg in names:
+            bound[keyword.arg] = keyword.value
+    defaults = arguments.defaults
+    if defaults:
+        for parameter, default in zip(positional[len(positional) - len(defaults):], defaults):
+            bound.setdefault(parameter.arg, default)
+    for parameter, default in zip(arguments.kwonlyargs, arguments.kw_defaults):
+        if default is not None:
+            bound.setdefault(parameter.arg, default)
+
+    def resolve_in_lambda(name):
+        if name in bound:
+            return _is_interpolated(bound[name], resolve, shadowed, resolve_alias)
+        if name in names:
+            return None
+        return resolve(name) if resolve is not None else None
+
+    return resolve_in_lambda
+
+
 def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = None) -> str | None:
     """Every call shape that hands its argument through as source."""
     function = node.func
     if isinstance(function, ast.Lambda):
         # `(lambda: f"import {name}")()` returns exactly what its body evaluates to,
         # and that body is written out right here. The callee is a `Lambda` rather
-        # than a name, so none of the branches below saw it. Parameters are not
-        # resolved: a body reading one is unknown, and `resolve` answers for the
-        # enclosing scope, so `_is_interpolated` reads it as an ordinary name.
-        return _is_interpolated(function.body, resolve, shadowed, resolve_alias)
+        # than a name, so none of the branches below saw it.
+        #
+        # The arguments are matched to the parameters first. A body that returns one
+        # of them, `(lambda source: source)(f"import {name}")`, returns the argument,
+        # and resolving the body against the ENCLOSING scope alone left `source`
+        # unresolved and the call silent. A parameter with no visible argument
+        # resolves to nothing rather than to the enclosing name it shadows.
+        return _is_interpolated(
+            function.body,
+            _lambda_scope(node, function, resolve, shadowed, resolve_alias),
+            shadowed,
+            resolve_alias,
+        )
     preserving = None
     if isinstance(function, ast.Name):
         preserving = function.id
@@ -1417,11 +1561,17 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
     # to _BUILDERS instead raises 5 findings here and 5 in unsloth, all of them
     # that idiom; this branch raises none.
     if isinstance(function, ast.Attribute) and function.attr == "replace":
+        # The receiver's OWN interpolation is read whatever the arguments are; only
+        # the "literal template plus a spliced replacement" reading below depends on
+        # them. Gating the whole branch on the arguments dropped the taint a built
+        # receiver carries, which is the shape this repo's `inspect.getsource`
+        # rewriting has.
+        splices = _replace_can_splice(node)
         receiver = function.value
-        if isinstance(receiver, ast.Constant):
+        if isinstance(receiver, ast.Constant) and splices:
             if isinstance(receiver.value, (str, bytes)):
                 return ".replace() on a literal"
-        if isinstance(receiver, ast.Name) and resolve is not None:
+        if isinstance(receiver, ast.Name) and resolve is not None and splices:
             # `template = "import MODULE"; template.replace("MODULE", name)` is the
             # same splice one line later, which is a two-line refactor away from the
             # literal receiver above. Only a name a written-out string bound: the
@@ -1442,7 +1592,7 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
         if _constructor_name(receiver, shadowed, resolve_alias) in ("str", "bytes"):
             if node.args:
                 template = node.args[0]
-                if isinstance(template, ast.Constant):
+                if isinstance(template, ast.Constant) and splices:
                     if isinstance(template.value, (str, bytes)):
                         return ".replace() on a literal"
                 # The template can be built rather than literal, same as for the
@@ -1451,6 +1601,39 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
     # An unrecognised call shape fell through to the closing `return None` in the
     # original, because a Call is none of the disjoint shapes above it. Spelled out.
     return None
+
+
+def _replace_can_splice(node: ast.Call) -> bool:
+    """Whether a `.replace()` call can put a nonliteral value into its result.
+
+    `"pass".replace("x", "y")` rewrites one literal into another and executes fixed
+    source; `"pass".replace("x", name, 0)` performs no replacement at all. Both were
+    reported on the receiver alone. Only a written-out argument answers here - a
+    replacement this cannot read is assumed to splice, which is the reporting side.
+    """
+    replacement = node.args[1] if len(node.args) > 1 else None
+    for keyword in node.keywords:
+        if keyword.arg == "new":
+            replacement = keyword.value
+        elif keyword.arg is None:
+            # `**mapping` can supply anything, including the replacement.
+            return True
+    if isinstance(replacement, ast.Constant) and isinstance(
+        replacement.value, (str, bytes)
+    ):
+        return False
+    count = node.args[2] if len(node.args) > 2 else None
+    for keyword in node.keywords:
+        if keyword.arg == "count":
+            count = keyword.value
+    if (
+        isinstance(count, ast.Constant)
+        and isinstance(count.value, int)
+        and not isinstance(count.value, bool)
+        and count.value == 0
+    ):
+        return False
+    return True
 
 
 def _always_breaks(body) -> bool:
@@ -2248,6 +2431,9 @@ def _compile_call_is_complete(node: ast.Call, shadowed = None, skip: int = 0) ->
     `compile(source, filename, mode)` has no defaults for any of them. A `*` or `**`
     in the call may supply what is missing, so those are unknown and count as
     complete: this only ever declines to report a call CPython refuses outright.
+
+    False also for a call that binds one parameter twice, which is the other way
+    CPython refuses it outright.
     """
     positional = 0
     named = {keyword.arg for keyword in node.keywords if keyword.arg is not None}
@@ -2283,6 +2469,16 @@ def _compile_call_is_complete(node: ast.Call, shadowed = None, skip: int = 0) ->
             key.value for key in mapping.keys
             if isinstance(key, ast.Constant) and isinstance(key.value, str)
         }
+    # A keyword that repeats a positional makes the call a `TypeError` before any
+    # source is compiled: `compile(f"...", "<x>", "exec", source = "pass")` never runs,
+    # and reporting the f-string in it blocked CI over code CPython refuses.
+    if any(
+        positional > index and wanted in named
+        for index, wanted in enumerate(
+            ("source", "filename", "mode", "flags", "dont_inherit", "optimize")
+        )
+    ):
+        return False
     return all(
         positional > index or wanted in named
         for index, wanted in enumerate(("source", "filename", "mode"))
@@ -2368,7 +2564,15 @@ def _source_argument(node: ast.Call, sink: str, shadowed = None, skip: int = 0) 
                 # expansion as possibly empty merged that filename in and reported it
                 # as executable source.
                 if isinstance(inner, (ast.Tuple, ast.List, ast.Set)) and inner.elts:
-                    candidates.append(inner.elts[0])
+                    # A set has no order: `compile(*{"exec", "<x>", f"import {name}"})`
+                    # yields its three elements in hash order, so ANY of them can be
+                    # the source argument. Reading the one written first said the
+                    # f-string was the mode and reported nothing. A list or tuple does
+                    # state the order, and keeps it.
+                    if isinstance(inner, ast.Set):
+                        candidates.extend(inner.elts)
+                    else:
+                        candidates.append(inner.elts[0])
                     break
                 # An opaque expansion may BE the source, `exec(*[f"..."])`, and it
                 # may also contribute nothing at runtime, in which case the next
@@ -2415,8 +2619,9 @@ class _Visitor(ast.NodeVisitor):
         self.path = path
         # Reset per file, so a class name from the previous one cannot silence a
         # receiver here. Populated by `_collect_aliases` as it walks each scope.
-        global _LOCAL_CLASSES
+        global _LOCAL_CLASSES, _REBOUND_CLASS_NAMES
         _LOCAL_CLASSES = {}
+        _REBOUND_CLASS_NAMES = set()
         # Set for a notebook cell, so two cells defining the same function name are
         # separate allowlist entries rather than colliding on one key.
         self.qualname_prefix = ""
@@ -2462,6 +2667,10 @@ class _Visitor(ast.NodeVisitor):
         # Names declared `nonlocal`, which rebind in the nearest enclosing FUNCTION
         # scope rather than at module level.
         self.nonlocal_names: list[set[str]] = [set()]
+        # Per scope, the names it binds to built source anywhere in its body. Read
+        # when a nested body is entered, since that body runs after the whole
+        # enclosing scope has. Filled in by the caller for the module level.
+        self.future_taint: list[dict] = [{}]
 
     def _visible_scopes(self):
         """Scope indices a name lookup here may consult, innermost first.
@@ -2567,6 +2776,36 @@ class _Visitor(ast.NodeVisitor):
         return parts
 
     @staticmethod
+    def _later_taint(body) -> dict:
+        """Names this scope binds to built source ANYWHERE in it, in one pass.
+
+        A nested function reads its closure when it is CALLED, not where it is
+        written, so `payload = "pass"; def inner(): exec(payload); payload = f"..."`
+        really does execute the f-string. Inheriting only the taint present at the
+        `def` froze the cell at the wrong moment and reported nothing.
+
+        Written-out assignments only, resolved against nothing: this answers "does the
+        scope ever put built source in that name", which does not depend on where the
+        reader sits. Order-sensitive reasoning stays where it belongs, in the walk.
+        """
+        found: dict = {}
+        for statement in body:
+            for child in _walk_this_scope(statement):
+                if isinstance(child, ast.Assign):
+                    targets = child.targets
+                elif isinstance(child, ast.AnnAssign) and child.value is not None:
+                    targets = [child.target]
+                else:
+                    continue
+                reason = _is_interpolated(child.value)
+                if reason is None or isinstance(reason, _LiteralText):
+                    continue
+                for target in targets:
+                    if isinstance(target, ast.Name):
+                        found.setdefault(target.id, reason)
+        return found
+
+    @staticmethod
     def _declared_locals(node) -> set:
         """Names a function body binds itself, so its closure never reads the outer one.
 
@@ -2598,6 +2837,17 @@ class _Visitor(ast.NodeVisitor):
                     names.add(child.name)
                 elif isinstance(child, ast.ExceptHandler) and child.name:
                     names.add(child.name)
+        # A name the body declares `global` or `nonlocal` is NOT one of its locals,
+        # however many times the body assigns it: the assignment writes the enclosing
+        # cell. Counting it as local dropped the enclosing taint before the body was
+        # read, so `def f(): global payload; exec(payload); payload = "pass"` executed
+        # a payload built outside and reported nothing.
+        declared = set()
+        for statement in getattr(node, "body", []) or []:
+            for child in _walk_this_scope(statement):
+                if isinstance(child, (ast.Global, ast.Nonlocal)):
+                    declared.update(child.names)
+        names -= declared
         return names
 
     def _enter(self, node):
@@ -2658,12 +2908,26 @@ class _Visitor(ast.NodeVisitor):
         # names the nested body binds itself are left out, since those are its own
         # locals for the whole body and the closure never sees the outer one.
         inherited = {}
-        if not isinstance(node, ast.ClassDef) and self.scope_kinds[-1] == "function":
+        if not isinstance(node, ast.ClassDef):
             bound_here = self._declared_locals(node)
-            inherited = {
-                name: reason for name, reason in self.tainted[-1].items()
-                if isinstance(name, str) and name not in bound_here
-            }
+            if self.scope_kinds[-1] == "function":
+                inherited = {
+                    name: reason for name, reason in self.tainted[-1].items()
+                    if isinstance(name, str) and name not in bound_here
+                }
+            # And what the enclosing scope binds LATER. The body is deferred, so a
+            # write BELOW the `def` has already happened by the time it runs:
+            # `payload = "pass"; def inner(): exec(payload); payload = f"..."` executes
+            # the f-string. Reading the enclosing map alone froze the cell at the
+            # `def`. This holds whatever encloses the body, module scope included,
+            # which is why it sits outside the test above.
+            # These OVERRIDE what the enclosing map holds now, which is the state at
+            # the `def` and not the state at the call: in the example above the map
+            # says `payload` is the literal `"pass"` at that line, and keeping it left
+            # the body reading a value that has been replaced by the time it runs.
+            for name, reason in self.future_taint[-1].items():
+                if name not in bound_here:
+                    inherited[name] = reason
         self.tainted.append(
             self._implicit_base_taint() if isinstance(node, ast.ClassDef) else inherited
         )
@@ -2677,6 +2941,11 @@ class _Visitor(ast.NodeVisitor):
         self.star_restored.append(set())
         self.global_names.append(set())
         self.nonlocal_names.append(set())
+        # A class body is not a lexical scope, so a function nested in one closes over
+        # whatever encloses the CLASS; it has no later bindings of its own to offer.
+        self.future_taint.append(
+            {} if isinstance(node, ast.ClassDef) else self._later_taint(node.body)
+        )
         if not isinstance(node, ast.ClassDef):
             arguments = node.args
             defaults = outer_defaults
@@ -2724,6 +2993,7 @@ class _Visitor(ast.NodeVisitor):
         self.star_restored.pop()
         self.global_names.pop()
         self.nonlocal_names.pop()
+        self.future_taint.pop()
         self.tainted.pop()
         self.scope.pop()
         self.scope_kinds.pop()
@@ -3824,6 +4094,21 @@ class _Visitor(ast.NodeVisitor):
         """`class Safe:` makes `Safe()` a receiver whose methods are not string ones."""
         if isinstance(statement, ast.ClassDef):
             _LOCAL_CLASSES[statement.name] = statement
+            return
+        # Any OTHER binding of that name takes the exemption away, permanently and
+        # file-wide. `class Safe: ...` followed by `Safe = lambda: "import {}"` leaves
+        # `Safe()` a plain string builder, and reading the class definition through the
+        # new value made `exec(Safe().format(name))` silent. The table is a file-wide
+        # fact, so the withdrawal is one too: a name that means two things somewhere in
+        # the file earns no exemption anywhere in it.
+        for child in _walk_this_scope(statement):
+            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
+                _REBOUND_CLASS_NAMES.add(child.id)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                _REBOUND_CLASS_NAMES.add(child.name)
+            elif isinstance(child, (ast.Import, ast.ImportFrom)):
+                for alias in child.names:
+                    _REBOUND_CLASS_NAMES.add(alias.asname or alias.name.split(".")[0])
 
     def _alias_pass_definition(self, statement, declared, rebound) -> None:
         """A `def` or `class` binds its own name in THIS scope.
@@ -4888,6 +5173,9 @@ class _Visitor(ast.NodeVisitor):
         self.star_restored.append(set())
         self.global_names.append(set())
         self.nonlocal_names.append(set())
+        # A lambda body and a comprehension bind nothing later that a nested body
+        # could read, so the parallel stack stays level with an empty frame.
+        self.future_taint.append({})
         # The default aliases go in the lambda's OWN scope. Written to the enclosing
         # one they were invisible from the body whenever that scope was a class body,
         # because `_visible_scopes` skips class levels once a function level is on top.
@@ -4919,6 +5207,7 @@ class _Visitor(ast.NodeVisitor):
         self.star_restored.pop()
         self.global_names.pop()
         self.nonlocal_names.pop()
+        self.future_taint.pop()
         self._restore_locals(saved_scope)
         # A lambda IS a function scope, so a walrus in its body binds locally and
         # nothing it does reaches the enclosing map. Restoring the parameters alone
@@ -4993,6 +5282,9 @@ class _Visitor(ast.NodeVisitor):
         self.star_restored.append(set())
         self.global_names.append(set())
         self.nonlocal_names.append(set())
+        # A lambda body and a comprehension bind nothing later that a nested body
+        # could read, so the parallel stack stays level with an empty frame.
+        self.future_taint.append({})
         # Shadows are installed AFTER the push, so they land in the comprehension's own
         # scope. Recording them in the enclosing one was invisible from the body when
         # that scope was a class body, because `_visible_scopes` skips class levels
@@ -5015,6 +5307,18 @@ class _Visitor(ast.NodeVisitor):
                 for child in ast.walk(generator.target)
                 if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store)
             }
+            # A target that is not a plain name is EVALUATED on every iteration:
+            # `[None for table[exec(f"import {name}")] in [1]]` calls the builtin to
+            # work out where to store. Only stored names were extracted here, so the
+            # subscript and its index were never read. Visited under the same test the
+            # filters use, since a generator that yields nothing never binds.
+            if self._generator_yields(generator):
+                for child in ast.walk(generator.target):
+                    if isinstance(child, ast.Subscript):
+                        self.visit(child.value)
+                        self.visit(child.slice)
+                    elif isinstance(child, ast.Attribute):
+                        self.visit(child.value)
             # Computed HERE, for this generator only. Precomputing every generator up
             # front let a later `for exec in [print]` overwrite an earlier
             # `for exec in [builtins.exec]`, so a real call in the earlier filter was
@@ -5099,6 +5403,7 @@ class _Visitor(ast.NodeVisitor):
         self.star_restored.pop()
         self.global_names.pop()
         self.nonlocal_names.pop()
+        self.future_taint.pop()
         # Only the target names are put back. Restoring the whole map discarded any
         # walrus made inside the comprehension, which binds in the ENCLOSING scope and
         # outlives it: `[... for x in y if (payload := f"import {name}")]` then
@@ -6115,6 +6420,49 @@ def _foreign_cell_magic(code: str) -> str | None:
     return None
 
 
+# How many lines one cell may lose to recovery before it is given up on. A cell that
+# needs more than this is not Python with a magic in it, it is something else.
+_RECOVERY_LIMIT = 20
+
+
+def _blanked_unparseable(source: str) -> str | None:
+    """`source` with the individual lines that will not parse blanked out.
+
+    IPython's automagic runs `pip install requests` as `%pip install requests`, and
+    there is no list of every alias a running kernel might have: `_neutralised` can
+    only rewrite the spellings it knows. A line it does not know left the whole cell
+    unparseable, and the whole cell was then skipped - including any sink written
+    below the magic, which is the part that matters.
+
+    So the unrecognised line is dropped instead of the cell. Strictly more code is
+    read than before: a cell that recovers here was contributing nothing at all.
+    """
+    lines = source.splitlines()
+    removed = 0
+    while removed < _RECOVERY_LIMIT:
+        try:
+            ast.parse("\n".join(lines))
+        except (SyntaxError, ValueError) as error:
+            number = getattr(error, "lineno", None)
+            if not isinstance(number, int) or not 1 <= number <= len(lines):
+                return None
+            if not lines[number - 1].strip():
+                # Blanking it again would loop: the reported line is already empty, so
+                # the error is about the structure around it and no line can be blamed.
+                return None
+            indent = lines[number - 1][: len(lines[number - 1]) - len(lines[number - 1].lstrip())]
+            # `pass` at the same indentation rather than a blank line, so a magic alone
+            # in an `if:` body does not leave an empty block - the same reason
+            # `_neutralised` writes `pass` there.
+            lines[number - 1] = indent + "pass"
+            removed += 1
+            continue
+        except (MemoryError, RecursionError):
+            return None
+        return "\n".join(lines) if removed else None
+    return None
+
+
 def _parse_cell(code: str, filename: str):
     """The cell's AST, trying it verbatim before neutralising anything.
 
@@ -6141,6 +6489,14 @@ def _parse_cell(code: str, filename: str):
                     f"{filename}: hit a parser limit ({error.__class__.__name__}), so "
                     f"the cell was not checked"
                 ) from None
+        # Last resort: drop the individual lines that will not parse rather than the
+        # cell they are in.
+        recovered = _blanked_unparseable(_neutralised(code))
+        if recovered is not None:
+            try:
+                return ast.parse(recovered, filename = filename)
+            except (SyntaxError, ValueError, MemoryError, RecursionError):
+                return None
     return None
 
 
@@ -6192,6 +6548,7 @@ def _scan_notebook(path: Path) -> list[dict]:
     # in cell 0 is called after cell 1 has run, so an alias imported later is visible
     # to it - collecting per cell analysed that function before the import existed.
     for _index, tree in parsed:
+        visitor.future_taint[0].update(visitor._later_taint(tree.body))
         visitor._collect_aliases(tree.body)
     for index, tree in parsed:
         if _annotations_deferred(tree):
@@ -6264,6 +6621,7 @@ def scan_file(path: Path) -> list[dict]:
         ) from None
     visitor = _Visitor(path)
     visitor.annotations_deferred = _annotations_deferred(tree)
+    visitor.future_taint[0].update(visitor._later_taint(tree.body))
     visitor._collect_aliases(tree.body)
     try:
         visitor.visit(tree)
