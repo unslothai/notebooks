@@ -300,21 +300,33 @@ def _constructor_accepts_text(node: ast.Call, name: str) -> bool:
     return True
 
 
-def _partial_call(node: ast.AST) -> ast.Call | None:
-    """`functools.partial(...)` or a bare `partial(...)` written out here, else None."""
-    if not isinstance(node, ast.Call):
+def _partial_call(node: ast.AST, aliases = None, shadowed = None) -> ast.Call | None:
+    """`functools.partial(...)`, a bare `partial(...)`, or a recorded alias of it.
+
+    `from functools import partial as bind` makes `bind(exec, f"...")()` the same
+    call, so reading only the spelling at the call site missed it. Only a name an
+    import from `functools` bound is accepted, and only while it is not shadowed, so
+    this stays a fact stated in the file rather than a guess about what a name holds.
+    """
+    if not isinstance(node, ast.Call) or not node.args:
         return None
     function = node.func
-    name = (
-        function.attr if isinstance(function, ast.Attribute)
-        else (function.id if isinstance(function, ast.Name) else "")
-    )
-    return node if name == "partial" and node.args else None
+    if isinstance(function, ast.Attribute):
+        return node if function.attr == "partial" else None
+    if not isinstance(function, ast.Name):
+        return None
+    if shadowed is not None and shadowed(function.id):
+        return None
+    if function.id == "partial":
+        return node
+    if aliases is not None and aliases(f"partial:{function.id}"):
+        return node
+    return None
 
 
 def _partial_sink(node: ast.AST, aliases = None, shadowed = None) -> str | None:
     """The sink a visible `partial` was built around, else None."""
-    partial = _partial_call(node)
+    partial = _partial_call(node, aliases, shadowed)
     if partial is None:
         return None
     return _sink_name(partial.args[0], aliases, shadowed)
@@ -668,6 +680,40 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             return _is_interpolated(
                 ast.copy_location(inner, node), resolve, shadowed, resolve_alias,
             )
+        if function.attr == "compile_command" and isinstance(function.value, ast.Name):
+            # `exec(codeop.compile_command(f"..."))` hands back a code object compiled
+            # FROM the interpolated source, so the source survives the conversion
+            # exactly as `ast.parse` does. Checked against the stdlib:
+            # `codeop.compile_command("x = 1")` returns a `code` object. Receiver
+            # written out and unshadowed; positional or the documented `source` keyword.
+            compiled = node.args[0] if node.args else None
+            if compiled is None:
+                for keyword in reversed(node.keywords):
+                    if keyword.arg == "source":
+                        compiled = keyword.value
+                        break
+            if compiled is not None and function.value.id == "codeop" and not (
+                shadowed is not None and shadowed("codeop")
+            ):
+                return _is_interpolated(compiled, resolve, shadowed, resolve_alias)
+        if function.attr in ("add", "concat") and isinstance(function.value, ast.Name):
+            # `exec(operator.add("import ", name))` builds the same string the `+`
+            # operator does, and the stdlib documents `operator.concat` the same way.
+            # Rebuilt as that operator and read there, which also applies the visibly
+            # numeric exclusion, so `operator.add(1, 2)` stays quiet. Receiver written
+            # out and unshadowed, two positional arguments, the only shape these take.
+            if (
+                function.value.id == "operator"
+                and len(node.args) == 2
+                and not node.keywords
+                and not (shadowed is not None and shadowed("operator"))
+            ):
+                equivalent = ast.BinOp(
+                    left = node.args[0], op = ast.Add(), right = node.args[1],
+                )
+                return _is_interpolated(
+                    ast.copy_location(equivalent, node), resolve, shadowed, resolve_alias,
+                )
         if function.attr == "parse" and isinstance(function.value, ast.Name):
             # `compile(ast.parse(f"..."), "<x>", "exec")` compiles the tree that
             # was parsed FROM the interpolated source, so the source survives the
@@ -968,6 +1014,12 @@ def _getattr_sink_name(function: ast.Call, aliases = None, shadowed = None) -> s
         ):
             owner, attribute = function.args[0], function.args[1]
             if isinstance(attribute, ast.Constant) and attribute.value in SINKS:
+                if _literal_builtins_import(owner, shadowed):
+                    # `getattr(__import__("builtins"), "exec")` names the module
+                    # inline, so the owner is a Call rather than a Name and the
+                    # branch below never ran. Same reasoning as the attribute
+                    # spelling: nothing is guessed at, the module is written out.
+                    return f"builtins.{attribute.value}"
                 if isinstance(owner, ast.Name):
                     module = owner.id
                     if shadowed is not None and shadowed(module):
@@ -2104,6 +2156,7 @@ class _Visitor(ast.NodeVisitor):
                 table[-1].pop(target.id, None)
                 table[-1].pop(f"module:{target.id}", None)
                 table[-1].pop(f"constructor:{target.id}", None)
+                table[-1].pop(f"partial:{target.id}", None)
             level = self._binding_level(target.id)
             if level != len(self.scope_kinds) - 1:
                 # `global exec; del exec` deletes the MODULE binding, so the shadow an
@@ -2115,6 +2168,7 @@ class _Visitor(ast.NodeVisitor):
                     table[level].pop(target.id, None)
                     table[level].pop(f"module:{target.id}", None)
                     table[level].pop(f"constructor:{target.id}", None)
+                    table[level].pop(f"partial:{target.id}", None)
                 self.shadowed_sinks[level].discard(target.id)
                 continue
             if self.scope_kinds[-1] == "function":
@@ -2759,6 +2813,15 @@ class _Visitor(ast.NodeVisitor):
                     self.collected_aliases[-1][f"constructor:{constructor}"] = constructor
                     self.shadowed_sinks[-1].discard(constructor)
                 continue
+            if node.module == "functools" and not node.level and alias.name == "partial":
+                # `from functools import partial as bind` gives `bind` the real
+                # `partial`, so `bind(exec, f"...")()` binds the sink and its source
+                # exactly as `functools.partial` does. Only the callee spelling was
+                # read, so the ordinary imported-alias form went unseen.
+                self.sink_aliases[-1][f"partial:{bound}"] = "partial"
+                self.collected_aliases[-1][f"partial:{bound}"] = "partial"
+                self.shadowed_sinks[-1].discard(bound)
+                continue
             if node.module == "builtins" and not node.level and alias.name in _CONSTRUCTORS:
                 # `from builtins import str as s` gives `s` the constructor, exactly as
                 # the sink form gives a name the builtin. Only the sinks were recorded,
@@ -2837,6 +2900,10 @@ class _Visitor(ast.NodeVisitor):
             # missed it and `text = lambda _: "pass"` left the earlier
             # `from builtins import str as text` alias standing.
             or self._alias(f"constructor:{name}") is not None
+            # And a `functools.partial` alias, for the same reason: `bind = print`
+            # inside a function makes `bind` a local for the whole body, so the outer
+            # `from functools import partial as bind` must stop being visible there.
+            or self._alias(f"partial:{name}") is not None
             # A name already recorded as shadowed still counts, so a second assignment
             # can hand it back: `run = print` then `run = builtins.exec` has to make
             # `run` an alias again, and by then the alias entry is gone.
@@ -3100,6 +3167,14 @@ class _Visitor(ast.NodeVisitor):
             return
         if not isinstance(target, ast.Name):
             return
+        # Rebinding the name takes any recorded `functools.partial` alias away:
+        # `from functools import partial as bind; bind = print` makes `bind(...)` a
+        # print, and leaving the record in place reported a call that cannot execute.
+        # Not chased any further, same as the rest of this method: `other = bind` does
+        # not re-record, which can only decline to read a call, never invent one.
+        level = self._binding_level(target.id)
+        self.sink_aliases[level].pop(f"partial:{target.id}", None)
+        self.collected_aliases[level].pop(f"partial:{target.id}", None)
         # With the shadow test: `exec = print; run = exec` makes `run` print, and
         # resolving the spelling alone recorded a sink alias that does not exist.
         partial_sink = _partial_sink(value, self._alias, self._is_shadowed)
@@ -3109,7 +3184,8 @@ class _Visitor(ast.NodeVisitor):
             # threw that argument away, so the zero-argument call had nothing to look
             # at. The reason travels onto the name instead.
             bound = _source_argument(
-                _partial_call(value), partial_sink, self._is_shadowed, skip = 1,
+                _partial_call(value, self._alias, self._is_shadowed),
+                partial_sink, self._is_shadowed, skip = 1,
             )
             reason = _is_interpolated(
                 bound, self.tainted[-1].get, self._is_shadowed, self._alias,
@@ -3185,6 +3261,8 @@ class _Visitor(ast.NodeVisitor):
         # prefixed entry kept unwrapping through a name that means something else.
         self.sink_aliases[level].pop(f"constructor:{target.id}", None)
         self.collected_aliases[level].pop(f"constructor:{target.id}", None)
+        self.sink_aliases[level].pop(f"partial:{target.id}", None)
+        self.collected_aliases[level].pop(f"partial:{target.id}", None)
 
     def _shadow_sink(self, name: str) -> None:
         """Record that `name` was bound to something that is not the builtin.
@@ -3215,6 +3293,7 @@ class _Visitor(ast.NodeVisitor):
             # `from builtins import str as text; text = lambda _: "pass"` kept
             # unwrapping through a name that no longer converts anything.
             table[-1].pop(f"constructor:{name}", None)
+            table[-1].pop(f"partial:{name}", None)
 
     def visit_Lambda(self, node: ast.Lambda):
         """A lambda parameter shadows the enclosing name for the body.
@@ -3507,7 +3586,8 @@ class _Visitor(ast.NodeVisitor):
             # `functools.partial(exec)(f"...")` supplies it at call time instead, and
             # asking only the inner call read that as having no source.
             argument = _source_argument(
-                _partial_call(node.func), sink, self._is_shadowed, skip = 1,
+                _partial_call(node.func, self._alias, self._is_shadowed),
+                sink, self._is_shadowed, skip = 1,
             )
             if argument is None:
                 argument = _source_argument(node, sink, self._is_shadowed)

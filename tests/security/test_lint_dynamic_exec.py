@@ -194,6 +194,8 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'an imported alias of functools.partial binds the sink': 'from functools import partial as bind\ndef f(name):\n    bind(exec, f"import {name}")()\n',
+    'an inline builtins import is a getattr owner': 'def f(name):\n    getattr(__import__("builtins"), "exec")(f"import {name}")\n',
     'a builtins-qualified getattr names the sink': 'import builtins\ndef f(name):\n    builtins.getattr(builtins, "exec")(f"import {name}")\n',
     'a computed key keeps the get default reachable as a callee': 'def f(name, key):\n    {key: print}.get("run", exec)(f"import {name}")\n',
     'a later module-level def does not apply to earlier calls': 'name = "ok"\nexec(f"import {name}")\ndef exec(source):\n    pass\n',
@@ -253,6 +255,9 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'codeop compiles the source it was handed': 'import codeop\ndef f(name):\n    exec(codeop.compile_command(f"import {name}"))\n',
+    'operator.add is concatenation under another name': 'import operator\ndef f(name):\n    exec(operator.add("import ", name))\n',
+    'operator.concat is the same concatenation': 'import operator\ndef f(name):\n    exec(operator.concat("import ", name))\n',
     '__add__ is concatenation written as a call': 'def f(name):\n    exec("print(".__add__(name).__add__(")"))\n',
     '__mod__ is the percent operator written as a call': 'def f(name):\n    exec("print(%r)".__mod__(name))\n',
     '__str__ hands back the same string': 'def f(name):\n    exec(f"import {name}".__str__())\n',
@@ -310,6 +315,8 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a rebound partial alias is no longer partial': 'from functools import partial as bind\ndef f(name):\n    bind = print\n    bind(exec, f"import {name}")()\n',
+    'operator.add on numbers builds no source': 'import operator\ndef f():\n    exec(operator.add(1, 2))\n',
     'a composite default resolving to a shadowed name is not the builtin': 'from re import compile\ndef f(name, run = [compile][0]):\n    run(f"^{name}$")\n',
     'a constant short-circuits a boolean callee': "def f(name):\n    (None and exec)(f'import {name}')\n",
     'a literal condition decides a conditional expression': "def f(name):\n    exec('pass' if True else f'import {name}')\n",
