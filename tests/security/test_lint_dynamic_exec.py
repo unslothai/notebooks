@@ -194,6 +194,12 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'map with a second iterable still calls the sink': 'def f(name):\n    list(map(exec, [f"import {name}"], [{}]))\n',
+    'a for loop over a map consumes it': 'def f(name):\n    for _ in map(exec, [f"import {name}"]):\n        pass\n',
+    'a starred display of a map consumes it': 'def f(name):\n    [*map(exec, [f"import {name}"])]\n',
+    'a template held by a name still substitutes': 'import string\ndef f(name):\n    template = string.Template("import $name")\n    exec(template.substitute(name = name))\n',
+    'a decidable comparison leaves the live binding alone': 'def f(name):\n    payload = f"import {name}"\n    if 1 == 2:\n        payload = "pass"\n    exec(payload)\n',
+    'a local class that subclasses str inherits the builder': 'class Template(str):\n    pass\ndef f(name):\n    exec(Template("import {}").format(name))\n',
     'a directly imported operator builder still concatenates': 'from operator import add as join\ndef f(name):\n    exec(join("import ", name))\n',
     'an undecidable comprehension filter binds no walrus': 'import builtins\ndef f(name, flag):\n    run = builtins.exec\n    [(run := print) for _ in [0] if flag]\n    run(f"import {name}")\n',
     'a string.Template substitution splices like format': 'import string\ndef f(name):\n    exec(string.Template("import $module").substitute(module = name))\n',
@@ -374,6 +380,12 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a local map is not the builtin': 'def f(map, name):\n    list(map(exec, [f"import {name}"]))\n',
+    'map takes no keyword arguments': 'def f(name):\n    list(map(exec, [f"import {name}"], nope = True))\n',
+    'a partial consumer never reaches the later element': 'def f(name):\n    next(map(exec, ["pass", f"import {name}"]))\n',
+    'a walrus binds before the next boolean operand is read': 'def f(name):\n    payload = f"import {name}"\n    exec((payload := "pass") and payload)\n',
+    'rebinding the root clears the path recorded against it': 'import types\ndef f(obj, name):\n    obj.payload = f"import {name}"\n    obj = types.SimpleNamespace(payload = "pass")\n    exec(obj.payload)\n',
+    'a template with no placeholder ignores its arguments': 'import string\ndef f(name):\n    exec(string.Template("pass").substitute(x = name))\n',
     'a nested function that rebinds the name sees its own': 'def f(name):\n    payload = f"import {name}"\n    def inner():\n        payload = "pass"\n        exec(payload)\n    inner()\n',
     'a filter over an empty iterable never runs': 'def f(name):\n    [None for _ in [] if exec(f"import {name}")]\n',
     'an async comprehension over a synchronous literal raises first': 'async def f(name):\n    return [exec(payload) async for payload in [f"import {name}"]]\n',
@@ -460,6 +472,7 @@ def test_code_that_cannot_execute_a_built_string_is_quiet(description, tmp_path)
 
 # A magic or interpreter invocation that really does execute the cell body.
 _NOTEBOOK_RUNS_PYTHON = {
+    'an interactive command still reads the cell body': '{"cells": [{"cell_type": "code", "metadata": {}, "source": ["%%script python -i -c \\"pass\\"\\n", "exec(f\\"import {name}\\")\\n"], "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'a shell escape running python -c carries a program': '{"cells": [{"cell_type": "code", "source": "!python -c \'name=input(); exec(f\\"import {name}\\")\'\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'a bundled short option carries its attached program': '{"cells": [{"cell_type": "code", "source": "%%script python -uc\'name=\\"x\\";exec(f\\"import {name}\\")\'\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'an assignment-form %time binds the value it timed': '{"cells": [{"cell_type": "code", "source": "name = input()\\npayload = %time f\\"import {name}\\"\\nexec(payload)\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',

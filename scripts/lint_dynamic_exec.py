@@ -209,7 +209,7 @@ _OPERATOR_BUILDERS = {
 }
 _BUILTIN_NAMES = frozenset({
     *SINKS, *_CONSTRUCTORS, *_MODULE_RECEIVERS, *_TEXT_PRESERVING_FUNCTIONS,
-    "builtins", "dict", "getattr",
+    "builtins", "dict", "getattr", "map",
     # The bare spelling `_nullcontext_value` accepts. A local of that name provides
     # whatever it likes from `__enter__`, so the shadow test it already performs has
     # to have something to find.
@@ -632,6 +632,23 @@ def _is_interpolated(node: ast.AST, resolve = None, shadowed = None, resolve_ali
     if isinstance(node, ast.BoolOp):
         # `exec(enabled and f"import {name}")` executes the interpolated operand
         # whenever the guard lets it through: same conditional-source shape as IfExp.
+        #
+        # Operands are evaluated left to right, and a walrus in one binds before the
+        # next is read: `exec((payload := "pass") and payload)` executes the literal,
+        # and resolving every operand against the state from before the expression
+        # reported the f-string that name used to hold.
+        walrus = {}
+        for earlier in node.values:
+            for child in ast.walk(earlier):
+                if isinstance(child, ast.NamedExpr) and isinstance(child.target, ast.Name):
+                    walrus[child.target.id] = _is_interpolated(
+                        child.value, resolve, shadowed, resolve_alias,
+                    )
+        if walrus and resolve is not None:
+            outer = resolve
+
+            def resolve(name, _outer = outer, _walrus = walrus):
+                return _walrus[name] if name in _walrus else _outer(name)
         for operand in _reachable_operands(node):
             reason = _is_interpolated(operand, resolve, shadowed, resolve_alias)
             if reason is not None:
@@ -803,7 +820,7 @@ def _interpolated_subscript(node, resolve = None, shadowed = None, resolve_alias
 # Classes the file being scanned defines. Set once per parse, read by the receiver
 # test below. A module-level set rather than another parameter on every resolver:
 # one file is scanned at a time, and `_Visitor` sets it before it walks anything.
-_LOCAL_CLASSES: set = set()
+_LOCAL_CLASSES: dict = {}
 
 
 def _visibly_local_instance(node: ast.AST, shadowed = None) -> bool:
@@ -816,7 +833,56 @@ def _visibly_local_instance(node: ast.AST, shadowed = None) -> bool:
         return False
     if shadowed is not None and shadowed(node.func.id):
         return False
+    # A class that SUBCLASSES `str` or `bytes` inherits the real builder unless it
+    # overrides it, so `class Template(str): pass` followed by
+    # `Template("import {}").format(name)` really does splice. Only a class that
+    # cannot inherit one is treated as not a string builder.
     return node.func.id in _LOCAL_CLASSES
+
+
+def _defines_own_builder(name: str, attribute: str) -> bool:
+    """Whether this local class's `attribute` is its own rather than the string one.
+
+    True when the class writes the method itself, and true when it cannot have
+    inherited one - it subclasses nothing textual. False for `class T(str): pass`,
+    which inherits the real `str.format` and really does splice.
+    """
+    definition = _LOCAL_CLASSES.get(name)
+    if definition is None:
+        return False
+    inherits_text = any(
+        isinstance(base, ast.Name) and base.id in ("str", "bytes")
+        for base in definition.bases
+    )
+    defines = any(
+        isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and statement.name == attribute
+        for statement in definition.body
+    )
+    return defines or not inherits_text
+
+
+def _has_template_placeholder(template: str) -> bool:
+    """Whether a `string.Template` body has a placeholder to substitute into.
+
+    Read with `string.Template.pattern` itself, so `$$` is the escaped dollar it
+    really is and `$$name` renders as the literal `$name` with nothing substituted.
+    A hand-written regex got that one wrong.
+    """
+    return any(
+        match.group("named") or match.group("braced")
+        for match in string.Template.pattern.finditer(template)
+    )
+
+
+def _template_text(node: ast.AST):
+    """The written-out template a `string.Template(...)` was built from, else None."""
+    if not isinstance(node, ast.Call) or not node.args:
+        return None
+    first = node.args[0]
+    if isinstance(first, ast.Constant) and isinstance(first.value, str):
+        return first.value
+    return None
 
 
 def _is_template_call(node: ast.AST, shadowed = None, aliases = None) -> bool:
@@ -838,6 +904,16 @@ def _is_template_call(node: ast.AST, shadowed = None, aliases = None) -> bool:
             return False
         return aliases is not None and aliases(f"stdlibfunc:{function.id}") == "string.Template"
     return False
+
+
+def _bound_template(node: ast.AST, shadowed = None, aliases = None):
+    """The `string.Template(...)` a name was bound to, else None."""
+    if not isinstance(node, ast.Name) or aliases is None:
+        return None
+    if shadowed is not None and shadowed(node.id):
+        return None
+    held = aliases(f"template:{node.id}")
+    return held if isinstance(held, ast.Call) else None
 
 
 def _is_stable(node: ast.AST) -> bool:
@@ -1201,17 +1277,32 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                     if node.args else None
                 )
             return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
+        template_receiver = function.value
+        if function.attr in _TEMPLATE_BUILDERS:
+            bound = _bound_template(function.value, shadowed, resolve_alias)
+            if bound is not None:
+                template_receiver = bound
         if function.attr in _TEMPLATE_BUILDERS and _is_template_call(
-            function.value, shadowed, resolve_alias,
+            template_receiver, shadowed, resolve_alias,
         ):
             # A `string.Template` substitution builds source out of the values it is
             # handed, exactly as `.format` does. The receiver has to be a written-out
             # `Template(...)`, so nothing is guessed about what an arbitrary object's
             # `substitute` returns.
+            template = _template_text(template_receiver)
+            if template is not None and not _has_template_placeholder(template):
+                # `string.Template("pass").substitute(x = name)` has no placeholder,
+                # so the mapping is never consulted and the result is the literal.
+                # Same rule the field-free `.format()` case applies.
+                return None
             if node.args or node.keywords:
                 return f".{function.attr}()"
             return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
-        if function.attr in _BUILDERS and _visibly_local_instance(function.value, shadowed):
+        if (
+            function.attr in _BUILDERS
+            and _visibly_local_instance(function.value, shadowed)
+            and _defines_own_builder(function.value.func.id, function.attr)
+        ):
             # `class Safe: def format(self, v): return "pass"` followed by
             # `Safe().format(name)` is not a string builder at all, and reporting it
             # failed the gate on code that cannot be changed to pass. Only a receiver
@@ -1775,6 +1866,43 @@ def _constant_truth(test: ast.AST):
     if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
         inner = _constant_truth(test.operand)
         return None if inner is None else not inner
+    if isinstance(test, ast.Compare):
+        # `if 1 == 2:` is decidable, and reading it as unknown traversed a suite that
+        # cannot run and applied its assignments. Only written-out constants on every
+        # side, and only the comparisons whose result depends on nothing else; `is`
+        # and `in` are left alone, since identity and membership of equal literals are
+        # not decided by their values.
+        operands = [test.left, *test.comparators]
+        if all(
+            isinstance(operand, ast.Constant) and not isinstance(operand.value, bool)
+            for operand in operands
+        ) and all(
+            isinstance(operator, (ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE))
+            for operator in test.ops
+        ):
+            # Compared here rather than by evaluating the expression: this file is
+            # itself scanned by this gate, and building a `compile`/`eval` pair to
+            # fold a constant would be exactly the shape it exists to report.
+            comparisons = {
+                ast.Eq: lambda a, b: a == b,
+                ast.NotEq: lambda a, b: a != b,
+                ast.Lt: lambda a, b: a < b,
+                ast.LtE: lambda a, b: a <= b,
+                ast.Gt: lambda a, b: a > b,
+                ast.GtE: lambda a, b: a >= b,
+            }
+            try:
+                for index, operator in enumerate(test.ops):
+                    left = operands[index].value
+                    right = operands[index + 1].value
+                    if not comparisons[type(operator)](left, right):
+                        return False
+            except TypeError:
+                # `1 < "a"` raises at runtime, so the condition decides nothing and
+                # the statement does not complete either.
+                return None
+            return True
+        return None
     if isinstance(test, ast.BoolOp):
         # `True and False` is decidable, and reading it as unknown left a walrus in a
         # comprehension filter that never runs looking like it had bound its target.
@@ -2288,7 +2416,7 @@ class _Visitor(ast.NodeVisitor):
         # Reset per file, so a class name from the previous one cannot silence a
         # receiver here. Populated by `_collect_aliases` as it walks each scope.
         global _LOCAL_CLASSES
-        _LOCAL_CLASSES = set()
+        _LOCAL_CLASSES = {}
         # Set for a notebook cell, so two cells defining the same function name are
         # separate allowlist entries rather than colliding on one key.
         self.qualname_prefix = ""
@@ -2866,6 +2994,10 @@ class _Visitor(ast.NodeVisitor):
                         aggregated.setdefault(key, value)
                 self.tainted[-1] = before
             self.tainted[-1].update(aggregated)
+        # `for _ in map(exec, [f"..."]): pass` advances the map, so the callback runs
+        # on every element. The iterable is a call to `map` rather than to the sink,
+        # so nothing had associated the two.
+        self._report_mapped_sinks(self._mapped_sink_elements(node.iter))
         self.visit(node.target)
         # `for exec in callbacks:` calls the callback in the body, not the builtin.
         # Store context only: in `for table[exec] in ...` the `exec` is a subscript key
@@ -3366,7 +3498,7 @@ class _Visitor(ast.NodeVisitor):
                     table[-1].pop(node.name, None)
                     for prefix in (
                         "module:", "constructor:", "partial:", "functools:", "text:",
-                        "stdlib:", "stdlibfunc:",
+                        "stdlib:", "stdlibfunc:", "template:", "builder:",
                     ):
                         table[-1].pop(f"{prefix}{node.name}", None)
         for statement in node.body:
@@ -3691,7 +3823,7 @@ class _Visitor(ast.NodeVisitor):
     def _record_local_class(self, statement) -> None:
         """`class Safe:` makes `Safe()` a receiver whose methods are not string ones."""
         if isinstance(statement, ast.ClassDef):
-            _LOCAL_CLASSES.add(statement.name)
+            _LOCAL_CLASSES[statement.name] = statement
 
     def _alias_pass_definition(self, statement, declared, rebound) -> None:
         """A `def` or `class` binds its own name in THIS scope.
@@ -4484,6 +4616,16 @@ class _Visitor(ast.NodeVisitor):
         level = self._binding_level(target.id)
         for table in (self.sink_aliases, self.collected_aliases):
             table[level].pop(f"builder:{target.id}", None)
+        if _is_template_call(value, self._is_shadowed, self._alias):
+            # `template = string.Template("import $name")` then
+            # `template.substitute(name = name)` splices exactly as the inline
+            # spelling does, and the receiver is a bare name by then. The constructor
+            # call is stored, so the substitution reads the same template text.
+            for table in (self.sink_aliases, self.collected_aliases):
+                table[level][f"template:{target.id}"] = value
+            return
+        for table in (self.sink_aliases, self.collected_aliases):
+            table[level].pop(f"template:{target.id}", None)
         if not isinstance(value, ast.Attribute):
             return
         if value.attr not in (*_BUILDERS, *_TEMPLATE_BUILDERS):
@@ -4530,6 +4672,19 @@ class _Visitor(ast.NodeVisitor):
         # Not chased any further, same as the rest of this method: `other = bind` does
         # not re-record, which can only decline to read a call, never invent one.
         self._record_builder_alias(target, value)
+        # `obj.payload = f"..."` then `obj = something_else` replaces the object, so
+        # the path recorded against the old one no longer describes anything. Only the
+        # bare name was cleared, and the stale `path>obj.payload` reason then rejected
+        # a call that reads the new object.
+        prefix = f"path>{target.id}"
+        for scope in self.tainted:
+            for key in [
+                key for key in scope
+                if isinstance(key, str)
+                and key.startswith(prefix)
+                and (len(key) == len(prefix) or not (key[len(prefix)].isalnum() or key[len(prefix)] == "_"))
+            ]:
+                scope.pop(key, None)
         level = self._binding_level(target.id)
         self.sink_aliases[level].pop(f"partial:{target.id}", None)
         self.collected_aliases[level].pop(f"partial:{target.id}", None)
@@ -5012,10 +5167,14 @@ class _Visitor(ast.NodeVisitor):
     visit_DictComp = _visit_comprehension
     visit_GeneratorExp = _visit_comprehension
 
-    # Calls that consume a `map` eagerly, so the callback really does run.
+    # Calls that consume a `map` and reach EVERY element. `next` takes one, and
+    # `any`/`all` stop at the first result that decides them - a sink returns None,
+    # so `any` runs them all and `all` stops at the first. Only the ones that must
+    # reach every element are listed, so nothing is reported for an element that a
+    # partial consumer never asks for.
     _CONSUMERS = frozenset({
-        "list", "tuple", "set", "frozenset", "dict", "sorted", "sum", "any", "all",
-        "min", "max", "next",
+        "list", "tuple", "set", "frozenset", "dict", "sorted", "sum", "min", "max",
+        "any",
     })
 
     def _mapped_sink_calls(self, node: ast.Call):
@@ -5031,17 +5190,52 @@ class _Visitor(ast.NodeVisitor):
             return
         if self._is_shadowed(node.func.id) or len(node.args) != 1 or node.keywords:
             return
-        inner = node.args[0]
+        yield from self._mapped_sink_elements(node.args[0])
+
+    def _mapped_sink_elements(self, inner):
+        """`(sink, element, call)` for a written-out `map(<sink>, [literal, ...])`."""
         if not (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name)):
             return
-        if inner.func.id != "map" or self._is_shadowed("map") or len(inner.args) != 2:
+        if inner.func.id != "map" or self._is_shadowed("map"):
+            return
+        # `map` takes no keyword arguments, so a call with one raises TypeError before
+        # the callback is ever invoked.
+        if inner.keywords or len(inner.args) < 2:
             return
         sink = _sink_name(inner.args[0], self._alias, self._is_shadowed)
         if sink is None:
             return
+        # `map(exec, sources, scopes)` calls `exec(source, scope)`, which executes just
+        # the same; the FIRST iterable supplies the source and the rest are the sink's
+        # other parameters. Requiring exactly two iterables let that spelling past.
+        # More arguments than the sink takes raises, so those are left alone: `exec`
+        # and `eval` take three, `compile` six.
+        if len(inner.args) - 1 > {"exec": 3, "eval": 3}.get(sink.rpartition(".")[2], 6):
+            return
         elements = self._literal_elements(inner.args[1])
         for element in elements or ():
             yield sink, element, inner
+
+    def _report_mapped_sinks(self, pairs) -> None:
+        """Report a sink invoked as a `map` callback over written-out elements."""
+        for mapped_sink, element, inner in pairs:
+            reason = _is_interpolated(
+                element, self.tainted[-1].get, self._is_shadowed, self._alias,
+            )
+            if reason is not None:
+                self.findings.append({
+                    "path": _relative(self.path),
+                    "qualname": self._qualname(),
+                    "sink": mapped_sink,
+                    "reason": f"{reason} through map()",
+                    "line": inner.lineno,
+                    "hash": _call_hash(inner),
+                })
+
+    def visit_Starred(self, node: ast.Starred):
+        """`[*map(exec, [...])]` consumes the map as eagerly as `list(...)` does."""
+        self._report_mapped_sinks(self._mapped_sink_elements(node.value))
+        self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call):
         for mapped_sink, element, inner in self._mapped_sink_calls(node):
@@ -5806,6 +6000,33 @@ def _is_expression(text: str) -> bool:
     return True
 
 
+def _interactive_script_command(code: str) -> bool:
+    """Whether a `%%script python ...` escape also reads the cell body interactively.
+
+    `python --help` documents `-i` as forcing a prompt even when stdin is not a
+    terminal, so `python -i -c "..."` runs the command and THEN reads what follows.
+    Only the `-i` spellings, and only where an exit-only option does not win.
+    """
+    for line in code.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith(("%%script", "%%bash", "!", "%")):
+            continue
+        tokens = stripped.lstrip("%!").split()
+        for token in tokens:
+            if token in _PYTHON_EXIT_ONLY_OPTIONS:
+                return False
+            if (
+                token.startswith("-")
+                and not token.startswith("--")
+                and any(letter in token[1:] for letter in "hV?")
+            ):
+                return False
+        for token in tokens:
+            if token.startswith("-") and not token.startswith("--") and "i" in token[1:]:
+                return True
+    return False
+
+
 def _script_command_source(code: str) -> str | None:
     """The program a `%%script python -c "..."` cell hands to the interpreter.
 
@@ -5947,7 +6168,19 @@ def _scan_notebook(path: Path) -> list[dict]:
         # the cell's source instead.
         command = _script_command_source(code)
         if command is not None:
-            code = command
+            # `-i` with `-c` runs BOTH: the command first, then interactive mode reads
+            # the cell body from stdin as Python. Replacing the cell with the command
+            # alone discarded the body, so a sink written under the escape went
+            # unread. The escape lines are blanked rather than removed, so the body
+            # keeps the line numbers it had.
+            if _interactive_script_command(code):
+                body = "\n".join(
+                    "" if line.lstrip().startswith(("%", "!")) else line
+                    for line in code.splitlines()
+                )
+                code = command + "\n" + body
+            else:
+                code = command
         elif _foreign_cell_magic(code) is not None:
             continue
         tree = _parse_cell(code, f"{path}#cell{index}")
