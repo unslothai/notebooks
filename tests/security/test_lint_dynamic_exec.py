@@ -194,6 +194,8 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'the implicit __builtins__ names the sink as an attribute': 'def f(name):\n    __builtins__.exec(f"import {name}")\n',
+    'an aliased codeop still compiles the source it was given': 'import codeop as co\ndef f(name):\n    exec(co.compile_command(f"import {name}"))\n',
     'a mixed literal loop keeps the sink over the constructor': 'import builtins\ndef f(name):\n    for run in [builtins.str, builtins.exec]:\n        run(f"import {name}")\n',
     'a statically false while never takes the builtin away': 'import builtins\ndef f(name, condition):\n    run = builtins.exec\n    while False:\n        run = print\n    run(f"import {name}")\n',
     'a decidable boolean filter binds no comprehension walrus': 'import builtins\ndef f(name):\n    run = builtins.exec\n    [(run := print) for _ in [0] if True and False]\n    run(f"import {name}")\n',
@@ -261,6 +263,9 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'format_map with an empty mapping returns the receiver': 'def f(name):\n    exec(f"import {name}".format_map({}))\n',
+    'an opaque expansion leaves compile its source keyword': 'def f(name, args = ()):\n    exec(compile(*args, source = f"import {name}", filename = "<x>", mode = "exec"))\n',
+    'nullcontext hands its argument to the as target': 'import contextlib\ndef f(name):\n    with contextlib.nullcontext(f"import {name}") as payload:\n        exec(payload)\n',
     'an empty expansion does not hide the first spread key': 'def f(name):\n    exec(*{**{}, f"import {name}": None})\n',
     'a literal template reached through a name is still a template': 'def f(name):\n    template = "import MODULE"\n    exec(template.replace("MODULE", name))\n',
     'codeop compiles the source it was handed': 'import codeop\ndef f(name):\n    exec(codeop.compile_command(f"import {name}"))\n',
@@ -306,6 +311,10 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'an annotated literal is still a template for replace': 'def f(name):\n    template: str = "import MODULE"\n    exec(template.replace("MODULE", name))\n',
+    'a positive augmented repetition keeps the built source': 'def f(name):\n    payload = f"import {name}"\n    payload *= 2\n    exec(payload)\n',
+    'an assignment below an unconditional break never runs': 'def f(name):\n    payload = f"import {name}"\n    for _ in [0]:\n        break\n        payload = "pass"\n    exec(payload)\n',
+    'an unknown operand before a decisive constant still decides': 'import builtins\ndef f(name, flag):\n    run = builtins.exec\n    while flag and False:\n        run = print\n    run(f"import {name}")\n',
     'a literal loop element carries the taint it holds': 'def f(name):\n    payload = f"import {name}"\n    for source in [payload]:\n        exec(source)\n',
     'a short-circuited walrus never clears the taint': 'def f(name):\n    payload = f"import {name}"\n    False and (payload := "pass")\n    exec(payload)\n',
     'the final loop body wins over the last element': 'def f(name):\n    for payload in ["pass"]:\n        payload = f"import {name}"\n    exec(payload)\n',
@@ -326,6 +335,9 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a local operator is not the stdlib module': 'def f(operator, name):\n    exec(operator.add("import ", name))\n',
+    'assigning the builtins module drops the earlier sink alias': 'import builtins\ndef f(name):\n    run = builtins.exec\n    run = builtins\n    run(f"import {name}")\n',
+    'an augmented repetition by zero builds nothing': 'def f(name):\n    payload = f"import {name}"\n    payload *= 0\n    exec(payload)\n',
     'a folded unary condition drops the constructor arm': 'def f(name):\n    exec((str if not True else print)(f"import {name}"))\n',
     'an except target takes a prefixed alias away': 'from builtins import str as text\ndef f(name):\n    try:\n        pass\n    except Exception as text:\n        exec(text(f"import {name}"))\n',
     'async for cannot iterate a synchronous literal': 'async def f(name):\n    async for payload in [f"import {name}"]:\n        exec(payload)\n',
