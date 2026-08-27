@@ -459,7 +459,32 @@ _NUMERIC = object()
 # reason, because the name holds a literal and is not itself built source. Only a
 # literal binds it, so an opaque producer - `inspect.getsource(f)`, the idiom this
 # repo is built on - never does.
-_LITERAL_TEXT = object()
+class _LiteralText:
+    """Marker for a name bound to a written-out string, carrying that string.
+
+    A bare sentinel said only THAT the name holds a literal, which is enough for the
+    `.replace()` rule but not for the field-free `.format()` one: `template = "pass"`
+    and `template = "import {m}"` are different questions. The text travels with it.
+    """
+
+    __slots__ = ("text",)
+
+    def __init__(self, text):
+        self.text = text
+
+    def __repr__(self):
+        return f"_LiteralText({self.text!r})"
+
+
+# The bare marker, for the places that only ask whether a literal is held at all.
+_LITERAL_TEXT = _LiteralText("")
+
+
+def _literal_text_of(node: ast.AST):
+    """The written-out string a value is, or False when it is not one."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes)):
+        return node.value
+    return False
 
 
 def _visibly_literal_text(node: ast.AST) -> bool:
@@ -580,7 +605,7 @@ def _is_interpolated(node: ast.AST, resolve = None, shadowed = None, resolve_ali
         reason = resolve(node.id)
         # The markers are binding facts, not reasons. Returning one would put a
         # non-string into a finding.
-        return None if reason in (_NUMERIC, _LITERAL_TEXT) else reason
+        return None if reason is _NUMERIC or isinstance(reason, _LiteralText) else reason
     if isinstance(node, ast.BoolOp):
         # `exec(enabled and f"import {name}")` executes the interpolated operand
         # whenever the guard lets it through: same conditional-source shape as IfExp.
@@ -668,8 +693,15 @@ def _interpolated_subscript(node, resolve = None, shadowed = None, resolve_alias
         def _keeps_everything(bound, whole):
             if bound is None:
                 return True
-            if isinstance(bound, ast.Constant) and bound.value == whole:
-                return not isinstance(bound.value, bool)
+            # `[-0::+1]` is the whole object too: a signed literal is a `UnaryOp`
+            # around the constant, not a constant, so requiring one let that spelling
+            # past the gate. Normalised the same way the repetition helper does.
+            sign = 1
+            if isinstance(bound, ast.UnaryOp) and isinstance(bound.op, (ast.USub, ast.UAdd)):
+                sign = -1 if isinstance(bound.op, ast.USub) else 1
+                bound = bound.operand
+            if isinstance(bound, ast.Constant) and not isinstance(bound.value, bool):
+                return isinstance(bound.value, int) and sign * bound.value == whole
             return False
 
         if (
@@ -680,6 +712,23 @@ def _interpolated_subscript(node, resolve = None, shadowed = None, resolve_alias
             return _is_interpolated(node.value, resolve, shadowed, resolve_alias)
         return None
     return _literal_element(node, resolve, shadowed, resolve_alias)
+
+
+def _is_stable(node: ast.AST) -> bool:
+    """Whether evaluating this expression twice is guaranteed to give the same text.
+
+    The receiver and the argument of `s.removeprefix(s)` are evaluated separately, so
+    identical source does not mean identical values when either can advance something:
+    `f"{next(values)}".removeprefix(f"{next(values)}")` reads two different strings.
+    Only constants, names and f-strings built from them are treated as stable.
+    """
+    for child in ast.walk(node):
+        if isinstance(child, (ast.Call, ast.NamedExpr, ast.Await, ast.Yield, ast.YieldFrom)):
+            return False
+        if isinstance(child, (ast.Subscript, ast.Attribute)):
+            # Either can run arbitrary code through `__getitem__` or a property.
+            return False
+    return True
 
 
 def _names_module(node: ast.AST, module: str, shadowed = None, aliases = None) -> bool:
@@ -987,7 +1036,9 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             # nothing. Only when the argument is written out as the SAME expression
             # as the receiver, which is decidable from the text; anything else still
             # preserves the receiver through the normaliser branch below.
-            if ast.dump(function.value) == ast.dump(node.args[0]):
+            if _is_stable(function.value) and ast.dump(function.value) == ast.dump(
+                node.args[0]
+            ):
                 return None
         if function.attr in _NORMALISERS:
             # `str.strip(s)` is the unbound descriptor spelling of `s.strip()`, so
@@ -1029,6 +1080,18 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                 if function.attr in ("format", "format_map"):
                     return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
                 return None
+            held = None
+            if isinstance(function.value, ast.Name) and resolve is not None:
+                # `template = "pass"; template.format(user)` is the literal receiver
+                # one line later, which is the same refactor the `.replace()` rule
+                # already follows. The marker carries the text, so the field scan is
+                # the same one; a template WITH a field still reports.
+                marker = resolve(function.value.id)
+                if isinstance(marker, _LiteralText):
+                    held = marker.text
+            if function.attr in ("format", "format_map") and held is not None:
+                if isinstance(held, str) and not _has_format_field(held):
+                    return None
             if function.attr in ("format", "format_map") and _visibly_literal_text(
                 function.value
             ):
@@ -1106,7 +1169,7 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             # literal receiver above. Only a name a written-out string bound: the
             # marker is set nowhere else, so `inspect.getsource(f).replace(...)`,
             # the idiom this repo is built on, still resolves to nothing here.
-            if resolve(receiver.id) is _LITERAL_TEXT:
+            if isinstance(resolve(receiver.id), _LiteralText):
                 return ".replace() on a literal"
         # `exec(f"import {model_type}".replace("-", "_"))` is the shape from the
         # original report with a normalisation step bolted on. The receiver is the
@@ -1764,6 +1827,17 @@ def _constructor_names(function: ast.AST, shadowed = None, aliases = None):
                 _constructor_name(function.orelse, shadowed, aliases),
             ) if name is not None
         ]
+    if isinstance(function, ast.BoolOp):
+        # `(memoryview and str)` really is `str`, since both objects are truthy, and
+        # collapsing to the first resolved name let `memoryview`'s argument test speak
+        # for the arm Python actually selects. Every reachable operand is returned.
+        found = []
+        for operand in _reachable_operands(function):
+            name = _constructor_name(operand, shadowed, aliases)
+            if name is not None and name not in found:
+                found.append(name)
+        if found:
+            return found
     resolved = _constructor_name(function, shadowed, aliases)
     return [] if resolved is None else [resolved]
 
@@ -2306,7 +2380,7 @@ class _Visitor(ast.NodeVisitor):
         # Visiting every target before binding any of them missed that.
         self.visit(node.value)
         numeric = _visibly_numeric(node.value)
-        literal_text = reason is None and _visibly_literal_text(node.value)
+        literal_text = _literal_text_of(node.value) if reason is None else False
         for target in node.targets:
             # An unpacking assigns each element before the NEXT target is evaluated,
             # so `payload, table[exec(payload)] = (f"import {name}", None)` executes
@@ -2326,7 +2400,7 @@ class _Visitor(ast.NodeVisitor):
                         element,
                         element_reason,
                         numeric = _visibly_numeric(item),
-                        literal_text = element_reason is None and _visibly_literal_text(item),
+                        literal_text = _literal_text_of(item) if element_reason is None else False,
                     )
                     self._bind_unpacked(element, item)
                     self._shadow_assignment(element, item)
@@ -2366,7 +2440,7 @@ class _Visitor(ast.NodeVisitor):
                 node.target,
                 reason,
                 numeric = _visibly_numeric(node.value),
-                literal_text = reason is None and _visibly_literal_text(node.value),
+                literal_text = _literal_text_of(node.value) if reason is None else False,
             )
         # An annotated assignment binds like any other one.
         if node.value is not None:
@@ -3156,7 +3230,7 @@ class _Visitor(ast.NodeVisitor):
             node.target,
             reason,
             numeric = _visibly_numeric(node.value),
-            literal_text = reason is None and _visibly_literal_text(node.value),
+            literal_text = _literal_text_of(node.value) if reason is None else False,
         )
         # `(exec := builtins.exec)` hands the builtin back to its own spelling exactly
         # as the statement form does, and only the taint map was being updated, so an
@@ -3197,7 +3271,7 @@ class _Visitor(ast.NodeVisitor):
                 element,
                 element_reason,
                 numeric = _visibly_numeric(item),
-                literal_text = element_reason is None and _visibly_literal_text(item),
+                literal_text = _literal_text_of(item) if element_reason is None else False,
             )
             self._bind_unpacked(element, item)
 
@@ -3240,15 +3314,18 @@ class _Visitor(ast.NodeVisitor):
 
     def _bind(
         self, target: ast.AST, reason: str | None, numeric: bool = False,
-        literal_text: bool = False,
+        literal_text = False,
     ) -> None:
         if not isinstance(target, ast.Name):
             return
-        if literal_text:
+        if literal_text is not False and literal_text is not None:
             # Same shape as the numeric marker: a fact about what the name holds, so a
             # later `.replace()` on it reads as a splice into a written-out template.
+            held = _LiteralText(
+                literal_text if isinstance(literal_text, (str, bytes)) else ""
+            )
             self.tainted[len(self.tainted) - 1 if self.scope_kinds[-1] != "class"
-                         else self._binding_level(target.id)][target.id] = _LITERAL_TEXT
+                         else self._binding_level(target.id)][target.id] = held
             return
         if numeric:
             # Not a reason: a marker saying the name holds a number, so a later `+=`
@@ -3426,12 +3503,37 @@ class _Visitor(ast.NodeVisitor):
                         self.collected_aliases[-1][
                             f"constructor:{alias.asname or alias.name}"
                         ] = alias.name
+            else:
+                # The recognised stdlib imports bind for the whole scope in exactly
+                # the same way, and only the builtins ones were pre-collected - so
+                # `def f(name): exec(clean(f"..."))` written above
+                # `from textwrap import dedent as clean` was scanned before `clean`
+                # meant anything and reported nothing at all. Same for the direct
+                # helpers and `functools.partial`.
+                for alias in statement.names:
+                    bound = alias.asname or alias.name
+                    qualified = f"{statement.module}.{alias.name}" if statement.module else ""
+                    if statement.level:
+                        continue
+                    if qualified in _DIRECT_HELPERS:
+                        self.collected_aliases[-1][f"stdlibfunc:{bound}"] = qualified
+                    elif statement.module == "textwrap" and alias.name in _TEXT_PRESERVING_FUNCTIONS:
+                        self.collected_aliases[-1][f"text:{bound}"] = alias.name
+                    elif statement.module == "functools" and alias.name == "partial":
+                        self.collected_aliases[-1][f"partial:{bound}"] = "partial"
         elif isinstance(statement, ast.Import):
             # The module form binds for the whole scope too, so
             # `def f(x): b.exec(f"import {x}")` above `import builtins as b` is
             # still a finding.
             for alias in statement.names:
                 bound = alias.asname or alias.name.split(".")[0]
+                if alias.name in _MODULE_RECEIVERS:
+                    # `import codeop as co` below a `def` that uses `co` binds for the
+                    # whole scope as well, and the deferred body saw nothing.
+                    self.collected_aliases[-1][f"stdlib:{bound}"] = alias.name
+                    if alias.name == "functools":
+                        self.collected_aliases[-1][f"functools:{bound}"] = "functools"
+                    continue
                 if alias.name == "builtins" and alias.asname:
                     self.collected_aliases[-1][f"module:{alias.asname}"] = "builtins"
                 else:

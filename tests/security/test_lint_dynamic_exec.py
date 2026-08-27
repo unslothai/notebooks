@@ -194,6 +194,9 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a stdlib alias imported below a function still binds for it': 'def f(name):\n    exec(clean(f"result = {name}"))\nfrom textwrap import dedent as clean\nf("42")\n',
+    'a signed zero and a signed step still slice the whole string': 'def f(name, scope):\n    exec(f"result = {name}"[-0::+1], scope)\n',
+    'a template held by a name still splices its field': 'def f(user):\n    template = "import {m}"\n    exec(template.format(m = user))\n',
     'a field between escaped braces is still a field': 'def f(name):\n    exec("{{{x}}}".format(x = name))\n',
     'a directly imported ast.parse still preserves its source': 'from ast import parse\ndef f(name):\n    compile(parse(f"import {name}"), "<x>", "exec")\n',
     'getattr reads the implicit builtins module too': 'def f(name):\n    getattr(__builtins__, "exec")(f"import {name}")\n',
@@ -243,6 +246,7 @@ def test_a_sink_reached_through_another_spelling_is_reported(description, tmp_pa
 
 # `str`, `bytes` and friends reached indirectly still pass the source through.
 _CONSTRUCTOR_IS_STILL_RESOLVED = {
+    'a boolean callee names every constructor it can select': 'def f(name):\n    exec((memoryview and str)(f"result = {name}"))\n',
     'the decoding form of str hands the text back': 'def f(name):\n    exec(str(f"import {name}".encode(), "utf-8"))\n',
     'an undecidable constructor choice checks both arms': 'def f(name, flag):\n    exec((memoryview if flag else str)(f"import {name}"))\n',
     'a builtins star import hands back the conversions too': "def f(name):\n    str = print\n    from builtins import *\n    exec(str(f'import {name}'))\n",
@@ -276,6 +280,7 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'two calls that read the same source are not the same value': 'def f(values, scope):\n    exec(f"{next(values)}".removeprefix(f"{next(values)}"), scope)\n',
     'an identity translation table changes nothing': 'def f(name):\n    exec(f"import {name}".translate({0: 0}))\n',
     'an ordinary async context manager still runs its body': 'async def f(name, manager):\n    async with manager as payload:\n        exec(f"import {name}")\n',
     'format_map with an empty mapping returns the receiver': 'def f(name):\n    exec(f"import {name}".format_map({}))\n',
@@ -359,6 +364,7 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a field-free template held by a name ignores its arguments': 'def f(user):\n    template = "pass"\n    exec(template.format(user))\n',
     'a field-free format_map template ignores its mapping': 'def f(name):\n    exec("pass".format_map({"x": name}))\n',
     'compile without a filename and a mode raises first': 'def f(name):\n    compile(f"import {name}")\n',
     'a bare partial is only functools.partial when imported': 'def partial(callback, source):\n    return lambda: None\ndef f(name):\n    partial(exec, f"import {name}")()\n',
