@@ -194,6 +194,10 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a helper that returns the sink is still the builtin': 'def runner():\n    return exec\ndef f(name):\n    runner()(f"import {name}")\n',
+    'a sink stored in a written-out list is still the builtin': 'def f(name):\n    runners = [exec]\n    runners[0](f"import {name}")\n',
+    'a builtins-qualified map still consumes its callback': 'import builtins\ndef f(name):\n    list(builtins.map(exec, [f"import {name}"]))\n',
+    'sort takes the same key callback sorted does': 'def f(name):\n    [f"import {name}"].sort(key = exec)\n',
     'an and hands back its last operand': 'def f(name):\n    (compile and exec)(f"import {name}")\n',
     'a sink above the return still runs': 'def f(name):\n    exec(f"import {name}")\n    return\n',
     'next runs the callback on the first mapped element': 'def f(name):\n    next(map(exec, [f"import {name}"]))\n',
@@ -302,6 +306,11 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'a nested container element is still addressable': 'def f(name):\n    payloads = {"run": [f"import {name}"]}\n    exec(payloads["run"][0])\n',
+    'a slice that cuts only the literal tail keeps the value': 'def f(name):\n    exec(f"import {name}#"[:-1])\n',
+    'a slice that cuts only the literal head keeps the value': 'def f(name):\n    exec(f"Ximport {name}"[1:])\n',
+    'a result-preserving decorator still hands the body back': 'import functools\n@functools.cache\ndef build(value):\n    return f"import {value}"\ndef f(name):\n    exec(build(name))\n',
+    'a bound dunder builder keeps its left operand': 'def f(name):\n    build = "import ".__add__\n    exec(build(name))\n',
     'a base this file cannot resolve may still be textual': 'class Namespace:\n    class Base(str):\n        pass\nclass Safe(Namespace.Base):\n    pass\ndef f(name):\n    exec(Safe("import {}").format(name))\n',
     'a visible local helper hands back what it built': 'def build(name):\n    return f"import {name}"\ndef f(name):\n    exec(build(name))\n',
     'a class attribute outlives the class body': 'class C:\n    payload = None\ndef f(name):\n    C.payload = f"import {name}"\n    exec(C.payload)\n',
@@ -426,6 +435,10 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a conversion given more arguments than it takes raises first': 'def f(name):\n    exec(f"import {name}".encode("utf-8", "strict", "extra"))\n',
+    'a partition index outside its three elements raises first': 'def f(name):\n    exec(f"import {name}".partition("#")[3])\n',
+    'a slice that cuts into the spliced value says nothing': 'def f(name):\n    exec(f"import {name}"[:3])\n',
+    'a decorator that replaces the function is not read': 'def swap(func):\n    return lambda value: "pass"\n@swap\ndef build(value):\n    return f"import {value}"\ndef f(name):\n    exec(build(name))\n',
     'a normaliser given a keyword it does not take raises first': 'def f(name):\n    exec(f"import {name}".upper(foo = 1))\n',
     'replace takes its arguments positionally only': 'def f(name):\n    exec("X".replace(old = "X", new = name))\n',
     'a visibly invalid compile mode stops the map there': 'def f(name):\n    list(map(compile, ["pass", f"import {name}"], ["<x>", "<x>"], ["bad", "exec"]))\n',
@@ -667,4 +680,96 @@ def test_the_workflow_directory_is_a_default_target():
     assert '".github/workflows"' in source, (
         "the default targets no longer name .github/workflows, so the heredocs in "
         "workflow run steps are scanned by nothing"
+    )
+
+
+# A workflow step that runs Python without a heredoc.
+_WORKFLOW_DASH_C = """name: demo
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python -c 'name=input(); exec(f"import {name}")'
+"""
+
+# A heredoc written to a file whose NAME contains python, and run by nothing.
+_WORKFLOW_WRITES_A_FILE = """name: demo
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat > /tmp/python.py <<'PY'
+          exec(f"import {name}")
+          PY
+"""
+
+# A heredoc holding an Actions expression: not Python here, Python on the runner.
+_WORKFLOW_IS_TEMPLATED = """name: demo
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'PY'
+          name = ${{ toJSON(inputs.module) }}
+          exec(f"import {name}")
+          PY
+"""
+
+
+def test_a_one_line_python_command_in_a_workflow_is_scanned(tmp_path):
+    sample = tmp_path / "demo.yml"
+    sample.write_text(_WORKFLOW_DASH_C)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_a_heredoc_written_to_a_file_named_python_is_not_scanned(tmp_path):
+    sample = tmp_path / "demo.yml"
+    sample.write_text(_WORKFLOW_WRITES_A_FILE)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 0, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_a_templated_heredoc_is_read_rather_than_skipped(tmp_path):
+    sample = tmp_path / "demo.yml"
+    sample.write_text(_WORKFLOW_IS_TEMPLATED)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+    assert "skipped" not in proc.stdout.lower(), proc.stdout
+
+
+def test_the_origin_of_a_built_source_is_recorded(tmp_path):
+    """Editing the line that BUILDS the source invalidates the reviewed entry.
+
+    The key hashes the sink call, which is byte for byte the same in both files here;
+    only the assignment above it differs, and that is what the origin records. The
+    module is loaded by path rather than run as a subprocess, since the digest is a
+    field of the finding and the command line prints a summary.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("lint_dynamic_exec_under_test", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    digests = []
+    for index, source in enumerate((
+        'def f(safe):\n    payload = f"import {safe}"\n    exec(payload)\n',
+        'def f():\n    payload = f"import {input()}"\n    exec(payload)\n',
+    )):
+        sample = tmp_path / f"sample{index}.py"
+        sample.write_text(source)
+        findings = module.scan_file(sample)
+        assert len(findings) == 1, findings
+        digests.append(findings[0].get("origin"))
+
+    assert all(digests), digests
+    assert digests[0] != digests[1], (
+        "two different source-building expressions produced the same origin, so an "
+        "edit to the line above an allowlisted sink would inherit its review"
     )

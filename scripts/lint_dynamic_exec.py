@@ -136,6 +136,16 @@ _MATCHSEQUENCE = _node_type("MatchSequence")
 # `memoryview(f"...".encode()).tobytes()` stopped one call short of the sink.
 _CONVERSIONS = ("encode", "decode", "tobytes")
 
+# How many positional arguments each conversion takes, from the CPython docs. Outside
+# its range the call raises before the sink: `"...".encode("utf-8", "strict", "extra")`
+# is a TypeError, and reporting it blocked CI on code that cannot run. `encode` and
+# `decode` document `encoding` and `errors` as keywords; `tobytes` documents `order`.
+_CONVERSION_ARITY = {
+    "encode": (0, 2, {"encoding", "errors"}),
+    "decode": (0, 2, {"encoding", "errors"}),
+    "tobytes": (0, 1, {"order"}),
+}
+
 # The dunder spellings of the conversions above. `f"...".__str__()` returns the same
 # string and `bytes.__str__` is not a conversion at all, so only the ones whose
 # receiver is the text itself are listed here.
@@ -913,6 +923,10 @@ def _split_piece_is_literal(inner: ast.Call, index_node) -> bool:
         else:
             break
     method = inner.func.attr
+    if method in ("partition", "rpartition") and not -3 <= index <= 2:
+        # Both always return a three-element tuple, so any other constant index is an
+        # `IndexError` before the sink and nothing is executed at all.
+        return True
     if method in ("partition", "rpartition"):
         if method == "partition" and index == 0:
             return separator.value in leading
@@ -949,6 +963,39 @@ def _interpolated_split_element(node, resolve = None, shadowed = None, resolve_a
     return _is_interpolated(inner.func.value, resolve, shadowed, resolve_alias)
 
 
+def _slice_keeps_interpolation(receiver: ast.AST, index: ast.Slice) -> bool:
+    """Whether a constant slice of a written-out f-string still holds its values."""
+    if not isinstance(receiver, ast.JoinedStr):
+        return False
+    if not any(isinstance(part, ast.FormattedValue) for part in receiver.values):
+        return False
+    if index.step is not None and _constant_integer(index.step) != 1:
+        return False
+    leading = trailing = 0
+    for part in receiver.values:
+        if isinstance(part, ast.Constant) and isinstance(part.value, str):
+            leading += len(part.value)
+        else:
+            break
+    for part in reversed(receiver.values):
+        if isinstance(part, ast.Constant) and isinstance(part.value, str):
+            trailing += len(part.value)
+        else:
+            break
+    lower = 0 if index.lower is None else _constant_integer(index.lower)
+    upper = 0 if index.upper is None else _constant_integer(index.upper)
+    if lower is None or upper is None:
+        return False
+    # The front cut has to stay inside the leading literal, and the back cut inside
+    # the trailing one. A positive upper bound counts from the front, which says
+    # nothing about where the values are, so it is left alone.
+    if lower < 0 or lower > leading:
+        return False
+    if index.upper is not None and not (-trailing <= upper < 0):
+        return False
+    return True
+
+
 def _interpolated_subscript(node, resolve = None, shadowed = None, resolve_alias = None) -> str | None:
     """`exec(table[key])` where the container or the whole slice is readable."""
     # `exec([f"import {name}"][0])` and `exec({"s": f"..."}["s"])` pick the source
@@ -981,6 +1028,13 @@ def _interpolated_subscript(node, resolve = None, shadowed = None, resolve_alias
             and _keeps_everything(node.slice.step, 1)
         ):
             return _is_interpolated(node.value, resolve, shadowed, resolve_alias)
+        # A partial slice of a written-out f-string can still contain the interpolated
+        # part: `f"import {name}#"[:-1]` drops the literal `#` and `f"Ximport {name}"[1:]`
+        # drops the literal `X`. Only when the cut is inside the receiver's own leading
+        # or trailing LITERAL run, which is decidable from the text; a cut that may
+        # reach into the spliced value, or a bound this cannot read, is still None.
+        if _slice_keeps_interpolation(node.value, node.slice):
+            return _is_interpolated(node.value, resolve, shadowed, resolve_alias)
         return None
     return _literal_element(node, resolve, shadowed, resolve_alias)
 
@@ -1002,6 +1056,25 @@ _REBOUND_FUNCTION_NAMES: set = set()
 
 # Helpers currently being resolved, so a recursive one cannot loop forever.
 _HELPER_STACK: set = set()
+
+# Decorators documented as handing the wrapped function's result back unchanged. Any
+# other decorator may return anything at all, and the body below it says nothing about
+# what the name ends up bound to.
+_RESULT_PRESERVING_DECORATORS = frozenset({
+    "cache", "lru_cache", "wraps", "staticmethod", "classmethod", "final",
+    "override", "no_type_check", "cached_property",
+})
+
+
+def _decorator_name(node: ast.AST) -> str:
+    """The bare name of a decorator, however it is qualified or called."""
+    if isinstance(node, ast.Call):
+        node = node.func
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Name):
+        return node.id
+    return ""
 
 
 def _returned_expressions(definition) -> list:
@@ -1920,6 +1993,15 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             # receiver; a bytes-producing one still preserves the source.
             return None
         if function.attr in _CONVERSIONS:
+            unbound = _constructor_name(function.value, shadowed, resolve_alias) is not None
+            low, high, keywords = _CONVERSION_ARITY[function.attr]
+            if unbound:
+                low, high = low + 1, high + 1
+            spelled = [keyword.arg for keyword in node.keywords]
+            if None not in spelled:
+                if set(spelled) - keywords or not low <= len(node.args) + len(spelled) <= high:
+                    # The conversion raises before the sink runs.
+                    return None
             # `str.encode(s)` is the unbound descriptor spelling of `s.encode()`.
             # There the source is the first argument and the receiver is the type,
             # so unwrapping the receiver looked at the name `str` and found nothing.
@@ -2379,6 +2461,20 @@ def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None
             recorded = aliases(path)
             if recorded:
                 return recorded
+    if isinstance(function, ast.Call):
+        # `def runner(): return exec` then `runner()(f"...")` calls what the helper
+        # hands back, and that is written out in the file. Same table the source side
+        # reads, same guards: a `def` bound to nothing else, and a recursion stack.
+        helper = _visible_helper(function.func, shadowed)
+        if helper is not None and helper.name not in _HELPER_STACK:
+            _HELPER_STACK.add(helper.name)
+            try:
+                for value in _returned_expressions(helper):
+                    resolved = _sink_name(value, aliases, shadowed)
+                    if resolved is not None:
+                        return resolved
+            finally:
+                _HELPER_STACK.discard(helper.name)
     if isinstance(function, ast.Call) and isinstance(function.func, ast.Lambda):
         # `(lambda run: run)(exec)(f"...")` calls whatever the lambda hands back, which
         # is written out right here. The source side already binds arguments to
@@ -2696,6 +2792,16 @@ def _nullcontext_value(node: ast.AST, aliases = None, shadowed = None) -> ast.AS
             return None
         return node.args[0]
     return None
+
+
+def _callee_spelling(call: ast.Call) -> str:
+    """The bare name of a call's callee, for the reason string."""
+    function = call.func
+    if isinstance(function, ast.Attribute):
+        return function.attr
+    if isinstance(function, ast.Name):
+        return function.id
+    return "map"
 
 
 def _boolop_candidates(node: ast.BoolOp) -> list:
@@ -3243,6 +3349,11 @@ class _Visitor(ast.NodeVisitor):
         # when a nested body is entered, since that body runs after the whole
         # enclosing scope has. Filled in by the caller for the module level.
         self.future_taint: list[dict] = [{}]
+        # `(qualname, name) -> digest of the expression that put built source there`.
+        # A finding whose source is built one line above the sink carries it, so an
+        # edit to that line stops matching the reviewed entry even though the sink
+        # call itself is untouched.
+        self.origin_of: dict = {}
 
     def _visible_scopes(self):
         """Scope indices a name lookup here may consult, innermost first.
@@ -3666,12 +3777,13 @@ class _Visitor(ast.NodeVisitor):
                         element_reason,
                         numeric = _visibly_numeric(item),
                         literal_text = _literal_text_of(item) if element_reason is None else False,
+                        origin = item,
                     )
                     self._bind_unpacked(element, item)
                     self._shadow_assignment(element, item)
                 continue
             self.visit(target)
-            self._bind(target, reason, numeric, literal_text)
+            self._bind(target, reason, numeric, literal_text, origin = node.value)
             self._bind_unpacked(target, node.value)
             self._shadow_assignment(target, node.value)
             self._bind_container_elements(target, node.value)
@@ -3702,11 +3814,6 @@ class _Visitor(ast.NodeVisitor):
                         continue
                     pairs.append((key.value, item))
         for index, item in pairs:
-            element_reason = _is_interpolated(
-                item, self.tainted[-1].get, self._is_shadowed, self._alias,
-            )
-            if element_reason is None or isinstance(element_reason, _LiteralText):
-                continue
             path = "path>" + ast.unparse(
                 ast.Subscript(
                     value = ast.Name(id = target.id, ctx = ast.Load()),
@@ -3714,7 +3821,26 @@ class _Visitor(ast.NodeVisitor):
                     ctx = ast.Load(),
                 )
             )
-            self.tainted[-1][path] = element_reason
+            # A sink stored in the container is recorded too: `runners = [exec]` makes
+            # `runners[0](f"...")` the builtin, exactly as `table["run"] = exec` does.
+            resolved = _sink_name(item, self._alias, self._is_shadowed)
+            if resolved is not None:
+                for table in (self.sink_aliases, self.collected_aliases):
+                    table[-1][path] = resolved.rpartition(".")[2]
+            element_reason = _is_interpolated(
+                item, self.tainted[-1].get, self._is_shadowed, self._alias,
+            )
+            if element_reason is not None and not isinstance(element_reason, _LiteralText):
+                self.tainted[-1][path] = element_reason
+                continue
+            # A container INSIDE the container is addressable too:
+            # `payloads = {"run": [f"..."]}` reaches the f-string at
+            # `payloads["run"][0]`, and stopping at the outer item dropped it. The
+            # nested paths are spelled by recursing with the path built so far.
+            if isinstance(item, (ast.List, ast.Tuple, ast.Dict)):
+                self._bind_container_elements(
+                    ast.Name(id = path[len("path>"):], ctx = ast.Store()), item,
+                )
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         """Same tracking for `payload: str = f"...{x}..."`.
@@ -4660,8 +4786,15 @@ class _Visitor(ast.NodeVisitor):
 
     def _bind(
         self, target: ast.AST, reason: str | None, numeric: bool = False,
-        literal_text = False,
+        literal_text = False, origin = None,
     ) -> None:
+        if origin is not None:
+            key = target.id if isinstance(target, ast.Name) else _compound_key(target)
+            if key is not None:
+                if reason is None or isinstance(reason, _LiteralText):
+                    self.origin_of.pop((self._qualname(), key), None)
+                else:
+                    self.origin_of[(self._qualname(), key)] = _expression_digest(origin)
         if not isinstance(target, ast.Name):
             # `self.payload = f"import {name}"` then `exec(self.payload)` executes the
             # source, and dropping every non-name target lost it. The written-out path
@@ -4769,6 +4902,16 @@ class _Visitor(ast.NodeVisitor):
     def _record_local_class(self, statement) -> None:
         """`class Safe:` makes `Safe()` a receiver whose methods are not string ones."""
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if any(
+                _decorator_name(decorator) not in _RESULT_PRESERVING_DECORATORS
+                for decorator in statement.decorator_list
+            ):
+                # A decorator replaces what the name binds, and what it returns need
+                # not be this body at all: reading the undecorated source as the
+                # callee would answer for a function the file does not call. The few
+                # that document handing the wrapped result back unchanged are the
+                # exception, and they are the ones that appear on a helper.
+                _REBOUND_FUNCTION_NAMES.add(statement.name)
             recorded = _LOCAL_FUNCTIONS.get(statement.name)
             if recorded is not None and recorded is not statement:
                 _REBOUND_FUNCTION_NAMES.add(statement.name)
@@ -5650,6 +5793,9 @@ class _Visitor(ast.NodeVisitor):
         # normalises exactly as the inline spelling does.
         if value.attr not in (
             *_BUILDERS, *_TEMPLATE_BUILDERS, *_NORMALISERS, *_CONVERSIONS, "replace",
+            # `build = "import ".__add__` binds the operator with its left operand
+            # attached, and the call a line later concatenates exactly as `+` does.
+            "__add__", "__mod__",
         ):
             return
         receiver = value.value
@@ -6266,13 +6412,26 @@ class _Visitor(ast.NodeVisitor):
     # Consumers that take a `key` callback, and how many elements they provably feed
     # it. `sorted` computes the key for every element before it compares anything;
     # `min` and `max` compute two and then compare, which raises on None.
-    _KEY_CONSUMERS = {"sorted": None, "min": 2, "max": 2}
+    _KEY_CONSUMERS = {"sorted": None, "min": 2, "max": 2, "sort": None}
 
     def _key_sink_calls(self, node: ast.Call):
         """`sorted([f"..."], key = exec)` calls the sink on the elements it consumes."""
-        if not isinstance(node.func, ast.Name) or node.func.id not in self._KEY_CONSUMERS:
-            return
-        if self._is_shadowed(node.func.id) or len(node.args) != 1:
+        elements_from = None
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "sort"
+            and isinstance(node.func.value, (ast.List,))
+            and not node.args
+        ):
+            # `[f"..."].sort(key = exec)` is the in-place spelling of `sorted`, and it
+            # computes the key for every element exactly the same way. The receiver is
+            # a written-out list, so the elements are as visible as `sorted`'s are.
+            elements_from = node.func.value
+        elif isinstance(node.func, ast.Name) and node.func.id in self._KEY_CONSUMERS:
+            if self._is_shadowed(node.func.id) or len(node.args) != 1:
+                return
+            elements_from = node.args[0]
+        if elements_from is None:
             return
         key = None
         for keyword in node.keywords:
@@ -6286,19 +6445,37 @@ class _Visitor(ast.NodeVisitor):
         sink = _sink_name(key, self._alias, self._is_shadowed)
         if sink is None:
             return
-        elements = self._literal_elements(node.args[0]) or ()
+        elements = self._literal_elements(elements_from) or ()
         reach = len(elements)
-        counted = self._KEY_CONSUMERS[node.func.id]
+        counted = self._KEY_CONSUMERS.get(_callee_spelling(node))
         if counted is not None:
             reach = min(reach, counted)
         for element in elements[:reach]:
             yield sink, element, node
 
+    def _iterator_factory(self, function) -> str:
+        """`map` or `filter` when the callee names one, however it is qualified."""
+        if isinstance(function, ast.Name):
+            if function.id in ("map", "filter") and not self._is_shadowed(function.id):
+                return function.id
+            return ""
+        if isinstance(function, ast.Attribute) and function.attr in ("map", "filter"):
+            # `builtins.map(exec, [...])` is the same builtin spelled out, and the
+            # owner is tested the way every other qualified builtin here is.
+            if _names_module(function.value, "builtins", self._is_shadowed, self._alias):
+                return function.attr
+            if isinstance(function.value, ast.Name) and self._alias(
+                f"module:{function.value.id}"
+            ):
+                return function.attr
+        return ""
+
     def _mapped_sink_elements(self, inner, consumer: str = ""):
         """`(sink, element, call)` for a written-out `map(<sink>, [literal, ...])`."""
-        if not (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name)):
+        if not isinstance(inner, ast.Call):
             return
-        if inner.func.id not in ("map", "filter") or self._is_shadowed(inner.func.id):
+        factory = self._iterator_factory(inner.func)
+        if not factory:
             return
         # `map` takes no keyword arguments, so a call with one raises TypeError before
         # the callback is ever invoked. `filter` takes none either, and takes exactly
@@ -6307,7 +6484,7 @@ class _Visitor(ast.NodeVisitor):
         # does.
         if inner.keywords or len(inner.args) < 2:
             return
-        if inner.func.id == "filter" and len(inner.args) != 2:
+        if factory == "filter" and len(inner.args) != 2:
             return
         sink = _sink_name(inner.args[0], self._alias, self._is_shadowed)
         if sink is None:
@@ -6361,7 +6538,7 @@ class _Visitor(ast.NodeVisitor):
                     "path": _relative(self.path),
                     "qualname": self._qualname(),
                     "sink": mapped_sink,
-                    "reason": f"{reason} through {inner.func.id}()",
+                    "reason": f"{reason} through {_callee_spelling(inner)}()",
                     "line": inner.lineno,
                     "hash": _call_hash(inner),
                 })
@@ -6383,6 +6560,21 @@ class _Visitor(ast.NodeVisitor):
         """`[*map(exec, [...])]` consumes the map as eagerly as `list(...)` does."""
         self._report_mapped_sinks(self._mapped_sink_elements(node.value))
         self.generic_visit(node)
+
+    def _origin_of_argument(self, argument) -> str:
+        """The digest recorded for the name or path this argument reads, if any."""
+        for node in ast.walk(argument) if isinstance(argument, ast.AST) else ():
+            key = None
+            if isinstance(node, ast.Name):
+                key = node.id
+            elif isinstance(node, (ast.Attribute, ast.Subscript)):
+                key = _compound_key(node)
+            if key is None:
+                continue
+            found = self.origin_of.get((self._qualname(), key))
+            if found:
+                return found
+        return ""
 
     def _yields_a_tree(self, argument) -> bool:
         """Whether the argument is a visible `ast.parse(...)`, which is not source.
@@ -6410,7 +6602,7 @@ class _Visitor(ast.NodeVisitor):
                     "path": _relative(self.path),
                     "qualname": self._qualname(),
                     "sink": mapped_sink,
-                    "reason": f"{reason} through {inner.func.id}()",
+                    "reason": f"{reason} through {_callee_spelling(inner)}()",
                     "line": inner.lineno,
                     "hash": _call_hash(inner),
                 })
@@ -6450,17 +6642,32 @@ class _Visitor(ast.NodeVisitor):
                 argument, self.tainted[-1].get, self._is_shadowed, self._alias,
             )
             if reason is not None:
-                self.findings.append(
-                    {
-                        "path": _relative(self.path),
-                        "qualname": self._qualname(),
-                        "sink": sink,
-                        "reason": reason,
-                        "line": node.lineno,
-                        "hash": _call_hash(node),
-                    }
-                )
+                finding = {
+                    "path": _relative(self.path),
+                    "qualname": self._qualname(),
+                    "sink": sink,
+                    "reason": reason,
+                    "line": node.lineno,
+                    "hash": _call_hash(node),
+                }
+                # Where the source was BUILT, when that is a binding this walked. The
+                # call's own hash cannot see it: `payload = f"import {safe}"` becoming
+                # `payload = f"import {input()}"` leaves `exec(payload)` byte for byte
+                # the same, and the reviewed entry would still have covered it.
+                origin = self._origin_of_argument(argument)
+                if origin:
+                    finding["origin"] = origin
+                self.findings.append(finding)
         self.generic_visit(node)
+
+
+def _expression_digest(node: ast.AST) -> str:
+    """A short digest of an expression's own source, canonicalised through unparse."""
+    try:
+        text = ast.unparse(node)
+    except Exception:
+        return ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
 
 
 def _call_hash(node: ast.Call) -> str:
@@ -7480,18 +7687,55 @@ def _annotations_deferred(tree: ast.AST) -> bool:
     return False
 
 
+def _runs_python_command(line: str) -> bool:
+    """Whether the command before a heredoc really is a Python interpreter.
+
+    A substring test called `cat > /tmp/python.py <<'PY'` Python, since the word is in
+    the destination filename. The command is tokenised instead, redirections and their
+    operands are dropped, and the remaining words are matched against the interpreter
+    pattern `_runs_python` already uses.
+    """
+    command = line.split("<<", 1)[0]
+    try:
+        tokens = shlex.split(command, comments = True)
+    except ValueError:
+        tokens = command.split()
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token in (">", ">>", "<", "2>", "&>", "|"):
+            # The next token is a destination, not a command.
+            index += 2
+            continue
+        if token.startswith((">", "<")):
+            index += 1
+            continue
+        name = token.rsplit("/", 1)[-1].split("\\")[-1]
+        if _PYTHON_COMMAND.fullmatch(name):
+            return True
+        index += 1
+    return False
+
+
+# An Actions expression is not Python, and a heredoc holding one does not parse until
+# the runner has substituted it. Replaced by a name so the rest of the block can be
+# read: the substituted value is whatever the workflow computes, which is exactly the
+# untrusted-value case this gate is about.
+_ACTIONS_EXPRESSION = re.compile(r"\$\{\{.*?\}\}", re.S)
+
+
 def _python_heredocs(text: str):
     """`(line number, source)` for each Python heredoc in a workflow file.
 
-    Only a heredoc whose introducing line names python: `run: |` blocks are shell, and
-    a `cat <<EOF > file` block is data. The block's common indentation is removed,
-    since YAML indents the whole `run:` scalar.
+    Only a heredoc whose introducing line really runs python: `run: |` blocks are
+    shell, and a `cat <<EOF > file` block is data. The block's common indentation is
+    removed, since YAML indents the whole `run:` scalar.
     """
     lines = text.splitlines()
     index = 0
     while index < len(lines):
         match = _HEREDOC.search(lines[index])
-        if match is None or "python" not in lines[index].lower():
+        if match is None or not _runs_python_command(lines[index]):
             index += 1
             continue
         delimiter = match.group(2)
@@ -7503,8 +7747,32 @@ def _python_heredocs(text: str):
             index += 1
         indents = [len(line) - len(line.lstrip()) for line in body if line.strip()]
         cut = min(indents) if indents else 0
-        yield start, "\n".join(line[cut:] if line.strip() else "" for line in body)
+        source = "\n".join(line[cut:] if line.strip() else "" for line in body)
+        # `name = ${{ inputs.module }}` is not Python here and IS Python on the runner,
+        # once Actions has substituted it. Skipping the block let a sink under such a
+        # line through unread, so the expression becomes a name and the block is
+        # scanned - which is the same answer the notebook reader gives a magic.
+        yield start, _ACTIONS_EXPRESSION.sub("_actions_expression", source)
         index += 1
+
+
+def _python_dash_c_commands(text: str):
+    """`(line number, program)` for each `python -c "..."` a workflow file runs.
+
+    The heredoc reader covers the multi-line spelling; this is the one-liner, which
+    executes on the runner just the same. The same extractor the notebook `%%script`
+    reader uses answers it, so there is one implementation of the option rules.
+    """
+    for number, line in enumerate(text.splitlines(), start = 1):
+        if "<<" in line or not _runs_python_command(line + " <<"):
+            continue
+        stripped = line.strip()
+        for prefix in ("run:", "- run:", "-", "|"):
+            if stripped.startswith(prefix):
+                stripped = stripped[len(prefix):].strip()
+        program = _script_command_source("%%script " + stripped)
+        if program is not None:
+            yield number, _ACTIONS_EXPRESSION.sub("_actions_expression", program)
 
 
 def _scan_workflow(path: Path) -> list[dict]:
@@ -7522,7 +7790,7 @@ def _scan_workflow(path: Path) -> list[dict]:
     visitor = _Visitor(path)
     skipped = 0
     parsed = []
-    for start, source in _python_heredocs(text):
+    for start, source in [*_python_heredocs(text), *_python_dash_c_commands(text)]:
         try:
             tree = ast.parse(source, filename = f"{path}#line{start}")
         except (SyntaxError, ValueError):
@@ -7716,8 +7984,22 @@ def key_of(finding: dict) -> str:
     return f"{finding['path']}::{finding['qualname']}::{finding['hash']}"
 
 
+def origins_by_key(findings: list[dict]) -> dict[str, str]:
+    """Every origin digest recorded against each key, in one stable string.
+
+    Two byte-identical calls under one key can be handed source built by two different
+    expressions, so the entry records both and a change to either one is a mismatch.
+    """
+    grouped: dict[str, set] = {}
+    for finding in findings:
+        if finding.get("origin"):
+            grouped.setdefault(key_of(finding), set()).add(finding["origin"])
+    return {key: "+".join(sorted(values)) for key, values in grouped.items()}
+
+
 def write_allowlist(findings: list[dict], reason: str) -> None:
     existing = load_allowlist()
+    origins = origins_by_key(findings)
     counts: dict[str, int] = {}
     for finding in findings:
         counts[key_of(finding)] = counts.get(key_of(finding), 0) + 1
@@ -7739,6 +8021,8 @@ def write_allowlist(findings: list[dict], reason: str) -> None:
             "hash": finding["hash"],
             "reason": previous.get("reason", reason),
         }
+        if origins.get(key):
+            entry["origin"] = origins[key]
         if counts[key] > 1:
             # Two byte-identical calls in one function share a key, so one entry
             # approved both - and a THIRD copy added later inherited the same
@@ -8086,6 +8370,7 @@ def main() -> int:
     # silently. When such a change alters the shape at all, it alters the reason, and
     # that is now a mismatch rather than a match. Entries written before `kind` was
     # recorded carry none, and those still match on the key alone.
+    seen_origins = origins_by_key(findings)
     seen_counts: dict[str, int] = {}
     for finding in findings:
         seen_counts[key_of(finding)] = seen_counts.get(key_of(finding), 0) + 1
@@ -8095,6 +8380,11 @@ def main() -> int:
         or allowlist[key_of(f)].get("kind", f["reason"]) != f["reason"]
         # And the number of calls sharing the key has to be the number reviewed.
         or allowlist[key_of(f)].get("count", 1) != seen_counts[key_of(f)]
+        # And the expression that BUILT the source has to be the one reviewed, when
+        # the entry records it. An entry written before this field existed carries
+        # none and still matches on the rest.
+        or allowlist[key_of(f)].get("origin", seen_origins.get(key_of(f), ""))
+        != seen_origins.get(key_of(f), "")
     ]
     pending = [
         entry
