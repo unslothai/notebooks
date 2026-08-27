@@ -69,6 +69,10 @@ ALLOWLIST_PATH = Path(__file__).resolve().parent / "dynamic_exec_allowlist.json"
 DEFAULT_TARGETS = (
     "scripts", "original_template", "nb", "kaggle", "Template_Notebook.ipynb",
     "update_all_notebooks.py", "replace_text.py", "update_max_seq_length.py",
+    # Workflow `run:` steps execute Python heredocs on the CI runner, with the
+    # runner's token in the environment, so a sink written inside one is as
+    # executable as anything else here and was covered by nothing.
+    ".github/workflows",
 )
 
 
@@ -990,6 +994,40 @@ _LOCAL_CLASSES: dict = {}
 # a name that is a class in one place and a lambda in another is no evidence at all.
 _REBOUND_CLASS_NAMES: set = set()
 
+# Functions the file defines, and the names it binds to more than one thing. Same
+# shape as the class tables above and read the same way: a name that means two things
+# somewhere in the file is no evidence anywhere in it.
+_LOCAL_FUNCTIONS: dict = {}
+_REBOUND_FUNCTION_NAMES: set = set()
+
+# Helpers currently being resolved, so a recursive one cannot loop forever.
+_HELPER_STACK: set = set()
+
+
+def _returned_expressions(definition) -> list:
+    """The values this function's own `return` statements hand back.
+
+    Its own: a `return` inside a nested `def` belongs to that one. A bare `return`
+    hands back None and contributes nothing.
+    """
+    found = []
+    for statement in definition.body:
+        for child in _walk_this_scope(statement):
+            if isinstance(child, ast.Return) and child.value is not None:
+                found.append(child.value)
+    return found
+
+
+def _visible_helper(function: ast.AST, shadowed = None):
+    """The local `def` a callee names, when that is a fact stated in the file."""
+    if not isinstance(function, ast.Name):
+        return None
+    if shadowed is not None and shadowed(function.id):
+        return None
+    if function.id in _REBOUND_FUNCTION_NAMES:
+        return None
+    return _LOCAL_FUNCTIONS.get(function.id)
+
 
 def _visibly_local_instance(node: ast.AST, shadowed = None) -> bool:
     """Whether `node` is written out as an instance of a class defined in this file.
@@ -1253,6 +1291,36 @@ def _interpolated_binop(node, resolve = None, shadowed = None, resolve_alias = N
     return None
 
 
+def _helper_scope(node: ast.Call, helper, resolve, shadowed, resolve_alias):
+    """A `resolve` for a visible helper's body: its parameters, then nothing local.
+
+    The parameters come from the call, the same pairing `_lambda_scope` performs. A
+    name the body BINDS is its own local and resolves to nothing; anything else falls
+    through to the enclosing scope, which is where a module-level constant lives.
+    """
+    paired = _lambda_scope(node, helper, resolve, shadowed, resolve_alias)
+    bound_here = _Visitor._declared_locals(helper)
+    parameters = {
+        argument.arg
+        for argument in (
+            *helper.args.posonlyargs, *helper.args.args, *helper.args.kwonlyargs,
+            helper.args.vararg, helper.args.kwarg,
+        )
+        if argument is not None
+    }
+
+    def resolve_in_helper(name):
+        if name in parameters:
+            # `_lambda_scope` hands back the enclosing resolver when the call cannot
+            # be paired up, and that resolver may be None.
+            return paired(name) if callable(paired) else None
+        if name in bound_here:
+            return None
+        return resolve(name) if resolve is not None else None
+
+    return resolve_in_helper
+
+
 def _lambda_scope(node: ast.Call, function: ast.Lambda, resolve, shadowed, resolve_alias):
     """A `resolve` that answers for an immediately invoked lambda's parameters.
 
@@ -1378,6 +1446,25 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             return _is_interpolated(
                 inner.args[0].elts[0], resolve, shadowed, resolve_alias,
             )
+    helper = _visible_helper(function, shadowed)
+    if helper is not None and helper.name not in _HELPER_STACK:
+        # `def build(): return f"import {name}"` followed by `exec(build())` executes
+        # what the helper hands back, and that is written out one screen away. Only a
+        # `def` this file states outright and binds to nothing else, with its
+        # parameters paired to the arguments exactly as an immediately invoked lambda
+        # is; a name the body binds itself resolves to nothing rather than to the
+        # caller's value of the same spelling.
+        returned = _returned_expressions(helper)
+        if returned:
+            inner_resolve = _helper_scope(node, helper, resolve, shadowed, resolve_alias)
+            _HELPER_STACK.add(helper.name)
+            try:
+                for value in returned:
+                    reason = _is_interpolated(value, inner_resolve, shadowed, resolve_alias)
+                    if reason is not None and not isinstance(reason, _LiteralText):
+                        return reason
+            finally:
+                _HELPER_STACK.discard(helper.name)
     preserving = None
     if isinstance(function, ast.Name):
         preserving = function.id
@@ -1762,6 +1849,15 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                 container = spliced[0]
                 elements = container.keys if isinstance(container, ast.Dict) else container.elts
                 empty = not elements
+            if function.attr in ("join", "format_map") and not any(
+                keyword.arg is None for keyword in node.keywords
+            ):
+                # Both take exactly one positional argument and no keywords, so
+                # `",".join([x], [])` and `t.format_map(m, m2)` raise before the sink.
+                # A `**` this cannot read may still supply the one, so it is left
+                # alone.
+                if len(node.args) > 1 or node.keywords:
+                    return None
             if no_arguments and function.attr == "format_map" and not node.keywords:
                 # `format_map` requires exactly one mapping argument, so the
                 # ARGUMENT-LESS call raises TypeError before the sink is reached.
@@ -3057,8 +3153,11 @@ class _Visitor(ast.NodeVisitor):
         # Reset per file, so a class name from the previous one cannot silence a
         # receiver here. Populated by `_collect_aliases` as it walks each scope.
         global _LOCAL_CLASSES, _REBOUND_CLASS_NAMES
+        global _LOCAL_FUNCTIONS, _REBOUND_FUNCTION_NAMES
         _LOCAL_CLASSES = {}
         _REBOUND_CLASS_NAMES = set()
+        _LOCAL_FUNCTIONS = {}
+        _REBOUND_FUNCTION_NAMES = set()
         # Set for a notebook cell, so two cells defining the same function name are
         # separate allowlist entries rather than colliding on one key.
         self.qualname_prefix = ""
@@ -3433,7 +3532,22 @@ class _Visitor(ast.NodeVisitor):
         self.global_names.pop()
         self.nonlocal_names.pop()
         self.future_taint.pop()
+        if isinstance(node, ast.ClassDef):
+            # A class body's locals become the class object's attributes, and they
+            # outlive the body: `class C: payload = f"import {name}"` followed by
+            # `exec(C.payload)` executes the built string. Popping the map discarded
+            # them, so they are exported to the compound path the attribute access
+            # spells first. Rebinding `C` takes them away again, through the same
+            # root-rebinding cleanup every other path gets.
+            exported = {
+                f"path>{node.name}.{name}": reason
+                for name, reason in self.tainted[-1].items()
+                if isinstance(name, str) and not name.startswith("path>")
+            }
+        else:
+            exported = {}
         self.tainted.pop()
+        self.tainted[-1].update(exported)
         self.scope.pop()
         self.scope_kinds.pop()
         saved_deferred = self.deferred_state.pop()
@@ -3706,6 +3820,31 @@ class _Visitor(ast.NodeVisitor):
             and not iterable.keywords
         ):
             return self._literal_elements(iterable.args[0])
+        # `enumerate([...])` yields `(index, element)` pairs, and the pairs are as
+        # visible as the container is: `for _, payload in enumerate([f"import
+        # {name}"])` binds the interpolated element. Read as opaque, it cleared the
+        # target and the sink in the body went unreported. The pairs are built here so
+        # the ordinary unpacking machinery does the rest.
+        if (
+            isinstance(iterable, ast.Call)
+            and isinstance(iterable.func, ast.Name)
+            and iterable.func.id == "enumerate"
+            and not self._is_shadowed("enumerate")
+            and len(iterable.args) in (1, 2)
+        ):
+            inner = self._literal_elements(iterable.args[0])
+            if inner is None:
+                return None
+            return [
+                ast.copy_location(
+                    ast.Tuple(
+                        elts = [ast.Constant(value = index), element],
+                        ctx = ast.Load(),
+                    ),
+                    element,
+                )
+                for index, element in enumerate(inner)
+            ]
         if isinstance(iterable, (ast.Tuple, ast.List, ast.Set)):
             return iterable.elts
         if isinstance(iterable, ast.Dict) and all(k is not None for k in iterable.keys):
@@ -4589,6 +4728,20 @@ class _Visitor(ast.NodeVisitor):
 
     def _record_local_class(self, statement) -> None:
         """`class Safe:` makes `Safe()` a receiver whose methods are not string ones."""
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            recorded = _LOCAL_FUNCTIONS.get(statement.name)
+            if recorded is not None and recorded is not statement:
+                _REBOUND_FUNCTION_NAMES.add(statement.name)
+            _LOCAL_FUNCTIONS[statement.name] = statement
+        elif isinstance(statement, ast.ClassDef):
+            _REBOUND_FUNCTION_NAMES.add(statement.name)
+        else:
+            for child in _walk_this_scope(statement):
+                if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
+                    _REBOUND_FUNCTION_NAMES.add(child.id)
+                elif isinstance(child, (ast.Import, ast.ImportFrom)):
+                    for alias in child.names:
+                        _REBOUND_FUNCTION_NAMES.add(alias.asname or alias.name.split(".")[0])
         if isinstance(statement, ast.ClassDef):
             recorded = _LOCAL_CLASSES.get(statement.name)
             if recorded is not None and recorded is not statement:
@@ -5435,14 +5588,38 @@ class _Visitor(ast.NodeVisitor):
             return
         for table in (self.sink_aliases, self.collected_aliases):
             table[level].pop(f"template:{target.id}", None)
+        for table in (self.sink_aliases, self.collected_aliases):
+            table[level].pop(f"stdlibfunc:{target.id}", None)
         if not isinstance(value, ast.Attribute):
             return
-        if value.attr not in (*_BUILDERS, *_TEMPLATE_BUILDERS):
+        # `build = operator.add` binds the same helper `from operator import add`
+        # does, and only the import spelling was recorded, so the later bare call was
+        # read as an ordinary function of unknown behaviour.
+        if isinstance(value.value, ast.Name):
+            for module in _MODULE_RECEIVERS:
+                if not _names_module(value.value, module, self._is_shadowed, self._alias):
+                    continue
+                qualified = f"{module}.{value.attr}"
+                if qualified in _DIRECT_HELPERS:
+                    for table in (self.sink_aliases, self.collected_aliases):
+                        table[level][f"stdlibfunc:{target.id}"] = qualified
+                    return
+        # Every method that hands text on, not only the formatting ones:
+        # `replace = "import MODULE".replace` and `normalize = payload.strip` bind the
+        # method with its receiver attached, and the call a line later splices or
+        # normalises exactly as the inline spelling does.
+        if value.attr not in (
+            *_BUILDERS, *_TEMPLATE_BUILDERS, *_NORMALISERS, *_CONVERSIONS, "replace",
+        ):
             return
         receiver = value.value
         if not (
             _visibly_literal_text(receiver)
             or _is_template_call(receiver, self._is_shadowed, self._alias)
+            # A plain name is recorded too: the replay resolves it at the CALL site,
+            # against the taint map as it stands there, so nothing is assumed about
+            # what it holds when the method is bound.
+            or isinstance(receiver, ast.Name)
         ):
             return
         replay = ast.Call(func = value, args = [], keywords = [])
@@ -6246,6 +6423,16 @@ def _call_hash(node: ast.Call) -> str:
 
 
 NOTEBOOK_SUFFIX = ".ipynb"
+
+# Workflow files hold Python too: a `python - <<'PY' ... PY` block in a `run:` step is
+# a program the CI runner executes, with the runner's token in the environment, and a
+# sink written inside one was covered by nothing. Scanned like a notebook - each block
+# is its own module, an unparseable one is counted rather than failing the file, since
+# a heredoc may be shell or YAML templating rather than Python.
+WORKFLOW_SUFFIXES = (".yml", ".yaml")
+
+# `<<EOF`, `<<'PY'`, `<<-"EOF"`: the delimiter, quoted or not.
+_HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 
 
 def _notebook_code_cells(path: Path) -> list[tuple[int, str]]:
@@ -7235,6 +7422,78 @@ def _annotations_deferred(tree: ast.AST) -> bool:
     return False
 
 
+def _python_heredocs(text: str):
+    """`(line number, source)` for each Python heredoc in a workflow file.
+
+    Only a heredoc whose introducing line names python: `run: |` blocks are shell, and
+    a `cat <<EOF > file` block is data. The block's common indentation is removed,
+    since YAML indents the whole `run:` scalar.
+    """
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        match = _HEREDOC.search(lines[index])
+        if match is None or "python" not in lines[index].lower():
+            index += 1
+            continue
+        delimiter = match.group(2)
+        start = index + 1
+        body = []
+        index = start
+        while index < len(lines) and lines[index].strip() != delimiter:
+            body.append(lines[index])
+            index += 1
+        indents = [len(line) - len(line.lstrip()) for line in body if line.strip()]
+        cut = min(indents) if indents else 0
+        yield start, "\n".join(line[cut:] if line.strip() else "" for line in body)
+        index += 1
+
+
+def _scan_workflow(path: Path) -> list[dict]:
+    """Findings in the Python heredocs a workflow file runs.
+
+    One visitor for the file, as for a notebook, and one qualname prefix per block.
+    A block that will not parse is counted in NOTEBOOK_SKIPPED rather than failing the
+    file: `python -` is also spelled with templating and `${{ }}` inside, which is not
+    Python at all.
+    """
+    try:
+        text = path.read_text(encoding = "utf-8", errors = "replace")
+    except OSError as error:
+        raise ScanError(f"{_relative(path)}: {error.strerror or error}") from None
+    visitor = _Visitor(path)
+    skipped = 0
+    parsed = []
+    for start, source in _python_heredocs(text):
+        try:
+            tree = ast.parse(source, filename = f"{path}#line{start}")
+        except (SyntaxError, ValueError):
+            skipped += 1
+            continue
+        except (MemoryError, RecursionError) as error:
+            raise ScanError(
+                f"{_relative(path)}#line{start}: hit a parser limit "
+                f"({error.__class__.__name__}), so the block was not checked"
+            ) from None
+        # The block's own line numbers start at 1; the findings should point into the
+        # workflow file, so every node is shifted to where the block really sits.
+        ast.increment_lineno(tree, start)
+        parsed.append((start, tree))
+    for _start, tree in parsed:
+        visitor._collect_aliases(tree.body)
+    for start, tree in parsed:
+        visitor.qualname_prefix = f"line{start}"
+        try:
+            visitor.visit(tree)
+        except RecursionError:
+            raise ScanError(
+                f"{_relative(path)}#line{start}: too deeply nested to walk"
+            ) from None
+    if skipped:
+        NOTEBOOK_SKIPPED.append((_relative(path), skipped))
+    return visitor.findings
+
+
 def scan_file(path: Path) -> list[dict]:
     # A hard CI gate must not fall over on something that is not a readable file. A
     # dangling symlink, a directory named `*.py`, or a symlink to one all reach here
@@ -7242,6 +7501,8 @@ def scan_file(path: Path) -> list[dict]:
     # nothing to do with dynamic execution.
     if path.suffix == NOTEBOOK_SUFFIX:
         return _scan_notebook(path)
+    if path.suffix in WORKFLOW_SUFFIXES:
+        return _scan_workflow(path)
     try:
         # Bytes, not text. `ast.parse` applies the PEP 263 coding declaration itself,
         # while decoding here as UTF-8 with errors = "replace" corrupted any file that
@@ -7319,13 +7580,13 @@ def collect_paths(targets: list[str]) -> tuple[list[Path], list[str]]:
     paths, missing = [], []
     for target in targets:
         root = REPO_ROOT / target
-        if root.is_file() and root.suffix in (".py", NOTEBOOK_SUFFIX):
+        if root.is_file() and root.suffix in (".py", NOTEBOOK_SUFFIX, *WORKFLOW_SUFFIXES):
             paths.append(root)
         elif root.is_dir():
             # `is_file()` on each hit, so a directory named `foo.py` and a symlink that
             # points at one are skipped rather than read.
             before = len(paths)
-            for pattern in ("*.py", f"*{NOTEBOOK_SUFFIX}"):
+            for pattern in ("*.py", f"*{NOTEBOOK_SUFFIX}", *(f"*{x}" for x in WORKFLOW_SUFFIXES)):
                 paths.extend(
                     p for p in root.rglob(pattern)
                     if p.is_file() and not _EXCLUDED_PARTS & set(_exclusion_parts(p, root))
@@ -7399,19 +7660,35 @@ def key_of(finding: dict) -> str:
 
 def write_allowlist(findings: list[dict], reason: str) -> None:
     existing = load_allowlist()
-    allowed = []
+    counts: dict[str, int] = {}
     for finding in findings:
-        previous = existing.get(key_of(finding), {})
-        allowed.append(
-            {
-                "path": finding["path"],
-                "qualname": finding["qualname"],
-                "sink": finding["sink"],
-                "kind": finding["reason"],
-                "hash": finding["hash"],
-                "reason": previous.get("reason", reason),
-            }
-        )
+        counts[key_of(finding)] = counts.get(key_of(finding), 0) + 1
+    allowed = []
+    written = set()
+    for finding in findings:
+        key = key_of(finding)
+        if key in written:
+            # One entry per key: the copies are indistinguishable by it, and the count
+            # below is what says how many were reviewed.
+            continue
+        written.add(key)
+        previous = existing.get(key, {})
+        entry = {
+            "path": finding["path"],
+            "qualname": finding["qualname"],
+            "sink": finding["sink"],
+            "kind": finding["reason"],
+            "hash": finding["hash"],
+            "reason": previous.get("reason", reason),
+        }
+        if counts[key] > 1:
+            # Two byte-identical calls in one function share a key, so one entry
+            # approved both - and a THIRD copy added later inherited the same
+            # approval. The count is what the reviewer signed off: adding a copy
+            # changes it and the call has to be reviewed again. It does not move when
+            # unrelated lines do, which a line number would.
+            entry["count"] = counts[key]
+        allowed.append(entry)
     allowed.sort(key = lambda e: (e["path"], e["qualname"], e["hash"]))
     ALLOWLIST_PATH.write_text(
         json.dumps(
@@ -7751,10 +8028,15 @@ def main() -> int:
     # silently. When such a change alters the shape at all, it alters the reason, and
     # that is now a mismatch rather than a match. Entries written before `kind` was
     # recorded carry none, and those still match on the key alone.
+    seen_counts: dict[str, int] = {}
+    for finding in findings:
+        seen_counts[key_of(finding)] = seen_counts.get(key_of(finding), 0) + 1
     unreviewed = [
         f for f in findings
         if key_of(f) not in allowlist
         or allowlist[key_of(f)].get("kind", f["reason"]) != f["reason"]
+        # And the number of calls sharing the key has to be the number reviewed.
+        or allowlist[key_of(f)].get("count", 1) != seen_counts[key_of(f)]
     ]
     pending = [
         entry

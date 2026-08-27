@@ -301,6 +301,10 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'a visible local helper hands back what it built': 'def build(name):\n    return f"import {name}"\ndef f(name):\n    exec(build(name))\n',
+    'a class attribute outlives the class body': 'class C:\n    payload = None\ndef f(name):\n    C.payload = f"import {name}"\n    exec(C.payload)\n',
+    'a bound replace keeps its template': 'def f(name):\n    replace = "import MODULE".replace\n    exec(replace("MODULE", name))\n',
+    'a bound normaliser keeps its receiver': 'def f(name):\n    payload = f"import {name}"\n    normalize = payload.strip\n    exec(normalize())\n',
     'a memoryview handed back as bytes is the same source': 'def f(name):\n    exec(memoryview(f"import {name}".encode()).tobytes())\n',
     'a text subclass one level down still inherits the builder': 'class Base(str):\n    pass\nclass Template(Base):\n    pass\ndef f(name):\n    exec(Template("import {}").format(name))\n',
     'a Formatter bound to a name still formats': 'import string\ndef f(name):\n    payload = f"import {name}"\n    formatter = string.Formatter()\n    exec(formatter.vformat("{}", (payload,), {}))\n',
@@ -378,6 +382,7 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'enumerate over a written-out list still pairs its elements': 'def f(name):\n    for _, payload in enumerate([f"import {name}"]):\n        exec(payload)\n',
     'an iter around a written-out list still yields its elements': 'def f(name):\n    for payload in iter([f"import {name}"]):\n        exec(payload)\n',
     'a global declaration leaves the name in the enclosing scope': 'payload = f"import {name}"\ndef f():\n    global payload\n    exec(payload)\n    payload = "pass"\nf()\n',
     'a nonlocal declaration leaves the name in the enclosing scope': 'def outer(name):\n    payload = f"import {name}"\n    def f():\n        nonlocal payload\n        exec(payload)\n        payload = "pass"\n    f()\n',
@@ -418,6 +423,8 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'join takes one iterable and raises on two': 'def f(name):\n    exec(",".join([f"import {name}"], []))\n',
+    'format_map takes one mapping and raises on two': 'def f(name):\n    exec("import {name}".format_map({"name": name}, {}))\n',
     'a function body ends at an unconditional return': 'def f(name):\n    return\n    exec(f"import {name}")\n',
     'a function body ends at an unconditional raise': 'def f(name):\n    raise SystemExit\n    exec(f"import {name}")\n',
     'a discarded generator never evaluates its element': 'def f(name):\n    (exec(f"import {name}") for _ in [0])\n',
@@ -599,3 +606,58 @@ def test_the_scanner_runs_without_the_match_node_types():
         for name, value in saved.items():
             setattr(ast, name, value)
     assert isinstance(findings, list)
+
+
+# A workflow `run:` step executes its Python heredoc on the CI runner.
+_WORKFLOW_RUNS_PYTHON = """name: demo
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: run it
+        run: |
+          python3 - <<'PY'
+          import os
+          name = os.environ["M"]
+          exec(f"import {name}")
+          PY
+"""
+
+# The same text in a heredoc nothing runs as Python.
+_WORKFLOW_IS_DATA = """name: demo
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: write a file
+        run: |
+          cat <<'EOF' > note.txt
+          exec(f"import {name}")
+          EOF
+"""
+
+
+def test_a_python_heredoc_in_a_workflow_is_scanned(tmp_path):
+    sample = tmp_path / "demo.yml"
+    sample.write_text(_WORKFLOW_RUNS_PYTHON)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+    assert "exec()" in proc.stderr, proc.stderr
+
+
+def test_a_heredoc_that_is_not_python_is_left_alone(tmp_path):
+    sample = tmp_path / "demo.yml"
+    sample.write_text(_WORKFLOW_IS_DATA)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 0, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_the_workflow_directory_is_a_default_target():
+    """A capability nothing points at is not a gate."""
+    source = SCRIPT.read_text(encoding = "utf-8")
+    assert '".github/workflows"' in source, (
+        "the default targets no longer name .github/workflows, so the heredocs in "
+        "workflow run steps are scanned by nothing"
+    )
