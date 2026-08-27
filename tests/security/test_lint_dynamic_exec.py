@@ -194,6 +194,11 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'an aliased textwrap wrapper still hands the source through': 'from textwrap import dedent as clean\ndef f(name):\n    exec(clean(f"import {name}"))\n',
+    'operator.mod is percent formatting written as a call': 'import operator\ndef f(name):\n    exec(operator.mod("import %s", name))\n',
+    'the in-place operator spellings concatenate too': 'import operator\ndef f(name):\n    exec(operator.iadd("import ", name))\n',
+    '__getitem__ is the mapping subscript written as a call': 'import builtins\ndef f(name):\n    builtins.__dict__.__getitem__("exec")(f"import {name}")\n',
+    'a lazy type alias value is evaluated when the alias is read': 'type Payload = (exec(f"import {NAME}") or int)\n',
     'the implicit __builtins__ names the sink as an attribute': 'def f(name):\n    __builtins__.exec(f"import {name}")\n',
     'an aliased codeop still compiles the source it was given': 'import codeop as co\ndef f(name):\n    exec(co.compile_command(f"import {name}"))\n',
     'a mixed literal loop keeps the sink over the constructor': 'import builtins\ndef f(name):\n    for run in [builtins.str, builtins.exec]:\n        run(f"import {name}")\n',
@@ -232,6 +237,7 @@ def test_a_sink_reached_through_another_spelling_is_reported(description, tmp_pa
 
 # `str`, `bytes` and friends reached indirectly still pass the source through.
 _CONSTRUCTOR_IS_STILL_RESOLVED = {
+    'an undecidable constructor choice checks both arms': 'def f(name, flag):\n    exec((memoryview if flag else str)(f"import {name}"))\n',
     'a builtins star import hands back the conversions too': "def f(name):\n    str = print\n    from builtins import *\n    exec(str(f'import {name}'))\n",
     'a byte constructor over already encoded source reaches the sink': 'def f(name):\n    exec(bytes(f"import {name}".encode()))\n    exec(bytearray(f"import {name}".encode()))\n    exec(memoryview(f"import {name}".encode()))\n',
     'a class-body global import restores the constructor globally': 'str = print\nclass C:\n    global str\n    from builtins import str\ndef f(name):\n    exec(str(f"import {name}"))\n',
@@ -311,6 +317,12 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'a while suite ends at an unconditional break': 'def f(name):\n    payload = f"import {name}"\n    while True:\n        break\n        payload = "pass"\n    exec(payload)\n',
+    'a jump under a decidable test ends the suite as well': 'def f(name):\n    payload = f"import {name}"\n    for _ in [0]:\n        if True:\n            continue\n        payload = "pass"\n    exec(payload)\n',
+    'a statically false case guard runs no body': 'def f(name, value):\n    payload = f"import {name}"\n    match value:\n        case _ if False:\n            payload = "pass"\n    exec(payload)\n',
+    'a comprehension that runs no pass binds no walrus': 'def f(name):\n    payload = f"import {name}"\n    [(payload := "pass") for _ in []]\n    exec(payload)\n',
+    'an empty display is a false condition': 'def f(name):\n    payload = f"import {name}"\n    [] and (payload := "pass")\n    exec(payload)\n',
+    'a literal sequence subject pairs with its capture': 'def f(name):\n    match [f"import {name}"]:\n        case [payload]:\n            exec(payload)\n',
     'an annotated literal is still a template for replace': 'def f(name):\n    template: str = "import MODULE"\n    exec(template.replace("MODULE", name))\n',
     'a positive augmented repetition keeps the built source': 'def f(name):\n    payload = f"import {name}"\n    payload *= 2\n    exec(payload)\n',
     'an assignment below an unconditional break never runs': 'def f(name):\n    payload = f"import {name}"\n    for _ in [0]:\n        break\n        payload = "pass"\n    exec(payload)\n',
@@ -335,6 +347,20 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'False is a zero repetition count': 'def f(name):\n    exec(f"import {name}" * False)\n',
+    'two written-out containers add to a list, not to source': 'def f(name):\n    exec([f"import {name}"] + [])\n',
+    'an async loop over a synchronous literal never reaches its else': 'async def f(name):\n    async for _ in []:\n        pass\n    else:\n        exec(f"import {name}")\n',
+    'a deleted nonlocal cell is empty, not the builtin': 'def outer(name):\n    exec = print\n    def inner():\n        nonlocal exec\n        del exec\n        exec(f"import {name}")\n    return inner\n',
+    'a zero precision format spec keeps nothing': 'def f(name):\n    exec(format(f"import {name}", ".0"))\n',
+    'removing the receiver as its own prefix leaves nothing': 'def f(name):\n    exec(f"import {name}".removeprefix(f"import {name}"))\n',
+    'a written-out expansion supplies the source itself': 'def f(name):\n    exec(compile(*["pass"], f"<{name}>", "exec"))\n',
+    'an unpacked number stays a number': 'def f(name):\n    payload, = (1,)\n    payload += 2\n    exec(payload)\n',
+    'a walrus number stays a number': 'def f(name):\n    (payload := 1)\n    payload += 2\n    exec(payload)\n',
+    'dict takes at most one positional argument': 'def f(name):\n    compile(**dict({"source": f"import {name}"}, {"filename": "<x>", "mode": "exec"}))\n',
+    'the decoding form of str rejects text': 'def f(name):\n    exec(str(f"import {name}", "utf-8"))\n',
+    'a local contextlib is not the stdlib module': 'def f(contextlib, name):\n    with contextlib.nullcontext(f"import {name}") as payload:\n        exec(payload)\n',
+    'a literal template with no field ignores its arguments': 'def f(name):\n    exec("pass".format(name))\n',
+    'a local codeop is not the stdlib module': 'def f(codeop, name):\n    exec(codeop.compile_command(f"import {name}"))\n',
     'a local operator is not the stdlib module': 'def f(operator, name):\n    exec(operator.add("import ", name))\n',
     'assigning the builtins module drops the earlier sink alias': 'import builtins\ndef f(name):\n    run = builtins.exec\n    run = builtins\n    run(f"import {name}")\n',
     'an augmented repetition by zero builds nothing': 'def f(name):\n    payload = f"import {name}"\n    payload *= 0\n    exec(payload)\n',

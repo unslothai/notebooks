@@ -179,9 +179,24 @@ _CONSTRUCTOR_SOURCE_KEYWORD = {
 # ordinary parameter, and rewriting it as `+` reported a helper that may well return a
 # fixed literal. `_binds_over_sink` never recorded the shadow because the name was in
 # none of the tracked sets.
-_MODULE_RECEIVERS = frozenset({"codeop", "operator", "ast", "importlib", "functools"})
+_MODULE_RECEIVERS = frozenset({
+    "codeop", "operator", "ast", "importlib", "functools", "textwrap", "contextlib",
+})
+
+# `operator` functions that build a string out of two values, and the operator each
+# one is. The in-place spellings return the same concatenation for a str, which has no
+# in-place add, and `mod` is `%`, which the binary form already reports as formatting.
+_OPERATOR_BUILDERS = {
+    "add": ast.Add, "concat": ast.Add, "iadd": ast.Add, "iconcat": ast.Add,
+    "mod": ast.Mod, "imod": ast.Mod,
+}
 _BUILTIN_NAMES = frozenset({
-    *SINKS, *_CONSTRUCTORS, *_MODULE_RECEIVERS, "builtins", "dict", "getattr",
+    *SINKS, *_CONSTRUCTORS, *_MODULE_RECEIVERS, *_TEXT_PRESERVING_FUNCTIONS,
+    "builtins", "dict", "getattr",
+    # The bare spelling `_nullcontext_value` accepts. A local of that name provides
+    # whatever it likes from `__enter__`, so the shadow test it already performs has
+    # to have something to find.
+    "nullcontext",
 })
 
 
@@ -331,6 +346,16 @@ def _constructor_accepts_text(node: ast.Call, name: str) -> bool:
             keyword.arg == "encoding" for keyword in node.keywords
         )
         return supplied_encoding
+    if name == "str":
+        # `str(f"import {name}", "utf-8")` is the DECODING form, and CPython answers
+        # `TypeError: decoding str is not supported` before the sink is reached.
+        # Reporting it failed the gate on a call that cannot execute. One-argument
+        # `str(text)` is unaffected, and a bytes-like source still decodes: the test
+        # above already required a VISIBLY text argument to get here.
+        supplied_encoding = len(node.args) > 1 or any(
+            keyword.arg in ("encoding", "errors") for keyword in node.keywords
+        )
+        return not supplied_encoding
     return True
 
 
@@ -666,6 +691,15 @@ def _names_module(node: ast.AST, module: str, shadowed = None, aliases = None) -
     return aliases is not None and aliases(f"stdlib:{node.id}") == module
 
 
+def _visibly_container(node: ast.AST) -> bool:
+    """Whether `node` is written out as a list, tuple or set display.
+
+    A sink handed one of these raises TypeError, so nothing it holds is ever
+    executed. Only the written-out spelling; a name is unknown and stays source.
+    """
+    return isinstance(node, (ast.List, ast.Tuple, ast.Set))
+
+
 def _positive_repetition(count: ast.AST) -> bool:
     """Whether a written-out repetition count keeps at least one copy of the string.
 
@@ -678,11 +712,13 @@ def _positive_repetition(count: ast.AST) -> bool:
     if isinstance(count, ast.UnaryOp) and isinstance(count.op, (ast.USub, ast.UAdd)):
         sign = -1 if isinstance(count.op, ast.USub) else 1
         count = count.operand
-    if (
-        isinstance(count, ast.Constant)
-        and isinstance(count.value, int)
-        and not isinstance(count.value, bool)
-    ):
+    if isinstance(count, ast.Constant) and isinstance(count.value, bool):
+        # Python takes a bool as a repetition count, so `s * False` is the empty
+        # string and `s * True` is one copy. Excluding `bool` outright made `False`
+        # fall through to the conservative default and reported a call that builds
+        # nothing.
+        return sign * int(count.value) > 0
+    if isinstance(count, ast.Constant) and isinstance(count.value, int):
         return sign * count.value > 0
     return True
 
@@ -698,6 +734,14 @@ def _interpolated_binop(node, resolve = None, shadowed = None, resolve_alias = N
         if isinstance(node.op, ast.Mod):
             return "%-format"
         if isinstance(node.op, ast.Add):
+            # `[f"import {name}"] + []` is a LIST, and a sink handed a list raises
+            # TypeError before executing anything. Reporting it forced code that is
+            # not dynamic execution at all into the allowlist, which is the same
+            # argument the visibly numeric exclusion above already makes. Both
+            # operands have to be written-out containers; anything unknown still
+            # reads as concatenation.
+            if _visibly_container(node.left) and _visibly_container(node.right):
+                return None
             return "string concatenation"
     if isinstance(node.op, ast.Mult):
         # `f"import {name}" * 0` is the empty string, and a negative count is empty
@@ -726,6 +770,13 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
         preserving = function.id
     elif isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name):
         preserving = function.attr
+    if preserving not in _TEXT_PRESERVING_FUNCTIONS and isinstance(function, ast.Name):
+        # `from textwrap import dedent as clean` binds the same function under a
+        # different name, and matching on the spelling alone stopped before the
+        # argument was ever looked at. Recorded in its own namespace, so the alias
+        # resolves to the function it names and nothing else.
+        if resolve_alias is not None and not (shadowed is not None and shadowed(function.id)):
+            preserving = resolve_alias(f"text:{function.id}") or preserving
     if preserving in _TEXT_PRESERVING_FUNCTIONS and not (
         shadowed is not None and isinstance(function, ast.Name) and shadowed(function.id)
     ):
@@ -813,19 +864,22 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                 function.value, "codeop", shadowed, resolve_alias,
             ):
                 return _is_interpolated(compiled, resolve, shadowed, resolve_alias)
-        if function.attr in ("add", "concat") and isinstance(function.value, ast.Name):
+        if function.attr in _OPERATOR_BUILDERS and isinstance(function.value, ast.Name):
             # `exec(operator.add("import ", name))` builds the same string the `+`
-            # operator does, and the stdlib documents `operator.concat` the same way.
-            # Rebuilt as that operator and read there, which also applies the visibly
-            # numeric exclusion, so `operator.add(1, 2)` stays quiet. Receiver written
-            # out and unshadowed, two positional arguments, the only shape these take.
+            # operator does, and the stdlib documents `concat`, the in-place `iadd`
+            # and `iconcat`, and `mod` for `%`, all the same way. Rebuilt as that
+            # operator and read there, which also applies the visibly numeric
+            # exclusion, so `operator.add(1, 2)` stays quiet. Receiver written out and
+            # unshadowed, two positional arguments, the only shape these take.
             if (
                 _names_module(function.value, "operator", shadowed, resolve_alias)
                 and len(node.args) == 2
                 and not node.keywords
             ):
                 equivalent = ast.BinOp(
-                    left = node.args[0], op = ast.Add(), right = node.args[1],
+                    left = node.args[0],
+                    op = _OPERATOR_BUILDERS[function.attr](),
+                    right = node.args[1],
                 )
                 return _is_interpolated(
                     ast.copy_location(equivalent, node), resolve, shadowed, resolve_alias,
@@ -890,6 +944,14 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             if empty:
                 return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
             return None
+        if function.attr in ("removeprefix", "removesuffix") and node.args:
+            # `s.removeprefix(s)` is the empty string, so nothing survives to be
+            # executed and reporting it failed the gate on a call that builds
+            # nothing. Only when the argument is written out as the SAME expression
+            # as the receiver, which is decidable from the text; anything else still
+            # preserves the receiver through the normaliser branch below.
+            if ast.dump(function.value) == ast.dump(node.args[0]):
+                return None
         if function.attr in _NORMALISERS:
             # `str.strip(s)` is the unbound descriptor spelling of `s.strip()`, so
             # the source is the first argument and the receiver is only the type.
@@ -930,6 +992,13 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                 if function.attr in ("format", "format_map"):
                     return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
                 return None
+            if function.attr == "format" and _visibly_literal_text(function.value):
+                # `"pass".format(name)` has no replacement field, so the arguments
+                # change nothing and the result is the literal. Only a written-out
+                # template is read this way; a variable receiver may well hold one.
+                template = function.value.value
+                if isinstance(template, str) and not _FORMAT_FIELD.search(template):
+                    return None
             return f".{function.attr}()"
         if function.attr == "decode" and _visibly_text(function.value):
             # Python 3 has no `str.decode`, so `f"...".decode()` raises
@@ -949,8 +1018,19 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                 )
             # Unwrap the receiver: the conversion changes the type, not the syntax.
             return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
-    constructor = _constructor_name(function, shadowed, resolve_alias)
-    if constructor is not None and _constructor_accepts_text(node, constructor):
+    # Every arm a conditional callee may take, not just the first that resolves:
+    # `(memoryview if flag else str)(f"...")` answered `memoryview`, whose argument
+    # test then rejected a visible string, and the `str` arm - which does execute the
+    # source - was never looked at.
+    for constructor in _constructor_names(function, shadowed, resolve_alias):
+        if not _constructor_accepts_text(node, constructor):
+            continue
+        if constructor == "format" and _truncating_format_spec(node):
+            # `format(f"import {name}", ".0")` is the empty string on CPython, so
+            # nothing built survives to the sink. Only a written-out spec whose
+            # precision is zero; every other spec, and any spec this cannot read,
+            # still hands the source through.
+            continue
         source = _constructor_source(node, constructor, shadowed)
         if source is not None and not (constructor == "str" and _visibly_bytes(source)):
             # `str(bytes)` is the REPR of the bytes, `"b'import os'"`, which executes
@@ -1014,6 +1094,26 @@ def _always_breaks(body) -> bool:
         if isinstance(statement, (ast.Expr, ast.Assign, ast.AnnAssign, ast.AugAssign, ast.Pass)):
             continue
         return False
+    return False
+
+
+def _definitely_jumps(statement: ast.stmt) -> bool:
+    """Whether reaching this statement always leaves the suite it is in.
+
+    A `break`, `continue`, `return` or `raise`, or an `if` whose test is decidable and
+    whose selected suite always leaves. Reachability only: a jump under a test this
+    cannot decide leaves everything below it standing.
+    """
+    if isinstance(statement, (ast.Break, ast.Continue, ast.Return, ast.Raise)):
+        return True
+    if isinstance(statement, ast.If):
+        decided = _constant_truth(statement.test)
+        if decided is None:
+            return False
+        return any(
+            _definitely_jumps(inner)
+            for inner in (statement.body if decided else statement.orelse)
+        )
     return False
 
 
@@ -1228,13 +1328,15 @@ def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None
     if (
         isinstance(function, ast.Call)
         and isinstance(function.func, ast.Attribute)
-        and function.func.attr == "get"
+        and function.func.attr in ("get", "__getitem__")
         and function.args
         and isinstance(function.args[0], ast.Constant)
     ):
         # `{"run": builtins.exec}.get("run")` and `builtins.__dict__.get("exec")` pick
         # the callee out of a mapping that is written out right here, the same shape
-        # the subscript spelling already reads.
+        # the subscript spelling already reads. `__getitem__` is that subscript
+        # written as a call - `builtins.__dict__.__getitem__("exec")` - and reading
+        # only `get` left it unresolved.
         key = function.args[0].value
         # `dict(run = exec).get("run")` is the same mapping written with the
         # constructor, so it is read the same way. The source side already went
@@ -1368,6 +1470,19 @@ def _constant_truth(test: ast.AST):
     """
     if isinstance(test, ast.Constant):
         return bool(test.value)
+    if isinstance(test, (ast.List, ast.Tuple, ast.Set)):
+        # An empty display is falsy and a display of written-out elements is truthy.
+        # Reading only `ast.Constant` left `[] and (payload := "pass")` undecided, so
+        # the walrus Python skips was applied and the taint it cleared was real.
+        # A `*` element may contribute nothing, so those stay undecided.
+        if any(isinstance(element, ast.Starred) for element in test.elts):
+            return None
+        return bool(test.elts)
+    if isinstance(test, ast.Dict):
+        # `{**other}` may be empty, so only a display without one is decided.
+        if any(key is None for key in test.keys):
+            return None
+        return bool(test.keys)
     if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
         inner = _constant_truth(test.operand)
         return None if inner is None else not inner
@@ -1433,11 +1548,16 @@ def _reachable_operands(node: ast.BoolOp) -> list:
     reachable = []
     for operand in node.values:
         reachable.append(operand)
-        if not isinstance(operand, ast.Constant):
+        # `_constant_truth` rather than a bare `ast.Constant`: an empty display is
+        # statically false too, and reading only constants applied the walrus in
+        # `[] and (payload := "pass")`, which Python skips. It also folds `not` and a
+        # nested boolean operand, which the two rules below then decide on.
+        decided = _constant_truth(operand)
+        if decided is None:
             continue
-        if isinstance(node.op, ast.Or) and operand.value:
+        if isinstance(node.op, ast.Or) and decided:
             break
-        if isinstance(node.op, ast.And) and not operand.value:
+        if isinstance(node.op, ast.And) and not decided:
             break
     return reachable
 
@@ -1472,6 +1592,11 @@ def _literal_dict_call(node: ast.AST, shadowed = None) -> ast.Dict | None:
         return None
     if any(keyword.arg is None for keyword in node.keywords):
         return None
+    if len(node.args) > 1:
+        # `dict` takes at most ONE positional argument, so `dict({...}, {...})` raises
+        # TypeError before the call it feeds ever runs. Merging any number of them
+        # synthesised a mapping that cannot exist at runtime and reported the sink.
+        return None
     keys: list = []
     values: list = []
     for argument in node.args:
@@ -1492,6 +1617,45 @@ def _has_computed_key(mapping: ast.Dict) -> bool:
     return any(
         key is not None and not isinstance(key, ast.Constant) for key in mapping.keys
     )
+
+
+# A `str.format` replacement field. `{{` and `}}` are escapes for a literal brace, so
+# they are stepped over before a real field is looked for.
+_FORMAT_FIELD = re.compile(r"(?<!\{)\{(?!\{)[^{}]*\}")
+
+
+def _truncating_format_spec(node: ast.Call) -> bool:
+    """Whether a builtin `format(value, spec)` spec cuts the value to nothing.
+
+    Only `.0`, written out: `format(s, ".0")` is `""` for a string, so nothing built
+    reaches the sink. A spec this cannot read is unknown and keeps the source.
+    """
+    spec = node.args[1] if len(node.args) > 1 else None
+    if spec is None:
+        for keyword in node.keywords:
+            if keyword.arg == "format_spec":
+                spec = keyword.value
+    if not (isinstance(spec, ast.Constant) and isinstance(spec.value, str)):
+        return False
+    return bool(re.fullmatch(r"[^{}]*\.0", spec.value))
+
+
+def _constructor_names(function: ast.AST, shadowed = None, aliases = None):
+    """Every constructor a callee may resolve to, most likely first.
+
+    One name for an ordinary callee. A conditional or boolean callee that cannot be
+    decided has an arm for each side, and each has to be checked on its own: one arm
+    may refuse the argument while the other forwards it to the sink.
+    """
+    if isinstance(function, ast.IfExp) and _constant_truth(function.test) is None:
+        return [
+            name for name in (
+                _constructor_name(function.body, shadowed, aliases),
+                _constructor_name(function.orelse, shadowed, aliases),
+            ) if name is not None
+        ]
+    resolved = _constructor_name(function, shadowed, aliases)
+    return [] if resolved is None else [resolved]
 
 
 def _mapping_literal(node: ast.AST, shadowed = None) -> ast.Dict | None:
@@ -1643,6 +1807,14 @@ def _source_argument(node: ast.Call, sink: str, shadowed = None, skip: int = 0) 
                 if isinstance(inner, ast.Dict) and not inner.keys:
                     expanded = True
                     continue
+                # A written-out expansion with at least one element DOES supply the
+                # argument: `compile(*["pass"], f"<{name}>", "exec")` compiles the
+                # literal and uses the f-string as the FILENAME. Treating every
+                # expansion as possibly empty merged that filename in and reported it
+                # as executable source.
+                if isinstance(inner, (ast.Tuple, ast.List, ast.Set)) and inner.elts:
+                    candidates.append(inner.elts[0])
+                    break
                 # An opaque expansion may BE the source, `exec(*[f"..."])`, and it
                 # may also contribute nothing at runtime, in which case the next
                 # written-out argument is: `exec(*args, f"...")` with `args = ()`
@@ -2206,13 +2378,13 @@ class _Visitor(ast.NodeVisitor):
             # still runs, and an iterable this cannot read still keeps its body.
             for statement in node.body:
                 self.visit(statement)
-                if isinstance(statement, (ast.Break, ast.Continue, ast.Return, ast.Raise)):
+                if _definitely_jumps(statement):
                     # Nothing after an unconditional jump in this suite ever runs, and
                     # visiting it applied its mutations anyway: `for _ in [0]: break`
                     # followed by `payload = "pass"` cleared a binding the loop cannot
                     # reach, so a later `exec(payload)` on the built string reported
-                    # nothing. Statement level, in this suite only: a jump inside a
-                    # nested `if` is conditional and everything below it still stands.
+                    # nothing. `if True: continue` counts too, since the test folds;
+                    # a jump under a test this cannot decide does not.
                     break
         # The `else` suite also runs when the iterable was empty, in which case the
         # target was never bound and the name still means whatever it meant outside -
@@ -2296,7 +2468,10 @@ class _Visitor(ast.NodeVisitor):
         `visit_For` inferred iterations from those literals and reported a sink that
         cannot execute. The literal is still visited, since it is evaluated.
         """
-        if self._literal_elements(node.iter):
+        if self._literal_elements(node.iter) is not None:
+            # `is not None`, not truthiness: `async for _ in []` raises the same
+            # TypeError, and falling through to `visit_For` read the list as an empty
+            # ITERABLE, visited the `else` suite and reported a sink that cannot run.
             self.visit(node.iter)
             self.visit(node.target)
             return
@@ -2361,16 +2536,35 @@ class _Visitor(ast.NodeVisitor):
                 for name, captures_subject in _pattern_bindings(case.pattern)
             }
             saved_scope = self._shadow_locals(shadow if subject_sink else bound)
+            # `match [f"import {name}"]: case [payload]:` pairs element for element,
+            # exactly as an unpacking assignment does, so the capture holds the
+            # f-string and `exec(payload)` runs it. Clearing every sequence capture
+            # read that as binding nothing.
+            paired = self._sequence_pattern_pairs(node.subject, case.pattern)
             for name, captures_subject in _pattern_bindings(case.pattern):
-                self.tainted[-1][name] = f"{reason} via `{name}`" if (
-                    reason is not None and captures_subject
-                ) else None
-                if self.tainted[-1][name] is None:
+                element_reason = None
+                if reason is not None and captures_subject:
+                    element_reason = f"{reason} via `{name}`"
+                elif name in paired:
+                    inner = _is_interpolated(
+                        paired[name], self.tainted[-1].get, self._is_shadowed, self._alias,
+                    )
+                    if inner is not None:
+                        element_reason = f"{inner} via `{name}`"
+                if element_reason is None:
                     self.tainted[-1].pop(name, None)
+                else:
+                    self.tainted[-1][name] = element_reason
             if case.guard is not None:
                 self.visit(case.guard)
-            for statement in case.body:
-                self.visit(statement)
+            # A guard this can decide decides the body: `case _ if False:` never runs,
+            # and visiting it applied assignments that clear taint which survives. The
+            # guard itself is still visited above, since it is evaluated. Same literal
+            # rule `visit_If` and `visit_While` apply to their own tests.
+            if case.guard is not None and _constant_truth(case.guard) is False:
+                self._restore_locals(saved_scope)
+                continue
+            self._visit_suite(case.body)
             # An IRREFUTABLE case - a bare capture with no guard - always matches, so
             # its binding survives the statement, the same way a nonempty literal
             # loop's target does. Restoring unconditionally discarded it, and
@@ -2389,6 +2583,33 @@ class _Visitor(ast.NodeVisitor):
             if not irrefutable:
                 self._restore_locals(saved_scope)
 
+    @staticmethod
+    def _sequence_pattern_pairs(subject: ast.AST, pattern) -> dict:
+        """`{captured name: the subject element it takes}` for a literal pairing.
+
+        Both sides written out and the same length, with no star on either: that is
+        the same shape `_unpacked_pairs` already accepts for an assignment. Anything
+        less determined pairs nothing rather than guessing.
+        """
+        if not isinstance(subject, (ast.List, ast.Tuple)):
+            return {}
+        if any(isinstance(element, ast.Starred) for element in subject.elts):
+            return {}
+        if _MATCHSEQUENCE is None or not isinstance(pattern, _MATCHSEQUENCE):
+            return {}
+        patterns = list(getattr(pattern, "patterns", []))
+        if len(patterns) != len(subject.elts):
+            return {}
+        pairs = {}
+        for element, inner in zip(subject.elts, patterns):
+            if _MATCHAS is None or not isinstance(inner, _MATCHAS):
+                return {}
+            if inner.pattern is not None or inner.name is None:
+                # A nested pattern or a bare `_` binds nothing readable here.
+                continue
+            pairs[inner.name] = element
+        return pairs
+
     def visit_If(self, node: ast.If):
         """Only the suite a literal test selects is traversed.
 
@@ -2400,13 +2621,23 @@ class _Visitor(ast.NodeVisitor):
         self.visit(node.test)
         decided = _constant_truth(node.test)
         if decided is None:
-            for statement in node.body:
-                self.visit(statement)
-            for statement in node.orelse:
-                self.visit(statement)
+            self._visit_suite(node.body)
+            self._visit_suite(node.orelse)
             return
-        for statement in (node.body if decided else node.orelse):
+        self._visit_suite(node.body if decided else node.orelse)
+
+    def _visit_suite(self, body) -> None:
+        """Visit a suite, stopping at a jump that always leaves it.
+
+        Same reachability rule `visit_For` applies to a loop body: `while True: break`
+        followed by `payload = "pass"` cleared a binding the loop never reaches, so
+        the built string went to the sink unread. An `if` suite ends at a jump for the
+        same reason.
+        """
+        for statement in body:
             self.visit(statement)
+            if _definitely_jumps(statement):
+                return
 
     def visit_BoolOp(self, node: ast.BoolOp):
         """Only the operands that can still be evaluated are traversed.
@@ -2454,13 +2685,10 @@ class _Visitor(ast.NodeVisitor):
         self.visit(node.test)
         decided = _constant_truth(node.test)
         if decided is None:
-            for statement in node.body:
-                self.visit(statement)
-            for statement in node.orelse:
-                self.visit(statement)
+            self._visit_suite(node.body)
+            self._visit_suite(node.orelse)
             return
-        for statement in (node.body if decided else node.orelse):
-            self.visit(statement)
+        self._visit_suite(node.body if decided else node.orelse)
 
     def visit_TypeAlias(self, node):
         """`type run = int` rebinds the name for the rest of the scope."""
@@ -2468,6 +2696,12 @@ class _Visitor(ast.NodeVisitor):
         if isinstance(bound, ast.Name):
             self._shadow_sink(bound.id)
             self.tainted[-1].pop(bound.id, None)
+        # The value is lazy, not dead: reading `Payload.__value__` evaluates it, so
+        # `type Payload = (exec(f"import {name}") or int)` really can execute the
+        # source. Rebinding the name without visiting the value left the call unread.
+        value = getattr(node, "value", None)
+        if value is not None:
+            self.visit(value)
 
     def visit_Delete(self, node: ast.Delete):
         """`del exec` at module or class scope puts the builtin back.
@@ -2496,6 +2730,8 @@ class _Visitor(ast.NodeVisitor):
                 table[-1].pop(f"module:{target.id}", None)
                 table[-1].pop(f"constructor:{target.id}", None)
                 table[-1].pop(f"partial:{target.id}", None)
+                table[-1].pop(f"text:{target.id}", None)
+                table[-1].pop(f"stdlib:{target.id}", None)
             level = self._binding_level(target.id)
             if level != len(self.scope_kinds) - 1:
                 # `global exec; del exec` deletes the MODULE binding, so the shadow an
@@ -2508,7 +2744,17 @@ class _Visitor(ast.NodeVisitor):
                     table[level].pop(f"module:{target.id}", None)
                     table[level].pop(f"constructor:{target.id}", None)
                     table[level].pop(f"partial:{target.id}", None)
+                    table[level].pop(f"text:{target.id}", None)
+                    table[level].pop(f"stdlib:{target.id}", None)
                 self.shadowed_sinks[level].discard(target.id)
+                if target.id in self.nonlocal_names[-1]:
+                    # A deleted NONLOCAL cell is empty, and the name does not fall
+                    # back to the builtin: `nonlocal exec; del exec; exec(...)` raises
+                    # NameError. Treating it like a deleted global made the call read
+                    # as the builtin and failed the gate on code that cannot run. A
+                    # global really does fall back, which is why only this half moved.
+                    self.shadowed_sinks[-1].add(target.id)
+                    self.shadowed_sinks[level].add(target.id)
                 continue
             if self.scope_kinds[-1] == "function":
                 # But the SHADOW stays inside a function: the compiler still treats
@@ -2560,7 +2806,10 @@ class _Visitor(ast.NodeVisitor):
                 self.shadowed_sinks[-1].add(node.name)
                 for table in (self.sink_aliases, self.collected_aliases):
                     table[-1].pop(node.name, None)
-                    for prefix in ("module:", "constructor:", "partial:", "functools:"):
+                    for prefix in (
+                        "module:", "constructor:", "partial:", "functools:", "text:",
+                        "stdlib:",
+                    ):
                         table[-1].pop(f"{prefix}{node.name}", None)
         for statement in node.body:
             self.visit(statement)
@@ -2665,9 +2914,18 @@ class _Visitor(ast.NodeVisitor):
         self.generic_visit(node)
         # Resolved against the taint map for the same reason `visit_Assign` is:
         # `(alias := payload)` copies whatever `payload` holds.
+        # The numeric and literal-text markers travel with it too, exactly as they do
+        # for `visit_Assign`: without the numeric one `(payload := 1); payload += 2`
+        # read as concatenation and failed the gate on arithmetic that can only raise
+        # TypeError at the sink.
+        reason = _is_interpolated(
+            node.value, self.tainted[-1].get, self._is_shadowed, self._alias,
+        )
         self._bind(
             node.target,
-            _is_interpolated(node.value, self.tainted[-1].get, self._is_shadowed, self._alias),
+            reason,
+            numeric = _visibly_numeric(node.value),
+            literal_text = reason is None and _visibly_literal_text(node.value),
         )
         # `(exec := builtins.exec)` hands the builtin back to its own spelling exactly
         # as the statement form does, and only the taint map was being updated, so an
@@ -2698,9 +2956,17 @@ class _Visitor(ast.NodeVisitor):
             # Resolved against the taint map, as the whole-statement path is: an
             # element that is an already tainted NAME - `alias, ignored = payload,
             # None` - carries that name's reason rather than clearing the binding.
+            element_reason = _is_interpolated(
+                item, self.tainted[-1].get, self._is_shadowed, self._alias,
+            )
+            # And the markers beside the reason, for the same argument the whole
+            # statement path makes: `payload, = (1,); payload += 2` read as
+            # concatenation without the numeric one.
             self._bind(
                 element,
-                _is_interpolated(item, self.tainted[-1].get, self._is_shadowed, self._alias),
+                element_reason,
+                numeric = _visibly_numeric(item),
+                literal_text = element_reason is None and _visibly_literal_text(item),
             )
             self._bind_unpacked(element, item)
 
@@ -3193,6 +3459,18 @@ class _Visitor(ast.NodeVisitor):
                     self.collected_aliases[-1][f"constructor:{constructor}"] = constructor
                     self.shadowed_sinks[-1].discard(constructor)
                 continue
+            if (
+                node.module == "textwrap"
+                and not node.level
+                and alias.name in _TEXT_PRESERVING_FUNCTIONS
+            ):
+                # `from textwrap import dedent as clean` gives `clean` the same
+                # function, and matching the callee spelling alone stopped before the
+                # argument was read at all.
+                self.sink_aliases[-1][f"text:{bound}"] = alias.name
+                self.collected_aliases[-1][f"text:{bound}"] = alias.name
+                self.shadowed_sinks[-1].discard(bound)
+                continue
             if node.module == "functools" and not node.level and alias.name == "partial":
                 # `from functools import partial as bind` gives `bind` the real
                 # `partial`, so `bind(exec, f"...")()` binds the sink and its source
@@ -3303,6 +3581,8 @@ class _Visitor(ast.NodeVisitor):
             # inside a function makes `bind` a local for the whole body, so the outer
             # `from functools import partial as bind` must stop being visible there.
             or self._alias(f"partial:{name}") is not None
+            # And a `textwrap` function alias, for the same reason.
+            or self._alias(f"text:{name}") is not None
             # A name already recorded as shadowed still counts, so a second assignment
             # can hand it back: `run = print` then `run = builtins.exec` has to make
             # `run` an alias again, and by then the alias entry is gone.
@@ -3973,6 +4253,16 @@ class _Visitor(ast.NodeVisitor):
             )
             for generator in node.generators
         )
+        if not runs_a_pass:
+            # The same argument the lazy generator expression above makes: no pass
+            # ran, so the walrus bound nothing, and visiting the element had already
+            # cleared whatever those names held. `payload = f"import {name}";
+            # [(payload := "pass") for _ in []]; exec(payload)` executes the f-string,
+            # and suppressing only the alias EXPORT left the taint cleared.
+            for name in walrus_names:
+                self.tainted[-1].pop(name, None)
+                if name in saved:
+                    self.tainted[-1][name] = saved[name]
         for name in (walrus_names - targets) if runs_a_pass else ():
             for prefix in ("constructor:", "module:"):
                 # A walrus can bind a conversion or the builtins module as easily as a
