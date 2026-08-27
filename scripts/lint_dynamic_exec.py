@@ -1032,7 +1032,17 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             # still hands the source through.
             continue
         source = _constructor_source(node, constructor, shadowed)
-        if source is not None and not (constructor == "str" and _visibly_bytes(source)):
+        # `str(b"...")` is the REPR of the bytes and executes nothing. `str(b"...",
+        # "utf-8")` is the DECODING form and hands the text straight back, so limiting
+        # the exemption to the one-argument spelling was the difference between a
+        # quoted repr and the source itself.
+        decodes = constructor == "str" and (
+            len(node.args) > 1
+            or any(keyword.arg in ("encoding", "errors") for keyword in node.keywords)
+        )
+        if source is not None and not (
+            constructor == "str" and _visibly_bytes(source) and not decodes
+        ):
             # `str(bytes)` is the REPR of the bytes, `"b'import os'"`, which executes
             # as a string expression and imports nothing. Every other constructor here
             # hands the text through unchanged.
@@ -2690,6 +2700,40 @@ class _Visitor(ast.NodeVisitor):
             return
         self._visit_suite(node.body if decided else node.orelse)
 
+    def visit_AsyncWith(self, node):
+        """`async with nullcontext(...)` raises: it has no `__aenter__`.
+
+        Checked on CPython: `async with contextlib.nullcontext(x)` answers
+        `TypeError: 'async with' received an object that does not implement
+        __aenter__`, so the body never runs. Aliasing this to `visit_With` inferred
+        what the target held from the synchronous constructor and reported a call in a
+        suite that cannot execute. Only that one inference is dropped; everything else
+        `visit_With` does - the unconditional rebinding, the shadowing, visiting the
+        context expressions - still applies, since an ordinary async manager does run
+        its body.
+        """
+        for item in node.items:
+            self.visit(item.context_expr)
+            if item.optional_vars is not None:
+                self.visit(item.optional_vars)
+                for child in ast.walk(item.optional_vars):
+                    if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
+                        self.tainted[-1].pop(child.id, None)
+                self._shadow_locals({
+                    child.id: None
+                    for child in ast.walk(item.optional_vars)
+                    if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store)
+                })
+        if any(
+            _nullcontext_value(item.context_expr, self._alias, self._is_shadowed) is not None
+            for item in node.items
+        ):
+            # A written-out `nullcontext` cannot be entered asynchronously, so nothing
+            # below it runs at all.
+            return
+        for statement in node.body:
+            self.visit(statement)
+
     def visit_TypeAlias(self, node):
         """`type run = int` rebinds the name for the rest of the scope."""
         bound = getattr(node, "name", None)
@@ -2901,7 +2945,9 @@ class _Visitor(ast.NodeVisitor):
         for statement in node.body:
             self.visit(statement)
 
-    visit_AsyncWith = visit_With
+    # `visit_AsyncWith` is defined on its own above: `async with` cannot enter a
+    # synchronous context manager, so the `nullcontext` inference here does not apply
+    # to it.
 
     def visit_NamedExpr(self, node: ast.NamedExpr):
         """`(payload := f"import {name}")` as a statement, then `exec(payload)`.

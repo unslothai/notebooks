@@ -237,6 +237,7 @@ def test_a_sink_reached_through_another_spelling_is_reported(description, tmp_pa
 
 # `str`, `bytes` and friends reached indirectly still pass the source through.
 _CONSTRUCTOR_IS_STILL_RESOLVED = {
+    'the decoding form of str hands the text back': 'def f(name):\n    exec(str(f"import {name}".encode(), "utf-8"))\n',
     'an undecidable constructor choice checks both arms': 'def f(name, flag):\n    exec((memoryview if flag else str)(f"import {name}"))\n',
     'a builtins star import hands back the conversions too': "def f(name):\n    str = print\n    from builtins import *\n    exec(str(f'import {name}'))\n",
     'a byte constructor over already encoded source reaches the sink': 'def f(name):\n    exec(bytes(f"import {name}".encode()))\n    exec(bytearray(f"import {name}".encode()))\n    exec(memoryview(f"import {name}".encode()))\n',
@@ -269,6 +270,7 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'an ordinary async context manager still runs its body': 'async def f(name, manager):\n    async with manager as payload:\n        exec(f"import {name}")\n',
     'format_map with an empty mapping returns the receiver': 'def f(name):\n    exec(f"import {name}".format_map({}))\n',
     'an opaque expansion leaves compile its source keyword': 'def f(name, args = ()):\n    exec(compile(*args, source = f"import {name}", filename = "<x>", mode = "exec"))\n',
     'nullcontext hands its argument to the as target': 'import contextlib\ndef f(name):\n    with contextlib.nullcontext(f"import {name}") as payload:\n        exec(payload)\n',
@@ -347,6 +349,7 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'async with cannot enter a synchronous nullcontext': 'import builtins, contextlib\nasync def f(name):\n    async with contextlib.nullcontext(builtins.exec) as run:\n        run(f"import {name}")\n',
     'False is a zero repetition count': 'def f(name):\n    exec(f"import {name}" * False)\n',
     'two written-out containers add to a list, not to source': 'def f(name):\n    exec([f"import {name}"] + [])\n',
     'an async loop over a synchronous literal never reaches its else': 'async def f(name):\n    async for _ in []:\n        pass\n    else:\n        exec(f"import {name}")\n',
