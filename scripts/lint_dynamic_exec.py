@@ -312,7 +312,19 @@ def _partial_call(node: ast.AST, aliases = None, shadowed = None) -> ast.Call | 
         return None
     function = node.func
     if isinstance(function, ast.Attribute):
-        return node if function.attr == "partial" else None
+        # The owner has to BE functools. Accepting any attribute called `partial`
+        # reported `runner.partial(exec, f"...")()` on an application object whose
+        # method never invokes the builtin, which fails the gate on valid code that
+        # cannot be changed to pass. A recorded module alias of functools counts,
+        # since that states the same thing outright.
+        if function.attr != "partial" or not isinstance(function.value, ast.Name):
+            return None
+        owner = function.value.id
+        if shadowed is not None and shadowed(owner):
+            return None
+        if owner == "functools" or (aliases is not None and aliases(f"functools:{owner}")):
+            return node
+        return None
     if not isinstance(function, ast.Name):
         return None
     if shadowed is not None and shadowed(function.id):
@@ -374,6 +386,18 @@ def _constructor_source(node: ast.Call, name: str, shadowed = None) -> ast.AST |
 # The map otherwise holds reasons, which are strings, so a sentinel object cannot be
 # mistaken for one.
 _NUMERIC = object()
+# The same idea for a name that holds a written-out string: `template = "import
+# MODULE"` makes `template.replace("MODULE", name)` the same splice as doing it on the
+# literal, which one line of refactoring otherwise hid. Kept as a marker rather than a
+# reason, because the name holds a literal and is not itself built source. Only a
+# literal binds it, so an opaque producer - `inspect.getsource(f)`, the idiom this
+# repo is built on - never does.
+_LITERAL_TEXT = object()
+
+
+def _visibly_literal_text(node: ast.AST) -> bool:
+    """Whether the value is a written-out string or bytes, so a name holding it is one."""
+    return isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes))
 
 
 def _visibly_numeric(node: ast.AST) -> bool:
@@ -487,9 +511,9 @@ def _is_interpolated(node: ast.AST, resolve = None, shadowed = None, resolve_ali
         if resolve is None:
             return None
         reason = resolve(node.id)
-        # The numeric marker is a binding fact, not a reason. Returning it would put a
+        # The markers are binding facts, not reasons. Returning one would put a
         # non-string into a finding.
-        return None if reason is _NUMERIC else reason
+        return None if reason in (_NUMERIC, _LITERAL_TEXT) else reason
     if isinstance(node, ast.BoolOp):
         # `exec(enabled and f"import {name}")` executes the interpolated operand
         # whenever the guard lets it through: same conditional-source shape as IfExp.
@@ -846,6 +870,14 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
         if isinstance(receiver, ast.Constant):
             if isinstance(receiver.value, (str, bytes)):
                 return ".replace() on a literal"
+        if isinstance(receiver, ast.Name) and resolve is not None:
+            # `template = "import MODULE"; template.replace("MODULE", name)` is the
+            # same splice one line later, which is a two-line refactor away from the
+            # literal receiver above. Only a name a written-out string bound: the
+            # marker is set nowhere else, so `inspect.getsource(f).replace(...)`,
+            # the idiom this repo is built on, still resolves to nothing here.
+            if resolve(receiver.id) is _LITERAL_TEXT:
+                return ".replace() on a literal"
         # `exec(f"import {model_type}".replace("-", "_"))` is the shape from the
         # original report with a normalisation step bolted on. The receiver is the
         # f-string itself, so recursing into it keeps that visible. This does not
@@ -1097,12 +1129,16 @@ def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None
         # the callee out of a mapping that is written out right here, the same shape
         # the subscript spelling already reads.
         key = function.args[0].value
-        if isinstance(function.func.value, ast.Dict):
-            found = _mapping_lookup(function.func.value, key)
+        # `dict(run = exec).get("run")` is the same mapping written with the
+        # constructor, so it is read the same way. The source side already went
+        # through `_mapping_literal`; the callee side still required a display.
+        literal_mapping = _mapping_literal(function.func.value, shadowed)
+        if literal_mapping is not None:
+            found = _mapping_lookup(literal_mapping, key)
             fallback = function.args[1] if len(function.args) > 1 else None
             if found is None:
                 found = fallback
-            elif fallback is not None and _uncertain_lookup(function.func.value):
+            elif fallback is not None and _uncertain_lookup(literal_mapping):
                 # A computed key means the hit is not certain, so the default is a
                 # possible callee too: `{key: print}.get("run", exec)(...)` calls the
                 # builtin whenever `key != "run"`.
@@ -1228,6 +1264,31 @@ def _constant_truth(test: ast.AST):
     if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
         inner = _constant_truth(test.operand)
         return None if inner is None else not inner
+    return None
+
+
+def _nullcontext_value(node: ast.AST, aliases = None, shadowed = None) -> ast.AST | None:
+    """The single argument a written-out `contextlib.nullcontext(...)` hands over.
+
+    The stdlib documents `nullcontext(enter_result)` as returning `enter_result` from
+    `__enter__`, so `with nullcontext(builtins.exec) as run:` makes `run` the builtin
+    as plainly as an assignment would. Only the visible spelling: an unshadowed
+    `contextlib.nullcontext` or a bare `nullcontext`, with exactly one argument.
+    """
+    if not isinstance(node, ast.Call) or len(node.args) != 1 or node.keywords:
+        return None
+    function = node.func
+    if isinstance(function, ast.Attribute):
+        if function.attr != "nullcontext" or not isinstance(function.value, ast.Name):
+            return None
+        owner = function.value.id
+        if owner != "contextlib" or (shadowed is not None and shadowed(owner)):
+            return None
+        return node.args[0]
+    if isinstance(function, ast.Name) and function.id == "nullcontext":
+        if shadowed is not None and shadowed(function.id):
+            return None
+        return node.args[0]
     return None
 
 
@@ -1791,9 +1852,10 @@ class _Visitor(ast.NodeVisitor):
         # Visiting every target before binding any of them missed that.
         self.visit(node.value)
         numeric = _visibly_numeric(node.value)
+        literal_text = reason is None and _visibly_literal_text(node.value)
         for target in node.targets:
             self.visit(target)
-            self._bind(target, reason, numeric)
+            self._bind(target, reason, numeric, literal_text)
             self._bind_unpacked(target, node.value)
             self._shadow_assignment(target, node.value)
 
@@ -1991,7 +2053,13 @@ class _Visitor(ast.NodeVisitor):
         # keep insertion order, so its keys are read like a list.
         ordered = literal and not isinstance(node.iter, ast.Set)
         breaks = _can_break(node.body)
-        if ordered and not breaks:
+        if ordered and not breaks and not self._rebinds(node.body, node.target):
+            # Skipped when the BODY assigns the target: the last thing that ran in the
+            # final iteration is that assignment, not the element. Rebinding from
+            # `literal[-1]` regardless overwrote it both ways - it hid
+            # `for payload in ["pass"]: payload = f"..."` and it invented a finding for
+            # the opposite body - so the body's own binding, already applied above,
+            # stands instead.
             last = literal[-1]
             self._bind(node.target, _is_interpolated(last))
             self._bind_unpacked(node.target, last)
@@ -2040,6 +2108,30 @@ class _Visitor(ast.NodeVisitor):
                 self.visit(statement)
 
     visit_AsyncFor = visit_For
+
+    @staticmethod
+    def _rebinds(body, target) -> bool:
+        """Whether this loop body assigns any name the loop target binds.
+
+        Only THIS body: a nested `def`/`class`/`lambda` binds in its own scope and
+        does not change what the target holds out here.
+        """
+        names = {
+            child.id for child in ast.walk(target)
+            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store)
+        }
+        if not names:
+            return False
+        for statement in body:
+            for node in _walk_this_scope(statement):
+                for child in ast.walk(node) if isinstance(node, ast.AST) else ():
+                    if (
+                        isinstance(child, ast.Name)
+                        and isinstance(child.ctx, ast.Store)
+                        and child.id in names
+                    ):
+                        return True
+        return False
 
     def visit_Match(self, node: _MATCH):
         """`match f"import {name}": case payload: exec(payload)` binds the subject.
@@ -2122,6 +2214,41 @@ class _Visitor(ast.NodeVisitor):
             return
         for statement in (node.body if decided else node.orelse):
             self.visit(statement)
+
+    def visit_BoolOp(self, node: ast.BoolOp):
+        """Only the operands that can still be evaluated are traversed.
+
+        `False and (payload := "pass")` never runs the walrus, so applying its binding
+        cleared a taint that survives in real execution and the sink went unreported.
+        The same short-circuit rule the source reader already uses, applied to the
+        traversal: only a written-out constant decides anything, a name decides nothing.
+        """
+        for operand in _reachable_operands(node):
+            self.visit(operand)
+
+    def visit_IfExp(self, node: ast.IfExp):
+        """A literal condition picks one arm; the other never runs.
+
+        Same reasoning as `visit_If` for the statement form, and as `_is_interpolated`
+        already applies when reading the value of a conditional expression.
+        """
+        self.visit(node.test)
+        decided = _constant_truth(node.test)
+        if decided is None:
+            self.visit(node.body)
+            self.visit(node.orelse)
+            return
+        self.visit(node.body if decided else node.orelse)
+
+    def visit_Assert(self, node: ast.Assert):
+        """The message is only evaluated when the test FAILS.
+
+        `assert True, (payload := "pass")` never builds the message, so a binding in it
+        does not happen. A literal truthy test is the only case decided here.
+        """
+        self.visit(node.test)
+        if node.msg is not None and _constant_truth(node.test) is not True:
+            self.visit(node.msg)
 
     def visit_TypeAlias(self, node):
         """`type run = int` rebinds the name for the rest of the scope."""
@@ -2242,8 +2369,19 @@ class _Visitor(ast.NodeVisitor):
             self.visit(item.context_expr)
             if item.optional_vars is not None:
                 self.visit(item.optional_vars)
-                self._bind_unpacked(item.optional_vars, None)
-                self._bind(item.optional_vars, None)
+                # `with contextlib.nullcontext(builtins.exec) as run:` states outright
+                # what the target gets: `nullcontext` is documented as returning its
+                # argument from `__enter__`. Treating every context result as opaque
+                # made `run` a shadow and the call went unread. Only that one
+                # constructor, written out and unshadowed.
+                handed = _nullcontext_value(item.context_expr, self._alias, self._is_shadowed)
+                self._bind_unpacked(item.optional_vars, handed)
+                self._bind(
+                    item.optional_vars,
+                    _is_interpolated(
+                        handed, self.tainted[-1].get, self._is_shadowed, self._alias,
+                    ) if handed is not None else None,
+                )
                 # A tuple target pairs with nothing when the value is opaque, and
                 # `_bind` ignores a non-name target, so `with ctx() as (payload, _):`
                 # kept a stale reason on `payload` even though reaching the suite
@@ -2267,6 +2405,10 @@ class _Visitor(ast.NodeVisitor):
             child.id
             for item in node.items
             if item.optional_vars is not None
+            # A visible `nullcontext` states what it hands over, so its target is not
+            # opaque and must not be shadowed: it is bound by `_shadow_assignment`
+            # below, exactly as the equivalent plain assignment would be.
+            and _nullcontext_value(item.context_expr, self._alias, self._is_shadowed) is None
             for child in ast.walk(item.optional_vars)
             # Store context only: in `with ctx() as table[exec]` the `exec` is a
             # subscript key that is merely READ, so treating it as bound shadowed a
@@ -2278,6 +2420,13 @@ class _Visitor(ast.NodeVisitor):
         # ends, so `with ctx() as exec: pass` then `exec(f"import {name}")` calls
         # whatever the context manager handed over, not the builtin.
         self._shadow_locals(names)
+        for item in node.items:
+            handed = _nullcontext_value(item.context_expr, self._alias, self._is_shadowed)
+            if handed is not None and item.optional_vars is not None:
+                # `contextlib.nullcontext(builtins.exec)` hands its argument straight
+                # through, so the target is whatever that argument resolves to - a
+                # sink, a constructor, or nothing - rather than an opaque shadow.
+                self._shadow_assignment(item.optional_vars, handed)
         for statement in node.body:
             self.visit(statement)
 
@@ -2370,8 +2519,17 @@ class _Visitor(ast.NodeVisitor):
             pairs = list(zip(target.elts, value.elts))
         return pairs
 
-    def _bind(self, target: ast.AST, reason: str | None, numeric: bool = False) -> None:
+    def _bind(
+        self, target: ast.AST, reason: str | None, numeric: bool = False,
+        literal_text: bool = False,
+    ) -> None:
         if not isinstance(target, ast.Name):
+            return
+        if literal_text:
+            # Same shape as the numeric marker: a fact about what the name holds, so a
+            # later `.replace()` on it reads as a splice into a written-out template.
+            self.tainted[len(self.tainted) - 1 if self.scope_kinds[-1] != "class"
+                         else self._binding_level(target.id)][target.id] = _LITERAL_TEXT
             return
         if numeric:
             # Not a reason: a marker saying the name holds a number, so a later `+=`
@@ -2852,6 +3010,15 @@ class _Visitor(ast.NodeVisitor):
         for alias in node.names:
             bound = alias.asname or alias.name.split(".")[0]
             self.tainted[-1].pop(bound, None)
+            if alias.name == "functools":
+                # `import functools as ft` makes `ft.partial` the real one, exactly as
+                # `import builtins as b` makes `b.exec` the real builtin. Kept in its
+                # own key rather than the `module:` one, which means the BUILTINS
+                # module: putting functools there would have made `ft.exec` resolve as
+                # a sink, which it is not.
+                self.sink_aliases[-1][f"functools:{bound}"] = "functools"
+                self.collected_aliases[-1][f"functools:{bound}"] = "functools"
+                continue
             if alias.name == "builtins":
                 # Read BEFORE `_shadow_sink` clears both tables, since that clearing is
                 # what the check below would otherwise be looking at.
@@ -4332,12 +4499,16 @@ def _script_command_source(code: str) -> str | None:
                 token.startswith("-")
                 and not token.startswith("--")
                 and len(token) > 2
-                and token.endswith("c")
-                and "c" not in token[1:-1]
+                and "c" in token[1:]
             ):
-                # A bundle ending in `c`, `python -uc "prog"`: the program is the next
-                # token, because `-c` consumes the rest of the ARGUMENT and there was
-                # nothing left of it.
+                # A bundle containing `c`. `-c` consumes the REST of the argument, so
+                # `python -uc"prog"` puts the program right there and `python -uc
+                # "prog"` puts it in the next token. Only a bundle ENDING in `c` was
+                # read, so the attached form returned nothing and the cell was passed
+                # over. Split at the first `c` and take whatever follows it.
+                attached = token[token.index("c", 1) + 1:]
+                if attached:
+                    return attached
                 return tokens[position + 1] if position + 1 < len(tokens) else None
             if token.startswith("-c") and len(token) > 2 and not token.startswith("--"):
                 # `python -cPROGRAM` attaches the program to the option, which is what

@@ -194,6 +194,9 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a dict constructor literal answers get on the callee side': 'def f(name):\n    dict(run = exec).get("run")(f"import {name}")\n',
+    'functools under a module alias still binds the sink': 'import functools as ft\ndef f(name):\n    ft.partial(exec, f"import {name}")()\n',
+    'nullcontext hands its argument to the with target': 'import contextlib, builtins\ndef f(name):\n    with contextlib.nullcontext(builtins.exec) as run:\n        run(f"import {name}")\n',
     'an imported alias of functools.partial binds the sink': 'from functools import partial as bind\ndef f(name):\n    bind(exec, f"import {name}")()\n',
     'an inline builtins import is a getattr owner': 'def f(name):\n    getattr(__import__("builtins"), "exec")(f"import {name}")\n',
     'a builtins-qualified getattr names the sink': 'import builtins\ndef f(name):\n    builtins.getattr(builtins, "exec")(f"import {name}")\n',
@@ -255,6 +258,7 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'a literal template reached through a name is still a template': 'def f(name):\n    template = "import MODULE"\n    exec(template.replace("MODULE", name))\n',
     'codeop compiles the source it was handed': 'import codeop\ndef f(name):\n    exec(codeop.compile_command(f"import {name}"))\n',
     'operator.add is concatenation under another name': 'import operator\ndef f(name):\n    exec(operator.add("import ", name))\n',
     'operator.concat is the same concatenation': 'import operator\ndef f(name):\n    exec(operator.concat("import ", name))\n',
@@ -298,6 +302,8 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'a short-circuited walrus never clears the taint': 'def f(name):\n    payload = f"import {name}"\n    False and (payload := "pass")\n    exec(payload)\n',
+    'the final loop body wins over the last element': 'def f(name):\n    for payload in ["pass"]:\n        payload = f"import {name}"\n    exec(payload)\n',
     'a walrus alias carries the taint': 'def f(name):\n    payload = f"import {name}"\n    (alias := payload)\n    exec(alias)\n',
     'an annotated alias carries the taint': 'def f(name):\n    payload = f"import {name}"\n    alias: str = payload\n    exec(alias)\n',
     'an unpacked alias carries the taint': 'def f(name):\n    payload = f"import {name}"\n    alias, ignored = payload, None\n    exec(alias)\n',
@@ -315,6 +321,9 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a partial method on some other object is not functools': 'class R:\n    def partial(self, *a):\n        return lambda: None\ndef f(name, runner):\n    runner.partial(exec, f"import {name}")()\n',
+    'the last element wins when the body does not rebind': 'def f(name):\n    for payload in [f"import {name}"]:\n        payload = "pass"\n    exec(payload)\n',
+    'an opaque receiver is not a literal template': 'import inspect\ndef f(name, target):\n    exec(inspect.getsource(target).replace("MODULE", name))\n',
     'a rebound partial alias is no longer partial': 'from functools import partial as bind\ndef f(name):\n    bind = print\n    bind(exec, f"import {name}")()\n',
     'operator.add on numbers builds no source': 'import operator\ndef f():\n    exec(operator.add(1, 2))\n',
     'a composite default resolving to a shadowed name is not the builtin': 'from re import compile\ndef f(name, run = [compile][0]):\n    run(f"^{name}$")\n',
@@ -360,6 +369,7 @@ def test_code_that_cannot_execute_a_built_string_is_quiet(description, tmp_path)
 
 # A magic or interpreter invocation that really does execute the cell body.
 _NOTEBOOK_RUNS_PYTHON = {
+    'a bundled short option carries its attached program': '{"cells": [{"cell_type": "code", "source": "%%script python -uc\'name=\\"x\\";exec(f\\"import {name}\\")\'\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'an assignment-form %time binds the value it timed': '{"cells": [{"cell_type": "code", "source": "name = input()\\npayload = %time f\\"import {name}\\"\\nexec(payload)\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'env -S carries the interpreter command inside its value': '{"cells": [{"cell_type": "code", "source": "%%script env -S \\"python -c \'name=input(); exec(f\\\\\\"import {name}\\\\\\")\'\\"\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'prefix help syntax does not hide the rest of the cell': '{"cells": [{"cell_type": "code", "source": "?len\\nname = input()\\nexec(f\\"import {name}\\")\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
