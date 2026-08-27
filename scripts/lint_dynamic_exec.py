@@ -174,6 +174,10 @@ _IDENTITY_TRANSLATIONS = ("translate",)
 _TEXT_PRESERVING_MODULES = {
     "textwrap": ("dedent", "indent"),
     "copy": ("copy", "deepcopy"),
+    # `ast.unparse(ast.parse(f"..."))` is a round trip: the text that comes back
+    # executes what went in, so the interpolation survives it. The outer call read as
+    # opaque and the whole round trip passed the gate.
+    "ast": ("unparse",),
 }
 _TEXT_PRESERVING_FUNCTIONS = tuple(
     name for names in _TEXT_PRESERVING_MODULES.values() for name in names
@@ -1162,6 +1166,14 @@ _REBOUND_FUNCTION_NAMES: set = set()
 # resolvers that read the tables are plain functions with no visitor to ask.
 _CURRENT_SCOPE = ""
 
+# The prefixed namespaces an alias can be recorded under. Read when a helper
+# parameter is answered from its argument: whatever the argument means, the parameter
+# means the same thing inside the body.
+_ALIAS_NAMESPACES = (
+    "module:", "constructor:", "partial:", "functools:", "text:", "stdlib:",
+    "stdlibfunc:", "builder:", "template:", "formatter:",
+)
+
 # Helpers currently being resolved, so a recursive one cannot loop forever.
 _HELPER_STACK: set = set()
 
@@ -1188,6 +1200,26 @@ def _decorator_name(node: ast.AST) -> str:
     return ""
 
 
+def _reachable_statements(body):
+    """The statements of a suite that can run, stopping at one that always leaves.
+
+    A decided `if` contributes only the branch that runs. A test this cannot decide
+    leaves both suites standing, since being generous costs at most an extra read.
+    """
+    for statement in body:
+        if isinstance(statement, ast.If):
+            decided = _constant_truth(statement.test)
+            if decided is not None:
+                branch = statement.body if decided else statement.orelse
+                yield from _reachable_statements(branch)
+                if any(_definitely_jumps(inner) for inner in branch):
+                    return
+                continue
+        yield statement
+        if _definitely_jumps(statement):
+            return
+
+
 def _returned_expressions(definition) -> list:
     """The values this function's own `return` statements hand back.
 
@@ -1201,12 +1233,10 @@ def _returned_expressions(definition) -> list:
     condition this cannot decide leaves everything below it standing.
     """
     found = []
-    for statement in definition.body:
+    for statement in _reachable_statements(definition.body):
         for child in _walk_this_scope(statement):
             if isinstance(child, ast.Return) and child.value is not None:
                 found.append(child.value)
-        if _definitely_jumps(statement):
-            break
     return found
 
 
@@ -1726,6 +1756,24 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
     selected = _first_from_iterator(node, shadowed)
     if selected is not None:
         return _is_interpolated(selected, resolve, shadowed, resolve_alias)
+    if (
+        isinstance(function, ast.Name)
+        and function.id in ("min", "max")
+        and not (shadowed is not None and shadowed(function.id))
+        and not node.keywords
+        and len(node.args) == 1
+        and not isinstance(node.args[0], ast.Starred)
+    ):
+        # `min([f"import {name}"])` has one element to choose from, so it hands that
+        # element back whichever way it compares. Only a written-out container holding
+        # exactly one element: with two, which one wins depends on the values.
+        container = node.args[0]
+        if (
+            isinstance(container, (ast.List, ast.Tuple, ast.Set))
+            and len(container.elts) == 1
+            and not isinstance(container.elts[0], ast.Starred)
+        ):
+            return _is_interpolated(container.elts[0], resolve, shadowed, resolve_alias)
     helper = _visible_helper(function, shadowed)
     if helper is not None and helper.name not in _HELPER_STACK:
         # `def build(): return f"import {name}"` followed by `exec(build())` executes
@@ -2144,6 +2192,15 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             if node.args or node.keywords:
                 return f".{function.attr}()"
             return _is_interpolated(function.value, resolve, shadowed, resolve_alias)
+        if function.attr in _BUILDERS and _visibly_not_this_builder(
+            function.value, function.attr,
+        ):
+            # `[].format(name)` and `[].join([...])` raise AttributeError before the
+            # sink is reached: a list has neither method, and bytes has `join` but not
+            # `format`. Reporting them failed the gate on calls that cannot execute.
+            # Only a receiver written out as a literal of the wrong type; anything
+            # unknown is still read as a string method.
+            return None
         if (
             function.attr in _BUILDERS
             and _visibly_local_instance(function.value, shadowed)
@@ -2549,6 +2606,28 @@ def _literal_builtins_import(node: ast.AST, shadowed = None, aliases = None) -> 
     return False
 
 
+def _visibly_not_this_builder(receiver: ast.AST, builder: str) -> bool:
+    """Whether the receiver is written out as something without that method.
+
+    `str` has all three; `bytes` has `join` but neither formatting method; a written-out
+    list, tuple, set, dict or number has none of them. Anything not written out here -
+    a name, a call, an attribute - says nothing and is left alone, which is the
+    reporting side.
+    """
+    if isinstance(receiver, ast.JoinedStr):
+        return False
+    if isinstance(receiver, (ast.List, ast.Tuple, ast.Set, ast.Dict)):
+        return True
+    if isinstance(receiver, ast.Constant):
+        if isinstance(receiver.value, str):
+            return False
+        if isinstance(receiver.value, bytes):
+            return builder != "join"
+        # A number, None, or True/False: none of the three exist on any of them.
+        return not isinstance(receiver.value, type(...))
+    return False
+
+
 def _visibly_unaddable(left: ast.AST, right: ast.AST) -> bool:
     """Whether adding these two written-out operands raises rather than concatenating.
 
@@ -2854,6 +2933,21 @@ def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None
                 given = _sink_name(argument, aliases, shadowed)
                 if given is not None:
                     supplied[parameter] = given
+                if not isinstance(argument, ast.Name):
+                    continue
+                # And every OTHER namespace the argument is recorded in, not just the
+                # sinks: `def choose(module): return module.exec` needs `module` to
+                # answer as the builtins module, and recording only sink arguments left
+                # the returned attribute unresolved. The prefixes are the ones this
+                # file already uses, so nothing new is invented here.
+                if argument.id in ("builtins", "__builtins__"):
+                    supplied[f"module:{parameter}"] = "builtins"
+                if aliases is None:
+                    continue
+                for namespace in _ALIAS_NAMESPACES:
+                    recorded = aliases(f"{namespace}{argument.id}")
+                    if recorded:
+                        supplied[f"{namespace}{parameter}"] = recorded
 
             def inner_aliases(key):
                 if key in supplied:
@@ -7162,7 +7256,11 @@ class _Visitor(ast.NodeVisitor):
             return
         _HELPER_STACK.add(helper.name)
         try:
-            for statement in helper.body:
+            # Only the statements that can run: `def run(source): return` followed by
+            # `exec(source)` cannot reach the sink, and a walk over the whole body
+            # reported the caller's f-string for a call that never happens. Same
+            # reachability the return collector uses.
+            for statement in _reachable_statements(helper.body):
                 for child in _walk_this_scope(statement):
                     if not isinstance(child, ast.Call):
                         continue
@@ -7197,7 +7295,14 @@ class _Visitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _origin_of_argument(self, argument) -> str:
-        """The digest recorded for the name or path this argument reads, if any."""
+        """The digests recorded for every name or path this argument reads.
+
+        EVERY one, joined and sorted, not the first found: `exec(a + b)` is built from
+        two bindings, and answering with `a`'s digest alone left a justification
+        standing when `b` changed underneath it. Sorted so the value does not depend on
+        walk order, and joined with `+` the way several findings under one key are.
+        """
+        found = set()
         for node in ast.walk(argument) if isinstance(argument, ast.AST) else ():
             key = None
             if isinstance(node, ast.Name):
@@ -7206,10 +7311,10 @@ class _Visitor(ast.NodeVisitor):
                 key = _compound_key(node)
             if key is None:
                 continue
-            found = self.origin_of.get((self._qualname(), key))
-            if found:
-                return found
-        return ""
+            recorded = self.origin_of.get((self._qualname(), key))
+            if recorded:
+                found.add(recorded)
+        return "+".join(sorted(found))
 
     def _yields_a_tree(self, argument) -> bool:
         """Whether the argument is a visible `ast.parse(...)`, which is not source.
@@ -7351,7 +7456,57 @@ WORKFLOW_SUFFIXES = (".yml", ".yaml")
 # to `python -`, or a one-line `python -c`. `studio/setup.sh` and the ROCm installer both
 # do it, and a sink written inside one of those programs was covered by nothing, so the
 # hard gate stayed green over executable source the repository ships.
-SHELL_SUFFIXES = (".sh",)
+SHELL_SUFFIXES = (".sh", ".ps1")
+
+# PowerShell launchers hold Python too, and not on the command line: the shipped
+# installers bind the program to a variable and hand that variable to `-c`, so the
+# shell reader - which follows the words of one command - saw nothing. A literal
+# assignment and a `-c` that names it are both written out, which is all this reads.
+_POWERSHELL_ASSIGNMENT = re.compile(
+    r"""^[ \t]*\$(?:\w+:)?(?P<name>[A-Za-z_]\w*)[ \t]*=[ \t]*(?P<quote>["'])(?P<body>.*?)(?P=quote)[ \t]*$""",
+    re.M,
+)
+# `@' ... '@` and `@" ... "@`, PowerShell's multi-line string.
+_POWERSHELL_HERESTRING = re.compile(
+    r"""^[ \t]*\$(?:\w+:)?(?P<name>[A-Za-z_]\w*)[ \t]*=[ \t]*@(?P<quote>["'])\r?\n(?P<body>.*?)\r?\n(?P=quote)@""",
+    re.M | re.S,
+)
+# `-c`, then either a variable or a quoted program. The comma is PowerShell's array
+# separator, and a bare space is the ordinary call spelling.
+_POWERSHELL_DASH_C = re.compile(
+    r"""["']?-c["']?[ \t]*(?:,[ \t]*)?(?:\$(?:\w+:)?(?P<name>[A-Za-z_]\w*)|(?P<quote>["'])(?P<body>.*?)(?P=quote))""",
+    re.S,
+)
+
+
+def _powershell_programs(text: str):
+    """`(line number, program)` for each Python `-c` payload a PowerShell file runs.
+
+    The payload is read where it is WRITTEN - a literal assignment or a here-string -
+    and matched to the `-c` that names it. Nothing is evaluated: a variable this cannot
+    see assigned a literal is left alone.
+    """
+    literals = {}
+    lines = {}
+    for pattern in (_POWERSHELL_HERESTRING, _POWERSHELL_ASSIGNMENT):
+        for match in pattern.finditer(text):
+            name = match.group("name")
+            if name in literals:
+                # Two literals under one name is no evidence about either.
+                literals[name] = None
+                continue
+            literals[name] = match.group("body")
+            lines[name] = text[: match.start()].count("\n") + 1
+    for match in _POWERSHELL_DASH_C.finditer(text):
+        number = text[: match.start()].count("\n") + 1
+        if match.group("name") is not None:
+            program = literals.get(match.group("name"))
+            if program:
+                yield lines.get(match.group("name"), number), program
+            continue
+        program = match.group("body")
+        if program:
+            yield number, program
 
 # `<<EOF`, `<<'PY'`, `<<-"EOF"`: the delimiter, quoted or not.
 _HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
@@ -7868,6 +8023,10 @@ _PYTHON_VALUE_OPTIONS = ("-c", "-m", "-W", "-X", "--check-hash-based-pycs")
 _PYTHON_COMMAND = re.compile(r"(?:python|pypy)[0-9]*(?:\.[0-9]+)?(?:\.exe)?", re.IGNORECASE)
 
 
+# `NAME=value` in front of a command, which the shell applies to that command only.
+_SHELL_ASSIGNMENT = re.compile(r"^[A-Za-z_]\w*=")
+
+
 def _names_python(argument: str) -> bool:
     """Whether a `%%script` argument names a Python interpreter at all.
 
@@ -7911,6 +8070,14 @@ def _runs_python(argument: str, body_only: bool = True) -> bool:
                 index += 2
             else:
                 index += 1
+            continue
+        if _SHELL_ASSIGNMENT.match(token):
+            # `FOO=bar python -c '...'` sets the variable for that one command and the
+            # shell runs Python all the same. Reading the assignment as the command
+            # name said the step was not Python at all, and its `-c` program went
+            # unread. The `env` wrapper below already steps over these; a bare prefix
+            # is the same thing without the wrapper.
+            index += 1
             continue
         command = token.rsplit("/", 1)[-1].split("\\")[-1]
         if command == "env":
@@ -8168,6 +8335,11 @@ def _dash_c_program(argument: str) -> str | None:
     return None
 
 
+# Cell magics that run a SHELL. The body is not Python, but a shell launches Python,
+# so the body is read for embedded programs rather than dropped.
+_SHELL_MAGICS = frozenset({"bash", "sh", "script"})
+
+
 def _foreign_cell_magic(code: str) -> str | None:
     """The `%%magic` name when it makes the whole cell stop being Python.
 
@@ -8327,6 +8499,24 @@ def _scan_notebook(path: Path) -> list[dict]:
             else:
                 code = command
         elif _foreign_cell_magic(code) is not None:
+            magic = _foreign_cell_magic(code)
+            if magic in _SHELL_MAGICS:
+                # `%%bash` is another language, but a shell cell LAUNCHES Python the
+                # same way a workflow step does - a heredoc, or `python -c '...'` - and
+                # dropping the whole cell left those programs unread. The same two
+                # readers the workflow scanner uses answer for the body.
+                body = "\n".join(code.splitlines()[1:])
+                for start, source in [
+                    *_python_heredocs(body), *_python_dash_c_commands(body),
+                ]:
+                    inner = _parse_cell(source, f"{path}#cell{index}")
+                    if inner is None:
+                        skipped += 1
+                        continue
+                    # The magic line and the lines above the program, so the finding
+                    # points where the program really sits in the cell.
+                    ast.increment_lineno(inner, start)
+                    parsed.append((index, inner))
             continue
         tree = _parse_cell(code, f"{path}#cell{index}")
         if tree is None:
@@ -8520,6 +8710,47 @@ def _python_dash_c_commands(text: str):
             )
 
 
+# `run: >` folds its lines into one command, so a `python` on one line and a `-c` on
+# the next are one shell command on the runner. `|` keeps the newlines and is left
+# alone. The indicator may carry a chomping or indentation modifier: `>-`, `>2`.
+_FOLDED_SCALAR = re.compile(r"^(?P<indent>[ \t]*)(?:-[ \t]+)?(?P<key>[\w.-]+):[ \t]*>[-+0-9]*[ \t]*$")
+
+
+def _folded_commands(text: str) -> str:
+    """`text` with every folded block scalar joined onto its introducing line.
+
+    Line for line: the joined command replaces the first line of the block and the
+    rest are blanked, so every reader below keeps reporting the line numbers the file
+    really has. A blank line inside a folded scalar is a newline in the value and ends
+    the command, exactly as YAML says.
+    """
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        match = _FOLDED_SCALAR.match(lines[index])
+        if match is None:
+            index += 1
+            continue
+        margin = len(match.group("indent"))
+        start = index + 1
+        collected = []
+        cursor = start
+        while cursor < len(lines):
+            line = lines[cursor]
+            if not line.strip():
+                break
+            if len(line) - len(line.lstrip()) <= margin:
+                break
+            collected.append(line.strip())
+            cursor += 1
+        if collected:
+            lines[index] = f"{match.group('indent')}{match.group('key')}: " + " ".join(collected)
+            for blanked in range(start, cursor):
+                lines[blanked] = ""
+        index = max(cursor, index + 1)
+    return "\n".join(lines)
+
+
 def _scan_workflow(path: Path) -> list[dict]:
     """Findings in the Python heredocs a workflow file or shell script runs.
 
@@ -8544,7 +8775,15 @@ def _scan_workflow(path: Path) -> list[dict]:
     findings = []
     skipped = 0
     parsed = []
-    for start, source in [*_python_heredocs(text), *_python_dash_c_commands(text)]:
+    if path.suffix in WORKFLOW_SUFFIXES:
+        # A folded scalar is one shell command however many lines it is written over.
+        text = _folded_commands(text)
+    embedded = [*_python_heredocs(text), *_python_dash_c_commands(text)]
+    if path.suffix == ".ps1":
+        # A PowerShell file is not shell: the heredoc and word-splitting readers above
+        # find nothing in one, and its `-c` payload is bound to a variable first.
+        embedded = list(_powershell_programs(text))
+    for start, source in embedded:
         try:
             tree = ast.parse(source, filename = f"{path}#line{start}")
         except (SyntaxError, ValueError):
@@ -8563,6 +8802,11 @@ def _scan_workflow(path: Path) -> list[dict]:
         visitor = _Visitor(path)
         visitor.qualname_prefix = f"line{start}"
         visitor._collect_aliases(tree.body)
+        # The same prepass a module and a notebook get: a nested `def` reads its
+        # closure when it is CALLED, so a heredoc that defines one above the assignment
+        # it reads really does execute the built string. Without this the identical
+        # `.py` module reported a finding and the heredoc reported nothing.
+        visitor.future_taint[0].update(visitor._later_taint(tree.body))
         try:
             visitor.visit(tree)
         except RecursionError:
@@ -8753,7 +8997,10 @@ def origins_by_key(findings: list[dict]) -> dict[str, str]:
     grouped: dict[str, set] = {}
     for finding in findings:
         if finding.get("origin"):
-            grouped.setdefault(key_of(finding), set()).add(finding["origin"])
+            # A single finding already joins the digests of every binding its source
+            # was built from, so the parts are split out again here rather than nested:
+            # two copies built the same way would otherwise repeat a digest.
+            grouped.setdefault(key_of(finding), set()).update(finding["origin"].split("+"))
     return {key: "+".join(sorted(values)) for key, values in grouped.items()}
 
 
@@ -8773,13 +9020,23 @@ def write_allowlist(findings: list[dict], reason: str) -> None:
             continue
         written.add(key)
         previous = existing.get(key, {})
+        # The justification is carried over only when every field the gate compares is
+        # unchanged. `--update` is what a reviewer is told to run after the gate fails,
+        # and copying the old reason across a changed origin, kind or count wrote the
+        # new identity next to a justification nobody had read it against - which is
+        # the whole thing the origin and count fields exist to prevent.
+        unchanged = (
+            previous.get("kind", finding["reason"]) == finding["reason"]
+            and previous.get("count", 1) == counts[key]
+            and previous.get("origin", origins.get(key, "")) == origins.get(key, "")
+        )
         entry = {
             "path": finding["path"],
             "qualname": finding["qualname"],
             "sink": finding["sink"],
             "kind": finding["reason"],
             "hash": finding["hash"],
-            "reason": previous.get("reason", reason),
+            "reason": previous.get("reason", reason) if unchanged else reason,
         }
         if origins.get(key):
             entry["origin"] = origins[key]

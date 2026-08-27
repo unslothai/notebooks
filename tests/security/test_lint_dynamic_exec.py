@@ -194,6 +194,7 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a helper resolves the module it was handed': 'import builtins\ndef choose(module):\n    return module.exec\ndef f(name):\n    choose(builtins)(f"import {name}")\n',
     'a sink popped from a written-out list is still the builtin': 'def f(name):\n    [exec].pop()(f"import {name}")\n',
     'a partial built from a written-out expansion still binds the sink': 'from functools import partial\ndef f(name):\n    partial(*(exec, f"import {name}"))()\n',
     'a helper hands back a choice between the sink and something else': 'import builtins\ndef choose(run, flag):\n    return run if flag else print\ndef f(name):\n    choose(builtins.exec, True)(f"import {name}")\n',
@@ -315,6 +316,8 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'one element is what min has to choose': 'def f(name):\n    exec(min([f"import {name}"]))\n',
+    'unparse hands back what parse was given': 'import ast\ndef f(name):\n    exec(ast.unparse(ast.parse(f"import {name}")))\n',
     'a comprehension over a nonempty iterable produces its element': 'def f(name):\n    exec([f"import {name}" for _ in [0]][0])\n',
     'setdefault stores the default and hands it back': 'def f(name):\n    exec({}.setdefault("x", f"import {name}"))\n',
     'copy of a string is the same string': 'import copy\ndef f(name):\n    exec(copy.copy(f"import {name}"))\n',
@@ -461,6 +464,9 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a list has no format method': 'def f(name):\n    exec([].format(name))\n',
+    'a list has no join method either': 'def f(name):\n    exec([].join([f"{name}"]))\n',
+    'a wrapper that returns first never reaches its sink': 'def run(source):\n    return\n    exec(source)\ndef f(name):\n    run(f"import {name}")\n',
     'a cached_property is a descriptor, not a callable': 'from functools import cached_property\n@cached_property\ndef build(name):\n    return f"import {name}"\ndef f(name):\n    exec(build())\n',
     'a return below an unconditional return never runs': 'def build(name):\n    return "pass"\n    return f"import {name}"\ndef f(name):\n    exec(build(name))\n',
     'exec has no such keyword': 'def f(name):\n    exec(f"import {name}", spam = 1)\n',
@@ -969,5 +975,99 @@ def test_a_continued_shell_command_is_joined(tmp_path):
     """A trailing backslash continues the command, so the `-c` is on the next line."""
     sample = tmp_path / "demo.yml"
     sample.write_text(_WORKFLOW_CONTINUES_A_LINE)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+
+
+_WORKFLOW_ASSIGNS_FIRST = """name: demo
+on: [push]
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: FOO=bar python -c 'name = input(); exec(f"import {name}")'
+"""
+
+_WORKFLOW_FOLDS_ITS_COMMAND = """name: demo
+on: [push]
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: >
+          python
+          -c 'name = input(); exec(f"import {name}")'
+"""
+
+_WORKFLOW_DEFERS_INSIDE_A_HEREDOC = """name: demo
+on: [push]
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python - <<'PY'
+          def inner():
+              exec(payload)
+          payload = f"import {input()}"
+          inner()
+          PY
+"""
+
+
+def test_an_assignment_prefix_does_not_hide_the_interpreter(tmp_path):
+    """`FOO=bar python -c ...` runs Python with a variable set for that command."""
+    sample = tmp_path / "demo.yml"
+    sample.write_text(_WORKFLOW_ASSIGNS_FIRST)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_a_folded_scalar_is_one_command(tmp_path):
+    """`run: >` folds its lines, so the interpreter and the `-c` are one command."""
+    sample = tmp_path / "demo.yml"
+    sample.write_text(_WORKFLOW_FOLDS_ITS_COMMAND)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_a_heredoc_gets_the_deferred_taint_prepass(tmp_path):
+    """A closure in a heredoc reads its cell when it is CALLED, as in a module."""
+    sample = tmp_path / "demo.yml"
+    sample.write_text(_WORKFLOW_DEFERS_INSIDE_A_HEREDOC)
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_a_powershell_launcher_program_is_scanned(tmp_path):
+    """The shipped installers bind the program to a variable and hand it to `-c`."""
+    sample = tmp_path / "install.ps1"
+    sample.write_text(
+        '$script:Trampoline = "import sys; exec(f\'import {sys.argv[1]}\')"\n'
+        '$pythonArgs = @("-X", "utf8", "-c", $script:Trampoline)\n'
+        "& $Python @pythonArgs\n"
+    )
+    proc = _run("--paths", str(sample))
+    assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
+
+
+def test_a_shell_magic_cell_still_launches_python(tmp_path):
+    """`%%bash` is another language, and it runs Python the same way a step does."""
+    sample = tmp_path / "demo.ipynb"
+    sample.write_text(json.dumps({
+        "cells": [{
+            "cell_type": "code",
+            "metadata": {},
+            "execution_count": None,
+            "outputs": [],
+            "source": [
+                "%%bash\n",
+                "python -c 'name = input(); exec(f\"import {name}\")'\n",
+            ],
+        }],
+        "metadata": {},
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }))
     proc = _run("--paths", str(sample))
     assert proc.returncode == 1, f"{proc.stdout}\n{proc.stderr}"
