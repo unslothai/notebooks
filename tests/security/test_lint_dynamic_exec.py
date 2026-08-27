@@ -194,6 +194,8 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'a directly imported operator builder still concatenates': 'from operator import add as join\ndef f(name):\n    exec(join("import ", name))\n',
+    'an undecidable comprehension filter binds no walrus': 'import builtins\ndef f(name, flag):\n    run = builtins.exec\n    [(run := print) for _ in [0] if flag]\n    run(f"import {name}")\n',
     'a string.Template substitution splices like format': 'import string\ndef f(name):\n    exec(string.Template("import $module").substitute(module = name))\n',
     'a bound builder method keeps its template': 'def f(name):\n    formatter = "import {}".format\n    exec(formatter(name))\n',
     'a sink handed to a consumed map is still called': 'def f(name):\n    list(map(exec, [f"import {name}"]))\n',
@@ -283,6 +285,8 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'a piece of a split string still holds the interpolation': 'def f(name):\n    exec(f"import {name}".partition("#")[0])\n',
+    'an immediately invoked lambda returns what its body builds': 'def f(name):\n    exec((lambda: f"import {name}")())\n',
     'two calls that read the same source are not the same value': 'def f(values, scope):\n    exec(f"{next(values)}".removeprefix(f"{next(values)}"), scope)\n',
     'an identity translation table changes nothing': 'def f(name):\n    exec(f"import {name}".translate({0: 0}))\n',
     'an ordinary async context manager still runs its body': 'async def f(name, manager):\n    async with manager as payload:\n        exec(f"import {name}")\n',
@@ -334,6 +338,7 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'a nested function closes over the enclosing source': 'def f(name):\n    payload = f"import {name}"\n    def inner():\n        exec(payload)\n    inner()\n',
     'an attribute holds the source it was given': 'def f(self, name):\n    self.payload = f"import {name}"\n    exec(self.payload)\n',
     'a literal subscript holds the source it was given': 'def f(name, payloads):\n    payloads["run"] = f"import {name}"\n    exec(payloads["run"])\n',
     'an unpacking binds each element before the next target runs': 'def f(name, table):\n    payload, table[exec(payload)] = (f"import {name}", None)\n',
@@ -369,6 +374,9 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a nested function that rebinds the name sees its own': 'def f(name):\n    payload = f"import {name}"\n    def inner():\n        payload = "pass"\n        exec(payload)\n    inner()\n',
+    'a filter over an empty iterable never runs': 'def f(name):\n    [None for _ in [] if exec(f"import {name}")]\n',
+    'an async comprehension over a synchronous literal raises first': 'async def f(name):\n    return [exec(payload) async for payload in [f"import {name}"]]\n',
     'a format method on a locally defined class is not a builder': 'class Safe:\n    def format(self, value):\n        return "pass"\ndef f(name):\n    exec(Safe().format(name))\n',
     'a written-out expansion says how many arguments it supplies': 'def f(name):\n    compile(*[f"import {name}"])\n',
     'a written-out mapping expansion names the keys it supplies': 'def f(name):\n    compile(**{"source": f"import {name}"})\n',

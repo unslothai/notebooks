@@ -196,7 +196,12 @@ _MODULE_RECEIVERS = frozenset({
 # Stdlib helpers that hand their source through and can be imported directly, as
 # `<module>.<name>`. `visit_ImportFrom` records `from ast import parse as p` against
 # these, and `_interpolated_call` rewrites such a call to the qualified spelling.
-_DIRECT_HELPERS = frozenset({"ast.parse", "codeop.compile_command", "string.Template"})
+_DIRECT_HELPERS = frozenset({
+    "ast.parse", "codeop.compile_command", "string.Template",
+    # `from operator import add as join` binds the same builder the qualified
+    # spelling names, and only the qualified one was read.
+    *(f"operator.{name}" for name in ("add", "concat", "iadd", "iconcat", "mod", "imod")),
+})
 
 _OPERATOR_BUILDERS = {
     "add": ast.Add, "concat": ast.Add, "iadd": ast.Add, "iconcat": ast.Add,
@@ -611,6 +616,11 @@ def _is_interpolated(node: ast.AST, resolve = None, shadowed = None, resolve_ali
     if stored is not None:
         return stored
     if isinstance(node, ast.Subscript):
+        # A piece of a split string still holds the interpolation, and the element
+        # lookup below cannot read a call result, so it answered nothing.
+        piece = _interpolated_split_element(node, resolve, shadowed, resolve_alias)
+        if piece is not None:
+            return piece
         return _interpolated_subscript(node, resolve, shadowed, resolve_alias)
     if isinstance(node, ast.Name):
         if resolve is None:
@@ -735,6 +745,23 @@ def _interpolated_starred(node, resolve = None, shadowed = None, resolve_alias =
         # only when it is written out rather than coming from a `**` expansion.
         return _is_interpolated(inner.keys[0], resolve, shadowed, resolve_alias)
     return None
+
+
+# Methods that cut a string into pieces. Selecting one of those pieces still carries
+# the interpolation: `f"import {name}".partition("#")[0]` is `import <name>`.
+_SPLITTERS = ("split", "rsplit", "partition", "rpartition", "splitlines")
+
+
+def _interpolated_split_element(node, resolve = None, shadowed = None, resolve_alias = None):
+    """The source a `s.split(...)[i]` selection still carries, if any."""
+    if not isinstance(node, ast.Subscript):
+        return None
+    inner = node.value
+    if not (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Attribute)):
+        return None
+    if inner.func.attr not in _SPLITTERS:
+        return None
+    return _is_interpolated(inner.func.value, resolve, shadowed, resolve_alias)
 
 
 def _interpolated_subscript(node, resolve = None, shadowed = None, resolve_alias = None) -> str | None:
@@ -921,6 +948,13 @@ def _interpolated_binop(node, resolve = None, shadowed = None, resolve_alias = N
 def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = None) -> str | None:
     """Every call shape that hands its argument through as source."""
     function = node.func
+    if isinstance(function, ast.Lambda):
+        # `(lambda: f"import {name}")()` returns exactly what its body evaluates to,
+        # and that body is written out right here. The callee is a `Lambda` rather
+        # than a name, so none of the branches below saw it. Parameters are not
+        # resolved: a body reading one is unknown, and `resolve` answers for the
+        # enclosing scope, so `_is_interpolated` reads it as an ordinary name.
+        return _is_interpolated(function.body, resolve, shadowed, resolve_alias)
     preserving = None
     if isinstance(function, ast.Name):
         preserving = function.id
@@ -2404,6 +2438,40 @@ class _Visitor(ast.NodeVisitor):
                 parts.append(node.returns)
         return parts
 
+    @staticmethod
+    def _declared_locals(node) -> set:
+        """Names a function body binds itself, so its closure never reads the outer one.
+
+        Parameters, assignment and walrus targets, `for`/`with`/`except`/`match`
+        targets, imports and definitions - anything in THIS body, not in a nested one,
+        since a nested scope binds in its own.
+        """
+        names = set()
+        arguments = getattr(node, "args", None)
+        if isinstance(arguments, ast.arguments):
+            for argument in (
+                *arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs,
+                arguments.vararg, arguments.kwarg,
+            ):
+                if argument is not None:
+                    names.add(argument.arg)
+        for statement in getattr(node, "body", []) or []:
+            for child in _walk_this_scope(statement):
+                if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
+                    names.add(child.id)
+                elif isinstance(child, ast.arg):
+                    names.add(child.arg)
+                elif isinstance(child, (ast.Import, ast.ImportFrom)):
+                    for alias in child.names:
+                        names.add(alias.asname or alias.name.split(".")[0])
+                elif isinstance(child, (
+                    ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+                )):
+                    names.add(child.name)
+                elif isinstance(child, ast.ExceptHandler) and child.name:
+                    names.add(child.name)
+        return names
+
     def _enter(self, node):
         # Evaluated in the scope we are still in, before the new one exists.
         for part in self._outer_parts(node):
@@ -2456,8 +2524,20 @@ class _Visitor(ast.NodeVisitor):
         # but a class namespace is NOT a lexical scope, so a class nested directly in
         # another sees the enclosing FUNCTION or module, never the outer class's
         # locals. `class A: payload = f"..."; class B: exec(payload)` raises NameError.
+        # A nested function CLOSES OVER the enclosing locals, so
+        # `payload = f"import {name}"; def inner(): exec(payload)` really does execute
+        # the built string. Starting every body with an empty map dropped that. The
+        # names the nested body binds itself are left out, since those are its own
+        # locals for the whole body and the closure never sees the outer one.
+        inherited = {}
+        if not isinstance(node, ast.ClassDef) and self.scope_kinds[-1] == "function":
+            bound_here = self._declared_locals(node)
+            inherited = {
+                name: reason for name, reason in self.tainted[-1].items()
+                if isinstance(name, str) and name not in bound_here
+            }
         self.tainted.append(
-            self._implicit_base_taint() if isinstance(node, ast.ClassDef) else {}
+            self._implicit_base_taint() if isinstance(node, ast.ClassDef) else inherited
         )
         # Aliases are lexical too: a `from builtins import exec as run` inside one
         # function said nothing about a `run` parameter in the next one. Parameters
@@ -4690,6 +4770,26 @@ class _Visitor(ast.NodeVisitor):
         # left those local bindings behind, which reported a clean outer name.
         self.tainted[-1] = saved
 
+    def _generator_yields(self, generator) -> bool:
+        """Whether a comprehension clause can produce a pass at all.
+
+        A written-out empty iterable produces none, and an `async for` over a
+        written-out synchronous container raises while acquiring its async iterator -
+        the same fact `visit_AsyncFor` records for the statement form. Anything this
+        cannot read is assumed to yield, which is the reporting direction.
+        """
+        if self._literal_elements(generator.iter) == []:
+            return False
+        if (
+            isinstance(generator.iter, ast.Constant)
+            and isinstance(generator.iter.value, (str, bytes))
+            and not generator.iter.value
+        ):
+            return False
+        if getattr(generator, "is_async", False):
+            return self._literal_elements(generator.iter) is None
+        return True
+
     def _visit_comprehension(self, node):
         """A comprehension target is local to the comprehension.
 
@@ -4789,13 +4889,32 @@ class _Visitor(ast.NodeVisitor):
                             aggregated.setdefault(key, value)
                     self.tainted[-1] = before
                 self.tainted[-1].update(aggregated)
-            for condition in generator.ifs:
-                self.visit(condition)
+            # A filter only runs if this generator yields something: `[None for _ in
+            # [] if exec(f"...")]` evaluates neither, and reporting the sink failed
+            # the gate on code that cannot execute. Same test the element below uses,
+            # applied to this generator on its own.
+            if self._generator_yields(generator):
+                for condition in generator.ifs:
+                    self.visit(condition)
 
-        for field in ("elt", "key", "value"):
-            child = getattr(node, field, None)
-            if child is not None:
-                self.visit(child)
+        # The element only runs if some pass reaches it. `[None for _ in [] if
+        # exec(f"...")]` never evaluates either, and reporting the sink failed the
+        # gate on code that cannot execute; an `async for` over a written-out
+        # synchronous list raises while acquiring its async iterator, before the
+        # element too. Anything undecidable still visits the element, which is where
+        # the reporting direction belongs.
+        reaches_element = all(
+            self._generator_yields(generator)
+            and not any(
+                _constant_truth(condition) is False for condition in generator.ifs
+            )
+            for generator in node.generators
+        )
+        if reaches_element:
+            for field in ("elt", "key", "value"):
+                child = getattr(node, field, None)
+                if child is not None:
+                    self.visit(child)
 
         # A generator expression is LAZY. Nothing in it has run when the statement
         # ends, so a walrus inside one has not bound anything yet and carrying its
@@ -4848,8 +4967,13 @@ class _Visitor(ast.NodeVisitor):
                 and isinstance(generator.iter.value, (str, bytes))
                 and not generator.iter.value
             )
-            and not any(
-                _constant_truth(condition) is False for condition in generator.ifs
+            and all(
+                # A filter this cannot decide may reject every item, and then the
+                # comprehension binds nothing: `[(run := print) for _ in [0] if flag]`
+                # leaves `run` whatever it was when `flag` is false. Treating an
+                # undecidable filter as true exported a shadow that may not exist and
+                # hid a call to the builtin. Only a filter PROVED true keeps the pass.
+                _constant_truth(condition) is True for condition in generator.ifs
             )
             for generator in node.generators
         )
