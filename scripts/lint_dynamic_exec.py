@@ -276,6 +276,28 @@ def _visibly_text(node: ast.AST) -> bool:
     return False
 
 
+def _visibly_bytes(node: ast.AST) -> bool:
+    """Whether the value is written out as bytes, so `str()` of it is a repr.
+
+    `str(f"import {name}".encode())` is `"b'import os'"`, a quoted bytes literal, and
+    executing that expression imports nothing: the interpolation is escaped rather
+    than spliced into syntax. Reporting it failed the gate on a call that cannot do
+    what the finding claims. Narrow on purpose: a bytes literal, a `.encode()` on
+    anything, or a `bytes`/`bytearray` construction, all written out here.
+    """
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, bytes)
+    if isinstance(node, ast.Call):
+        function = node.func
+        if isinstance(function, ast.Attribute) and function.attr == "encode":
+            return True
+        name = function.id if isinstance(function, ast.Name) else (
+            function.attr if isinstance(function, ast.Attribute) else ""
+        )
+        return name in ("bytes", "bytearray")
+    return False
+
+
 def _constructor_accepts_text(node: ast.Call, name: str) -> bool:
     """Whether this constructor call can reach the sink with what it was handed.
 
@@ -563,6 +585,21 @@ def _interpolated_starred(node, resolve = None, shadowed = None, resolve_alias =
         return _is_interpolated(inner.elts[0], resolve, shadowed, resolve_alias)
     if isinstance(inner, (ast.Tuple, ast.List)) and inner.elts:
         return _is_interpolated(inner.elts[0], resolve, shadowed, resolve_alias)
+    if isinstance(inner, ast.Dict):
+        # A `**{}` contributes no runtime key, so the first key the mapping actually
+        # yields may sit behind one. Reading `keys[0]` regardless saw a `None` and gave
+        # up, and `exec(*{**{}, f"import {name}": None})` went unreported.
+        for position, key in enumerate(inner.keys):
+            if key is None:
+                expansion = inner.values[position]
+                if isinstance(expansion, ast.Dict) and not expansion.keys:
+                    continue
+                if _literal_dict_call(expansion, shadowed) is not None and not (
+                    _literal_dict_call(expansion, shadowed).keys
+                ):
+                    continue
+                break
+            return _is_interpolated(key, resolve, shadowed, resolve_alias)
     if isinstance(inner, ast.Dict) and inner.keys and inner.keys[0] is not None:
         # Spreading a mapping iterates its KEYS, so `exec(*{f"import {name}": None})`
         # hands the interpolated key straight to the sink. Only the first key, and
@@ -613,6 +650,23 @@ def _interpolated_binop(node, resolve = None, shadowed = None, resolve_alias = N
         if isinstance(node.op, ast.Add):
             return "string concatenation"
     if isinstance(node.op, ast.Mult):
+        # `f"import {name}" * 0` is the empty string, and a negative count is empty
+        # too, so nothing is built and reporting it failed the gate on a call that
+        # cannot execute anything. Only a written-out count decides this.
+        for count in (node.left, node.right):
+            # A negative literal is `UnaryOp(USub, Constant(1))`, not a `Constant`, so
+            # requiring one read `f"..." * -1` as an unknown count.
+            sign = 1
+            if isinstance(count, ast.UnaryOp) and isinstance(count.op, (ast.USub, ast.UAdd)):
+                sign = -1 if isinstance(count.op, ast.USub) else 1
+                count = count.operand
+            if (
+                isinstance(count, ast.Constant)
+                and isinstance(count.value, int)
+                and not isinstance(count.value, bool)
+                and sign * count.value <= 0
+            ):
+                return None
         # `f"import {name}\n" * 2` repeats the built string; the interpolation is
         # still in every copy. Either side may be the string.
         return (
@@ -856,7 +910,10 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
     constructor = _constructor_name(function, shadowed, resolve_alias)
     if constructor is not None and _constructor_accepts_text(node, constructor):
         source = _constructor_source(node, constructor, shadowed)
-        if source is not None:
+        if source is not None and not (constructor == "str" and _visibly_bytes(source)):
+            # `str(bytes)` is the REPR of the bytes, `"b'import os'"`, which executes
+            # as a string expression and imports nothing. Every other constructor here
+            # hands the text through unchanged.
             return _is_interpolated(source, resolve, shadowed, resolve_alias)
     # `exec("import MODULE".replace("MODULE", name))` splices a value into a
     # template that is right there in the file, which is the `.format()` shape
@@ -4230,6 +4287,25 @@ def _neutralised(source: str) -> str:
                     continue
         if stripped.startswith(("%", "!")):
             indent = line[: len(line) - len(stripped)]
+            if stripped.startswith("!"):
+                # `!python -c 'prog'` runs `prog` as Python, exactly as
+                # `%%script python -c 'prog'` does. Replacing the whole escape with
+                # `pass` threw that program away, so a sink inside it was never read.
+                # The same extractor answers both, asked here about the one line.
+                program = _script_command_source("%%script " + stripped[1:].strip())
+                if program is not None:
+                    try:
+                        ast.parse(program)
+                    except (SyntaxError, ValueError):
+                        pass
+                    else:
+                        # The program takes the escape's place rather than being
+                        # added after it, so a one-line `-c` program keeps the line
+                        # count exactly and a sink further down the cell is still
+                        # reported at its own line.
+                        out.extend(indent + piece for piece in program.splitlines())
+                        continuing = False
+                        continue
             # A line magic that takes code keeps its argument; the magic itself is not
             # Python but what follows it is, and dropping the line hid the sink.
             if stripped.startswith("%") and not stripped.startswith("%%"):

@@ -258,6 +258,7 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'an empty expansion does not hide the first spread key': 'def f(name):\n    exec(*{**{}, f"import {name}": None})\n',
     'a literal template reached through a name is still a template': 'def f(name):\n    template = "import MODULE"\n    exec(template.replace("MODULE", name))\n',
     'codeop compiles the source it was handed': 'import codeop\ndef f(name):\n    exec(codeop.compile_command(f"import {name}"))\n',
     'operator.add is concatenation under another name': 'import operator\ndef f(name):\n    exec(operator.add("import ", name))\n',
@@ -321,6 +322,9 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'str of visibly bytes is a repr, not the text': 'def f(name):\n    exec(str(f"import {name}".encode()))\n',
+    'a zero repetition builds an empty string': 'def f(name):\n    exec(f"import {name}" * 0)\n',
+    'a negative repetition builds an empty string': 'def f(name):\n    exec(f"import {name}" * -1)\n',
     'a partial method on some other object is not functools': 'class R:\n    def partial(self, *a):\n        return lambda: None\ndef f(name, runner):\n    runner.partial(exec, f"import {name}")()\n',
     'the last element wins when the body does not rebind': 'def f(name):\n    for payload in [f"import {name}"]:\n        payload = "pass"\n    exec(payload)\n',
     'an opaque receiver is not a literal template': 'import inspect\ndef f(name, target):\n    exec(inspect.getsource(target).replace("MODULE", name))\n',
@@ -369,6 +373,7 @@ def test_code_that_cannot_execute_a_built_string_is_quiet(description, tmp_path)
 
 # A magic or interpreter invocation that really does execute the cell body.
 _NOTEBOOK_RUNS_PYTHON = {
+    'a shell escape running python -c carries a program': '{"cells": [{"cell_type": "code", "source": "!python -c \'name=input(); exec(f\\"import {name}\\")\'\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'a bundled short option carries its attached program': '{"cells": [{"cell_type": "code", "source": "%%script python -uc\'name=\\"x\\";exec(f\\"import {name}\\")\'\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'an assignment-form %time binds the value it timed': '{"cells": [{"cell_type": "code", "source": "name = input()\\npayload = %time f\\"import {name}\\"\\nexec(payload)\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'env -S carries the interpreter command inside its value': '{"cells": [{"cell_type": "code", "source": "%%script env -S \\"python -c \'name=input(); exec(f\\\\\\"import {name}\\\\\\")\'\\"\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
