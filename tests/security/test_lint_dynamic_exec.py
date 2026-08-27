@@ -194,6 +194,10 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'next runs the callback on the first mapped element': 'def f(name):\n    next(map(exec, [f"import {name}"]))\n',
+    'a lambda hands the sink itself back': 'def f(name):\n    (lambda run: run)(exec)(f"import {name}")\n',
+    'a key callback runs on every element sorted consumes': 'def f(name):\n    sorted([f"import {name}"], key = exec)\n',
+    'a folded constant names the same builtin': 'import builtins\ndef f(name):\n    getattr(builtins, "ex" + "ec")(f"import {name}")\n',
     'a sink stored on an attribute is still the builtin': 'import builtins, types\ndef f(name):\n    obj = types.SimpleNamespace()\n    obj.run = builtins.exec\n    obj.run(f"import {name}")\n',
     'a sink stored under a literal key is still the builtin': 'import builtins\ndef f(name):\n    table = {}\n    table["run"] = builtins.exec\n    table["run"](f"import {name}")\n',
     'vars of the builtins module is the same namespace mapping': 'import builtins\ndef f(name):\n    vars(builtins)["exec"](f"import {name}")\n',
@@ -296,6 +300,12 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'a memoryview handed back as bytes is the same source': 'def f(name):\n    exec(memoryview(f"import {name}".encode()).tobytes())\n',
+    'a text subclass one level down still inherits the builder': 'class Base(str):\n    pass\nclass Template(Base):\n    pass\ndef f(name):\n    exec(Template("import {}").format(name))\n',
+    'a Formatter bound to a name still formats': 'import string\ndef f(name):\n    payload = f"import {name}"\n    formatter = string.Formatter()\n    exec(formatter.vformat("{}", (payload,), {}))\n',
+    'a written-out list hands back the element popped from it': 'def f(name):\n    exec([f"import {name}"].pop())\n',
+    'a container bound to a name keeps its elements': 'def f(name):\n    payloads = [f"import {name}"]\n    exec(payloads[0])\n',
+    'a mapping bound to a name keeps its values': 'def f(name):\n    payloads = {"run": f"import {name}"}\n    exec(payloads["run"])\n',
     'an f-string removed from an equal f-string is two evaluations': 'def f(name):\n    exec(f"import {name}".removeprefix(f"import {name}"))\n',
     'a string Formatter vformat is the format method spelled apart': 'import string\ndef f(name):\n    payload = f"import {name}"\n    exec(string.Formatter().vformat("{}", (payload,), {}))\n',
     'an unbound string add takes its receiver as an argument': 'def f(name):\n    payload = f"import {name}"\n    exec(str.__add__("", payload))\n',
@@ -367,6 +377,7 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'an iter around a written-out list still yields its elements': 'def f(name):\n    for payload in iter([f"import {name}"]):\n        exec(payload)\n',
     'a global declaration leaves the name in the enclosing scope': 'payload = f"import {name}"\ndef f():\n    global payload\n    exec(payload)\n    payload = "pass"\nf()\n',
     'a nonlocal declaration leaves the name in the enclosing scope': 'def outer(name):\n    payload = f"import {name}"\n    def f():\n        nonlocal payload\n        exec(payload)\n        payload = "pass"\n    f()\n',
     'a closure reads what its scope binds after the def': 'def f(name):\n    payload = "pass"\n    def inner():\n        exec(payload)\n    payload = f"import {name}"\n    inner()\n',
@@ -406,6 +417,16 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a discarded generator never evaluates its element': 'def f(name):\n    (exec(f"import {name}") for _ in [0])\n',
+    'min compares two results and raises before the third': 'def f(name):\n    min(map(exec, ["pass", "pass", f"import {name}"]))\n',
+    'an empty second iterable stops the map before it starts': 'def f(name):\n    list(map(exec, [f"import {name}"], []))\n',
+    'a shorter second iterable stops the map early': 'def f(name):\n    list(map(exec, ["pass", f"import {name}"], [{}]))\n',
+    'a lambda given more values than it takes raises first': 'def f(name):\n    exec((lambda source: source)(*[f"import {name}", "extra"]))\n',
+    'a local class with its own add is not concatenation': 'class Safe:\n    def __add__(self, value):\n        return "pass"\ndef f(name):\n    exec(Safe().__add__(f"{name}"))\n',
+    'the same keyword from two expansions raises first': 'def f(name):\n    compile(**{"source": f"import {name}"}, **{"source": "pass"}, filename = "<x>", mode = "exec")\n',
+    'a normaliser given an argument it does not take raises first': 'def f(name):\n    exec(f"import {name}".upper(1))\n',
+    'adding a visible number to visible text raises first': 'import operator\ndef f(name):\n    exec(operator.add(f"import {name}", 1))\n',
+    'a zero precision with the string type truncates too': 'def f(name):\n    exec(format(f"import {name}", ".0s"))\n',
     'textwrap indent without its prefix raises first': 'import textwrap\ndef f(name):\n    exec(textwrap.indent(f"import {name}"))\n',
     'a search text absent from the literal replaces nothing': 'def f(name):\n    exec("pass".replace("MISSING", name))\n',
     'an unbound replace with an absent search text changes nothing': 'def f(name):\n    exec(str.replace("pass", "MISSING", name))\n',
@@ -533,6 +554,7 @@ def test_a_notebook_cell_that_runs_python_is_reported(description, tmp_path):
 
 # The cell body is data: no interpreter reads it.
 _NOTEBOOK_IS_INERT = {
+    'an option after the script operand belongs to the script': '{"cells": [{"cell_type": "code", "metadata": {}, "outputs": [], "execution_count": null, "source": "%%script python helper.py -c \\"exec(f\'import {name}\')\\"\\nprint(1)\\n"}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'a bundled help flag never reads the cell body': '{"cells": [{"cell_type": "code", "source": "%%script python -uh\\nname = input()\\nexec(f\\"import {name}\\")\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'help wins over interactive mode': '{"cells": [{"cell_type": "code", "source": "%%script python -i --help\\nname = input()\\nexec(f\\"import {name}\\")\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'python --help never reads the cell body': '{"cells": [{"cell_type": "code", "source": "%%script python --help\\nname = input()\\nexec(f\\"import {name}\\")\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',

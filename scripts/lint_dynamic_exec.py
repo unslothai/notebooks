@@ -127,7 +127,10 @@ _MATCHSEQUENCE = _node_type("MatchSequence")
 # Conversions that hand the same source on in another type. `exec`, `eval` and
 # `compile` all accept bytes as well as str, so `exec(f"import {name}".encode())`
 # executes exactly the payload the f-string built.
-_CONVERSIONS = ("encode", "decode")
+# `.tobytes()` on a `memoryview` of built source is the same bytes back, and the
+# constructor is already read as source-preserving; without the method the chain
+# `memoryview(f"...".encode()).tobytes()` stopped one call short of the sink.
+_CONVERSIONS = ("encode", "decode", "tobytes")
 
 # The dunder spellings of the conversions above. `f"...".__str__()` returns the same
 # string and `bytes.__str__` is not a conversion at all, so only the ones whose
@@ -156,6 +159,18 @@ _NORMALISERS = (
     "casefold", "swapcase", "expandtabs", "removeprefix", "removesuffix",
     "center", "ljust", "rjust", "zfill",
 )
+
+# How many positional arguments each normaliser takes, from the CPython docs. A call
+# outside its range raises `TypeError` before the sink is reached:
+# `f"import {name}".upper(1)` is "str.upper() takes no arguments". Only checked when
+# the call has no keywords, since a keyword this cannot read may supply anything.
+_NORMALISER_ARITY = {
+    "strip": (0, 1), "lstrip": (0, 1), "rstrip": (0, 1),
+    "upper": (0, 0), "lower": (0, 0), "title": (0, 0), "capitalize": (0, 0),
+    "casefold": (0, 0), "swapcase": (0, 0), "expandtabs": (0, 1),
+    "removeprefix": (1, 1), "removesuffix": (1, 1),
+    "center": (1, 2), "ljust": (1, 2), "rjust": (1, 2), "zfill": (1, 1),
+}
 
 # Constructors that hand the same source on in another type. Same argument as
 # `_CONVERSIONS`, spelled as a call instead of a method: `bytes(s, "utf-8")` is
@@ -203,18 +218,55 @@ _DIRECT_HELPERS = frozenset({
     *(f"operator.{name}" for name in ("add", "concat", "iadd", "iconcat", "mod", "imod")),
 })
 
-# Calls that consume a `map` and reach EVERY element. `next` takes one, and
-# `any`/`all` stop at the first result that decides them - a sink returns None, so
-# `any` runs them all and `all` stops at the first. Only the ones that must reach
-# every element are listed, so nothing is reported for an element that a partial
-# consumer never asks for.
-#
-# `sum` and `dict` are NOT here for the same reason: a sink returns None, so
-# `sum(map(exec, ...))` raises on `0 + None` and `dict(map(exec, ...))` raises trying
-# to unpack None, both after the FIRST element. Neither ever asks for the second.
+# Calls that consume a `map`. How MANY elements each one provably reaches is a
+# separate question, answered by `_consumed_count` below: listing only the exhaustive
+# ones missed `next(map(exec, [f"..."]))`, which runs the callback on the first
+# element and is the whole of what it does.
 _CONSUMER_NAMES = frozenset({
-    "list", "tuple", "set", "frozenset", "sorted", "min", "max", "any",
+    "list", "tuple", "set", "frozenset", "sorted", "min", "max", "any", "all",
+    "sum", "dict", "next",
 })
+
+
+def _consumed_count(consumer: str, sink: str) -> int | None:
+    """How many mapped elements this consumer provably evaluates. None means every one.
+
+    What decides it is what the callback RETURNS. `exec` and `eval` return None, so
+    `sum` raises on `0 + None` and `dict` raises unpacking it, both after the first
+    element; `all` stops at the first falsy result, which None is; `any` gets None for
+    every element and runs them all. `compile` returns a code object, which reverses
+    both of those: `any` stops at the first, `all` runs them all.
+
+    `min` and `max` pull two elements before comparing, and None (or a code object) is
+    not orderable, so they raise having evaluated exactly two.
+    """
+    returns_none = sink.rpartition(".")[2] in ("exec", "eval")
+    if consumer == "next":
+        return 1
+    if consumer in ("sum", "dict"):
+        return 1
+    if consumer in ("min", "max"):
+        return 2
+    if consumer == "all":
+        return 1 if returns_none else None
+    if consumer == "any":
+        return None if returns_none else 1
+    return None
+
+
+def _visible_length(node: ast.AST) -> int | None:
+    """The element count of a written-out container, or None if it is not written out."""
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        if any(isinstance(element, ast.Starred) for element in node.elts):
+            return None
+        return len(node.elts)
+    if isinstance(node, ast.Dict):
+        if any(key is None for key in node.keys):
+            return None
+        return len(node.keys)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes)):
+        return len(node.value)
+    return None
 
 
 _OPERATOR_BUILDERS = {
@@ -958,6 +1010,33 @@ def _visibly_local_instance(node: ast.AST, shadowed = None) -> bool:
     return node.func.id in _LOCAL_CLASSES
 
 
+def _inherits_text(definition: ast.ClassDef, seen = None) -> bool:
+    """Whether this local class has `str` or `bytes` anywhere above it.
+
+    Through local bases as well as direct ones: `class Base(str): pass` followed by
+    `class Template(Base): pass` inherits `str.format` just as plainly, and reading
+    only the direct bases treated the subclass as textless and exempted a real splice.
+    A base this file does not define is unknown, and unknown counts as textual - that
+    is the reporting side.
+    """
+    seen = seen if seen is not None else set()
+    for base in definition.bases:
+        if not isinstance(base, ast.Name):
+            continue
+        if base.id in ("str", "bytes"):
+            return True
+        if base.id in seen:
+            continue
+        seen.add(base.id)
+        parent = _LOCAL_CLASSES.get(base.id)
+        if parent is None:
+            # A base from somewhere else may itself be a `str` subclass.
+            return True
+        if _inherits_text(parent, seen):
+            return True
+    return False
+
+
 def _defines_own_builder(name: str, attribute: str) -> bool:
     """Whether this local class's `attribute` is its own rather than the string one.
 
@@ -968,10 +1047,7 @@ def _defines_own_builder(name: str, attribute: str) -> bool:
     definition = _LOCAL_CLASSES.get(name)
     if definition is None:
         return False
-    inherits_text = any(
-        isinstance(base, ast.Name) and base.id in ("str", "bytes")
-        for base in definition.bases
-    )
+    inherits_text = _inherits_text(definition)
     defines = any(
         isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
         and statement.name == attribute
@@ -1052,6 +1128,16 @@ def _bound_template(node: ast.AST, shadowed = None, aliases = None):
     if shadowed is not None and shadowed(node.id):
         return None
     held = aliases(f"template:{node.id}")
+    return held if isinstance(held, ast.Call) else None
+
+
+def _bound_formatter(node: ast.AST, shadowed = None, aliases = None):
+    """The `string.Formatter()` a name was bound to, else None."""
+    if not isinstance(node, ast.Name) or aliases is None:
+        return None
+    if shadowed is not None and shadowed(node.id):
+        return None
+    held = aliases(f"formatter:{node.id}")
     return held if isinstance(held, ast.Call) else None
 
 
@@ -1188,7 +1274,7 @@ def _lambda_scope(node: ast.Call, function: ast.Lambda, resolve, shadowed, resol
     # `*args` at the call site moves every later argument, so nothing after it pairs
     # up: those parameters stay unresolved rather than being paired with the wrong
     # value.
-    supplied = []
+    supplied, opaque = [], False
     for argument in node.args:
         if isinstance(argument, ast.Starred):
             # A written-out expansion says exactly which values it supplies, so
@@ -1201,8 +1287,14 @@ def _lambda_scope(node: ast.Call, function: ast.Lambda, resolve, shadowed, resol
             ):
                 supplied.extend(inner.elts)
                 continue
+            opaque = True
             break
         supplied.append(argument)
+    if arguments.vararg is None and not opaque and len(supplied) > len(positional):
+        # More positional values than the lambda takes, all of them written out:
+        # `(lambda source: source)(*["a", "b"])` raises `TypeError` before the sink
+        # runs, so nothing it appears to bind is real.
+        return resolve
     for index, argument in enumerate(supplied):
         if index < len(positional):
             bound[positional[index].arg] = argument
@@ -1364,6 +1456,24 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             return _is_interpolated(
                 ast.copy_location(equivalent, node), resolve, shadowed, resolve_alias,
             )
+    if (
+        isinstance(function, ast.Attribute)
+        and function.attr == "pop"
+        and isinstance(function.value, (ast.List, ast.Tuple))
+        and function.value.elts
+        and not any(isinstance(element, ast.Starred) for element in function.value.elts)
+        and not node.keywords
+    ):
+        # `[f"..."].pop()` returns the last element of a container written out right
+        # here, and `[a, b].pop(0)` the one it names. Only the mapping spelling was
+        # read, so the list one selected and executed source with nothing reported.
+        elements = function.value.elts
+        if not node.args:
+            return _is_interpolated(elements[-1], resolve, shadowed, resolve_alias)
+        index = _constant_integer(node.args[0]) if len(node.args) == 1 else None
+        if index is not None and -len(elements) <= index < len(elements):
+            return _is_interpolated(elements[index], resolve, shadowed, resolve_alias)
+        return None
     if isinstance(function, ast.Attribute):
         literal_mapping = (
             _mapping_literal(function.value, shadowed)
@@ -1447,6 +1557,12 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
                 and len(node.args) == 2
                 and not node.keywords
             ):
+                if isinstance(
+                    _OPERATOR_BUILDERS[function.attr](), ast.Add
+                ) and _visibly_unaddable(node.args[0], node.args[1]):
+                    # The call raises before the sink runs. `%` is not this case: a
+                    # string and a number is an ordinary `"%d" % 1`.
+                    return None
                 equivalent = ast.BinOp(
                     left = node.args[0],
                     op = _OPERATOR_BUILDERS[function.attr](),
@@ -1487,6 +1603,17 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             return _is_interpolated(
                 ast.copy_location(equivalent, node), resolve, shadowed, resolve_alias,
             )
+        if (
+            function.attr in ("__add__", "__mod__")
+            and len(node.args) == 1
+            and not node.keywords
+            and _visibly_local_instance(function.value, shadowed)
+            and _defines_own_builder(function.value.func.id, function.attr)
+        ):
+            # `class Safe: def __add__(self, value): return "pass"` followed by
+            # `Safe().__add__(name)` is not concatenation at all, exactly as the
+            # `.format()` case above is not a string builder. Same test, same reason.
+            return None
         if (
             function.attr in ("__add__", "__mod__")
             and len(node.args) == 1
@@ -1550,7 +1677,14 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             # the source is the first argument and the receiver is only the type.
             # Unwrapping the receiver looked at the name `str` and found nothing.
             # Same shape the conversions below already handle.
-            if _constructor_name(function.value, shadowed, resolve_alias) is not None:
+            unbound = _constructor_name(function.value, shadowed, resolve_alias) is not None
+            low, high = _NORMALISER_ARITY[function.attr]
+            if unbound:
+                low, high = low + 1, high + 1
+            if not node.keywords and not low <= len(node.args) <= high:
+                # The call raises before the sink runs.
+                return None
+            if unbound:
                 return (
                     _is_interpolated(node.args[0], resolve, shadowed, resolve_alias)
                     if node.args else None
@@ -1590,7 +1724,10 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             return None
         if (
             function.attr in ("vformat", "format_field")
-            and _is_formatter_call(function.value, shadowed, resolve_alias)
+            and (
+                _is_formatter_call(function.value, shadowed, resolve_alias)
+                or _bound_formatter(function.value, shadowed, resolve_alias) is not None
+            )
         ):
             # `string.Formatter().vformat("{}", (payload,), {})` is `str.format` with
             # the arguments handed over as a tuple and a mapping, and the method was in
@@ -1955,6 +2092,86 @@ def _literal_builtins_import(node: ast.AST, shadowed = None, aliases = None) -> 
     return False
 
 
+def _visibly_unaddable(left: ast.AST, right: ast.AST) -> bool:
+    """Whether adding these two written-out operands raises rather than concatenating.
+
+    `operator.add(f"import {name}", 1)` is a `TypeError`, so no source is built and
+    reporting it blocked CI on code that cannot run. Only when BOTH sides are written
+    out and one is text while the other plainly is not: anything unknown still reads
+    as a concatenation, which is the reporting side.
+    """
+    def kind(node):
+        if isinstance(node, ast.JoinedStr):
+            return "text"
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, str):
+                return "text"
+            if isinstance(node.value, bytes):
+                return "bytes"
+            return "other"
+        if isinstance(node, (ast.List, ast.Tuple, ast.Set, ast.Dict)):
+            return "other"
+        return None
+
+    left_kind, right_kind = kind(left), kind(right)
+    if left_kind is None or right_kind is None:
+        return False
+    return left_kind != right_kind
+
+
+def _lambda_result(call: ast.Call):
+    """What an immediately invoked lambda hands back, when that is written out.
+
+    The body itself, or - when the body is one of the parameters - the argument that
+    parameter was given. Only a straightforward pairing: a `*` or `**` at the call site
+    can supply anything, and nothing is guessed there.
+    """
+    lambda_node = call.func
+    if not isinstance(lambda_node, ast.Lambda):
+        return None
+    body = lambda_node.body
+    if not isinstance(body, ast.Name):
+        return body
+    arguments = lambda_node.args
+    positional = [*arguments.posonlyargs, *arguments.args]
+    names = {argument.arg for argument in positional}
+    if body.id not in names:
+        return None
+    if any(isinstance(argument, ast.Starred) for argument in call.args):
+        return None
+    if any(keyword.arg is None for keyword in call.keywords):
+        return None
+    bound = {}
+    for index, argument in enumerate(call.args):
+        if index < len(positional):
+            bound[positional[index].arg] = argument
+    for keyword in call.keywords:
+        bound[keyword.arg] = keyword.value
+    defaults = arguments.defaults
+    if defaults:
+        for parameter, default in zip(positional[len(positional) - len(defaults):], defaults):
+            bound.setdefault(parameter.arg, default)
+    return bound.get(body.id)
+
+
+def _folded_text(node: ast.AST) -> ast.AST:
+    """A written-out concatenation of string literals, folded to one constant.
+
+    Only `+` between literals, and only when every piece is one: nothing here
+    evaluates a name or calls anything. Anything else is handed back unchanged.
+    """
+    if not isinstance(node, ast.BinOp) or not isinstance(node.op, ast.Add):
+        return node
+    left = _folded_text(node.left)
+    right = _folded_text(node.right)
+    if (
+        isinstance(left, ast.Constant) and isinstance(right, ast.Constant)
+        and isinstance(left.value, str) and isinstance(right.value, str)
+    ):
+        return ast.copy_location(ast.Constant(value = left.value + right.value), node)
+    return node
+
+
 def _getattr_sink_name(function: ast.Call, aliases = None, shadowed = None) -> str | None:
     """The sink `getattr(builtins, "exec")` names, or None.
 
@@ -1985,6 +2202,9 @@ def _getattr_sink_name(function: ast.Call, aliases = None, shadowed = None) -> s
             shadowed is not None and shadowed("getattr")
         ):
             owner, attribute = function.args[0], function.args[1]
+            # `"ex" + "ec"` is `"exec"` however it is written; the pieces are all
+            # literals, so folding them reads the same name CPython will.
+            attribute = _folded_text(attribute)
             if isinstance(attribute, ast.Constant) and attribute.value in SINKS:
                 if _literal_builtins_import(owner, shadowed, aliases):
                     # `getattr(__import__("builtins"), "exec")` names the module
@@ -2043,6 +2263,13 @@ def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None
             recorded = aliases(path)
             if recorded:
                 return recorded
+    if isinstance(function, ast.Call) and isinstance(function.func, ast.Lambda):
+        # `(lambda run: run)(exec)(f"...")` calls whatever the lambda hands back, which
+        # is written out right here. The source side already binds arguments to
+        # parameters; the callee side stopped at the lambda and read nothing.
+        result = _lambda_result(function)
+        if result is not None:
+            return _sink_name(result, aliases, shadowed)
     if isinstance(function, ast.Call) and _partial_sink(function, aliases, shadowed):
         # `functools.partial(exec, f"...")()` binds the sink and its source and then
         # calls the result, so neither half resolved on its own. Only the visible
@@ -2490,7 +2717,8 @@ _FORMATTER = string.Formatter()
 def _truncating_format_spec(node: ast.Call) -> bool:
     """Whether a builtin `format(value, spec)` spec cuts the value to nothing.
 
-    Only `.0`, written out: `format(s, ".0")` is `""` for a string, so nothing built
+    Only `.0`, written out, with or without the `s` type that says the value is a
+    string: `format(s, ".0")` and `format(s, ".0s")` are both `""`, so nothing built
     reaches the sink. A spec this cannot read is unknown and keeps the source.
     """
     spec = node.args[1] if len(node.args) > 1 else None
@@ -2500,7 +2728,7 @@ def _truncating_format_spec(node: ast.Call) -> bool:
                 spec = keyword.value
     if not (isinstance(spec, ast.Constant) and isinstance(spec.value, str)):
         return False
-    return bool(re.fullmatch(r"[^{}]*\.0", spec.value))
+    return bool(re.fullmatch(r"[^{}]*\.0s?", spec.value))
 
 
 def _constructor_names(function: ast.AST, shadowed = None, aliases = None):
@@ -2627,7 +2855,12 @@ def _compile_call_is_complete(node: ast.Call, shadowed = None, skip: int = 0) ->
     CPython refuses it outright.
     """
     positional = 0
-    named = {keyword.arg for keyword in node.keywords if keyword.arg is not None}
+    spelled = [keyword.arg for keyword in node.keywords if keyword.arg is not None]
+    named = set(spelled)
+    if len(spelled) != len(named):
+        # `compile(source = a, source = b)` does not parse, but a mapping expansion
+        # repeating a plain keyword is the same `TypeError` and does.
+        return False
     for argument in node.args[skip:]:
         if isinstance(argument, ast.Starred):
             inner = argument.value
@@ -2656,10 +2889,16 @@ def _compile_call_is_complete(node: ast.Call, shadowed = None, skip: int = 0) ->
             key is None for key in mapping.keys
         ):
             return True
-        named |= {
+        supplied = {
             key.value for key in mapping.keys
             if isinstance(key, ast.Constant) and isinstance(key.value, str)
         }
+        if supplied & named:
+            # The same keyword twice across two visible mappings is a `TypeError`
+            # before `compile` is called: `compile(**{"source": a}, **{"source": b})`
+            # never runs, and reporting it blocked CI on code that cannot.
+            return False
+        named |= supplied
     # A keyword that repeats a positional makes the call a `TypeError` before any
     # source is compiled: `compile(f"...", "<x>", "exec", source = "pass")` never runs,
     # and reporting the f-string in it blocked CI over code CPython refuses.
@@ -2682,6 +2921,13 @@ def _compile_keyword_source(node: ast.Call, shadowed = None) -> ast.AST | None:
         if keyword.arg == "source":
             return keyword.value
         if keyword.arg is None and _mapping_literal(keyword.value) is not None:
+            # WITHOUT the shadow test, unlike `_compile_call_is_complete`. The two ask
+            # different questions: that one asks whether the call can run at all, where
+            # reading a shadowed `dict` invents an argument; this one asks what source
+            # may reach the sink, where a local `def dict(**kwargs): return kwargs`
+            # hands the interpolated value straight through. Adding the test here was
+            # measured against the corpus and turned three real findings into misses
+            # (temp/r32/dictshadow.py, temp/r48, temp/r49).
             # `compile(**{"source": f"..."})` is the same call with the same
             # argument; a literal mapping names its keys as plainly as a keyword
             # does, and `dict({...}, filename = "<x>")` is that mapping written as
@@ -3272,6 +3518,47 @@ class _Visitor(ast.NodeVisitor):
             self._bind(target, reason, numeric, literal_text)
             self._bind_unpacked(target, node.value)
             self._shadow_assignment(target, node.value)
+            self._bind_container_elements(target, node.value)
+
+    def _bind_container_elements(self, target, value) -> None:
+        """`payloads = [f"import {name}"]` records what `payloads[0]` then holds.
+
+        A container written out at the subscript is already read through; bound to a
+        name first, it was not, so `payloads = [f"..."]; exec(payloads[0])` executed
+        built source with nothing reported. Only constant-addressable elements of a
+        written-out list, tuple or mapping, recorded under the same compound key the
+        attribute form uses - the spelling at the store and at the load is the same
+        text either way.
+        """
+        if not isinstance(target, ast.Name):
+            return
+        pairs = []
+        if isinstance(value, (ast.List, ast.Tuple)):
+            if any(isinstance(element, ast.Starred) for element in value.elts):
+                return
+            pairs = list(enumerate(value.elts))
+        elif isinstance(value, ast.Dict):
+            if any(key is None for key in value.keys):
+                return
+            for key, item in zip(value.keys, value.values):
+                if isinstance(key, ast.Constant) and isinstance(key.value, (str, int)):
+                    if isinstance(key.value, bool):
+                        continue
+                    pairs.append((key.value, item))
+        for index, item in pairs:
+            element_reason = _is_interpolated(
+                item, self.tainted[-1].get, self._is_shadowed, self._alias,
+            )
+            if element_reason is None or isinstance(element_reason, _LiteralText):
+                continue
+            path = "path>" + ast.unparse(
+                ast.Subscript(
+                    value = ast.Name(id = target.id, ctx = ast.Load()),
+                    slice = ast.Constant(value = index),
+                    ctx = ast.Load(),
+                )
+            )
+            self.tainted[-1][path] = element_reason
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         """Same tracking for `payload: str = f"...{x}..."`.
@@ -3397,8 +3684,7 @@ class _Visitor(ast.NodeVisitor):
         if isinstance(node.target, ast.Name):
             self.visit(node.target)
 
-    @staticmethod
-    def _literal_elements(iterable):
+    def _literal_elements(self, iterable):
         """The elements a written-out iterable yields, or None if it is not one.
 
         Iterating a mapping yields its KEYS, so `for payload in {f"...": None}` binds
@@ -3406,6 +3692,18 @@ class _Visitor(ast.NodeVisitor):
         cleared the target and the sink in the body reported nothing. A `**` expansion
         appears as a `None` key and says nothing, so such a mapping is not read.
         """
+        # `iter([...])` and `tuple([...])` yield exactly what the container does, so
+        # `for payload in iter([f"import {name}"])` binds the interpolated element.
+        # Reading the call as opaque cleared the target and lost the sink below it.
+        if (
+            isinstance(iterable, ast.Call)
+            and isinstance(iterable.func, ast.Name)
+            and iterable.func.id in ("iter", "tuple", "list", "set", "frozenset")
+            and not self._is_shadowed(iterable.func.id)
+            and len(iterable.args) == 1
+            and not iterable.keywords
+        ):
+            return self._literal_elements(iterable.args[0])
         if isinstance(iterable, (ast.Tuple, ast.List, ast.Set)):
             return iterable.elts
         if isinstance(iterable, ast.Dict) and all(k is not None for k in iterable.keys):
@@ -3965,7 +4263,7 @@ class _Visitor(ast.NodeVisitor):
                     table[-1].pop(node.name, None)
                     for prefix in (
                         "module:", "constructor:", "partial:", "functools:", "text:",
-                        "stdlib:", "stdlibfunc:", "template:", "builder:",
+                        "stdlib:", "stdlibfunc:", "template:", "builder:", "formatter:",
                     ):
                         table[-1].pop(f"{prefix}{node.name}", None)
         for statement in node.body:
@@ -4985,7 +5283,7 @@ class _Visitor(ast.NodeVisitor):
             # `for run, ignored in [(builtins.exec, None)]` binds `run` to the builtin
             # exactly as the plain form does. Each element is paired with the target
             # the same way an unpacking assignment is.
-            elements = _Visitor._literal_elements(iterable)
+            elements = self._literal_elements(iterable)
             if elements:
                 for element in elements:
                     for sub_target, sub_value in _Visitor._unpacked_pairs(target, element):
@@ -5003,7 +5301,7 @@ class _Visitor(ast.NodeVisitor):
             return answer
         if not isinstance(target, ast.Name) or target.id not in names:
             return answer
-        elements = _Visitor._literal_elements(iterable)
+        elements = self._literal_elements(iterable)
         if not elements:
             return answer
         resolved = [
@@ -5115,6 +5413,16 @@ class _Visitor(ast.NodeVisitor):
         level = self._binding_level(target.id)
         for table in (self.sink_aliases, self.collected_aliases):
             table[level].pop(f"builder:{target.id}", None)
+        for table in (self.sink_aliases, self.collected_aliases):
+            table[level].pop(f"formatter:{target.id}", None)
+        if _is_formatter_call(value, self._is_shadowed, self._alias):
+            # `formatter = string.Formatter()` then `formatter.vformat("{}", ...)`
+            # splices exactly as the inline constructor does. Same namespace trick the
+            # template below uses, for the same reason: by the call the receiver is a
+            # bare name and the constructor is a line above.
+            for table in (self.sink_aliases, self.collected_aliases):
+                table[level][f"formatter:{target.id}"] = value
+            return
         if _is_template_call(value, self._is_shadowed, self._alias):
             # `template = string.Template("import $name")` then
             # `template.substitute(name = name)` splices exactly as the inline
@@ -5727,11 +6035,47 @@ class _Visitor(ast.NodeVisitor):
         """
         if not isinstance(node.func, ast.Name) or node.func.id not in self._CONSUMERS:
             return
-        if self._is_shadowed(node.func.id) or len(node.args) != 1 or node.keywords:
+        # `next(iterator, default)` takes a second argument and still advances the
+        # iterator once; every other consumer here takes the one.
+        allowed = 2 if node.func.id == "next" else 1
+        if self._is_shadowed(node.func.id) or not 1 <= len(node.args) <= allowed:
             return
-        yield from self._mapped_sink_elements(node.args[0])
+        if node.keywords:
+            return
+        yield from self._mapped_sink_elements(node.args[0], consumer = node.func.id)
 
-    def _mapped_sink_elements(self, inner):
+    # Consumers that take a `key` callback, and how many elements they provably feed
+    # it. `sorted` computes the key for every element before it compares anything;
+    # `min` and `max` compute two and then compare, which raises on None.
+    _KEY_CONSUMERS = {"sorted": None, "min": 2, "max": 2}
+
+    def _key_sink_calls(self, node: ast.Call):
+        """`sorted([f"..."], key = exec)` calls the sink on the elements it consumes."""
+        if not isinstance(node.func, ast.Name) or node.func.id not in self._KEY_CONSUMERS:
+            return
+        if self._is_shadowed(node.func.id) or len(node.args) != 1:
+            return
+        key = None
+        for keyword in node.keywords:
+            if keyword.arg == "key":
+                key = keyword.value
+            elif keyword.arg is None:
+                # A `**` can supply or replace the key with anything.
+                return
+        if key is None:
+            return
+        sink = _sink_name(key, self._alias, self._is_shadowed)
+        if sink is None:
+            return
+        elements = self._literal_elements(node.args[0]) or ()
+        reach = len(elements)
+        counted = self._KEY_CONSUMERS[node.func.id]
+        if counted is not None:
+            reach = min(reach, counted)
+        for element in elements[:reach]:
+            yield sink, element, node
+
+    def _mapped_sink_elements(self, inner, consumer: str = ""):
         """`(sink, element, call)` for a written-out `map(<sink>, [literal, ...])`."""
         if not (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name)):
             return
@@ -5761,7 +6105,19 @@ class _Visitor(ast.NodeVisitor):
         if sink.rpartition(".")[2] == "compile" and len(inner.args) - 1 < 3:
             return
         elements = self._literal_elements(inner.args[1])
-        for element in elements or ():
+        # `map` stops as soon as the SHORTEST iterable is exhausted, so a written-out
+        # second iterable caps how many elements the callback ever sees:
+        # `map(exec, [f"..."], [])` calls it not once.
+        reach = len(elements or ())
+        for extra in inner.args[2:]:
+            length = _visible_length(extra)
+            if length is not None:
+                reach = min(reach, length)
+        if consumer:
+            counted = _consumed_count(consumer, sink)
+            if counted is not None:
+                reach = min(reach, counted)
+        for element in (elements or ())[:reach]:
             yield sink, element, inner
 
     def _report_mapped_sinks(self, pairs) -> None:
@@ -5779,6 +6135,19 @@ class _Visitor(ast.NodeVisitor):
                     "line": inner.lineno,
                     "hash": _call_hash(inner),
                 })
+
+    def visit_Expr(self, node: ast.Expr):
+        """A generator expression that nobody iterates runs only its first iterable.
+
+        `(exec(f"import {name}") for _ in [0])` as a statement of its own builds a
+        generator and drops it: the element and the filters are deferred to an
+        iteration that never happens. Visiting them reported a sink that cannot run.
+        The outermost iterable IS evaluated at construction, so it is still visited.
+        """
+        if isinstance(node.value, ast.GeneratorExp) and node.value.generators:
+            self.visit(node.value.generators[0].iter)
+            return
+        self.generic_visit(node)
 
     def visit_Starred(self, node: ast.Starred):
         """`[*map(exec, [...])]` consumes the map as eagerly as `list(...)` does."""
@@ -5801,6 +6170,7 @@ class _Visitor(ast.NodeVisitor):
         )
 
     def visit_Call(self, node: ast.Call):
+        self._report_mapped_sinks(self._key_sink_calls(node))
         for mapped_sink, element, inner in self._mapped_sink_calls(node):
             reason = _is_interpolated(
                 element, self.tainted[-1].get, self._is_shadowed, self._alias,
@@ -6619,7 +6989,28 @@ def _script_command_source(code: str) -> str | None:
             tokens = _expanded_env_tokens(shlex.split(argument))
         except ValueError:
             return None
+        # Option parsing starts AFTER the interpreter and stops at the first script
+        # operand: `python --help` documents the usage as
+        # `[option] ... [-c cmd | -m mod | file | -] [arg] ...`, so in
+        # `%%script python helper.py -c "prog"` the `-c` and its string are arguments
+        # to `helper.py`, not to the interpreter, and reading them as a `-c` program
+        # reported source that nothing here runs. `_runs_python` already stops there.
+        start = 0
         for position, token in enumerate(tokens):
+            command = token.rsplit("/", 1)[-1].split("\\")[-1]
+            if _PYTHON_COMMAND.fullmatch(command):
+                start = position + 1
+                break
+        position = start
+        while position < len(tokens):
+            token = tokens[position]
+            if not token.startswith("-"):
+                # The script operand. Everything after it belongs to that script.
+                return None
+            if token in ("-W", "-X", "--check-hash-based-pycs"):
+                # These take their value in the next token, which is not an operand.
+                position += 2
+                continue
             if token == "-c" and position + 1 < len(tokens):
                 return tokens[position + 1]
             if (
@@ -6645,6 +7036,7 @@ def _script_command_source(code: str) -> str | None:
                 if rest.lstrip("-") == rest:
                     return rest
                 return tokens[position + 1] if position + 1 < len(tokens) else None
+            position += 1
         return None
     return None
 
@@ -7350,7 +7742,18 @@ def main() -> int:
         return 0
 
     allowlist = load_allowlist()
-    unreviewed = [f for f in findings if key_of(f) not in allowlist]
+    # The recorded KIND has to still match as well as the key. The key hashes the sink
+    # call itself, which is what makes editing that call force a re-review - but a
+    # finding whose source is built in the statements ABOVE it keeps the same call
+    # text, so a change to how the source is built would inherit the old approval
+    # silently. When such a change alters the shape at all, it alters the reason, and
+    # that is now a mismatch rather than a match. Entries written before `kind` was
+    # recorded carry none, and those still match on the key alone.
+    unreviewed = [
+        f for f in findings
+        if key_of(f) not in allowlist
+        or allowlist[key_of(f)].get("kind", f["reason"]) != f["reason"]
+    ]
     pending = [
         entry
         for entry in allowlist.values()
