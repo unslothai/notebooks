@@ -1060,7 +1060,10 @@ def _inherits_text(definition: ast.ClassDef, seen = None) -> bool:
     seen = seen if seen is not None else set()
     for base in definition.bases:
         if not isinstance(base, ast.Name):
-            continue
+            # `class Safe(Namespace.Base)` names a base this cannot resolve, and that
+            # base may itself subclass `str`. Unknown counts as textual, which is the
+            # reporting side and the same answer a base from another module gets.
+            return True
         if base.id in ("str", "bytes"):
             return True
         if base.id in seen:
@@ -1768,7 +1771,18 @@ def _interpolated_call(node, resolve = None, shadowed = None, resolve_alias = No
             low, high = _NORMALISER_ARITY[function.attr]
             if unbound:
                 low, high = low + 1, high + 1
-            if not node.keywords and not low <= len(node.args) <= high:
+            spelled = [keyword.arg for keyword in node.keywords]
+            if None not in spelled:
+                # These parameters are positional-only, verified against CPython:
+                # every one of them raises "takes no keyword arguments" except
+                # `expandtabs`, which documents `tabsize`. So a keyword is a
+                # `TypeError` before the sink, and the call builds nothing.
+                allowed = {"tabsize"} if function.attr == "expandtabs" else set()
+                if set(spelled) - allowed:
+                    return None
+                if not low <= len(node.args) + len(spelled) <= high:
+                    return None
+            elif not node.keywords and not low <= len(node.args) <= high:
                 # The call raises before the sink runs.
                 return None
             if unbound:
@@ -2007,6 +2021,12 @@ def _replace_can_splice(node: ast.Call, template = None, offset: int = 0) -> boo
     reported on the receiver alone. Only a written-out argument answers here - a
     replacement this cannot read is assumed to splice, which is the reporting side.
     """
+    # `str.replace`'s parameters are positional-only, verified against CPython:
+    # `"X".replace(old = "X", new = name)` raises "takes no keyword arguments" before
+    # the sink. Reading those keywords as bound arguments reported a call that cannot
+    # run. A `**` this cannot read is still unknown and still splices.
+    if any(keyword.arg is not None for keyword in node.keywords):
+        return False
     # A search text that is visibly absent from a visible template replaces nothing:
     # `"pass".replace("MISSING", name)` executes the literal it started with.
     if template is None:
@@ -2457,7 +2477,12 @@ def _sink_name(function: ast.AST, aliases = None, shadowed = None) -> str | None
         # Only the operands that can still be the value: `(print or exec)(...)` calls
         # print, since a truthy literal ends the chain, and reporting the dead operand
         # failed the gate. Same rule the source side applies.
-        for value in _reachable_operands(function):
+        #
+        # And `and` hands back its LAST operand when the earlier ones are truthy, which
+        # a builtin function always is: `(compile and exec)(f"...")` calls `exec`.
+        # Reading the first resolved name gave `compile`, whose arity test then
+        # rejected the single argument and suppressed a real call.
+        for value in _boolop_candidates(function):
             resolved = _sink_name(value, aliases, shadowed)
             if resolved is not None:
                 return resolved
@@ -2671,6 +2696,17 @@ def _nullcontext_value(node: ast.AST, aliases = None, shadowed = None) -> ast.AS
             return None
         return node.args[0]
     return None
+
+
+def _boolop_candidates(node: ast.BoolOp) -> list:
+    """The operands a boolean callee may BE, most likely first.
+
+    `or` hands back the first truthy operand, so source order is right. `and` hands
+    back the last one when the earlier ones are truthy, and every builtin function is,
+    so the last operand is read first there.
+    """
+    operands = _reachable_operands(node)
+    return list(reversed(operands)) if isinstance(node.op, ast.And) else operands
 
 
 def _reachable_operands(node: ast.BoolOp) -> list:
@@ -3330,6 +3366,10 @@ class _Visitor(ast.NodeVisitor):
                 if isinstance(child, ast.Assign):
                     targets = child.targets
                 elif isinstance(child, ast.AnnAssign) and child.value is not None:
+                    targets = [child.target]
+                elif isinstance(child, ast.AugAssign):
+                    # `payload += f"import {name}"` puts built source in the name as
+                    # plainly as `=` does, and a deferred body reads the cell after it.
                     targets = [child.target]
                 else:
                     continue
@@ -6292,6 +6332,17 @@ class _Visitor(ast.NodeVisitor):
             length = _visible_length(extra)
             if length is not None:
                 reach = min(reach, length)
+        if sink.rpartition(".")[2] == "compile" and len(inner.args) > 3:
+            # `map(compile, sources, filenames, modes)` raises on the first mode
+            # `compile` refuses, and every later source is then never reached:
+            # `map(compile, ["pass", f"..."], [...], ["bad", "exec"])` compiles the
+            # literal and raises. Only written-out constant modes decide anything.
+            modes = self._literal_elements(inner.args[3])
+            for index, mode in enumerate(modes or ()):
+                if isinstance(mode, ast.Constant) and isinstance(mode.value, str):
+                    if mode.value not in ("exec", "eval", "single"):
+                        reach = min(reach, index)
+                        break
         if consumer:
             counted = _consumed_count(consumer, sink)
             if counted is not None:
@@ -7202,6 +7253,13 @@ def _script_command_source(code: str) -> str | None:
                 continue
             if token == "-c" and position + 1 < len(tokens):
                 return tokens[position + 1]
+            if token.startswith(("-W", "-X")) and len(token) > 2:
+                # `-Wignore::DeprecationWarning` attaches the value to the option, and
+                # the letters in that value are not flags: reading the `c` in
+                # `DeprecationWarning` as a bundled `-c` extracted `ationWarning` as
+                # the program, which parses as nothing and lost the real `-c` after it.
+                position += 1
+                continue
             if (
                 token.startswith("-")
                 and not token.startswith("--")

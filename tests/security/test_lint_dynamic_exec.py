@@ -194,6 +194,7 @@ def test_an_unjustified_allowlist_entry_fails(tmp_path):
 
 # The callee is written some other way and still resolves to the builtin.
 _SINK_IS_STILL_RESOLVED = {
+    'an and hands back its last operand': 'def f(name):\n    (compile and exec)(f"import {name}")\n',
     'a sink above the return still runs': 'def f(name):\n    exec(f"import {name}")\n    return\n',
     'next runs the callback on the first mapped element': 'def f(name):\n    next(map(exec, [f"import {name}"]))\n',
     'a lambda hands the sink itself back': 'def f(name):\n    (lambda run: run)(exec)(f"import {name}")\n',
@@ -301,6 +302,7 @@ def test_a_text_constructor_reached_through_another_spelling_is_reported(descrip
 
 # The built string survives a lookup, an operator, a wrapper or a spread.
 _SOURCE_SURVIVES_THE_SHAPE = {
+    'a base this file cannot resolve may still be textual': 'class Namespace:\n    class Base(str):\n        pass\nclass Safe(Namespace.Base):\n    pass\ndef f(name):\n    exec(Safe("import {}").format(name))\n',
     'a visible local helper hands back what it built': 'def build(name):\n    return f"import {name}"\ndef f(name):\n    exec(build(name))\n',
     'a class attribute outlives the class body': 'class C:\n    payload = None\ndef f(name):\n    C.payload = f"import {name}"\n    exec(C.payload)\n',
     'a bound replace keeps its template': 'def f(name):\n    replace = "import MODULE".replace\n    exec(replace("MODULE", name))\n',
@@ -382,6 +384,7 @@ def test_a_source_that_survives_its_wrapper_is_reported(description, tmp_path):
 
 # One level of local indirection: an alias of a name that holds a built string.
 _TAINT_TRAVELS_THROUGH_A_BINDING = {
+    'an augmented write below the def is read by the closure': 'def f(name):\n    payload = "pass\\n"\n    def inner():\n        exec(payload)\n    payload += f"import {name}"\n    inner()\n',
     'enumerate over a written-out list still pairs its elements': 'def f(name):\n    for _, payload in enumerate([f"import {name}"]):\n        exec(payload)\n',
     'an iter around a written-out list still yields its elements': 'def f(name):\n    for payload in iter([f"import {name}"]):\n        exec(payload)\n',
     'a global declaration leaves the name in the enclosing scope': 'payload = f"import {name}"\ndef f():\n    global payload\n    exec(payload)\n    payload = "pass"\nf()\n',
@@ -423,6 +426,9 @@ def test_taint_carried_through_a_binding_is_reported(description, tmp_path):
 
 # Shadowed, unreachable, unbound or unable to build a string at all.
 _NOTHING_REACHES_THE_SINK = {
+    'a normaliser given a keyword it does not take raises first': 'def f(name):\n    exec(f"import {name}".upper(foo = 1))\n',
+    'replace takes its arguments positionally only': 'def f(name):\n    exec("X".replace(old = "X", new = name))\n',
+    'a visibly invalid compile mode stops the map there': 'def f(name):\n    list(map(compile, ["pass", f"import {name}"], ["<x>", "<x>"], ["bad", "exec"]))\n',
     'join takes one iterable and raises on two': 'def f(name):\n    exec(",".join([f"import {name}"], []))\n',
     'format_map takes one mapping and raises on two': 'def f(name):\n    exec("import {name}".format_map({"name": name}, {}))\n',
     'a function body ends at an unconditional return': 'def f(name):\n    return\n    exec(f"import {name}")\n',
@@ -542,6 +548,7 @@ def test_code_that_cannot_execute_a_built_string_is_quiet(description, tmp_path)
 
 # A magic or interpreter invocation that really does execute the cell body.
 _NOTEBOOK_RUNS_PYTHON = {
+    'an attached warning option is not a bundled -c': '{"cells": [{"cell_type": "code", "metadata": {}, "outputs": [], "execution_count": null, "source": "%%script python -Wignore::DeprecationWarning -c \\"name=input(); exec(f\'import {name}\')\\"\\n"}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'an unrecognised automagic does not hide the rest of the cell': '{"cells": [{"cell_type": "code", "metadata": {}, "source": "pip install requests\\nname = input()\\nexec(f\\"import {name}\\")\\n", "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'an interactive command still reads the cell body': '{"cells": [{"cell_type": "code", "metadata": {}, "source": ["%%script python -i -c \\"pass\\"\\n", "exec(f\\"import {name}\\")\\n"], "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
     'a shell escape running python -c carries a program': '{"cells": [{"cell_type": "code", "source": "!python -c \'name=input(); exec(f\\"import {name}\\")\'\\n", "metadata": {}, "outputs": [], "execution_count": null}], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}',
