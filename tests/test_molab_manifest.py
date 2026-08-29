@@ -14,10 +14,9 @@
 """Manifest integrity gate (AC1 — updated for broad-catalog scope).
 
 Verifies that MOLAB_NOTEBOOKS is a materialized, explicit allowlist:
-- Covers every ``original_template/*.ipynb`` EXCEPT the three excluded families:
-  AMD- prefixed, Kaggle- prefixed, and HF-course duplicates.  GRPO/vLLM, A100/DGX,
-  vision/audio, GGUF-export and all other "heavy" families are now IN scope.
-- EXCLUSION_REASONS exists and covers at minimum the three truly excluded families.
+- Covers every ``original_template/*.ipynb`` except the excluded families and
+  the explicit Unsloth Studio policy exclusion.
+- EXCLUSION_REASONS documents the required exclusions.
 - Every entry carries all required fields with sensible values.
 - No entry carries ``wasm_compatible=True`` without an explicit proof in notes.
 - Every entry's ``source`` template actually exists on disk.
@@ -41,7 +40,7 @@ import molab_manifest as mm  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Truly excluded families (SCOPE CHANGE 2026-05-22: only these three)
+# Excluded families and explicit policy exclusions
 # ---------------------------------------------------------------------------
 
 # Patterns that flag a notebook stem as belonging to a TRULY excluded family.
@@ -53,10 +52,11 @@ _EXCLUDED_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # name; the real files use a space ("HuggingFace Course-*"), so allow any
     # separator between the two words.
     ("hf_course", re.compile(r"hf[\s_-]course|huggingface[\s_-]course", re.IGNORECASE)),
+    ("studio", re.compile(r"^Unsloth_Studio$")),
 ]
 
 # Minimum set of family tags that MUST appear in EXCLUSION_REASONS.
-_REQUIRED_EXCLUSION_KEYS = {"amd", "kaggle", "hf_course"}
+_REQUIRED_EXCLUSION_KEYS = {"amd", "kaggle", "hf_course", "studio"}
 
 
 # ---------------------------------------------------------------------------
@@ -73,14 +73,14 @@ def test_exclusion_reasons_is_non_empty() -> None:
 
 
 def test_exclusion_reasons_covers_required_families() -> None:
-    """EXCLUSION_REASONS must cover the three truly excluded families (AC1).
+    """EXCLUSION_REASONS must cover every required exclusion (AC1).
 
     GRPO, vLLM, A100/DGX, vision/audio, and GGUF-export are now IN scope;
     they no longer need to appear in EXCLUSION_REASONS."""
     missing = _REQUIRED_EXCLUSION_KEYS - set(mm.EXCLUSION_REASONS)
     assert not missing, (
         f"EXCLUSION_REASONS is missing required family tags: {sorted(missing)}. "
-        "Add entries for 'amd', 'kaggle', 'hf_course' to scripts/molab_manifest.py."
+        "Add the missing entries to scripts/molab_manifest.py."
     )
 
 
@@ -278,13 +278,13 @@ def test_no_duplicate_source_paths() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Parametrised: entries with AMD-/Kaggle-/HF-course stems must not appear
+# Parametrised: excluded families and Studio must not appear
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("nb", mm.MOLAB_NOTEBOOKS, ids=lambda nb: nb.source.stem)
 def test_entry_not_in_truly_excluded_family(nb: mm.MolabNotebook) -> None:
-    """Manifest entries whose source stem matches AMD-, Kaggle-, or HF-course
+    """Manifest entries matching a family or policy exclusion
     must NOT appear at all.  These are never generated; skip/notes does not
     make them acceptable in this list — remove them entirely (AC1)."""
     stem = nb.source.stem
@@ -293,7 +293,7 @@ def test_entry_not_in_truly_excluded_family(nb: mm.MolabNotebook) -> None:
             pytest.fail(
                 f"MANIFEST VIOLATION: {stem} matches the truly-excluded family "
                 f"'{family_tag}' (pattern: {pattern.pattern}). "
-                "AMD-, Kaggle-, and HF-course notebooks are never generated for molab. "
+                "Excluded notebooks are never generated for molab. "
                 "Remove this entry from MOLAB_NOTEBOOKS entirely. "
                 f"Reason: EXCLUSION_REASONS['{family_tag}'] = "
                 f"{mm.EXCLUSION_REASONS.get(family_tag, 'no entry found')!r}"
