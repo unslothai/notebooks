@@ -27,12 +27,14 @@ record per included notebook.  Add a new template and it shows up in
 the catalog the next time the generator runs.  The AMD, Kaggle, and
 python_scripts generators work the same way.
 
-Four families are filtered out:
+Five exclusions are filtered out:
 
 - ``AMD-`` prefixed.  Different ROCm install stack, has its own generator.
 - ``Kaggle-`` prefixed.  Environment-specific, relies on Kaggle's
   secret/credential model.
 - ``hf_course``.  Hugging Face course duplicates, not Unsloth-authored.
+- ``Unsloth_Studio``.  Studio launches a separate web UI and exposes molab
+  compute through a public tunnel, which molab's usage policy prohibits.
 - ``vllm``-pulling notebooks (content-based, not stem-prefix).  vllm's
   dep tree has many version-specific torch hard-pins and historically
   cp313-only abi3 wheels; uv on hosted molab silently aborts the
@@ -42,10 +44,11 @@ Four families are filtered out:
   are unaffected — they continue to ship via the Colab/Kaggle/AMD
   generators.
 
-No per-notebook skip list
-=========================
+One policy exclusion
+====================
 
-Every entry has to generate.  When a source notebook hits an edge case
+Every entry other than the explicit Studio policy exclusion has to generate.
+When a source notebook hits an edge case
 (duplicate imports, runtime clones, etc.) the fix goes into
 ``scripts/molab_generate.py``'s post-pass, not into a skip list here.
 ``test_committed_molab_file_exists`` hard-fails if an active entry has
@@ -105,6 +108,11 @@ EXCLUSION_REASONS: dict[str, str] = {
         "with a space) are not Unsloth-authored content; their spaced filenames "
         "also produce broken molab links."
     ),
+    "studio": (
+        "Unsloth Studio launches a separate web interface and exposes molab "
+        "compute through a public tunnel, which molab's usage policy prohibits. "
+        "The Colab, Kaggle, AMD, and local Studio notebooks are unaffected."
+    ),
     "vllm": (
         "Notebooks whose install cells pull in vllm are excluded from the molab "
         "catalog: vllm's dep tree (torch==, xformers==, flashinfer-python==) "
@@ -115,6 +123,8 @@ EXCLUSION_REASONS: dict[str, str] = {
         "generators."
     ),
 }
+
+_POLICY_EXCLUDED_STEMS: frozenset[str] = frozenset({"Unsloth_Studio"})
 
 # ---------------------------------------------------------------------------
 # Support tier and runtime-proof status types
@@ -205,6 +215,8 @@ def _is_excluded(stem: str) -> bool:
     also appear as ``hf_course`` / ``hf-course`` / ``huggingface_course``, so
     match any separator. The space variant ships broken molab links (spaces in
     the URL), so it must be caught here."""
+    if stem in _POLICY_EXCLUDED_STEMS:
+        return True
     if stem.startswith("AMD-") or stem.startswith("Kaggle-"):
         return True
     if re.search(r"hf[\s_-]course|huggingface[\s_-]course", stem, re.IGNORECASE):
@@ -270,14 +282,16 @@ def _scan_manifest() -> list[MolabNotebook]:
         families) that are shipped to users via ``nb/`` directly.
 
     Filtered out: ``AMD-`` and ``Kaggle-`` prefixed variants in either
-    directory (they have their own generators), and HF-course duplicates.
+    directory (they have their own generators), HF-course duplicates, and
+    the explicit Unsloth Studio policy exclusion.
 
     EVERY non-excluded notebook is included with ``skip=False``.  The molab
     generator is expected to handle every catalog entry — when a source
     notebook hits an edge case (duplicate imports, runtime clones, etc.)
     the fix belongs in ``scripts/molab_generate.py``'s post-pass, not in a
-    per-notebook skip list.  ``test_committed_molab_file_exists`` will
-    hard-fail on any active entry that does not produce a ``molab/*.py``.
+    additional per-notebook skip list.
+    ``test_committed_molab_file_exists`` will hard-fail on any active entry
+    that does not produce a ``molab/*.py``.
 
     Output is sorted alphabetically by ``output.stem`` so manifest order
     and downstream README badge ordering are stable across runs.

@@ -738,12 +738,12 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 
 | Model | Type | Notebook |
 | --- | --- | --- |
-| **Unsloth Studio** | Chat UI | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Unsloth_Studio.py) |
 | **Gemma4** **(E2B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Vision.py) |
 | **Qwen3 5** **(4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(4B)_Vision.py) |
 | **Qwen3 5** **(2B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(2B)_Vision.py) |
 | **gpt oss** **(20B)** | Fine Tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)-Fine-tuning.py) |
 | **gpt oss** **(20B)** | Auto Kernel Creation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)-GRPO.py) |
+| **Qwen3** **(14B)** | Reasoning Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B)-Reasoning-Conversational.py) |
 
 <details>
   <summary>
@@ -856,7 +856,6 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **Qwen3** **(0 6B)** | Phone Deployment | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(0_6B)-Phone_Deployment.py) |
 | **Qwen3** **(14B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B).py) |
 | **Qwen3** **(14B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B)-Alpaca.py) |
-| **Qwen3** **(14B)** | Reasoning Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B)-Reasoning-Conversational.py) |
 | **Qwen3** **(32B)** | Reasoning Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(32B)_A100-Reasoning-Conversational.py) |
 | **Qwen3** **(4B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)-Instruct.py) |
 | **Qwen3** **(4B)** | Thinking | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)-Thinking.py) |
