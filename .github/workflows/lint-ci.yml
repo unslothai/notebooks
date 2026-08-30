@@ -63,6 +63,12 @@ jobs:
             update_max_seq_length.py \
             scripts tests
 
+      - name: Dynamic-execution gate self-test
+        run: python scripts/lint_exec_literals.py --self-test
+
+      - name: No exec, eval or compile of a value that is not written out
+        run: python scripts/lint_exec_literals.py
+
       - name: No leftover debugger / pdb / breakpoint calls
         continue-on-error: true
         run: |
