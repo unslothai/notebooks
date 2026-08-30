@@ -68,12 +68,9 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://github.com/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+    Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 
-    <table><tr>
-    <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-    <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-    </tr></table>
+    <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
 
     Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 
@@ -142,7 +139,7 @@ def _(mo):
 
     Two things matter a lot for memory here:
 
-    * `offload_embedding = True` keeps `embed_tokens` in CPU RAM and only moves the looked-up rows to
+    * The embedding offload keeps `embed_tokens` in CPU RAM and only moves the looked-up rows to
       the GPU. Muse Glimmer's input embedding is 202048 x 6656 in 16-bit, so this gives back 2.5 GB at load
       time. There is a callback further down that keeps it that way once training starts.
     * The checkpoint is already 4-bit, and its own `quantization_config` is what transformers uses.
@@ -165,9 +162,6 @@ def _():
     model, tokenizer = FastModel.from_pretrained(
         model_name="unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",  # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length=max_seq_length,  # Muse Glimmer supports long context, but 1024 is what fits a small card
-        load_in_4bit=True,
-        full_finetuning=False,
-        offload_embedding=True,  # Moves the 2.5 GB input embedding to CPU RAM
     )
     return FastModel, max_seq_length, model, tokenizer, torch
 
@@ -494,7 +488,7 @@ def _(tokenizer, trainer_1):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    One more memory step. `offload_embedding = True` puts `embed_tokens` in CPU RAM at load time, but
+    One more memory step. The embedding offload puts `embed_tokens` in CPU RAM at load time, but
     the trainer moves the whole model onto the accelerator when `train()` starts, which quietly drags
     the 2.5 GB embedding back onto the GPU. The lookup hooks Unsloth installs read the weight's device
     live, so we can simply push it back to CPU once training has begun and it stays there.
@@ -588,14 +582,14 @@ def _(mo):
     | configuration | resident after load, GB | peak reserved while training, GB |
     |---|---|---|
     | no embedding offload | 20.72 | 24.14 |
-    | `offload_embedding = True` only | 18.22 | 24.14 |
-    | `offload_embedding = True` plus `KeepEmbeddingOffloaded` | 18.22 | **21.25** |
+    | embedding offload only | 18.22 | 24.14 |
+    | embedding offload plus `KeepEmbeddingOffloaded` | 18.22 | **21.25** |
 
     The 20.72 GB of resident weights break down as the 416 4-bit text linears (11.72 GB), the
     untied `embed_tokens` and `lm_head` at 2.5 GB each in 16-bit, and the vision tower with its
     adapter and projection (3.44 GB). Offloading `embed_tokens` removes one of those 2.5 GB blocks.
 
-    Note the middle row. `offload_embedding` on its own buys nothing at the peak, because the trainer
+    Note the middle row. The offload on its own buys nothing at the peak, because the trainer
     pulls the embedding back onto the GPU when training starts. Only the callback makes the saving
     survive into the training loop.
 
@@ -716,10 +710,7 @@ def _(TextStreamer, model_1, tokenizer):
         from unsloth import FastModel as _FastModel
 
         _model, _tokenizer = _FastModel.from_pretrained(
-            model_name="muse_glimmer_lora",  # YOUR MODEL YOU USED FOR TRAINING
-            max_seq_length=1024,  # Muse Glimmer supports long context, but 1024 is what fits a small card
-            load_in_4bit=True,
-            offload_embedding=True,  # Moves the 2.5 GB input embedding to CPU RAM
+            model_name="muse_glimmer_lora", max_seq_length=1024  # YOUR MODEL YOU USED FOR TRAINING
         )
     messages_3 = [
         {"role": "user", "content": "Describe a tall tower in the capital of France."}

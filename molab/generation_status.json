@@ -100,6 +100,7 @@
   "Qwen2.5_VL_(7B)-Vision": "ok",
   "Qwen2_(7B)-Alpaca": "ok",
   "Qwen2_VL_(7B)-Vision": "ok",
+  "Qwen3.8_(27B)-Conversational": "ok",
   "Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch": "ok",
   "Qwen3_(0_6B)-Phone_Deployment": "ok",
   "Qwen3_(14B)": "ok",

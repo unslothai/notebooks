@@ -68,12 +68,9 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://github.com/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+    Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 
-    <table><tr>
-    <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-    <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-    </tr></table>
+    <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
 
     Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 
@@ -140,7 +137,7 @@ def _(mo):
     | total | | **20.68 GiB** |
 
     The embeddings are 26% of that, and they are frozen during LoRA training, so we set
-    `offload_embedding = True`. That keeps `embed_tokens` in CPU RAM and moves only the looked-up
+    the embedding offload. That keeps `embed_tokens` in CPU RAM and moves only the looked-up
     rows to the GPU, which takes 2.5 GiB off the resident footprint. `lm_head` stays on the GPU
     because it is needed for every logit.
 
@@ -161,10 +158,7 @@ def _():
 
     model, processor = FastModel.from_pretrained(
         model_name="unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",  # The adapters you just saved
-        load_in_4bit=True,  # 4bit quantisation to reduce memory
         max_seq_length=max_seq_length,
-        use_gradient_checkpointing="unsloth",  # "unsloth" for long context
-        offload_embedding=True,  # Keeps the 202048 x 6656 embedding matrix in RAM
     )
     print(type(model).__name__, type(processor).__name__)
     return FastModel, max_seq_length, model, torch
@@ -660,10 +654,7 @@ def _(
         from unsloth import FastModel as _FastModel
 
         _model, _processor = _FastModel.from_pretrained(
-            model_name="muse_glimmer_lora",  # The adapters you just saved
-            load_in_4bit=True,  # 4bit quantisation to reduce memory
-            max_seq_length=1024,
-            offload_embedding=True,  # Keeps the 202048 x 6656 embedding matrix in RAM
+            model_name="muse_glimmer_lora", max_seq_length=1024  # The adapters you just saved
         )
     sample_2 = dataset[1]
     messages_3 = [
