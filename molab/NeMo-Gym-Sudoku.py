@@ -1,8 +1,20 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
+#     "accelerate",
+#     "bitsandbytes>=0.43.0",
+#     "datasets==4.3.0",
+#     "hf_transfer",
+#     "huggingface_hub>=0.34.0",
 #     "marimo",
 #     "omegaconf",
+#     "peft",
+#     "protobuf",
+#     "sentencepiece",
+#     "torchao>=0.16.0",
+#     "transformers==4.56.2",
+#     "triton>=3.2.0",
+#     "trl==0.22.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 # ]
@@ -66,17 +78,6 @@ def _(mo):
     ## Installation
     If you are using Google Colab, please visit [Unsloth installation docs](https://unsloth.ai/docs/get-started/install) rather than the pip install below.
     """)
-    return
-
-
-@app.cell
-def _():
-
-    # If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:
-    # !source /home/ubuntu/.venv/bin/activate
-    # !python -m ensurepip --upgrade
-    # !python -m pip install -U pip
-    # !python -m pip install -U "unsloth @ git+https://github.com/unslothai/unsloth"
     return
 
 
@@ -304,7 +305,7 @@ def _():
         requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout=2)
         print("NeMo Gym server already running on port 11000.")
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        _colab_flag = " +uv_pip_set_python=true"
+        _colab_flag = " +uv_pip_set_python=true" if _on_colab else ""
         print("Starting NeMo Gym server...")
         _ng_log = open(os.path.join(GYM_DIR, "ng_run.log"), "w")
         ng_process = subprocess.Popen(
@@ -448,12 +449,15 @@ def _(os, tokenizer):
                 tokenizer.apply_chat_template(
                     [{"role": "user", "content": task_prompt}],
                     add_generation_prompt=True,
+                    return_dict=False,
                 )
             )
             max_length_seen = max(max_length_seen, prompt_length)
     print(f"Loaded {len(train_data)} examples!\n\n")
     print(f"Example prompt:\n\n{train_data[0]['prompt'][0]['content']}")
-    train_dataset = Dataset.from_list(train_data)  # extract prompt from nemo gym format
+    train_dataset = Dataset.from_list(
+        train_data
+    )
     return max_length_seen, train_dataset
 
 
