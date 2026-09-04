@@ -33,13 +33,7 @@
 # In[ ]:
 
 
-get_ipython().system('pip install unsloth unsloth_zoo omegaconf')
-
-# If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:
-# !source /home/ubuntu/.venv/bin/activate
-# !python -m ensurepip --upgrade
-# !python -m pip install -U pip
-# !python -m pip install -U unsloth
+get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth omegaconf  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer omegaconf\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n\n# If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:\n# !source /home/ubuntu/.venv/bin/activate\n# !python -m ensurepip --upgrade\n# !python -m pip install -U pip\n# !python -m pip install -U unsloth\n')
 
 
 # # Load the model
@@ -240,7 +234,7 @@ try:
     requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2)
     print("NeMo Gym server already running on port 11000.")
 except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-    _colab_flag = " +uv_pip_set_python=true"
+    _colab_flag = " +uv_pip_set_python=true" if _on_colab else ""
     print("Starting NeMo Gym server...")
     _ng_log = open(os.path.join(GYM_DIR, "ng_run.log"), "w")
     ng_process = subprocess.Popen(
@@ -382,7 +376,13 @@ with open(dataset_path, "r") as f:
 
         prompt_length = len(
             tokenizer.apply_chat_template(
-                [{"role": "user", "content": task_prompt}], add_generation_prompt = True
+                [{"role": "user", "content": task_prompt}],
+                add_generation_prompt = True,
+                # transformers 5 flipped apply_chat_template's return_dict default from
+                # False to True. Without asking for the list explicitly, len() would count
+                # BatchEncoding keys (2) instead of tokens, and every prompt would be
+                # truncated to a few tokens.
+                return_dict = False,
             )
         )
         max_length_seen = max(max_length_seen, prompt_length)

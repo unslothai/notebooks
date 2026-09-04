@@ -262,7 +262,7 @@ try:
     requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2)
     print("NeMo Gym servers already running on port 11000.")
 except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-    _colab_flag = " +uv_pip_set_python=true"
+    _colab_flag = " +uv_pip_set_python=true" if _on_colab else ""
     print("Starting NeMo Gym servers...")
     _ng_log = open(os.path.join(GYM_DIR, "ng_run.log"), "w")
     ng_process = subprocess.Popen(
@@ -425,7 +425,13 @@ for dataset_path, server_name in dataset_configs:
 
         prompt_length = len(
             tokenizer.apply_chat_template(
-                [{"role": "user", "content": task_prompt}], add_generation_prompt = True
+                [{"role": "user", "content": task_prompt}],
+                add_generation_prompt = True,
+                # transformers 5 flipped apply_chat_template's return_dict default from
+                # False to True. Without asking for the list explicitly, len() would count
+                # BatchEncoding keys (2) instead of tokens, and every prompt would be
+                # truncated to a few tokens.
+                return_dict = False,
             )
         )
         max_length_seen = max(max_length_seen, prompt_length)
