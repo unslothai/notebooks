@@ -928,7 +928,12 @@ installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 installation_qwen3_8_content = update_or_append_pip_install(
     installation_content,
     "transformers",
-    "!pip install transformers==5.15.1",
+    # uv is not preinstalled on Colab and this block never needed it before, so the
+    # cleanup brings its own uv along; without it the uninstall is a silent no-op.
+    "!pip install transformers==5.15.1\n"
+    "# Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them\n"
+    "!pip install --upgrade -qqq uv\n"
+    "!uv pip uninstall -qqq flash-linear-attention fla-core",
 )
 # Written out rather than derived from installation_kaggle_content. That one opens
 # with `pip install torch torchvision torchaudio xformers --index-url .../cu128`,
@@ -3014,14 +3019,32 @@ _AMD_PIP_VALUE_FLAGS = {
 }
 
 _AMD_PRESERVE_SETUP_PREFIXES = (
-    # Carries the fla uninstall into AMD cells; the bare `!pip uninstall` lines stay dropped.
-    "!uv pip uninstall",
     "!git clone",
     "!rm -rf",
     "os.remove(",
     "sys.path.append(",
     "%env ",
 )
+
+# The one uninstall carried into AMD cells. Anything else `!uv pip uninstall`
+# removes is left to the source cell, since the extractor sees stripped lines and
+# would re-emit a conditional uninstall unconditionally after the ROCm bootstrap.
+_AMD_PRESERVE_UNINSTALL_PACKAGES = frozenset({"flash-linear-attention", "fla-core"})
+
+
+def _is_preserved_uninstall_line(raw_line):
+    """True for a column-zero `!uv pip uninstall` of exactly the fla packages."""
+    if raw_line != raw_line.lstrip():
+        return False
+    line = raw_line.strip()
+    if not line.startswith("!uv pip uninstall"):
+        return False
+    packages = [
+        token
+        for token in _split_pip_args(line[len("!uv pip uninstall"):])
+        if not token.startswith("-")
+    ]
+    return set(packages) == _AMD_PRESERVE_UNINSTALL_PACKAGES
 
 
 def _logical_install_lines(text):
@@ -3225,12 +3248,14 @@ def _extract_preserved_setup_lines(text):
         line = raw_line.strip()
         if not line:
             continue
-        if line.startswith(_AMD_PRESERVE_SETUP_PREFIXES):
+        if _is_preserved_uninstall_line(raw_line):
             # AMD pip calls run --system (no venv in the ROCm images); this line skips _format_amd_pip_call.
-            if line.startswith("!uv pip uninstall") and "--system" not in line:
+            if "--system" not in _split_pip_args(line):
                 line = line.replace(
                     "!uv pip uninstall", "!uv pip uninstall --system", 1
                 )
+            preserved.append(line)
+        elif line.startswith(_AMD_PRESERVE_SETUP_PREFIXES):
             preserved.append(line)
         elif line.startswith('os.environ["FLA_TILELANG"]'):
             # Leftover from the removed TileLang install; unsloth_zoo sets it itself.

@@ -302,6 +302,12 @@ jobs:
         run: |
           python -m pytest tests/test_amd_templated_kernel_pins.py -q --tb=short
 
+      - name: tests/test_amd_preserved_setup_lines.py
+        # Only the fla cleanup line crosses into an AMD setup block, and it
+        # carries --system exactly once.
+        run: |
+          python -m pytest tests/test_amd_preserved_setup_lines.py -q --tb=short
+
       - name: tests/test_molab_marimo_validity.py
         run: |
           python -m pytest tests/test_molab_marimo_validity.py -q --tb=short
