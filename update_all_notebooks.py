@@ -904,37 +904,25 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install --upgrade --no-deps "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 !uv pip install transformers==5.2.0
 # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
-!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
-import torch
-if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
-    !uv pip install --no-deps "apache-tvm-ffi==0.1.9" "tilelang==0.1.8"
-else:
-    os.environ["FLA_TILELANG"] = "0"
+!uv pip install --no-build-isolation causal_conv1d==1.6.0
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
-# Qwen3.8 is a `qwen3_5` checkpoint but does NOT reuse the block above, for two
-# reasons that both cost a Kaggle kernel real time.
+# Qwen3.8 is a `qwen3_5` checkpoint but does NOT reuse the block above.
 #
-# 1. No `flash-linear-attention` from PyPI. Unsloth Zoo vendors an fla snapshot
-#    (0.5.1) and injects it as a real top-level `fla`, but its selection rule
-#    defers to a user install that is *strictly newer* -- and PyPI is on 0.5.2.
-#    Installing it therefore shadows the vendored kernels with the ones that do
-#    not carry Unsloth's post-0.5.1 backports. Leaving it out is what keeps the
-#    vendored copy live; `is_flash_linear_attention_available()` is true either
-#    way, so the notebook asserts on which copy answered, not merely that one did.
-# 2. No `causal_conv1d`. Its wheels track one exact torch, so on any other torch
-#    the cell builds from source for ~10 minutes. transformers falls back to a
-#    plain conv1d for the gated delta net's depthwise convolution, which is a
-#    small part of the step -- the measured numbers in the notebook were taken
-#    without it.
+# No `causal_conv1d`. Its wheels track one exact torch, so on any other torch
+# the cell builds from source for ~10 minutes, which costs a Kaggle kernel real
+# time. transformers falls back to a plain conv1d for the gated delta net's
+# depthwise convolution, which is a small part of the step -- the measured
+# numbers in the notebook were taken without it.
 #
 # transformers 5.15.1 rather than the 5.2.0 the Qwen3.5 block pins: that is the
 # release this notebook was actually run against end to end. Note the two are not
-# equivalent for fla. 5.2.0 does `from fla.ops.gated_delta_rule import ...` at
-# module scope, which Unsloth's vendor patch can rebind; 5.15.x resolves the
-# kernels through `use_kernel_func_from_hub_with_fallback` at import time instead.
+# equivalent for the gated delta net kernels. 5.2.0 does
+# `from fla.ops.gated_delta_rule import ...` at module scope, which Unsloth's
+# vendor patch can rebind; 5.15.x resolves the kernels through
+# `use_kernel_func_from_hub_with_fallback` at import time instead.
 installation_qwen3_8_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -945,10 +933,6 @@ installation_qwen3_8_content = update_or_append_pip_install(
 # which replaces Kaggle's entire preinstalled torch stack; on a T4 x2 kernel that
 # spent 20 minutes and then left `import unsloth` failing. The GRPO Kaggle
 # notebooks use uv and leave Kaggle's torch alone, which is what works there.
-#
-# flash-linear-attention is deliberately absent: unsloth_zoo vendors 0.5.1 and
-# injects it as a real top-level `fla`, and a pip copy would shadow the vendored
-# one. Pip installing it is how you end up NOT running the vendored kernels.
 installation_qwen3_8_kaggle_content = """%%capture
 import os
 
@@ -1989,7 +1973,7 @@ def validate_notebook_syntax(notebook_path):
 _RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
 _RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
 # A heading introducing a dependency install, e.g. "### Install
-# flash-linear-attention". Not `_RE_INSTALL_SECTION_MD`, which also matches
+# causal-conv-1d". Not `_RE_INSTALL_SECTION_MD`, which also matches
 # "setup" anywhere in the line and so accepts "### Setup the model".
 _RE_DEPENDENCY_HEADING = re.compile(r"^#+\s*(?:\d+[.)]\s*)?install", re.IGNORECASE)
 
@@ -2186,9 +2170,9 @@ def _adjacent_install_like_code_cells(cells, first_code_idx):
 
     Stopping at the first non-code cell missed a second install cell behind its
     own heading: Qwen3_5_MoE / Qwen3_6_MoE hid a CUDA-wheel resolver behind
-    "### Install flash-linear-attention and causal-conv-1d", which survived into
-    the AMD variant and made `_assert_amd_install_runtime` refuse the whole
-    `--amd` run. The heading comes back too, or it would point at nothing.
+    "### Install causal-conv-1d", which survived into the AMD variant and made
+    `_assert_amd_install_runtime` refuse the whole `--amd` run. The heading
+    comes back too, or it would point at nothing.
     """
     install_cells = []
     idx = first_code_idx + 1
@@ -3002,6 +2986,11 @@ _AMD_INSTALL_PACKAGE_IGNORE = frozenset({
     # NVIDIA/Hopper TileLang backend deps; do not auto-propagate into ROCm
     # AMD notebooks. AMD users get a separate ROCm install path or skip.
     "apache_tvm_ffi", "apache-tvm-ffi", "tilelang", "torch_c_dlpack_ext",
+    # The gated delta net kernels ship inside unsloth_zoo, which shadows a pip
+    # fla, so an AMD cell must never carry one forward from its own previous
+    # revision: the composer re-reads the committed AMD install cell as a
+    # source, so anything left there reinstalls itself on every regeneration.
+    "flash_linear_attention", "flash-linear-attention", "fla_core", "fla-core",
 })
 
 _AMD_VARIABLE_PACKAGE_FALLBACKS = {
@@ -3237,6 +3226,11 @@ def _extract_preserved_setup_lines(text):
             continue
         if line.startswith(_AMD_PRESERVE_SETUP_PREFIXES):
             preserved.append(line)
+        elif line.startswith('os.environ["FLA_TILELANG"]'):
+            # Left over from the removed TileLang install. unsloth_zoo's
+            # vendored fla sets this itself, and carrying it forward is the
+            # only thing that keeps it alive across regenerations.
+            continue
         elif line.startswith("os.environ["):
             preserved.append(line)
         elif "torch._dynamo.config.recompile_limit" in line:
@@ -4889,9 +4883,9 @@ def update_notebook_sections(
                                 installation = installation_qwen3_vl_content
                                 
                         # Qwen3.5 / Qwen3.6 INSTALLATION (must come after Qwen3VL).
-                        # Match the inconsistently-named variants too. Qwen3.6 also
-                        # needs flash-linear-attention + causal_conv1d + tilelang so
-                        # we route both families through the same install block.
+                        # Match the inconsistently-named variants too. Qwen3.6 needs
+                        # the same causal_conv1d build as Qwen3.5, so we route both
+                        # families through the same install block.
                         if is_path_contains_any(
                             notebook_path.lower(),
                             ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6"],
@@ -4956,12 +4950,12 @@ def update_notebook_sections(
                             ):
                                 source_install_texts.append(installation_extra_grpo_content)
                             if is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
-                                # AMD path: only the FLA + causal_conv1d kernels
-                                # are propagated. tilelang has no ROCm wheel
-                                # (and apache-tvm-ffi is CUDA-only), so they
-                                # stay filtered out via _AMD_INSTALL_PACKAGE_IGNORE.
+                                # AMD path: causal_conv1d is the only kernel
+                                # package propagated. The gated delta net
+                                # kernels ship inside unsloth_zoo, so nothing
+                                # else has to be built here.
                                 source_install_texts.append(
-                                    "!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0"
+                                    "!uv pip install --no-build-isolation causal_conv1d==1.6.0"
                                 )
                             installation, amd_extras_cell_text = _compose_amd_installation(
                                 notebook_path, source_install_texts
@@ -5037,7 +5031,7 @@ def update_notebook_sections(
                     if (
                         cell_index > 0
                         and notebook_content["cells"][cell_index - 1].get("cell_type") == "markdown"
-                        and "flash-linear-attention" in _cell_source_text(notebook_content["cells"][cell_index - 1]).lower()
+                        and "causal-conv-1d" in _cell_source_text(notebook_content["cells"][cell_index - 1]).lower()
                     ):
                         remove_indices.add(cell_index - 1)
             if remove_indices:

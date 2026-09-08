@@ -1,12 +1,9 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
-#     "apache-tvm-ffi==0.1.9",
 #     "bitsandbytes>=0.43.0",
 #     "causal_conv1d==1.6.0",
-#     "flash-linear-attention",
 #     "marimo",
-#     "tilelang==0.1.8",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch==2.8.0",
 #     "torchao>=0.16.0",

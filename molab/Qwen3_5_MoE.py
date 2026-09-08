@@ -1,12 +1,9 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
-#     "apache-tvm-ffi==0.1.9",
 #     "bitsandbytes>=0.43.0",
 #     "causal_conv1d==1.6.0",
-#     "flash-linear-attention",
 #     "marimo",
-#     "tilelang==0.1.8",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch",
 #     "torchao>=0.16.0",
@@ -89,7 +86,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Install flash-linear-attention and causal-conv-1d
+    ### Install causal-conv-1d
     """)
     return
 
@@ -98,6 +95,9 @@ def _(mo):
 def _():
     import subprocess
     import subprocess
+
+    # Unsloth bundles the gated delta net kernels, so flash-linear-attention does
+    # not need to be installed here.
     import json, platform, sys, torch
     from urllib.request import urlopen
 
@@ -139,12 +139,8 @@ def _():
         print(
             f"No prebuilt causal-conv1d wheel for torch {torch.__version__}/cu{cu}/{py}/abi{abi}, skipping it."
         )
-    fla = (
-        find("fla-org/flash-linear-attention", "v0.4.2", lambda n: n.endswith(whl))
-        or "https://github.com/fla-org/flash-linear-attention/archive/refs/tags/v0.4.2.tar.gz"
-    )
-    wheels = " ".join(f'"{w}"' for w in (cc1d, fla) if w)
-    #! pip uninstall -y sentence-transformers torchcodec
+
+    wheels = " ".join(f'"{w}"' for w in (cc1d,) if w)
     subprocess.call(["pip", "uninstall", "-y", "sentence-transformers", "torchcodec"])
     # torchcodec import broken on molab
     return (torch,)

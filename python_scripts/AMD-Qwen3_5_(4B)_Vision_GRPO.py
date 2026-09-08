@@ -41,12 +41,11 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 
-os.environ["FLA_TILELANG"] = "0"
 get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 get_ipython().system('uv pip install --system -qqq --no-deps "torchcodec==0.7.0"')
 get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 get_ipython().system('uv pip install --system -qqq "transformers==5.2.0" vllm')
-get_ipython().system('uv pip install --system -qqq --no-build-isolation flash-linear-attention "causal_conv1d==1.6.0"')
+get_ipython().system('uv pip install --system -qqq --no-build-isolation "causal_conv1d==1.6.0"')
 
 
 # We're also introducing how you can do `GSPO` inside of Unsloth as well!
