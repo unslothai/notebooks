@@ -39,6 +39,7 @@
 # # In[ ]:
 # 
 # 
+# get_ipython().system('uv pip uninstall --system -qqq flash-linear-attention fla-core')
 # get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 # get_ipython().system('uv pip install --system -qqq --no-deps "torchcodec==0.7.0"')
 # get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')

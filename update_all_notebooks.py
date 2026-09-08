@@ -903,6 +903,8 @@ elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 !uv pip install transformers==5.2.0
+# Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them
+!uv pip uninstall -qqq flash-linear-attention fla-core
 # causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
 !uv pip install --no-build-isolation causal_conv1d==1.6.0
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
@@ -3015,6 +3017,15 @@ _AMD_PIP_VALUE_FLAGS = {
 }
 
 _AMD_PRESERVE_SETUP_PREFIXES = (
+    # An `!uv pip uninstall` is the one non-install command a source install
+    # cell can carry that the AMD cell still needs: the composer only ever
+    # extracts install groups, so without this the line is dropped and a ROCm
+    # runtime that already has a pip flash-linear-attention keeps shadowing the
+    # kernels vendored in unsloth_zoo. Spelled with the `uv` prefix on purpose,
+    # so the older bare `!pip uninstall unsloth -y` in Falcon-H1 and the
+    # `!pip uninstall -y sentence-transformers torchcodec` in the Qwen3.5 wheel
+    # resolver keep their existing (dropped) behaviour.
+    "!uv pip uninstall",
     "!git clone",
     "!rm -rf",
     "os.remove(",
@@ -3225,6 +3236,15 @@ def _extract_preserved_setup_lines(text):
         if not line:
             continue
         if line.startswith(_AMD_PRESERVE_SETUP_PREFIXES):
+            # Every pip command the AMD cells emit carries --system, because
+            # the ROCm images run uv against the container interpreter with no
+            # virtualenv in sight and uv refuses to touch it otherwise. A
+            # preserved uninstall is the one pip line that does not go through
+            # _format_amd_pip_call, so give it the same flag here.
+            if line.startswith("!uv pip uninstall") and "--system" not in line:
+                line = line.replace(
+                    "!uv pip uninstall", "!uv pip uninstall --system", 1
+                )
             preserved.append(line)
         elif line.startswith('os.environ["FLA_TILELANG"]'):
             # Left over from the removed TileLang install. unsloth_zoo's

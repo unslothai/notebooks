@@ -40,6 +40,13 @@ def _():
     return (mo,)
 
 
+@app.cell
+def _():
+    import subprocess
+
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
