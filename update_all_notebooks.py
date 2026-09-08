@@ -2988,10 +2988,7 @@ _AMD_INSTALL_PACKAGE_IGNORE = frozenset({
     # NVIDIA/Hopper TileLang backend deps; do not auto-propagate into ROCm
     # AMD notebooks. AMD users get a separate ROCm install path or skip.
     "apache_tvm_ffi", "apache-tvm-ffi", "tilelang", "torch_c_dlpack_ext",
-    # The gated delta net kernels ship inside unsloth_zoo, which shadows a pip
-    # fla, so an AMD cell must never carry one forward from its own previous
-    # revision: the composer re-reads the committed AMD install cell as a
-    # source, so anything left there reinstalls itself on every regeneration.
+    # unsloth_zoo vendors the fla kernels; without this the committed AMD cell re-seeds the install.
     "flash_linear_attention", "flash-linear-attention", "fla_core", "fla-core",
 })
 
@@ -3017,14 +3014,7 @@ _AMD_PIP_VALUE_FLAGS = {
 }
 
 _AMD_PRESERVE_SETUP_PREFIXES = (
-    # An `!uv pip uninstall` is the one non-install command a source install
-    # cell can carry that the AMD cell still needs: the composer only ever
-    # extracts install groups, so without this the line is dropped and a ROCm
-    # runtime that already has a pip flash-linear-attention keeps shadowing the
-    # kernels vendored in unsloth_zoo. Spelled with the `uv` prefix on purpose,
-    # so the older bare `!pip uninstall unsloth -y` in Falcon-H1 and the
-    # `!pip uninstall -y sentence-transformers torchcodec` in the Qwen3.5 wheel
-    # resolver keep their existing (dropped) behaviour.
+    # Carries the fla uninstall into AMD cells; the bare `!pip uninstall` lines stay dropped.
     "!uv pip uninstall",
     "!git clone",
     "!rm -rf",
@@ -3236,20 +3226,14 @@ def _extract_preserved_setup_lines(text):
         if not line:
             continue
         if line.startswith(_AMD_PRESERVE_SETUP_PREFIXES):
-            # Every pip command the AMD cells emit carries --system, because
-            # the ROCm images run uv against the container interpreter with no
-            # virtualenv in sight and uv refuses to touch it otherwise. A
-            # preserved uninstall is the one pip line that does not go through
-            # _format_amd_pip_call, so give it the same flag here.
+            # AMD pip calls run --system (no venv in the ROCm images); this line skips _format_amd_pip_call.
             if line.startswith("!uv pip uninstall") and "--system" not in line:
                 line = line.replace(
                     "!uv pip uninstall", "!uv pip uninstall --system", 1
                 )
             preserved.append(line)
         elif line.startswith('os.environ["FLA_TILELANG"]'):
-            # Left over from the removed TileLang install. unsloth_zoo's
-            # vendored fla sets this itself, and carrying it forward is the
-            # only thing that keeps it alive across regenerations.
+            # Leftover from the removed TileLang install; unsloth_zoo sets it itself.
             continue
         elif line.startswith("os.environ["):
             preserved.append(line)
