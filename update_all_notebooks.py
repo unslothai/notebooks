@@ -115,6 +115,13 @@ PIN_TOKENIZERS_SPEC = "tokenizers>=0.22.0,<=0.23.0"
 PIN_TOKENIZERS = f'!pip install --no-deps "{PIN_TOKENIZERS_SPEC}"'
 UV_PIN_TOKENIZERS = PIN_TOKENIZERS.replace("pip", "uv pip")
 
+# The TTS codec sources are cloned and imported, so an unpinned clone runs
+# whatever upstream's default branch holds on the day the notebook is opened.
+# These are the same revisions Unsloth Studio pins, so a notebook and Studio
+# import identical codec code.
+PIN_SPARK_TTS_REF = "2f1ea9082400547242641f5271b6f941c9f439d1"
+PIN_OUTETTS_REF = "f5eac6e70d792844c6a6959d900a47af2c061a5b"
+
 SPACES = " " * 4
 
 XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
@@ -505,9 +512,9 @@ installation_orpheus_kaggle_content = installation_kaggle_content + """\n!pip in
 installation_whisper_content = installation_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
 installation_whisper_kaggle_content = installation_kaggle_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
-installation_spark_content = installation_content + """\n!git clone https://github.com/SparkAudio/Spark-TTS
+installation_spark_content = installation_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
-installation_spark_kaggle_content = installation_kaggle_content + """\n!git clone https://github.com/SparkAudio/Spark-TTS
+installation_spark_kaggle_content = installation_kaggle_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 installation_gpt_oss_content = r"""%%capture
@@ -539,8 +546,8 @@ elif importlib.util.find_spec("unsloth") is None:
 
 installation_gpt_oss_kaggle_content = installation_gpt_oss_content
 
-installation_oute_content = installation_content + """\n!pip install omegaconf einx
-!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
+installation_oute_content = installation_content + f"""\n!pip install omegaconf einx
+!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS && git -C OuteTTS checkout --quiet {PIN_OUTETTS_REF}
 import os
 os.remove("OuteTTS/outetts/models/gguf_model.py")
 os.remove("OuteTTS/outetts/interface.py")
@@ -549,8 +556,8 @@ os.remove("OuteTTS/outetts/__init__.py")
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
-installation_oute_kaggle_content = installation_kaggle_content + """\n!pip install omegaconf einx
-!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
+installation_oute_kaggle_content = installation_kaggle_content + f"""\n!pip install omegaconf einx
+!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS && git -C OuteTTS checkout --quiet {PIN_OUTETTS_REF}
 import os
 os.remove("OuteTTS/outetts/models/gguf_model.py")
 os.remove("OuteTTS/outetts/interface.py")
