@@ -40,7 +40,7 @@
 # 
 # 
 # import os
-# get_ipython().system('rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS')
+# get_ipython().system('rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS && git -C OuteTTS checkout --quiet f5eac6e70d792844c6a6959d900a47af2c061a5b')
 # os.remove("OuteTTS/outetts/models/gguf_model.py")
 # os.remove("OuteTTS/outetts/interface.py")
 # os.remove("OuteTTS/outetts/__init__.py")
