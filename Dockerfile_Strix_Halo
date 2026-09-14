@@ -1,11 +1,7 @@
 FROM rocm/pytorch:rocm6.4.4_ubuntu24.04_py3.12_pytorch_release_2.7.1
 
-# Create a new user with sudo privileges (passwordless)
-RUN apt-get update && apt-get install -y sudo && \
-    useradd -m -s /bin/bash user && \
-    usermod -aG sudo user && \
-    echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Create a new non-root user
+RUN useradd -m -s /bin/bash user
 
 WORKDIR /opt/src
 
