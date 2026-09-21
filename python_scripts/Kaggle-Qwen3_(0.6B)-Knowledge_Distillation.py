@@ -33,7 +33,7 @@
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\n# Pin Kaggle\'s torch and torchvision: upgrading them pulls a CUDA 13.0 torch onto\n# Kaggle\'s CUDA 12.8 torchaudio, which then refuses to import. Pin the base version,\n# since the local +cu128 label does not exist on the index.\ntry:\n    import torch, torchvision\n    _torch = f\'torch=={torch.__version__.split("+")[0]}\'\n    _tv = f\'torchvision=={torchvision.__version__.split("+")[0]}\'\nexcept Exception:\n    _torch, _tv = "torch", "torchvision"\n!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth\n!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"\n!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install -qqq transformers==5.15.1\n!uv pip install -qqq --no-deps trl==0.22.2\n')
 
 
 # In[ ]:
@@ -85,29 +85,35 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 # the vocabulary, not by the weights: Gemma-4's 262144-token vocabulary is what
 # makes it expensive, not its size.
 #
-#   config        weights           measured peak   fits 2x T4 (~30 GB)?
-#   gemma-4       8.1 + 10.9 GB     35.4 GB         NO at seq 1024, see below
-#   qwen3         1.2 + 3.4 GB      10.9 GB         yes
-#   qwen3.8       22.3 GB           not measured    self-distillation, tight
-#   muse-glimmer  22.2 GB           not measured    self-distillation, tight
+#   config        weights           measured peak   Kaggle 2x T4 result
+#   qwen3         1.2 + 3.4 GB      10.9 GB         PASS
+#   gemma-4       8.1 + 10.9 GB     35.4 GB         OOM loading the teacher
+#   qwen3.8       22.3 GB           n/a             OOM building GKDTrainer
+#   muse-glimmer  22.2 GB           n/a             OOM building GKDTrainer
+#
+# The two self-distillation configs die in the same place, and it is worth
+# knowing why before reaching for a smaller batch: GKDTrainer's kbit prep
+# upcasts every parameter that is not Params4bit to float32, and the one such
+# parameter that matters is the lm_head, which Unsloth deliberately leaves dense
+# so the distillation projection stays valid. At these vocabularies that single
+# tensor is 4.74 GiB (Qwen3.8, 248320 tokens) and 5.01 GiB (Muse Glimmer), on a
+# card with 14.56 GiB total and roughly 12 to 14 already spent on weights. No
+# sequence length or batch size reaches it. gemma-4 fails earlier and more
+# simply: it is the only config with a genuinely separate teacher, so it is
+# loading a second model.
+#
+# All three need a larger card. They are kept here because they work on one.
 #
 # unsloth/gemma-4-26B-A4B-it is 51.6 GB with no prebuilt 4-bit, so it needs an
 # A100 or better. Listed for that case, not for T4.
 #
-# READ THIS BEFORE SWITCHING CONFIG. Only "qwen3" runs today. The gemma-4,
-# qwen3.8 and muse-glimmer entries are blocked by a version hole, confirmed on
-# Kaggle 2x T4 (all three fail in the load cell in about three minutes):
-#
-#   ValueError: `unsloth/gemma-4-E2B-it-unsloth-bnb-4bit` is not supported yet
-#   in `transformers==4.56.2`
-#
-# Those architectures need transformers 5.15.x. Every TRL that ships alongside
-# it has moved GKD out of the top level: `from trl import GKDTrainer` resolves
-# on TRL 0.22.2 through 0.28, and on nothing after. TRL 1.9.2 has neither GKD
-# nor Distillation at the top level, and TRL 1.10+ has DistillationTrainer
-# instead. So GKD and these three models cannot currently be in the same
-# environment. The path for them is TRL 1.10+ DistillationTrainer, which Unsloth
-# does discover and generate, tracked separately; it is not a notebook fix.
+# On the version pins: the install cell puts transformers 5.15.1 together with
+# trl 0.22.2 installed --no-deps, and both halves are deliberate. 5.15.1 is the
+# floor that loads every architecture here (qwen3_5 landed in 5.15.1,
+# muse_glimmer in 5.15.0, Gemma-4 in 5.10.1); the canonical 4.56.2 loads none of
+# the last three. GKDTrainer is importable from the top level of trl 0.22.2
+# through 0.28 and nowhere after, so the old trl is pinned on without its
+# dependencies, which would otherwise drag transformers back below that floor.
 
 CONFIGS = {
     "gemma-4": dict(

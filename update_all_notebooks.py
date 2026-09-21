@@ -968,6 +968,30 @@ except Exception:
 !uv pip install -qqq transformers==5.15.1
 !uv pip install -qqq --no-deps trl==0.22.2"""
 
+# KNOWLEDGE DISTILLATION INSTALLATION.
+#
+# This notebook is not tied to one architecture: its CONFIGS dict spans Qwen3,
+# Gemma-4, Qwen3.8 and Muse Glimmer, so the install has to satisfy all of them
+# at once rather than the newest one.
+#
+# transformers 5.15.1 is the floor that does: `qwen3_5` (Qwen3.8) landed in
+# 5.15.1, `muse_glimmer` in 5.15.0, and Gemma-4 in 5.10.1. The canonical 4.56.2
+# loads none of them, which is what the first Kaggle run of this notebook proved
+# three times over ("is not supported yet in transformers==4.56.2").
+#
+# trl 0.22.2 with --no-deps is the other half, and the --no-deps is load-bearing.
+# GKDTrainer is only importable from the top level of trl 0.22.2 through 0.28;
+# 1.9.2 has neither GKD nor Distillation there, and 1.10+ has DistillationTrainer
+# instead. Resolving trl's dependencies would drag transformers back below the
+# floor above, so the pin goes on without them. That is the same pairing the
+# Qwen3.8 conversational Kaggle notebook already ships.
+installation_knowledge_distillation_kaggle_content = installation_qwen3_8_kaggle_content
+installation_knowledge_distillation_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.15.1",
+)
+
 # A wheel, not a source build of `main`: every sglang release pins ONE exact
 # transformers, so cloning main and then forcing transformers==4.53.0 left the
 # two disagreeing.
@@ -4946,6 +4970,17 @@ def update_notebook_sections(
                                 installation = installation_qwen3_8_kaggle_content
                             else:
                                 installation = installation_qwen3_8_content
+
+                        # KNOWLEDGE DISTILLATION INSTALLATION. Must come after
+                        # the Qwen3 rules above: the notebook is named for its
+                        # default student (Qwen3 0.6B) but its other configs are
+                        # Gemma-4, Qwen3.8 and Muse Glimmer, so the name must not
+                        # decide the install block on its own.
+                        if is_path_contains_any(notebook_path.lower(), ["knowledge_distillation"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_knowledge_distillation_kaggle_content
+                            else:
+                                installation = installation_knowledge_distillation_content
 
                         # Nemotron Nano 3 INSTALLATION also Granite has mamba
                         if is_path_contains_any(notebook_path.lower(), ["nemotron-3-nano","nemotron-nano-3", "granite4"]):
