@@ -93,6 +93,21 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 #
 # unsloth/gemma-4-26B-A4B-it is 51.6 GB with no prebuilt 4-bit, so it needs an
 # A100 or better. Listed for that case, not for T4.
+#
+# READ THIS BEFORE SWITCHING CONFIG. Only "qwen3" runs today. The gemma-4,
+# qwen3.8 and muse-glimmer entries are blocked by a version hole, confirmed on
+# Kaggle 2x T4 (all three fail in the load cell in about three minutes):
+#
+#   ValueError: `unsloth/gemma-4-E2B-it-unsloth-bnb-4bit` is not supported yet
+#   in `transformers==4.56.2`
+#
+# Those architectures need transformers 5.15.x. Every TRL that ships alongside
+# it has moved GKD out of the top level: `from trl import GKDTrainer` resolves
+# on TRL 0.22.2 through 0.28, and on nothing after. TRL 1.9.2 has neither GKD
+# nor Distillation at the top level, and TRL 1.10+ has DistillationTrainer
+# instead. So GKD and these three models cannot currently be in the same
+# environment. The path for them is TRL 1.10+ DistillationTrainer, which Unsloth
+# does discover and generate, tracked separately; it is not a notebook fix.
 
 CONFIGS = {
     "gemma-4": dict(
