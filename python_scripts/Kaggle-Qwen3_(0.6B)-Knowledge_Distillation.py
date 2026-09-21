@@ -1,0 +1,346 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
+# <div class="align-center">
+# <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+# <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# </div>
+# 
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# 
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
+
+# ### News
+
+# Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
+# 
+# <p>
+# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
+# </p>
+# 
+# Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
+# 
+# Ultra Long-Context Reinforcement Learning is here with 7x more context windows! [Blog](https://unsloth.ai/docs/new/grpo-long-context)
+# 
+# New in Reinforcement Learning: [FP8 RL](https://unsloth.ai/docs/new/fp8-reinforcement-learning) • [Vision RL](https://unsloth.ai/docs/new/vision-reinforcement-learning-vlm-rl) • [Standby](https://unsloth.ai/docs/basics/memory-efficient-rl) • [gpt-oss RL](https://unsloth.ai/docs/new/gpt-oss-reinforcement-learning)
+# 
+# Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
+
+# ### Installation
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+
+
+# In[ ]:
+
+
+# GKD under Unsloth needs unslothai/unsloth#11440 and unslothai/unsloth-zoo#1310,
+# which are on main but not yet in a PyPI release. Without them the generated
+# trainer downcasts GKDConfig back to SFTConfig and silently drops lmbda, beta
+# and temperature, so distillation degrades to plain SFT with no error
+# (unslothai/unsloth#1941). Delete this cell once a release carries both.
+get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
+
+
+# ### Knowledge distillation with Unsloth
+# 
+# Distillation trains a small **student** to match the output distribution of a
+# larger **teacher**, rather than to match one-hot labels. It usually beats plain
+# finetuning at the same student size, because a full distribution carries far more
+# signal per token than a single correct answer.
+# 
+# This notebook uses TRL's `GKDTrainer`, which Unsloth patches like any other TRL
+# trainer. Three things are worth knowing before you change the models:
+# 
+# 1. **Student and teacher must share a vocabulary.** The loss compares two
+#    distributions position by position, so a mismatch is not a quality problem, it
+#    is a shape error. Same family is the safe rule; even within a family, check.
+# 2. **A multimodal checkpoint hands back a processor, not a tokenizer.** Every
+#    model here is a `*ForConditionalGeneration`, and passing the processor to a
+#    text-only trainer makes it try to read the rendered chat prompt as an image
+#    (`Incorrect image source`). Unwrap it, as the helper below does.
+# 3. **`lmbda` picks off-policy or on-policy.** `lmbda = 0` scores the fixed
+#    dataset completions; `lmbda = 1` makes the student generate and scores its own
+#    samples, which costs generation per step but avoids the train/inference
+#    mismatch. `beta` interpolates the divergence: 0 is forward KL, 1 is reverse
+#    KL, in between is generalized JSD.
+
+# ### Pick a configuration
+
+# In[ ]:
+
+
+# Each entry is (student, teacher). A teacher equal to the student is
+# self-distillation: the student learns from its own frozen base, which needs
+# only ONE copy of the weights and so is the only option for the 27B and 30B
+# models on two T4s.
+#
+# Weights on disk, and MEASURED peak memory for 6 steps at the settings below.
+# GKD holds full (batch, seq, vocab) logits for BOTH models, so peak is driven by
+# the vocabulary, not by the weights: Gemma-4's 262144-token vocabulary is what
+# makes it expensive, not its size.
+#
+#   config        weights           measured peak   fits 2x T4 (~30 GB)?
+#   gemma-4       8.1 + 10.9 GB     35.4 GB         NO at seq 1024, see below
+#   qwen3         1.2 + 3.4 GB      10.9 GB         yes
+#   qwen3.8       22.3 GB           not measured    self-distillation, tight
+#   muse-glimmer  22.2 GB           not measured    self-distillation, tight
+#
+# unsloth/gemma-4-26B-A4B-it is 51.6 GB with no prebuilt 4-bit, so it needs an
+# A100 or better. Listed for that case, not for T4.
+
+CONFIGS = {
+    "gemma-4": dict(
+        student = "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit",
+        teacher = "unsloth/gemma-4-E4B-it-unsloth-bnb-4bit",
+    ),
+    "gemma-4-big-teacher": dict(          # A100 / H100, not T4
+        student = "unsloth/gemma-4-E4B-it",
+        teacher = "unsloth/gemma-4-26B-A4B-it",
+    ),
+    "qwen3": dict(                        # smallest proven pair, fits 2x T4
+        student = "unsloth/Qwen3-0.6B",
+        teacher = "unsloth/Qwen3-1.7B",
+    ),
+    "qwen3.8": dict(
+        student = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit",
+        teacher = None,                   # self-distillation
+    ),
+    "muse-glimmer": dict(
+        student = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
+        teacher = None,                   # self-distillation
+    ),
+}
+
+CONFIG = "qwen3"   # the pair proven to fit two T4s; see the table above
+student_name = CONFIGS[CONFIG]["student"]
+teacher_name = CONFIGS[CONFIG]["teacher"]
+
+# Gemma-4 "E" checkpoints are elastic (MatFormer): execution is data dependent,
+# so under torch.compile the gradient-checkpoint recompute can select a different
+# compiled graph than the forward pass and training dies with
+# "CheckpointError: Recomputed values ... have different metadata". Reproduced on
+# E2B <- E4B; disabling compile for that family alone is the fix, and it costs
+# nothing for every other config here.
+import os
+if CONFIG.startswith("gemma-4"):
+    os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
+    print("gemma-4 is elastic: UNSLOTH_COMPILE_DISABLE=1 set for this run")
+
+max_seq_length = 1024
+load_in_4bit = True
+print(f"student: {student_name}")
+print(f"teacher: {teacher_name or '(self-distillation: the student\'s own frozen base)'}")
+
+
+# ### Load the student
+
+# In[ ]:
+
+
+from unsloth import FastLanguageModel
+import torch
+
+student, processor = FastLanguageModel.from_pretrained(
+    student_name,
+    max_seq_length = max_seq_length,
+    dtype = None,            # None auto-detects: float16 on T4, bfloat16 on Ampere+
+    load_in_4bit = load_in_4bit,
+)
+
+# A `*ForConditionalGeneration` checkpoint returns a multimodal processor. The
+# text-only trainer must be handed the tokenizer it wraps, or the processor tries
+# to resolve the chat prompt as an image source and raises.
+def text_tokenizer(maybe_processor):
+    inner = getattr(maybe_processor, "tokenizer", None)
+    if inner is not None and type(maybe_processor).__name__.endswith("Processor"):
+        print(f"unwrapped {type(maybe_processor).__name__} -> {type(inner).__name__}")
+        return inner
+    return maybe_processor
+
+tokenizer = text_tokenizer(processor)
+
+# The distillation loss reads the output head directly, so it has to stay a dense
+# [vocab, hidden] matrix. Unsloth keeps lm_head out of quantization for this
+# reason; a checkpoint quantized elsewhere may not, so check rather than assume.
+head = student.get_output_embeddings()
+assert head.weight.dim() == 2, f"output head is not dense: {type(head.weight).__name__}"
+print(f"output head {type(head).__name__} {tuple(head.weight.shape)} {head.weight.dtype}")
+
+
+# ### Attach LoRA adapters to the student
+
+# In[ ]:
+
+
+student = FastLanguageModel.get_peft_model(
+    student,
+    r = 16,
+    lora_alpha = 32,
+    lora_dropout = 0,
+    bias = "none",
+    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
+                      "gate_proj", "up_proj", "down_proj"],
+    use_gradient_checkpointing = "unsloth",
+    random_state = 3407,
+)
+
+trainable = [n for n, p in student.named_parameters() if p.requires_grad]
+print(f"{len(trainable)} trainable tensors")
+# Note lora_B is zero-initialized, so dL/dA is zero on the very first step and
+# only the lora_B halves move. That is expected, not a sign nothing is learning.
+
+
+# ### Load the teacher (or reuse the student's frozen base)
+
+# In[ ]:
+
+
+if teacher_name is None:
+    # Self-distillation. Under LoRA the frozen base IS the teacher, so this costs
+    # no extra weights: the adapters are disabled for the teacher forward pass.
+    teacher = student
+    print("self-distillation: teacher is the student's base with adapters disabled")
+else:
+    teacher, teacher_processor = FastLanguageModel.from_pretrained(
+        teacher_name,
+        max_seq_length = max_seq_length,
+        dtype = None,
+        load_in_4bit = load_in_4bit,
+    )
+    teacher.eval()
+    for p in teacher.parameters():
+        p.requires_grad_(False)
+    n_trainable = sum(p.requires_grad for p in teacher.parameters())
+    print(f"teacher loaded, {n_trainable} trainable parameters (must be 0)")
+
+    # Same vocabulary, or the loss is a shape error rather than a bad number.
+    s_vocab = student.config.get_text_config().vocab_size
+    t_vocab = teacher.config.get_text_config().vocab_size
+    assert s_vocab == t_vocab, f"vocab mismatch: student {s_vocab} vs teacher {t_vocab}"
+    print(f"vocabularies match: {s_vocab}")
+
+
+# ### Dataset
+
+# In[ ]:
+
+
+from datasets import load_dataset
+from unsloth.chat_templates import standardize_sharegpt
+
+dataset = load_dataset("mlabonne/FineTome-100k", split = "train[:500]")
+
+# FineTome ships ShareGPT turns keyed `from`/`value`. The chat template expects
+# `role`/`content`, and passing the raw rows through renders as
+# "'dict object' has no attribute 'role'".
+dataset = standardize_sharegpt(dataset)
+dataset = dataset.rename_column("conversations", "messages")
+dataset = dataset.remove_columns([c for c in dataset.column_names if c != "messages"])
+
+print(dataset)
+print(dataset[0]["messages"][:2])
+
+
+# ### Train
+
+# In[ ]:
+
+
+from trl import GKDConfig, GKDTrainer
+
+config = GKDConfig(
+    output_dir = "outputs",
+    per_device_train_batch_size = 1,
+    gradient_accumulation_steps = 4,
+    warmup_steps = 5,
+    max_steps = 30,
+    learning_rate = 2e-4,
+    logging_steps = 1,
+    optim = "adamw_8bit",
+    weight_decay = 0.01,
+    lr_scheduler_type = "linear",
+    seed = 3407,
+    report_to = "none",
+    max_length = max_seq_length,
+
+    # Distillation knobs.
+    lmbda = 0.0,        # 0 off-policy (score the dataset), 1 on-policy (student samples)
+    beta = 0.5,         # 0 forward KL, 1 reverse KL, between is generalized JSD
+    temperature = 1.0,  # distillation temperature, NOT the sampling temperature
+    max_new_tokens = 64,
+
+    fp16 = not torch.cuda.is_bf16_supported(),
+    bf16 = torch.cuda.is_bf16_supported(),
+)
+
+trainer = GKDTrainer(
+    model = student,
+    teacher_model = teacher,
+    args = config,
+    train_dataset = dataset,
+    processing_class = tokenizer,
+)
+
+# Unsloth patches TRL's trainers, and a config that subclasses SFTConfig used to
+# be silently rebuilt as a plain one, dropping every distillation field. Assert
+# rather than trust it.
+assert type(trainer.args).__name__ == "GKDConfig", type(trainer.args).__name__
+assert trainer.args.lmbda == 0.0 and trainer.args.beta == 0.5
+print(f"args {type(trainer.args).__name__}: lmbda={trainer.args.lmbda} "
+      f"beta={trainer.args.beta} temperature={trainer.args.temperature}")
+
+
+# In[ ]:
+
+
+before = {n: p.detach().clone() for n, p in student.named_parameters() if p.requires_grad}
+result = trainer.train()
+
+changed = sum(1 for n, p in student.named_parameters()
+              if p.requires_grad and not torch.equal(p.detach(), before[n]))
+peak = torch.cuda.max_memory_allocated() / 1e9
+print(f"\ntrain loss      : {result.training_loss}")
+print(f"adapters changed: {changed}/{len(before)}")
+print(f"peak memory     : {peak:.2f} GB")
+
+history = [h["loss"] for h in trainer.state.log_history if "loss" in h]
+if len(history) >= 2:
+    print(f"loss first -> last: {history[0]:.4f} -> {history[-1]:.4f}")
+assert changed > 0, "no adapter changed: the student did not learn"
+print("\nDISTILLATION VERDICT: PASS")
+
+
+# ### What this does and does not cover
+# 
+# `GKDTrainer` holds the teacher in memory alongside the student, so the teacher
+# size is bounded by your GPU, not by the chunked loss. Distilling a
+# Deepseek- or Kimi-class teacher needs a served teacher over HTTP or cached top-k
+# teacher logprobs prepared ahead of training; neither is wired into Unsloth yet.
+# 
+# Self-distillation (`teacher = None` above) is the cheapest real configuration:
+# under LoRA the frozen base is already a perfectly good teacher, and it costs no
+# additional weights.
+# And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
+# 
+# Some other resources:
+# 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
+# 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
+# 3. Read our guides and notebooks for [Text-to-speech (TTS)](https://unsloth.ai/docs/basics/text-to-speech-tts-fine-tuning) and [vision](https://unsloth.ai/docs/basics/vision-fine-tuning) model support.
+# 4. Explore our [LLM Tutorials Directory](https://unsloth.ai/docs/models/tutorials-how-to-fine-tune-and-run-llms) to find dedicated guides for each model.
+# 5. Need help with Inference? Read our [Inference & Deployment page](https://unsloth.ai/docs/basics/inference-and-deployment) for details on using vLLM, llama.cpp, Ollama etc.
+# 
+# <div class="align-center">
+#   <a href="https://unsloth.ai"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+#   <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord.png" width="145"></a>
+#   <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a>
+# 
+#   Join Discord if you need help + ⭐️ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐️
+# 
+#   This notebook and all Unsloth notebooks are licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme)
+# </div>

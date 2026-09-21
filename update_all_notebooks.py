@@ -1387,6 +1387,7 @@ TYPE_MAPPING = {
 }
 
 KNOWN_TYPES_ORDERED = [
+    "Knowledge Distillation",
     "Tool Calling",          
     "Text Completion",       
     "Synthetic Data",        
