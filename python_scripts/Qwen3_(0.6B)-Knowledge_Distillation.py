@@ -77,7 +77,9 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 # 
 # A teacher equal to the student is self-distillation: the student learns from its
 # own frozen base, which needs only one copy of the weights and so is the only
-# option for the 27B and 30B models on two T4s.
+# option for the 27B and 30B models on two T4s. Read the note below it before
+# picking one of those two, because self-distillation needs a starting point that
+# this notebook does not give it.
 # 
 # GKD holds full `(batch, seq, vocab)` logits for **both** models, so peak memory is
 # driven by the vocabulary rather than by the weights. Gemma-4's 262144-token
@@ -87,8 +89,8 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 # | --- | --- | --- |
 # | `qwen3` | 1.2 + 3.4 GB | PASS, loss 0.413, 392/392 adapters, 10.9 GB |
 # | `gemma-4` | 8.1 + 10.9 GB | PASS, loss 0.079, 410/410 adapters, 14.3 GB |
-# | `muse-glimmer` | 22.2 GB | OOM by 208 MiB at seq 384, needs a larger card |
-# | `qwen3.8` | 22.3 GB | blocked on a dtype mismatch, see below |
+# | `muse-glimmer` | 22.2 GB | self-distillation, OOM by 208 MiB at seq 384 |
+# | `qwen3.8` | 22.3 GB | self-distillation, blocked on a dtype mismatch |
 # 
 # `unsloth/gemma-4-26B-A4B-it` is 51.6 GB with no prebuilt 4-bit, so it needs an
 # A100 or better. Listed for that case, not for T4.
@@ -120,7 +122,19 @@ student_name = CONFIGS[CONFIG]["student"]
 teacher_name = CONFIGS[CONFIG]["teacher"]
 
 
-# Two configurations need a note.
+# Three configurations need a note.
+# 
+# **Self-distillation needs an adapter that already differs from the base.** GKD's
+# loss is a divergence between the student and the teacher and nothing else, so it
+# is at its global minimum when the two agree. `lora_B` is zero-initialized, which
+# makes a freshly adapted student *exactly* its own base: the measured gap is
+# `0.000`, the first loss is `7e-5`, and what happens afterwards is the optimiser
+# amplifying numerical noise, not learning. So `qwen3.8` and `muse-glimmer` below
+# exercise the memory path on a big model, but they do not demonstrate
+# distillation unless you point them at an adapter you trained earlier. The real
+# uses of this mode are continuing from an existing adapter, or recovering a
+# checkpoint that midtraining degraded. Distillation between two different models,
+# which is what the notebook is about, is `qwen3` and `gemma-4`.
 # 
 # **gemma-4 needs `torch.compile` off on T4-class cards.** Under compile the
 # gradient-checkpoint recompute executes the layer differently from the forward
@@ -218,9 +232,16 @@ print(f"{len(trainable)} trainable tensors")
 
 # ### Load the teacher, or reuse the student's frozen base
 
-# Under LoRA the frozen base **is** a perfectly good teacher, and it costs no extra
-# weights: the adapters are simply disabled for the teacher forward pass. That is
-# what `teacher = None` selects above.
+# Under LoRA the frozen base can serve as the teacher at no extra weight cost: the
+# adapters are disabled for the teacher forward pass. That is what `teacher = None`
+# selects above, and it only carries signal once the adapters differ from the base.
+# 
+# Disabling them has to be done explicitly. `GKDTrainer` calls `self.teacher_model(...)`
+# and nothing else, so handing it the student directly gives two forwards through the
+# same active adapters, identical distributions and a divergence of zero. The wrapper
+# below is what makes the teacher the base model. It deliberately keeps the student out
+# of its submodules, because the trainer calls `teacher.eval()` on every step and that
+# would otherwise drop the student out of training mode too.
 # 
 # For a separate teacher, two things matter. Release the caching allocator's
 # reserved-but-unused blocks first, and give the device-map planner an explicit
@@ -232,8 +253,26 @@ print(f"{len(trainable)} trainable tensors")
 # In[ ]:
 
 
+class FrozenBaseTeacher(torch.nn.Module):
+    """The student with its adapters switched off for the duration of the call."""
+    def __init__(self, peft_student):
+        super().__init__()
+        object.__setattr__(self, "student", peft_student)
+
+    @property
+    def config(self):
+        return self.student.config
+
+    def forward(self, *args, **kwargs):
+        with self.student.disable_adapter():
+            return self.student(*args, **kwargs)
+
+
+# In[ ]:
+
+
 if teacher_name is None:
-    teacher = student
+    teacher = FrozenBaseTeacher(student)
     print("self-distillation: teacher is the student's base with adapters disabled")
 else:
     import gc
@@ -259,6 +298,23 @@ else:
     for p in teacher.parameters():
         p.requires_grad_(False)
     print(f"teacher loaded, {sum(p.requires_grad for p in teacher.parameters())} trainable (must be 0)")
+
+
+# The teacher has to disagree with the student, or there is nothing to learn from.
+# A gap of exactly zero produces a loss around `1e-4`, which reads as a converged
+# run rather than a broken one, so measure it instead of assuming it.
+
+# In[ ]:
+
+
+_ids = tokenizer("The capital of France is", return_tensors = "pt").input_ids.to(student.device)
+with torch.no_grad():
+    _gap = (student(input_ids = _ids).logits - teacher(input_ids = _ids).logits).abs().max().item()
+print(f"max teacher-student logit gap: {_gap:.3f}")
+if _gap == 0:
+    print("WARNING: the teacher matches the student exactly, so the divergence and its\n"
+          "gradient are both zero. Expected for self-distillation from a fresh adapter;\n"
+          "load an adapter you trained earlier to give this mode something to learn.")
 
 
 # Same vocabulary, or the loss is a shape error rather than a bad number.
@@ -414,9 +470,10 @@ assert changed > 0, "no adapter changed: the student did not learn"
 # served teacher over HTTP or cached top-k teacher logprobs prepared ahead of
 # training; neither is wired into Unsloth yet.
 # 
-# Self-distillation (`teacher = None` above) is the cheapest real configuration:
-# under LoRA the frozen base is already a perfectly good teacher, and it costs no
-# additional weights.
+# Self-distillation (`teacher = None` above) is the cheapest configuration, since
+# under LoRA the frozen base is the teacher and costs no additional weights. It is
+# not a way to start from nothing, though: a fresh adapter is identical to the base
+# it would be learning from. Use it to continue from an adapter you already have.
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
