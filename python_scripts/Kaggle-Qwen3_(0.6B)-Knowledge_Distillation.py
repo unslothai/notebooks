@@ -85,24 +85,32 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 # the vocabulary, not by the weights: Gemma-4's 262144-token vocabulary is what
 # makes it expensive, not its size.
 #
-#   config        weights           measured peak   Kaggle 2x T4 result
-#   qwen3         1.2 + 3.4 GB      10.9 GB         PASS
-#   gemma-4       8.1 + 10.9 GB     35.4 GB         OOM loading the teacher
-#   qwen3.8       22.3 GB           n/a             OOM building GKDTrainer
-#   muse-glimmer  22.2 GB           n/a             OOM building GKDTrainer
+#   config        weights           Kaggle 2x T4 result
+#   qwen3         1.2 + 3.4 GB      PASS, loss 0.413, 392/392 adapters, 10.9 GB
+#   gemma-4       8.1 + 10.9 GB     needs a bigger card, see below
+#   qwen3.8       22.3 GB           blocked on a dtype mismatch, see below
+#   muse-glimmer  22.2 GB           tight, no sequence length measured to work
 #
-# The two self-distillation configs die in the same place, and it is worth
-# knowing why before reaching for a smaller batch: GKDTrainer's kbit prep
-# upcasts every parameter that is not Params4bit to float32, and the one such
-# parameter that matters is the lm_head, which Unsloth deliberately leaves dense
-# so the distillation projection stays valid. At these vocabularies that single
-# tensor is 4.74 GiB (Qwen3.8, 248320 tokens) and 5.01 GiB (Muse Glimmer), on a
-# card with 14.56 GiB total and roughly 12 to 14 already spent on weights. No
-# sequence length or batch size reaches it. gemma-4 fails earlier and more
-# simply: it is the only config with a genuinely separate teacher, so it is
-# loading a second model.
+# gemma-4 loads fine on two T4s once unslothai/unsloth-zoo#1328 is in: both
+# models go resident, the teacher is frozen and the trainer builds. It is
+# sequence length that has no answer, because the two limits point opposite
+# ways and the gap between them is too small to trust:
 #
-# All three need a larger card. They are kept here because they work on one.
+#   256, 384, 512   the prompt fills the budget, leaving GKD nothing to score
+#                   ("mask [1, 512] does not match ... tensor [1, 0, 262144]")
+#   768             the loss itself does not fit, short by 336 MiB
+#
+# GKD materialises a full (batch, seq, vocab) tensor for student, teacher and
+# mixture, and at a 262144 vocabulary one of those in float32 is 805 MB at 768.
+# A value between 512 and 768 might pass on this dataset and fail on a longer
+# one, so this config wants a bigger card rather than a lucky number. The real
+# fix is a chunked loss (unslothai/unsloth-zoo#1310), which never builds that
+# tensor, and is not reachable from GKD yet.
+#
+# qwen3.8 is blocked on something else entirely: the first training step raises
+# "expected mat1 and mat2 to have the same dtype, but got: BFloat16 != Half"
+# inside the gated delta net. It is not memory, and it does not reproduce on a
+# card that supports bfloat16.
 #
 # unsloth/gemma-4-26B-A4B-it is 51.6 GB with no prebuilt 4-bit, so it needs an
 # A100 or better. Listed for that case, not for T4.
