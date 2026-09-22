@@ -36,14 +36,15 @@
 get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\n# Pin Kaggle\'s torch and torchvision: upgrading them pulls a CUDA 13.0 torch onto\n# Kaggle\'s CUDA 12.8 torchaudio, which then refuses to import. Pin the base version,\n# since the local +cu128 label does not exist on the index.\ntry:\n    import torch, torchvision\n    _torch = f\'torch=={torch.__version__.split("+")[0]}\'\n    _tv = f\'torchvision=={torchvision.__version__.split("+")[0]}\'\nexcept Exception:\n    _torch, _tv = "torch", "torchvision"\n!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth\n!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"\n!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install -qqq transformers==5.15.1\n!uv pip install -qqq --no-deps trl==0.25.1\n')
 
 
+# GKD needs unslothai/unsloth#11440 and unslothai/unsloth-zoo#1310, which are on
+# main but not yet in a PyPI release. Without them the generated trainer downcasts
+# `GKDConfig` back to `SFTConfig` and silently drops `lmbda`, `beta` and
+# `temperature`, so distillation degrades to plain SFT with no error
+# (unslothai/unsloth#1941). Delete the next cell once a release carries both.
+
 # In[ ]:
 
 
-# GKD under Unsloth needs unslothai/unsloth#11440 and unslothai/unsloth-zoo#1310,
-# which are on main but not yet in a PyPI release. Without them the generated
-# trainer downcasts GKDConfig back to SFTConfig and silently drops lmbda, beta
-# and temperature, so distillation degrades to plain SFT with no error
-# (unslothai/unsloth#1941). Delete this cell once a release carries both.
 get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
 
 
@@ -55,7 +56,9 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 # signal per token than a single correct answer.
 # 
 # This notebook uses TRL's `GKDTrainer`, which Unsloth patches like any other TRL
-# trainer. Three things are worth knowing before you change the models:
+# trainer.
+
+# Three things are worth knowing before you change the models:
 # 
 # 1. **Student and teacher must share a vocabulary.** The loss compares two
 #    distributions position by position, so a mismatch is not a quality problem, it
@@ -71,118 +74,73 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 #    KL, in between is generalized JSD.
 
 # ### Pick a configuration
+# 
+# A teacher equal to the student is self-distillation: the student learns from its
+# own frozen base, which needs only one copy of the weights and so is the only
+# option for the 27B and 30B models on two T4s.
+# 
+# GKD holds full `(batch, seq, vocab)` logits for **both** models, so peak memory is
+# driven by the vocabulary rather than by the weights. Gemma-4's 262144-token
+# vocabulary is what makes it expensive, not its size.
+# 
+# | config | weights | measured on a Kaggle 2x T4 |
+# | --- | --- | --- |
+# | `qwen3` | 1.2 + 3.4 GB | PASS, loss 0.413, 392/392 adapters, 10.9 GB |
+# | `gemma-4` | 8.1 + 10.9 GB | PASS, loss 0.079, 410/410 adapters, 14.3 GB |
+# | `muse-glimmer` | 22.2 GB | OOM by 208 MiB at seq 384, needs a larger card |
+# | `qwen3.8` | 22.3 GB | blocked on a dtype mismatch, see below |
+# 
+# `unsloth/gemma-4-26B-A4B-it` is 51.6 GB with no prebuilt 4-bit, so it needs an
+# A100 or better. Listed for that case, not for T4.
 
 # In[ ]:
 
-
-# Each entry is (student, teacher). A teacher equal to the student is
-# self-distillation: the student learns from its own frozen base, which needs
-# only ONE copy of the weights and so is the only option for the 27B and 30B
-# models on two T4s.
-#
-# Weights on disk, and MEASURED peak memory for 6 steps at the settings below.
-# GKD holds full (batch, seq, vocab) logits for BOTH models, so peak is driven by
-# the vocabulary, not by the weights: Gemma-4's 262144-token vocabulary is what
-# makes it expensive, not its size.
-#
-#   config        weights           Kaggle 2x T4 result at these settings
-#   qwen3         1.2 + 3.4 GB      PASS, loss 0.413, 392/392 adapters, 10.9 GB
-#   gemma-4       8.1 + 10.9 GB     PASS, loss 0.079, 410/410 adapters, 14.3 GB
-#   muse-glimmer  22.2 GB           OOM on 2x T4 by 208 MiB, needs a larger card
-#   qwen3.8       22.3 GB           blocked on a dtype mismatch, see below
-#
-# gemma-4 needs two things to fit two T4s, and both are in the cells below.
-# unslothai/unsloth-zoo#1328 removes a 5.25 GiB transient while placing the
-# teacher, and the row filter keeps the run away from the collator behaviour
-# described next. With both, it trains at sequence length 512 with 14.3 GiB peak.
-#
-# muse-glimmer self-distills correctly but does not fit two T4s. It no longer
-# needs compile disabled, since unslothai/unsloth#11519 fixed the checkpoint
-# configuration behind its failure, and with that fix all 103 checkpointed
-# layers report use_reentrant = True and it trains with compile on. What stops it
-# is memory: at sequence length 384 it reaches the training step and runs out
-# 208 MiB short of the 14.56 GiB card, down from 326 MiB short at 512.
-# Shortening the sequence further is not worth it, because the gap closes
-# slowly: the 22.2 GiB of 4-bit weights, not the logits, dominate what is left.
-# Use a card with more memory per device.
-#
-# qwen3.8 is blocked on something this notebook cannot fix: the first training
-# step raises "expected mat1 and mat2 to have the same dtype, but got:
-# BFloat16 != Half" inside the gated delta net. It is not memory, and it does
-# not reproduce on a card that supports bfloat16, so it is being tracked
-# separately rather than guessed at here.
-#
-# unsloth/gemma-4-26B-A4B-it is 51.6 GB with no prebuilt 4-bit, so it needs an
-# A100 or better. Listed for that case, not for T4.
-#
-# On the version pins: the install cell puts transformers 5.15.1 together with
-# trl 0.22.2 installed --no-deps, and both halves are deliberate. 5.15.1 is the
-# floor that loads every architecture here (qwen3_5 landed in 5.15.1,
-# muse_glimmer in 5.15.0, Gemma-4 in 5.10.1); the canonical 4.56.2 loads none of
-# the last three. GKDTrainer is importable from the top level of trl 0.22.2
-# through 0.28 and nowhere after, so the old trl is pinned on without its
-# dependencies, which would otherwise drag transformers back below that floor.
 
 CONFIGS = {
     "gemma-4": dict(
         student = "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit",
         teacher = "unsloth/gemma-4-E4B-it-unsloth-bnb-4bit",
     ),
-    "gemma-4-big-teacher": dict(          # A100 / H100, not T4
-        student = "unsloth/gemma-4-E4B-it",
-        teacher = "unsloth/gemma-4-26B-A4B-it",
-    ),
-    "qwen3": dict(                        # smallest proven pair, fits 2x T4
+    "qwen3": dict(
         student = "unsloth/Qwen3-0.6B",
         teacher = "unsloth/Qwen3-1.7B",
     ),
     "qwen3.8": dict(
         student = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit",
-        teacher = None,                   # self-distillation
+        teacher = None,
     ),
     "muse-glimmer": dict(
         student = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
-        teacher = None,                   # self-distillation
+        teacher = None,
     ),
 }
 
-CONFIG = "qwen3"   # the pair proven to fit two T4s; see the table above
+CONFIG = "qwen3"
 student_name = CONFIGS[CONFIG]["student"]
 teacher_name = CONFIGS[CONFIG]["teacher"]
 
-# gemma-4 still needs compile off here, and it is worth being precise about why,
-# because the obvious explanation turned out to be wrong twice.
-#
-# Under torch.compile the gradient-checkpoint recompute can execute a region
-# differently than the forward pass did, and torch.utils.checkpoint refuses the
-# mismatch. It shows up in two forms, depending on which check notices first:
-# "A different number of tensors was saved during the original forward and
-# recomputation", or "Recomputed values ... have different metadata".
-#
-# Muse Glimmer's case was a configuration bug, now fixed upstream in
-# unslothai/unsloth#11519: GKDConfig inherits gradient_checkpointing = True, so
-# transformers put every layer on the non-reentrant checkpoint path, which is
-# the only one that performs these checks. With use_reentrant pinned back to
-# True it trains with compile on. It is NOT a mixture of experts; it is dense
-# with alternating sliding and full attention.
-#
-# gemma-4 is a genuinely separate problem and is still open. With that fix
-# installed and all 52 layers confirmed on use_reentrant = True, it still fails,
-# and the recompute disagrees about tensor RANK rather than count:
-#   saved      [1, 474, 512]
-#   recomputed [1, 474, 1, 512]
-# That is a real shape divergence between the two executions of the same region,
-# so compile stays off for gemma-4 until it is tracked down. It costs the other
-# configs nothing.
+
+# Two configurations need a note.
+# 
+# **gemma-4 needs `torch.compile` off on T4-class cards.** Under compile the
+# gradient-checkpoint recompute executes the layer differently from the forward
+# pass, and `torch.utils.checkpoint` refuses the mismatch: the recompute disagrees
+# about tensor rank, `[1, 474, 512]` saved against `[1, 474, 1, 512]` recomputed.
+# It passes on a B200 with compile on, so this is specific to older cards and is
+# still being tracked. It costs the other configurations nothing.
+# 
+# **qwen3.8 is blocked** on something this notebook cannot fix: the first training
+# step raises `expected mat1 and mat2 to have the same dtype, but got: BFloat16 !=
+# Half` inside the gated delta net. It is not memory, and it does not reproduce on
+# a card that supports bfloat16.
+
+# In[ ]:
+
+
 import os
 if CONFIG.startswith("gemma-4"):
     os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
-    print(f"{CONFIG}: UNSLOTH_COMPILE_DISABLE=1 for this run, see the note above")
 
-# Sequence length. The row filter below drops conversations that do not fit, so
-# this is now purely a memory knob: GKD holds full (batch, seq, vocab) logits for
-# both models, so halving it halves the dominant term. 1024 is proven on the
-# qwen3 pair; the large self-distillation configs need less.
 max_seq_length = 1024
 load_in_4bit = True
 print(f"student: {student_name}")
@@ -200,13 +158,18 @@ import torch
 student, processor = FastLanguageModel.from_pretrained(
     student_name,
     max_seq_length = max_seq_length,
-    dtype = None,            # None auto-detects: float16 on T4, bfloat16 on Ampere+
+    dtype = None,
     load_in_4bit = load_in_4bit,
 )
+
 
 # A `*ForConditionalGeneration` checkpoint returns a multimodal processor. The
 # text-only trainer must be handed the tokenizer it wraps, or the processor tries
 # to resolve the chat prompt as an image source and raises.
+
+# In[ ]:
+
+
 def text_tokenizer(maybe_processor):
     inner = getattr(maybe_processor, "tokenizer", None)
     if inner is not None and type(maybe_processor).__name__.endswith("Processor"):
@@ -216,9 +179,14 @@ def text_tokenizer(maybe_processor):
 
 tokenizer = text_tokenizer(processor)
 
+
 # The distillation loss reads the output head directly, so it has to stay a dense
-# [vocab, hidden] matrix. Unsloth keeps lm_head out of quantization for this
+# `[vocab, hidden]` matrix. Unsloth keeps `lm_head` out of quantization for this
 # reason; a checkpoint quantized elsewhere may not, so check rather than assume.
+
+# In[ ]:
+
+
 head = student.get_output_embeddings()
 assert head.weight.dim() == 2, f"output head is not dense: {type(head.weight).__name__}"
 print(f"output head {type(head).__name__} {tuple(head.weight.shape)} {head.weight.dtype}")
@@ -243,42 +211,35 @@ student = FastLanguageModel.get_peft_model(
 
 trainable = [n for n, p in student.named_parameters() if p.requires_grad]
 print(f"{len(trainable)} trainable tensors")
-# Note lora_B is zero-initialized, so dL/dA is zero on the very first step and
-# only the lora_B halves move. That is expected, not a sign nothing is learning.
 
 
-# ### Load the teacher (or reuse the student's frozen base)
+# `lora_B` is zero-initialized, so `dL/dA` is zero on the very first step and only
+# the `lora_B` halves move. That is expected, not a sign nothing is learning.
+
+# ### Load the teacher, or reuse the student's frozen base
+
+# Under LoRA the frozen base **is** a perfectly good teacher, and it costs no extra
+# weights: the adapters are simply disabled for the teacher forward pass. That is
+# what `teacher = None` selects above.
+# 
+# For a separate teacher, two things matter. Release the caching allocator's
+# reserved-but-unused blocks first, and give the device-map planner an explicit
+# budget. Left alone the planner does `free, _ = torch.cuda.mem_get_info(d)` and
+# takes the whole card, leaving nothing for the transient buffers the load itself
+# needs. On gemma-4 E2B from E4B it budgeted 8.94 GiB on `cuda:0` when 9.93 GiB was
+# free, and by the time weights were being placed only 4.70 GiB remained.
 
 # In[ ]:
 
 
 if teacher_name is None:
-    # Self-distillation. Under LoRA the frozen base IS the teacher, so this costs
-    # no extra weights: the adapters are disabled for the teacher forward pass.
     teacher = student
     print("self-distillation: teacher is the student's base with adapters disabled")
 else:
-    # Release the caching allocator's reserved-but-unused blocks before the
-    # second model is placed. Unsloth budgets the teacher against what it sees
-    # as free, and after the student has loaded and had LoRA attached, PyTorch
-    # is still holding reserve it is not using. On gemma-4 E2B <- E4B across two
-    # T4s the planner budgeted 8.94 GiB on cuda:0 and tried to put 5.253 GiB
-    # there, while the card actually had 4.70 GiB free with 9.86 GiB in use
-    # against only 4.445 GiB of student weights. Both cards were in use and the
-    # weights fit; the gap was reserve, so hand it back first.
     import gc
     gc.collect()
     torch.cuda.empty_cache()
 
-    # Give the planner explicit budgets rather than letting it size the teacher
-    # against every byte that looks free. Left alone it does
-    # `free, _ = torch.cuda.mem_get_info(d); raw_budgets[d] = int(free)`, which
-    # leaves nothing for the transient buffers the load itself needs: on
-    # gemma-4 E2B <- E4B it budgeted 8.94 GiB on cuda:0 when 9.93 GiB was free,
-    # and by the time the weights were being placed only 4.70 GiB remained.
-    # Both cards were in use and the weights fit; the budget was simply the
-    # whole card. `max_memory` reaches the planner through
-    # planner_kwargs_with_max_memory, so hold some back on every card.
     TEACHER_HEADROOM_GIB = 2.0
     max_memory = {}
     for _d in range(torch.cuda.device_count()):
@@ -297,10 +258,15 @@ else:
     teacher.eval()
     for p in teacher.parameters():
         p.requires_grad_(False)
-    n_trainable = sum(p.requires_grad for p in teacher.parameters())
-    print(f"teacher loaded, {n_trainable} trainable parameters (must be 0)")
+    print(f"teacher loaded, {sum(p.requires_grad for p in teacher.parameters())} trainable (must be 0)")
 
-    # Same vocabulary, or the loss is a shape error rather than a bad number.
+
+# Same vocabulary, or the loss is a shape error rather than a bad number.
+
+# In[ ]:
+
+
+if teacher_name is not None:
     s_vocab = student.config.get_text_config().vocab_size
     t_vocab = teacher.config.get_text_config().vocab_size
     assert s_vocab == t_vocab, f"vocab mismatch: student {s_vocab} vs teacher {t_vocab}"
@@ -308,6 +274,10 @@ else:
 
 
 # ### Dataset
+# 
+# FineTome ships ShareGPT turns keyed `from`/`value`. The chat template expects
+# `role`/`content`, and passing the raw rows through renders as
+# `'dict object' has no attribute 'role'`.
 
 # In[ ]:
 
@@ -316,41 +286,42 @@ from datasets import load_dataset
 from unsloth.chat_templates import standardize_sharegpt
 
 dataset = load_dataset("mlabonne/FineTome-100k", split = "train[:500]")
-
-# FineTome ships ShareGPT turns keyed `from`/`value`. The chat template expects
-# `role`/`content`, and passing the raw rows through renders as
-# "'dict object' has no attribute 'role'".
 dataset = standardize_sharegpt(dataset)
 dataset = dataset.rename_column("conversations", "messages")
 dataset = dataset.remove_columns([c for c in dataset.column_names if c != "messages"])
 
-# Drop rows that do not fit in max_seq_length as a whole.
-#
+
+# Now drop rows that do not fit in `max_seq_length` **as a whole**. This one is
+# worth understanding, because the failure it prevents looks like a bug in the loss.
+# 
 # GKD's collator returns a `prompts` tensor alongside `input_ids`, and the loss
 # slices with it:
-#
-#     prompt_lengths = inputs["prompts"].shape[1]
-#     shifted_student_logits = student_outputs.logits[:, prompt_lengths - 1 : -1, :]
-#
-# When a row is longer than max_length the collator truncates it, and the prompt
-# is what gets dropped: `prompts` comes back with width 0, so the slice becomes
-# logits[:, -1:-1, :], which is empty, while the labels stay full width. That is
-# the "mask [1, 512] does not match ... tensor [1, 0, 262144]" failure.
-#
-# Note this is about the TOTAL length, not the prompt's. A short prompt with a
+# 
+# ```python
+# prompt_lengths = inputs["prompts"].shape[1]
+# shifted_student_logits = student_outputs.logits[:, prompt_lengths - 1 : -1, :]
+# ```
+# 
+# When a row is longer than `max_length` the collator truncates it, and the prompt
+# is what gets dropped. `prompts` comes back with width 0, so the slice becomes
+# `logits[:, -1:-1, :]`, which is empty, while the labels stay full width. That is
+# the `mask [1, 512] does not match ... tensor [1, 0, 262144]` failure.
+# 
+# Note this is about the **total** length, not the prompt's. A short prompt with a
 # long answer still overflows and still loses its prompt, so filtering on the
-# prompt alone does not help; measured on FineTome, the median prompt is only 54
-# tokens while completions run into the thousands.
+# prompt alone does not help: on FineTome the median prompt is only 54 tokens while
+# completions run into the thousands.
+
+# In[ ]:
+
+
 def _fits_in_the_budget(example):
     messages = example["messages"]
-    # FineTome always has at least two turns, but this notebook invites swapping
-    # the dataset, and a single-turn row has no completion to score.
     if len(messages) < 2: return False
     whole = tokenizer.apply_chat_template(messages, tokenize = True)
     prompt = tokenizer.apply_chat_template(
         messages[:-1], tokenize = True, add_generation_prompt = True,
     )
-    # Room for the prompt AND something after it to score.
     return len(whole) <= max_seq_length and len(prompt) < len(whole)
 
 _before = len(dataset)
@@ -360,12 +331,16 @@ assert len(dataset) > 0, (
     f"no row fits in max_seq_length = {max_seq_length}; raise it or use a "
     "dataset with shorter conversations"
 )
-
-print(dataset)
 print(dataset[0]["messages"][:2])
 
 
 # ### Train
+# 
+# `lmbda`, `beta` and `temperature` are the distillation knobs; the rest is an
+# ordinary TRL config.
+# 
+# No `fp16` or `bf16` is set here on purpose. Unsloth picks the precision per
+# architecture, and overriding it breaks the ones it has already ruled out.
 
 # In[ ]:
 
@@ -386,21 +361,15 @@ config = GKDConfig(
     seed = 3407,
     report_to = "none",
     max_length = max_seq_length,
-
-    # Distillation knobs.
-    lmbda = 0.0,        # 0 off-policy (score the dataset), 1 on-policy (student samples)
-    beta = 0.5,         # 0 forward KL, 1 reverse KL, between is generalized JSD
-    temperature = 1.0,  # distillation temperature, NOT the sampling temperature
+    lmbda = 0.0,        # 0 off-policy, 1 on-policy
+    beta = 0.5,         # 0 forward KL, 1 reverse KL
+    temperature = 1.0,
     max_new_tokens = 64,
-
-    # No fp16 / bf16 here on purpose: Unsloth picks the precision per
-    # architecture, and overriding it breaks the ones it has already ruled out.
-    # Qwen3.8 is such a case ("Using float16 precision for qwen3_5 won't work!
-    # Using float32."). Forcing fp16 = True on a T4 anyway left the dense
-    # lm_head at float16 while activations arrived as bfloat16, and training
-    # died in a plain nn.Linear with "expected mat1 and mat2 to have the same
-    # dtype, but got: c10::BFloat16 != c10::Half".
 )
+
+
+# In[ ]:
+
 
 trainer = GKDTrainer(
     model = student,
@@ -410,14 +379,14 @@ trainer = GKDTrainer(
     processing_class = tokenizer,
 )
 
-# Unsloth patches TRL's trainers, and a config that subclasses SFTConfig used to
-# be silently rebuilt as a plain one, dropping every distillation field. Assert
-# rather than trust it.
 assert type(trainer.args).__name__ == "GKDConfig", type(trainer.args).__name__
 assert trainer.args.lmbda == 0.0 and trainer.args.beta == 0.5
 print(f"args {type(trainer.args).__name__}: lmbda={trainer.args.lmbda} "
       f"beta={trainer.args.beta} temperature={trainer.args.temperature}")
 
+
+# A config that subclasses `SFTConfig` used to be silently rebuilt as a plain one,
+# dropping every distillation field, so the asserts above check rather than trust.
 
 # In[ ]:
 
@@ -436,15 +405,14 @@ history = [h["loss"] for h in trainer.state.log_history if "loss" in h]
 if len(history) >= 2:
     print(f"loss first -> last: {history[0]:.4f} -> {history[-1]:.4f}")
 assert changed > 0, "no adapter changed: the student did not learn"
-print("\nDISTILLATION VERDICT: PASS")
 
 
 # ### What this does and does not cover
 # 
 # `GKDTrainer` holds the teacher in memory alongside the student, so the teacher
-# size is bounded by your GPU, not by the chunked loss. Distilling a
-# Deepseek- or Kimi-class teacher needs a served teacher over HTTP or cached top-k
-# teacher logprobs prepared ahead of training; neither is wired into Unsloth yet.
+# size is bounded by your GPU. Distilling a Deepseek- or Kimi-class teacher needs a
+# served teacher over HTTP or cached top-k teacher logprobs prepared ahead of
+# training; neither is wired into Unsloth yet.
 # 
 # Self-distillation (`teacher = None` above) is the cheapest real configuration:
 # under LoRA the frozen base is already a perfectly good teacher, and it costs no
