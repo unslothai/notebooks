@@ -985,7 +985,26 @@ except Exception:
 # instead. Resolving trl's dependencies would drag transformers back below the
 # floor above, so the pin goes on without them. That is the same pairing the
 # Qwen3.8 conversational Kaggle notebook already ships.
-installation_knowledge_distillation_kaggle_content = installation_qwen3_8_kaggle_content
+# trl 0.25.1, NOT the 0.22.2 the Qwen3.8 block pins, and the difference is one
+# clause. TRL's prepare_peft_model calls peft's prepare_model_for_kbit_training,
+# which freezes every parameter and then upcasts each one that is not Params4bit
+# to float32. The only such parameter that matters is the lm_head, which Unsloth
+# deliberately leaves dense so the distillation projection can read it. On
+# 0.22.2 the call is guarded by `if is_qlora and not is_sharded_qlora`; from
+# 0.24.0 it is `... and not isinstance(model, PeftModel)`, which is our case,
+# since Unsloth has already applied LoRA by the time the trainer is built.
+#
+# Without that clause the upcast costs 4.74 GiB on Qwen3.8 (248320 tokens) and
+# 5.01 GiB on Muse Glimmer, for a tensor that is frozen and therefore gains
+# nothing from fp32 master weights. Both models OOMed on Kaggle 2x T4 building
+# the trainer, with the weights already loaded and sharded across both cards.
+# 0.24.0 through 0.26.2 all have the clause and still expose GKDTrainer at the
+# top level; 0.25.1 is the one this notebook was run against.
+installation_knowledge_distillation_kaggle_content = installation_qwen3_8_kaggle_content.replace(
+    '!uv pip install -qqq --no-deps trl==0.22.2',
+    '!uv pip install -qqq --no-deps trl==0.25.1',
+)
+assert "trl==0.25.1" in installation_knowledge_distillation_kaggle_content
 installation_knowledge_distillation_content = update_or_append_pip_install(
     installation_content,
     "transformers",

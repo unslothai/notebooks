@@ -296,8 +296,13 @@ config = GKDConfig(
     temperature = 1.0,  # distillation temperature, NOT the sampling temperature
     max_new_tokens = 64,
 
-    fp16 = not torch.cuda.is_bf16_supported(),
-    bf16 = torch.cuda.is_bf16_supported(),
+    # No fp16 / bf16 here on purpose: Unsloth picks the precision per
+    # architecture, and overriding it breaks the ones it has already ruled out.
+    # Qwen3.8 is such a case ("Using float16 precision for qwen3_5 won't work!
+    # Using float32."). Forcing fp16 = True on a T4 anyway left the dense
+    # lm_head at float16 while activations arrived as bfloat16, and training
+    # died in a plain nn.Linear with "expected mat1 and mat2 to have the same
+    # dtype, but got: c10::BFloat16 != c10::Half".
 )
 
 trainer = GKDTrainer(
