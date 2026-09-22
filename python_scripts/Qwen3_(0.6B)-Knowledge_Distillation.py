@@ -96,12 +96,15 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 # teacher, and the row filter keeps the run away from the collator behaviour
 # described next. With both, it trains at sequence length 512 with 14.3 GiB peak.
 #
-# muse-glimmer self-distills correctly but does not fit two T4s. With compile
-# disabled and the row filter on, sequence length 384 reaches the training step
-# and then runs out of memory 208 MiB short of the 14.56 GiB card, down from
-# 326 MiB short at 512. Shortening the sequence further is not worth it: the
-# gap closes slowly because the 22.2 GiB of 4-bit weights, not the logits,
-# dominate what is left. Use a card with more memory per device.
+# muse-glimmer self-distills correctly but does not fit two T4s. It no longer
+# needs compile disabled, since unslothai/unsloth#11519 fixed the checkpoint
+# configuration behind its failure, and with that fix all 103 checkpointed
+# layers report use_reentrant = True and it trains with compile on. What stops it
+# is memory: at sequence length 384 it reaches the training step and runs out
+# 208 MiB short of the 14.56 GiB card, down from 326 MiB short at 512.
+# Shortening the sequence further is not worth it, because the gap closes
+# slowly: the 22.2 GiB of 4-bit weights, not the logits, dominate what is left.
+# Use a card with more memory per device.
 #
 # qwen3.8 is blocked on something this notebook cannot fix: the first training
 # step raises "expected mat1 and mat2 to have the same dtype, but got:
@@ -147,17 +150,34 @@ CONFIG = "qwen3"   # the pair proven to fit two T4s; see the table above
 student_name = CONFIGS[CONFIG]["student"]
 teacher_name = CONFIGS[CONFIG]["teacher"]
 
-# Two families here execute a data-dependent graph: gemma-4 "E" checkpoints are
-# elastic (MatFormer), and Muse Glimmer routes tokens to a subset of experts. In
-# both cases the gradient-checkpoint recompute can take a different path than the
-# forward pass did, and training dies inside torch.utils.checkpoint with
+# gemma-4 still needs compile off here, and it is worth being precise about why,
+# because the obvious explanation turned out to be wrong twice.
+#
+# Under torch.compile the gradient-checkpoint recompute can execute a region
+# differently than the forward pass did, and torch.utils.checkpoint refuses the
+# mismatch. It shows up in two forms, depending on which check notices first:
 # "A different number of tensors was saved during the original forward and
-# recomputation" (81 vs 79 on Muse Glimmer at seq 384). Disabling compile for
-# those two is the fix, and it costs nothing for the other configs.
+# recomputation", or "Recomputed values ... have different metadata".
+#
+# Muse Glimmer's case was a configuration bug, now fixed upstream in
+# unslothai/unsloth#11519: GKDConfig inherits gradient_checkpointing = True, so
+# transformers put every layer on the non-reentrant checkpoint path, which is
+# the only one that performs these checks. With use_reentrant pinned back to
+# True it trains with compile on. It is NOT a mixture of experts; it is dense
+# with alternating sliding and full attention.
+#
+# gemma-4 is a genuinely separate problem and is still open. With that fix
+# installed and all 52 layers confirmed on use_reentrant = True, it still fails,
+# and the recompute disagrees about tensor RANK rather than count:
+#   saved      [1, 474, 512]
+#   recomputed [1, 474, 1, 512]
+# That is a real shape divergence between the two executions of the same region,
+# so compile stays off for gemma-4 until it is tracked down. It costs the other
+# configs nothing.
 import os
-if CONFIG.startswith("gemma-4") or CONFIG == "muse-glimmer":
+if CONFIG.startswith("gemma-4"):
     os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
-    print(f"{CONFIG} routes data-dependently: UNSLOTH_COMPILE_DISABLE=1 for this run")
+    print(f"{CONFIG}: UNSLOTH_COMPILE_DISABLE=1 for this run, see the note above")
 
 # Sequence length. The row filter below drops conversations that do not fit, so
 # this is now purely a memory knob: GKD holds full (batch, seq, vocab) logits for
