@@ -307,6 +307,30 @@ dataset = standardize_sharegpt(dataset)
 dataset = dataset.rename_column("conversations", "messages")
 dataset = dataset.remove_columns([c for c in dataset.column_names if c != "messages"])
 
+# Drop rows whose prompt leaves no room for a completion. GKD scores the
+# completion, so if everything up to the last turn already fills max_length the
+# completion truncates to nothing and the loss indexes a zero-length axis:
+# "mask [1, 512] does not match the shape of the indexed tensor [1, 0, 262144]".
+#
+# This is a long tail, not a small budget. On FineTome the median prompt is 54
+# tokens, but the 99th percentile is 2287 and the longest is 2767, so at 512
+# about one row in ten has no room and a single one of them ends the run.
+# Filtering is what makes a short sequence length usable at all; raising the
+# budget does not fix it, since even 1024 leaves such rows behind.
+MIN_COMPLETION_TOKENS = 64
+
+def _leaves_room_for_a_completion(example):
+    prompt = tokenizer.apply_chat_template(
+        example["messages"][:-1], tokenize = True, add_generation_prompt = True,
+    )
+    return len(prompt) <= max_seq_length - MIN_COMPLETION_TOKENS
+
+_before = len(dataset)
+dataset = dataset.filter(_leaves_room_for_a_completion)
+print(f"kept {len(dataset)}/{_before} rows with at least "
+      f"{MIN_COMPLETION_TOKENS} tokens left for a completion")
+assert len(dataset) > 0, "max_seq_length is too small for every prompt in this dataset"
+
 print(dataset)
 print(dataset[0]["messages"][:2])
 
