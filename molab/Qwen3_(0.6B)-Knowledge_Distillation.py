@@ -13,7 +13,7 @@
 #     "torchao>=0.16.0",
 #     "transformers==5.15.1",
 #     "triton>=3.2.0",
-#     "trl==0.22.2",
+#     "trl==0.25.1",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
 # ]
@@ -409,6 +409,7 @@ def _(
     teacher_name,
     torch,
 ):
+    teacher_processor = None  # only a separate teacher brings its own
     if teacher_name is None:
         teacher = FrozenBaseTeacher(student_1)
         print("self-distillation: teacher is the student's base with adapters disabled")

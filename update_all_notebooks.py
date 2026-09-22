@@ -1010,6 +1010,15 @@ installation_knowledge_distillation_content = update_or_append_pip_install(
     "transformers",
     "!pip install transformers==5.15.1",
 )
+# Same TRL pin as the Kaggle variant above. The Colab and local outputs would
+# otherwise keep the global 0.22.2, so the notebook would be running against a
+# different TRL from the one it was verified on.
+installation_knowledge_distillation_content = installation_knowledge_distillation_content.replace(
+    "!pip install --no-deps trl==0.22.2",
+    "!pip install --no-deps trl==0.25.1",
+)
+assert "trl==0.25.1" in installation_knowledge_distillation_content
+assert "trl==0.22.2" not in installation_knowledge_distillation_content
 
 # A wheel, not a source build of `main`: every sglang release pins ONE exact
 # transformers, so cloning main and then forcing transformers==4.53.0 left the

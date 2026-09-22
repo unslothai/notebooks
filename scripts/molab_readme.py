@@ -69,6 +69,7 @@ def _badge_markdown(nb: "MolabNotebook") -> str:
 # (KNOWN_TYPES_ORDERED / TYPE_MAPPING) so the molab Type column matches the
 # Colab and AMD tables. Longer phrases first so they win over substrings.
 _KNOWN_TYPES_ORDERED = [
+    "Knowledge Distillation",
     "Tool Calling", "Text Completion", "Synthetic Data",
     "Reasoning Conversational", "Vision GRPO", "Fine Tuning", "500K Context",
     "QAT", "Conversational", "Alpaca", "Vision", "Reasoning", "Completion",

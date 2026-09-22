@@ -276,6 +276,8 @@ class FrozenBaseTeacher(torch.nn.Module):
 # In[ ]:
 
 
+teacher_processor = None    # only a separate teacher brings its own
+
 if teacher_name is None:
     teacher = FrozenBaseTeacher(student)
     print("self-distillation: teacher is the student's base with adapters disabled")
