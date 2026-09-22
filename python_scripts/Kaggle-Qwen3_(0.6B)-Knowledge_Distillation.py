@@ -88,13 +88,20 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 #   config        weights           Kaggle 2x T4 result at these settings
 #   qwen3         1.2 + 3.4 GB      PASS, loss 0.413, 392/392 adapters, 10.9 GB
 #   gemma-4       8.1 + 10.9 GB     PASS, loss 0.079, 410/410 adapters, 14.3 GB
-#   muse-glimmer  22.2 GB           self-distillation, needs seq 384 and no compile
+#   muse-glimmer  22.2 GB           OOM on 2x T4 by 208 MiB, needs a larger card
 #   qwen3.8       22.3 GB           blocked on a dtype mismatch, see below
 #
 # gemma-4 needs two things to fit two T4s, and both are in the cells below.
 # unslothai/unsloth-zoo#1328 removes a 5.25 GiB transient while placing the
 # teacher, and the row filter keeps the run away from the collator behaviour
 # described next. With both, it trains at sequence length 512 with 14.3 GiB peak.
+#
+# muse-glimmer self-distills correctly but does not fit two T4s. With compile
+# disabled and the row filter on, sequence length 384 reaches the training step
+# and then runs out of memory 208 MiB short of the 14.56 GiB card, down from
+# 326 MiB short at 512. Shortening the sequence further is not worth it: the
+# gap closes slowly because the 22.2 GiB of 4-bit weights, not the logits,
+# dominate what is left. Use a card with more memory per device.
 #
 # qwen3.8 is blocked on something this notebook cannot fix: the first training
 # step raises "expected mat1 and mat2 to have the same dtype, but got:
