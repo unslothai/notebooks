@@ -153,6 +153,11 @@ if CONFIG.startswith("gemma-4"):
     os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
     print("gemma-4 is elastic: UNSLOTH_COMPILE_DISABLE=1 set for this run")
 
+# Sequence length has a floor as well as a ceiling here. GKD scores the
+# completion, so if the prompt fills the whole budget there are no completion
+# tokens left and the loss indexes a zero-length axis: "mask [1, 384] does not
+# match the shape of the indexed tensor [1, 0, 262144]". Seen at 256 on Muse
+# Glimmer and at 384 on gemma-4 with FineTome. 1024 is comfortably clear of it.
 max_seq_length = 1024
 load_in_4bit = True
 print(f"student: {student_name}")
