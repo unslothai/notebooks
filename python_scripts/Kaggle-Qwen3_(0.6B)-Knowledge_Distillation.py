@@ -320,6 +320,10 @@ dataset = dataset.remove_columns([c for c in dataset.column_names if c != "messa
 MIN_COMPLETION_TOKENS = 64
 
 def _leaves_room_for_a_completion(example):
+    # FineTome always has at least two turns, but this notebook invites swapping
+    # the dataset, and a single-turn row would ask the template to render an
+    # empty prompt.
+    if len(example["messages"]) < 2: return False
     prompt = tokenizer.apply_chat_template(
         example["messages"][:-1], tokenize = True, add_generation_prompt = True,
     )
