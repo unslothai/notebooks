@@ -29,7 +29,7 @@
 
 import marimo
 
-__generated_with = "0.24.2"
+__generated_with = "0.23.8"
 app = marimo.App()
 
 
@@ -164,20 +164,20 @@ def _(mo):
 def _():
     CONFIGS = {
         "gemma-4": dict(
-            student = "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit",
-            teacher = "unsloth/gemma-4-E4B-it-unsloth-bnb-4bit",
+            student="unsloth/gemma-4-E2B-it-unsloth-bnb-4bit",
+            teacher="unsloth/gemma-4-E4B-it-unsloth-bnb-4bit",
         ),
         "qwen3": dict(
-            student = "unsloth/Qwen3-0.6B",
-            teacher = "unsloth/Qwen3-1.7B",
+            student="unsloth/Qwen3-0.6B",
+            teacher="unsloth/Qwen3-1.7B",
         ),
         "qwen3.8": dict(
-            student = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit",
-            teacher = None,
+            student="unsloth/Qwen3.8-27B-unsloth-bnb-4bit",
+            teacher=None,
         ),
         "muse-glimmer": dict(
-            student = "unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
-            teacher = None,
+            student="unsloth/Muse-Glimmer-30B-unsloth-bnb-4bit",
+            teacher=None,
         ),
     }
 
@@ -222,13 +222,16 @@ def _(mo):
 @app.cell
 def _(CONFIG, student_name, teacher_name):
     import os
+
     if CONFIG.startswith("gemma-4"):
         os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
 
     max_seq_length = 1024
     load_in_4bit = True
     print(f"student: {student_name}")
-    print(f"teacher: {teacher_name or '(self-distillation: the student\'s own frozen base)'}")
+    print(
+        f"teacher: {teacher_name or "(self-distillation: the student's own frozen base)"}"
+    )
     return load_in_4bit, max_seq_length
 
 
@@ -247,9 +250,9 @@ def _(load_in_4bit, max_seq_length, student_name):
 
     student, processor = FastLanguageModel.from_pretrained(
         student_name,
-        max_seq_length = max_seq_length,
-        dtype = None,
-        load_in_4bit = load_in_4bit,
+        max_seq_length=max_seq_length,
+        dtype=None,
+        load_in_4bit=load_in_4bit,
     )
     return FastLanguageModel, processor, student, torch
 
@@ -269,7 +272,9 @@ def _(processor):
     def text_tokenizer(maybe_processor):
         inner = getattr(maybe_processor, "tokenizer", None)
         if inner is not None and type(maybe_processor).__name__.endswith("Processor"):
-            print(f"unwrapped {type(maybe_processor).__name__} -> {type(inner).__name__}")
+            print(
+                f"unwrapped {type(maybe_processor).__name__} -> {type(inner).__name__}"
+            )
             return inner
         return maybe_processor
 
@@ -290,8 +295,12 @@ def _(mo):
 @app.cell
 def _(student):
     head = student.get_output_embeddings()
-    assert head.weight.dim() == 2, f"output head is not dense: {type(head.weight).__name__}"
-    print(f"output head {type(head).__name__} {tuple(head.weight.shape)} {head.weight.dtype}")
+    assert head.weight.dim() == 2, (
+        f"output head is not dense: {type(head.weight).__name__}"
+    )
+    print(
+        f"output head {type(head).__name__} {tuple(head.weight.shape)} {head.weight.dtype}"
+    )
     return
 
 
@@ -305,9 +314,26 @@ def _(mo):
 
 @app.cell
 def _(FastLanguageModel, student):
-    student_1 = FastLanguageModel.get_peft_model(student, r=16, lora_alpha=32, lora_dropout=0, bias='none', target_modules=['q_proj', 'k_proj', 'v_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj'], use_gradient_checkpointing='unsloth', random_state=3407)
+    student_1 = FastLanguageModel.get_peft_model(
+        student,
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0,
+        bias="none",
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+        use_gradient_checkpointing="unsloth",
+        random_state=3407,
+    )
     trainable = [n for n, p in student_1.named_parameters() if p.requires_grad]
-    print(f'{len(trainable)} trainable tensors')
+    print(f"{len(trainable)} trainable tensors")
     return (student_1,)
 
 
@@ -356,6 +382,7 @@ def _(mo):
 def _(torch):
     class FrozenBaseTeacher(torch.nn.Module):
         """The student with its adapters switched off for the duration of the call."""
+
         def __init__(self, peft_student):
             super().__init__()
             object.__setattr__(self, "student", peft_student)
@@ -386,19 +413,30 @@ def _(
         print("self-distillation: teacher is the student's base with adapters disabled")
     else:
         import gc
+
         gc.collect()
         torch.cuda.empty_cache()
         TEACHER_HEADROOM_GIB = 2.0
         max_memory = {}
         for _d in range(torch.cuda.device_count()):
             _free, _total = torch.cuda.mem_get_info(_d)
-            max_memory[_d] = max(int(_free - TEACHER_HEADROOM_GIB * 2 ** 30), 0)
-            print(f'cuda:{_d} free {_free / 2 ** 30:.2f} GiB of {_total / 2 ** 30:.2f} GiB -> teacher budget {max_memory[_d] / 2 ** 30:.2f} GiB')
-        teacher, teacher_processor = FastLanguageModel.from_pretrained(teacher_name, max_seq_length=max_seq_length, dtype=None, load_in_4bit=load_in_4bit, max_memory=max_memory)
+            max_memory[_d] = max(int(_free - TEACHER_HEADROOM_GIB * 2**30), 0)
+            print(
+                f"cuda:{_d} free {_free / 2**30:.2f} GiB of {_total / 2**30:.2f} GiB -> teacher budget {max_memory[_d] / 2**30:.2f} GiB"
+            )
+        teacher, teacher_processor = FastLanguageModel.from_pretrained(
+            teacher_name,
+            max_seq_length=max_seq_length,
+            dtype=None,
+            load_in_4bit=load_in_4bit,
+            max_memory=max_memory,
+        )
         teacher.eval()
         for p in teacher.parameters():
             p.requires_grad_(False)
-        print(f'teacher loaded, {sum((p.requires_grad for p in teacher.parameters()))} trainable (must be 0)')
+        print(
+            f"teacher loaded, {sum((p.requires_grad for p in teacher.parameters()))} trainable (must be 0)"
+        )
     return (teacher,)
 
 
@@ -414,12 +452,21 @@ def _(mo):
 
 @app.cell
 def _(student_1, teacher, tokenizer, torch):
-    _ids = tokenizer('The capital of France is', return_tensors='pt').input_ids.to(student_1.device)
+    _ids = tokenizer("The capital of France is", return_tensors="pt").input_ids.to(
+        student_1.device
+    )
     with torch.no_grad():
-        _gap = (student_1(input_ids=_ids).logits - teacher(input_ids=_ids).logits).abs().max().item()
-    print(f'max teacher-student logit gap: {_gap:.3f}')
+        _gap = (
+            (student_1(input_ids=_ids).logits - teacher(input_ids=_ids).logits)
+            .abs()
+            .max()
+            .item()
+        )
+    print(f"max teacher-student logit gap: {_gap:.3f}")
     if _gap == 0:
-        print('WARNING: the teacher matches the student exactly, so the divergence and its\ngradient are both zero. Expected for self-distillation from a fresh adapter;\nload an adapter you trained earlier to give this mode something to learn.')
+        print(
+            "WARNING: the teacher matches the student exactly, so the divergence and its\ngradient are both zero. Expected for self-distillation from a fresh adapter;\nload an adapter you trained earlier to give this mode something to learn."
+        )
     return
 
 
@@ -436,8 +483,10 @@ def _(student_1, teacher, teacher_name):
     if teacher_name is not None:
         s_vocab = student_1.config.get_text_config().vocab_size
         t_vocab = teacher.config.get_text_config().vocab_size
-        assert s_vocab == t_vocab, f'vocab mismatch: student {s_vocab} vs teacher {t_vocab}'
-        print(f'vocabularies match: {s_vocab}')
+        assert s_vocab == t_vocab, (
+            f"vocab mismatch: student {s_vocab} vs teacher {t_vocab}"
+        )
+        print(f"vocabularies match: {s_vocab}")
     return
 
 
@@ -458,10 +507,12 @@ def _():
     from datasets import load_dataset
     from unsloth.chat_templates import standardize_sharegpt
 
-    dataset = load_dataset("mlabonne/FineTome-100k", split = "train[:500]")
+    dataset = load_dataset("mlabonne/FineTome-100k", split="train[:500]")
     dataset = standardize_sharegpt(dataset)
     dataset = dataset.rename_column("conversations", "messages")
-    dataset = dataset.remove_columns([c for c in dataset.column_names if c != "messages"])
+    dataset = dataset.remove_columns(
+        [c for c in dataset.column_names if c != "messages"]
+    )
     return (dataset,)
 
 
@@ -495,17 +546,22 @@ def _(mo):
 @app.cell
 def _(dataset, max_seq_length, tokenizer):
     def _fits_in_the_budget(example):
-        messages = example['messages']
+        messages = example["messages"]
         if len(messages) < 2:
             return False
         whole = tokenizer.apply_chat_template(messages, tokenize=True)
-        prompt = tokenizer.apply_chat_template(messages[:-1], tokenize=True, add_generation_prompt=True)
+        prompt = tokenizer.apply_chat_template(
+            messages[:-1], tokenize=True, add_generation_prompt=True
+        )
         return len(whole) <= max_seq_length and len(prompt) < len(whole)
+
     _before = len(dataset)
     dataset_1 = dataset.filter(_fits_in_the_budget)
-    print(f'kept {len(dataset_1)}/{_before} rows that fit in {max_seq_length} tokens')
-    assert len(dataset_1) > 0, f'no row fits in max_seq_length = {max_seq_length}; raise it or use a dataset with shorter conversations'
-    print(dataset_1[0]['messages'][:2])
+    print(f"kept {len(dataset_1)}/{_before} rows that fit in {max_seq_length} tokens")
+    assert len(dataset_1) > 0, (
+        f"no row fits in max_seq_length = {max_seq_length}; raise it or use a dataset with shorter conversations"
+    )
+    print(dataset_1[0]["messages"][:2])
     return (dataset_1,)
 
 
@@ -528,33 +584,41 @@ def _(max_seq_length):
     from trl import GKDConfig, GKDTrainer
 
     config = GKDConfig(
-        output_dir = "outputs",
-        per_device_train_batch_size = 1,
-        gradient_accumulation_steps = 4,
-        warmup_steps = 5,
-        max_steps = 30,
-        learning_rate = 2e-4,
-        logging_steps = 1,
-        optim = "adamw_8bit",
-        weight_decay = 0.01,
-        lr_scheduler_type = "linear",
-        seed = 3407,
-        report_to = "none",
-        max_length = max_seq_length,
-        lmbda = 0.0,        # 0 off-policy, 1 on-policy
-        beta = 0.5,         # 0 forward KL, 1 reverse KL
-        temperature = 1.0,
-        max_new_tokens = 64,
+        output_dir="outputs",
+        per_device_train_batch_size=1,
+        gradient_accumulation_steps=4,
+        warmup_steps=5,
+        max_steps=30,
+        learning_rate=2e-4,
+        logging_steps=1,
+        optim="adamw_8bit",
+        weight_decay=0.01,
+        lr_scheduler_type="linear",
+        seed=3407,
+        report_to="none",
+        max_length=max_seq_length,
+        lmbda=0.0,  # 0 off-policy, 1 on-policy
+        beta=0.5,  # 0 forward KL, 1 reverse KL
+        temperature=1.0,
+        max_new_tokens=64,
     )
     return GKDTrainer, config
 
 
 @app.cell
 def _(GKDTrainer, config, dataset_1, student_1, teacher, tokenizer):
-    trainer = GKDTrainer(model=student_1, teacher_model=teacher, args=config, train_dataset=dataset_1, processing_class=tokenizer)
-    assert type(trainer.args).__name__ == 'GKDConfig', type(trainer.args).__name__
+    trainer = GKDTrainer(
+        model=student_1,
+        teacher_model=teacher,
+        args=config,
+        train_dataset=dataset_1,
+        processing_class=tokenizer,
+    )
+    assert type(trainer.args).__name__ == "GKDConfig", type(trainer.args).__name__
     assert trainer.args.lmbda == 0.0 and trainer.args.beta == 0.5
-    print(f'args {type(trainer.args).__name__}: lmbda={trainer.args.lmbda} beta={trainer.args.beta} temperature={trainer.args.temperature}')
+    print(
+        f"args {type(trainer.args).__name__}: lmbda={trainer.args.lmbda} beta={trainer.args.beta} temperature={trainer.args.temperature}"
+    )
     return (trainer,)
 
 
@@ -569,17 +633,27 @@ def _(mo):
 
 @app.cell
 def _(student_1, torch, trainer):
-    before = {n: p.detach().clone() for n, p in student_1.named_parameters() if p.requires_grad}
+    before = {
+        n: p.detach().clone()
+        for n, p in student_1.named_parameters()
+        if p.requires_grad
+    }
     result = trainer.train()
-    changed = sum((1 for n, p in student_1.named_parameters() if p.requires_grad and (not torch.equal(p.detach(), before[n]))))
+    changed = sum(
+        (
+            1
+            for n, p in student_1.named_parameters()
+            if p.requires_grad and (not torch.equal(p.detach(), before[n]))
+        )
+    )
     peak = torch.cuda.max_memory_allocated() / 1000000000.0
-    print(f'\ntrain loss      : {result.training_loss}')
-    print(f'adapters changed: {changed}/{len(before)}')
-    print(f'peak memory     : {peak:.2f} GB')
-    history = [h['loss'] for h in trainer.state.log_history if 'loss' in h]
+    print(f"\ntrain loss      : {result.training_loss}")
+    print(f"adapters changed: {changed}/{len(before)}")
+    print(f"peak memory     : {peak:.2f} GB")
+    history = [h["loss"] for h in trainer.state.log_history if "loss" in h]
     if len(history) >= 2:
-        print(f'loss first -> last: {history[0]:.4f} -> {history[-1]:.4f}')
-    assert changed > 0, 'no adapter changed: the student did not learn'
+        print(f"loss first -> last: {history[0]:.4f} -> {history[-1]:.4f}")
+    assert changed > 0, "no adapter changed: the student did not learn"
     return
 
 
