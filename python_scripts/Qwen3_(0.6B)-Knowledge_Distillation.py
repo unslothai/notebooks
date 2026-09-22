@@ -88,7 +88,7 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 #   config        weights           Kaggle 2x T4 result at these settings
 #   qwen3         1.2 + 3.4 GB      PASS, loss 0.413, 392/392 adapters, 10.9 GB
 #   gemma-4       8.1 + 10.9 GB     PASS, loss 0.079, 410/410 adapters, 14.3 GB
-#   muse-glimmer  22.2 GB           self-distillation, tight
+#   muse-glimmer  22.2 GB           self-distillation, needs seq 384 and no compile
 #   qwen3.8       22.3 GB           blocked on a dtype mismatch, see below
 #
 # gemma-4 needs two things to fit two T4s, and both are in the cells below.
@@ -140,22 +140,22 @@ CONFIG = "qwen3"   # the pair proven to fit two T4s; see the table above
 student_name = CONFIGS[CONFIG]["student"]
 teacher_name = CONFIGS[CONFIG]["teacher"]
 
-# Gemma-4 "E" checkpoints are elastic (MatFormer): execution is data dependent,
-# so under torch.compile the gradient-checkpoint recompute can select a different
-# compiled graph than the forward pass and training dies with
-# "CheckpointError: Recomputed values ... have different metadata". Reproduced on
-# E2B <- E4B; disabling compile for that family alone is the fix, and it costs
-# nothing for every other config here.
+# Two families here execute a data-dependent graph: gemma-4 "E" checkpoints are
+# elastic (MatFormer), and Muse Glimmer routes tokens to a subset of experts. In
+# both cases the gradient-checkpoint recompute can take a different path than the
+# forward pass did, and training dies inside torch.utils.checkpoint with
+# "A different number of tensors was saved during the original forward and
+# recomputation" (81 vs 79 on Muse Glimmer at seq 384). Disabling compile for
+# those two is the fix, and it costs nothing for the other configs.
 import os
-if CONFIG.startswith("gemma-4"):
+if CONFIG.startswith("gemma-4") or CONFIG == "muse-glimmer":
     os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
-    print("gemma-4 is elastic: UNSLOTH_COMPILE_DISABLE=1 set for this run")
+    print(f"{CONFIG} routes data-dependently: UNSLOTH_COMPILE_DISABLE=1 for this run")
 
-# Sequence length has a floor as well as a ceiling here. GKD scores the
-# completion, so if the prompt fills the whole budget there are no completion
-# tokens left and the loss indexes a zero-length axis: "mask [1, 384] does not
-# match the shape of the indexed tensor [1, 0, 262144]". Seen at 256 on Muse
-# Glimmer and at 384 on gemma-4 with FineTome. 1024 is comfortably clear of it.
+# Sequence length. The row filter below drops conversations that do not fit, so
+# this is now purely a memory knob: GKD holds full (batch, seq, vocab) logits for
+# both models, so halving it halves the dominant term. 1024 is proven on the
+# qwen3 pair; the large self-distillation configs need less.
 max_seq_length = 1024
 load_in_4bit = True
 print(f"student: {student_name}")
