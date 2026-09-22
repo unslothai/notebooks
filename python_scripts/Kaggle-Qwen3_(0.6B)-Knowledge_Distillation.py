@@ -307,33 +307,42 @@ dataset = standardize_sharegpt(dataset)
 dataset = dataset.rename_column("conversations", "messages")
 dataset = dataset.remove_columns([c for c in dataset.column_names if c != "messages"])
 
-# Drop rows whose prompt leaves no room for a completion. GKD scores the
-# completion, so if everything up to the last turn already fills max_length the
-# completion truncates to nothing and the loss indexes a zero-length axis:
-# "mask [1, 512] does not match the shape of the indexed tensor [1, 0, 262144]".
+# Drop rows that do not fit in max_seq_length as a whole.
 #
-# This is a long tail, not a small budget. On FineTome the median prompt is 54
-# tokens, but the 99th percentile is 2287 and the longest is 2767, so at 512
-# about one row in ten has no room and a single one of them ends the run.
-# Filtering is what makes a short sequence length usable at all; raising the
-# budget does not fix it, since even 1024 leaves such rows behind.
-MIN_COMPLETION_TOKENS = 64
-
-def _leaves_room_for_a_completion(example):
+# GKD's collator returns a `prompts` tensor alongside `input_ids`, and the loss
+# slices with it:
+#
+#     prompt_lengths = inputs["prompts"].shape[1]
+#     shifted_student_logits = student_outputs.logits[:, prompt_lengths - 1 : -1, :]
+#
+# When a row is longer than max_length the collator truncates it, and the prompt
+# is what gets dropped: `prompts` comes back with width 0, so the slice becomes
+# logits[:, -1:-1, :], which is empty, while the labels stay full width. That is
+# the "mask [1, 512] does not match ... tensor [1, 0, 262144]" failure.
+#
+# Note this is about the TOTAL length, not the prompt's. A short prompt with a
+# long answer still overflows and still loses its prompt, so filtering on the
+# prompt alone does not help; measured on FineTome, the median prompt is only 54
+# tokens while completions run into the thousands.
+def _fits_in_the_budget(example):
+    messages = example["messages"]
     # FineTome always has at least two turns, but this notebook invites swapping
-    # the dataset, and a single-turn row would ask the template to render an
-    # empty prompt.
-    if len(example["messages"]) < 2: return False
+    # the dataset, and a single-turn row has no completion to score.
+    if len(messages) < 2: return False
+    whole = tokenizer.apply_chat_template(messages, tokenize = True)
     prompt = tokenizer.apply_chat_template(
-        example["messages"][:-1], tokenize = True, add_generation_prompt = True,
+        messages[:-1], tokenize = True, add_generation_prompt = True,
     )
-    return len(prompt) <= max_seq_length - MIN_COMPLETION_TOKENS
+    # Room for the prompt AND something after it to score.
+    return len(whole) <= max_seq_length and len(prompt) < len(whole)
 
 _before = len(dataset)
-dataset = dataset.filter(_leaves_room_for_a_completion)
-print(f"kept {len(dataset)}/{_before} rows with at least "
-      f"{MIN_COMPLETION_TOKENS} tokens left for a completion")
-assert len(dataset) > 0, "max_seq_length is too small for every prompt in this dataset"
+dataset = dataset.filter(_fits_in_the_budget)
+print(f"kept {len(dataset)}/{_before} rows that fit in {max_seq_length} tokens")
+assert len(dataset) > 0, (
+    f"no row fits in max_seq_length = {max_seq_length}; raise it or use a "
+    "dataset with shorter conversations"
+)
 
 print(dataset)
 print(dataset[0]["messages"][:2])
