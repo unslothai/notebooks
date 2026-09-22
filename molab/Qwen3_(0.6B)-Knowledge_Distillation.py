@@ -154,8 +154,10 @@ def _(mo):
     | `muse-glimmer` | 22.2 GB | self-distillation, OOM by 208 MiB at seq 384 |
     | `qwen3.8` | 22.3 GB | self-distillation, blocked on a dtype mismatch |
 
-    `unsloth/gemma-4-26B-A4B-it` is 51.6 GB with no prebuilt 4-bit, so it needs an
-    A100 or better. Listed for that case, not for T4.
+    `unsloth/gemma-4-26B-A4B-it` is deliberately not offered above. At 51.6 GB with
+    no prebuilt 4-bit it needs an A100 or better, so add it as a teacher yourself if
+    you have the card rather than have it fail on the hardware this notebook
+    targets.
     """)
     return
 
@@ -229,9 +231,8 @@ def _(CONFIG, student_name, teacher_name):
     max_seq_length = 1024
     load_in_4bit = True
     print(f"student: {student_name}")
-    print(
-        f"teacher: {teacher_name or "(self-distillation: the student's own frozen base)"}"
-    )
+    teacher_label = teacher_name or "(self-distillation: the student's own frozen base)"
+    print(f"teacher: {teacher_label}")
     return load_in_4bit, max_seq_length
 
 
@@ -279,7 +280,7 @@ def _(processor):
         return maybe_processor
 
     tokenizer = text_tokenizer(processor)
-    return (tokenizer,)
+    return text_tokenizer, tokenizer
 
 
 @app.cell(hide_code=True)
@@ -437,7 +438,7 @@ def _(
         print(
             f"teacher loaded, {sum((p.requires_grad for p in teacher.parameters()))} trainable (must be 0)"
         )
-    return (teacher,)
+    return teacher, teacher_processor
 
 
 @app.cell(hide_code=True)
@@ -473,20 +474,35 @@ def _(student_1, teacher, tokenizer, torch):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Same vocabulary, or the loss is a shape error rather than a bad number.
+    Same vocabulary, or the loss compares probabilities for unrelated tokens. Equal
+    width is not enough to establish that: Qwen2.5-0.5B and Qwen2.5-7B are both
+    151936 wide but assign different ids, so a width check passes and the run is
+    quietly meaningless. Compare what the two tokenizers actually produce.
     """)
     return
 
 
 @app.cell
-def _(student_1, teacher, teacher_name):
+def _(
+    student_1,
+    teacher,
+    teacher_name,
+    teacher_processor,
+    text_tokenizer,
+    tokenizer,
+):
     if teacher_name is not None:
         s_vocab = student_1.config.get_text_config().vocab_size
         t_vocab = teacher.config.get_text_config().vocab_size
         assert s_vocab == t_vocab, (
-            f"vocab mismatch: student {s_vocab} vs teacher {t_vocab}"
+            f"vocab width mismatch: student {s_vocab} vs teacher {t_vocab}"
         )
-        print(f"vocabularies match: {s_vocab}")
+        probe = "The quick brown fox jumps over 0123456789 lazy dogs, naively."
+        teacher_tokenizer = text_tokenizer(teacher_processor)
+        assert tokenizer(probe).input_ids == teacher_tokenizer(probe).input_ids, (
+            "same vocabulary width but different token ids, so the two models do not share a vocabulary and GKD cannot compare their distributions"
+        )
+        print(f"vocabularies match: {s_vocab}, and the ids agree")
     return
 
 
