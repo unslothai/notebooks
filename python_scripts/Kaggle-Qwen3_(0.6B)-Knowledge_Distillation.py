@@ -228,6 +228,20 @@ if teacher_name is None:
     teacher = student
     print("self-distillation: teacher is the student's base with adapters disabled")
 else:
+    # Release the caching allocator's reserved-but-unused blocks before the
+    # second model is placed. Unsloth budgets the teacher against what it sees
+    # as free, and after the student has loaded and had LoRA attached, PyTorch
+    # is still holding reserve it is not using. On gemma-4 E2B <- E4B across two
+    # T4s the planner budgeted 8.94 GiB on cuda:0 and tried to put 5.253 GiB
+    # there, while the card actually had 4.70 GiB free with 9.86 GiB in use
+    # against only 4.445 GiB of student weights. Both cards were in use and the
+    # weights fit; the gap was reserve, so hand it back first.
+    import gc
+    gc.collect()
+    torch.cuda.empty_cache()
+    free0, total0 = torch.cuda.mem_get_info(0)
+    print(f"before teacher load: cuda:0 {free0/2**30:.2f} GiB free of {total0/2**30:.2f} GiB")
+
     teacher, teacher_processor = FastLanguageModel.from_pretrained(
         teacher_name,
         max_seq_length = max_seq_length,
