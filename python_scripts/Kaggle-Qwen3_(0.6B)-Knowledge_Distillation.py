@@ -239,14 +239,30 @@ else:
     import gc
     gc.collect()
     torch.cuda.empty_cache()
-    free0, total0 = torch.cuda.mem_get_info(0)
-    print(f"before teacher load: cuda:0 {free0/2**30:.2f} GiB free of {total0/2**30:.2f} GiB")
+
+    # Give the planner explicit budgets rather than letting it size the teacher
+    # against every byte that looks free. Left alone it does
+    # `free, _ = torch.cuda.mem_get_info(d); raw_budgets[d] = int(free)`, which
+    # leaves nothing for the transient buffers the load itself needs: on
+    # gemma-4 E2B <- E4B it budgeted 8.94 GiB on cuda:0 when 9.93 GiB was free,
+    # and by the time the weights were being placed only 4.70 GiB remained.
+    # Both cards were in use and the weights fit; the budget was simply the
+    # whole card. `max_memory` reaches the planner through
+    # planner_kwargs_with_max_memory, so hold some back on every card.
+    TEACHER_HEADROOM_GIB = 2.0
+    max_memory = {}
+    for _d in range(torch.cuda.device_count()):
+        _free, _total = torch.cuda.mem_get_info(_d)
+        max_memory[_d] = max(int(_free - TEACHER_HEADROOM_GIB * 2**30), 0)
+        print(f"cuda:{_d} free {_free/2**30:.2f} GiB of {_total/2**30:.2f} GiB"
+              f" -> teacher budget {max_memory[_d]/2**30:.2f} GiB")
 
     teacher, teacher_processor = FastLanguageModel.from_pretrained(
         teacher_name,
         max_seq_length = max_seq_length,
         dtype = None,
         load_in_4bit = load_in_4bit,
+        max_memory = max_memory,
     )
     teacher.eval()
     for p in teacher.parameters():
