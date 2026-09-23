@@ -36,11 +36,9 @@
 get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\n# Pin Kaggle\'s torch and torchvision: upgrading them pulls a CUDA 13.0 torch onto\n# Kaggle\'s CUDA 12.8 torchaudio, which then refuses to import. Pin the base version,\n# since the local +cu128 label does not exist on the index.\ntry:\n    import torch, torchvision\n    _torch = f\'torch=={torch.__version__.split("+")[0]}\'\n    _tv = f\'torchvision=={torchvision.__version__.split("+")[0]}\'\nexcept Exception:\n    _torch, _tv = "torch", "torchvision"\n!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth\n!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"\n!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install -qqq transformers==5.15.1\n!uv pip install -qqq --no-deps trl==0.25.1\n')
 
 
-# GKD needs unslothai/unsloth#11440 and unslothai/unsloth-zoo#1310, which are on
-# main but not yet in a PyPI release. Without them the generated trainer downcasts
-# `GKDConfig` back to `SFTConfig` and silently drops `lmbda`, `beta` and
-# `temperature`, so distillation degrades to plain SFT with no error
-# (unslothai/unsloth#1941). Delete the next cell once a release carries both.
+# GKD needs unslothai/unsloth#11440 and unslothai/unsloth-zoo#1310, on main but
+# not yet released. Without them `GKDConfig` is downcast to `SFTConfig` and
+# distillation silently becomes plain SFT. Delete the next cell once released.
 
 # In[ ]:
 
@@ -50,40 +48,18 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 
 # ### Knowledge distillation with Unsloth
 # 
-# Distillation trains a small **student** to match the output distribution of a
-# larger **teacher**, rather than to match one-hot labels. It usually beats plain
-# finetuning at the same student size, because a full distribution carries far more
-# signal per token than a single correct answer.
-# 
-# This notebook uses TRL's `GKDTrainer`, which Unsloth patches like any other TRL
-# trainer.
+# Train a small **student** to match a larger **teacher**'s output distribution
+# rather than one-hot labels, which carries far more signal per token. Uses TRL's
+# `GKDTrainer`, which Unsloth patches like any other TRL trainer.
 
-# Three things are worth knowing before you change the models:
-# 
-# 1. **Student and teacher must share a vocabulary.** The loss compares two
-#    distributions position by position, so a mismatch is not a quality problem, it
-#    is a shape error. Same family is the safe rule; even within a family, check.
-# 2. **A multimodal checkpoint hands back a processor, not a tokenizer.** Every
-#    model here is a `*ForConditionalGeneration`, and passing the processor to a
-#    text-only trainer makes it try to read the rendered chat prompt as an image
-#    (`Incorrect image source`). Unwrap it, as the helper below does.
-# 3. **`lmbda` picks off-policy or on-policy.** `lmbda = 0` scores the fixed
-#    dataset completions; `lmbda = 1` makes the student generate and scores its own
-#    samples, which costs generation per step but avoids the train/inference
-#    mismatch. `beta` interpolates the divergence: 0 is forward KL, 1 is reverse
-#    KL, in between is generalized JSD.
+# Before changing the models: **student and teacher must share a vocabulary**.
+# **`lmbda`** picks off-policy (`0`) or on-policy (`1`, the student scores its own
+# samples); **`beta`** picks the divergence, 0 forward KL to 1 reverse KL.
 
 # ### Pick a configuration
 # 
-# A teacher equal to the student is self-distillation: the student learns from its
-# own frozen base, which needs only one copy of the weights and so is the only
-# option for the 27B and 30B models on two T4s. Read the note below it before
-# picking one of those two, because self-distillation needs a starting point that
-# this notebook does not give it.
-# 
-# GKD holds full `(batch, seq, vocab)` logits for **both** models, so peak memory is
-# driven by the vocabulary rather than by the weights. Gemma-4's 262144-token
-# vocabulary is what makes it expensive, not its size.
+# GKD holds full `(batch, seq, vocab)` logits for **both** models, so peak memory
+# follows the vocabulary, not the weights.
 # 
 # | config | weights | measured on a Kaggle 2x T4 |
 # | --- | --- | --- |
@@ -92,10 +68,7 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 # | `muse-glimmer` | 22.2 GB | self-distillation, OOM by 208 MiB at seq 384 |
 # | `qwen3.8` | 22.3 GB | self-distillation, blocked on a dtype mismatch |
 # 
-# `unsloth/gemma-4-26B-A4B-it` is deliberately not offered above. At 51.6 GB with
-# no prebuilt 4-bit it needs an A100 or better, so add it as a teacher yourself if
-# you have the card rather than have it fail on the hardware this notebook
-# targets.
+# `unsloth/gemma-4-26B-A4B-it` needs an A100 or better, so add it yourself.
 
 # In[ ]:
 
@@ -124,31 +97,15 @@ student_name = CONFIGS[CONFIG]["student"]
 teacher_name = CONFIGS[CONFIG]["teacher"]
 
 
-# Three configurations need a note.
+# Three notes.
 # 
-# **Self-distillation needs an adapter that already differs from the base.** GKD's
-# loss is a divergence between the student and the teacher and nothing else, so it
-# is at its global minimum when the two agree. `lora_B` is zero-initialized, which
-# makes a freshly adapted student *exactly* its own base: the measured gap is
-# `0.000`, the first loss is `7e-5`, and what happens afterwards is the optimiser
-# amplifying numerical noise, not learning. So `qwen3.8` and `muse-glimmer` below
-# exercise the memory path on a big model, but they do not demonstrate
-# distillation unless you point them at an adapter you trained earlier. The real
-# uses of this mode are continuing from an existing adapter, or recovering a
-# checkpoint that midtraining degraded. Distillation between two different models,
-# which is what the notebook is about, is `qwen3` and `gemma-4`.
+# **`qwen3.8` and `muse-glimmer` self-distil**, having no smaller sibling, which
+# only helps from an adapter you already trained: a fresh one equals its own base.
 # 
-# **gemma-4 needs `torch.compile` off on T4-class cards.** Under compile the
-# gradient-checkpoint recompute executes the layer differently from the forward
-# pass, and `torch.utils.checkpoint` refuses the mismatch: the recompute disagrees
-# about tensor rank, `[1, 474, 512]` saved against `[1, 474, 1, 512]` recomputed.
-# It passes on a B200 with compile on, so this is specific to older cards and is
-# still being tracked. It costs the other configurations nothing.
+# **gemma-4 needs `torch.compile` off on T4-class cards**, where the
+# gradient-checkpoint recompute disagrees with the forward about tensor rank.
 # 
-# **qwen3.8 is blocked** on something this notebook cannot fix: the first training
-# step raises `expected mat1 and mat2 to have the same dtype, but got: BFloat16 !=
-# Half` inside the gated delta net. It is not memory, and it does not reproduce on
-# a card that supports bfloat16.
+# **qwen3.8 is blocked** on a `BFloat16 != Half` mismatch in the gated delta net.
 
 # In[ ]:
 
@@ -182,9 +139,8 @@ student, processor = FastLanguageModel.from_pretrained(
 )
 
 
-# A `*ForConditionalGeneration` checkpoint returns a multimodal processor. The
-# text-only trainer must be handed the tokenizer it wraps, or the processor tries
-# to resolve the chat prompt as an image source and raises.
+# A `*ForConditionalGeneration` checkpoint returns a processor. Hand the trainer
+# the tokenizer it wraps, or it reads the chat prompt as an image and raises.
 
 # In[ ]:
 
@@ -199,9 +155,8 @@ def text_tokenizer(maybe_processor):
 tokenizer = text_tokenizer(processor)
 
 
-# The distillation loss reads the output head directly, so it has to stay a dense
-# `[vocab, hidden]` matrix. Unsloth keeps `lm_head` out of quantization for this
-# reason; a checkpoint quantized elsewhere may not, so check rather than assume.
+# The loss reads the output head directly, so it must stay dense. Unsloth keeps
+# `lm_head` unquantized; a checkpoint quantized elsewhere may not.
 
 # In[ ]:
 
@@ -232,28 +187,18 @@ trainable = [n for n, p in student.named_parameters() if p.requires_grad]
 print(f"{len(trainable)} trainable tensors")
 
 
-# `lora_B` is zero-initialized, so `dL/dA` is zero on the very first step and only
-# the `lora_B` halves move. That is expected, not a sign nothing is learning.
+# `lora_B` is zero-initialized, so only the `lora_B` halves move on the first
+# step. That is expected.
 
 # ### Load the teacher, or reuse the student's frozen base
 
-# Under LoRA the frozen base can serve as the teacher at no extra weight cost: the
-# adapters are disabled for the teacher forward pass. That is what `teacher = None`
-# selects above, and it only carries signal once the adapters differ from the base.
+# `teacher = None` uses the frozen base for free, but the adapters must be
+# disabled explicitly: `GKDTrainer` only calls `self.teacher_model(...)`, so the
+# student passed directly gives two identical forwards. The wrapper keeps the
+# student out of its submodules, since the trainer calls `teacher.eval()` each step.
 # 
-# Disabling them has to be done explicitly. `GKDTrainer` calls `self.teacher_model(...)`
-# and nothing else, so handing it the student directly gives two forwards through the
-# same active adapters, identical distributions and a divergence of zero. The wrapper
-# below is what makes the teacher the base model. It deliberately keeps the student out
-# of its submodules, because the trainer calls `teacher.eval()` on every step and that
-# would otherwise drop the student out of training mode too.
-# 
-# For a separate teacher, two things matter. Release the caching allocator's
-# reserved-but-unused blocks first, and give the device-map planner an explicit
-# budget. Left alone the planner does `free, _ = torch.cuda.mem_get_info(d)` and
-# takes the whole card, leaving nothing for the transient buffers the load itself
-# needs. On gemma-4 E2B from E4B it budgeted 8.94 GiB on `cuda:0` when 9.93 GiB was
-# free, and by the time weights were being placed only 4.70 GiB remained.
+# A separate teacher needs a device-map budget, or the planner takes the whole card
+# and leaves nothing for the load's own buffers.
 
 # In[ ]:
 
@@ -307,9 +252,8 @@ else:
     print(f"teacher loaded, {sum(p.requires_grad for p in teacher.parameters())} trainable (must be 0)")
 
 
-# The teacher has to disagree with the student, or there is nothing to learn from.
-# A gap of exactly zero produces a loss around `1e-4`, which reads as a converged
-# run rather than a broken one, so measure it instead of assuming it.
+# The teacher has to disagree with the student. A gap of zero gives a loss near
+# `1e-4`, which reads as converged rather than broken, so measure it.
 
 # In[ ]:
 
@@ -324,10 +268,8 @@ if _gap == 0:
           "load an adapter you trained earlier to give this mode something to learn.")
 
 
-# Same vocabulary, or the loss compares probabilities for unrelated tokens. Equal
-# width is not enough to establish that: Qwen2.5-0.5B and Qwen2.5-7B are both
-# 151936 wide but assign different ids, so a width check passes and the run is
-# quietly meaningless. Compare what the two tokenizers actually produce.
+# Equal width is not enough: Qwen2.5-0.5B and 7B are both 151936 wide but assign
+# different ids, so compare what the tokenizers produce.
 
 # In[ ]:
 
@@ -347,9 +289,8 @@ if teacher_name is not None:
 
 # ### Dataset
 # 
-# FineTome ships ShareGPT turns keyed `from`/`value`. The chat template expects
-# `role`/`content`, and passing the raw rows through renders as
-# `'dict object' has no attribute 'role'`.
+# FineTome ships ShareGPT turns keyed `from`/`value`; the chat template expects
+# `role`/`content` and otherwise raises `'dict object' has no attribute 'role'`.
 
 # In[ ]:
 
@@ -363,26 +304,9 @@ dataset = dataset.rename_column("conversations", "messages")
 dataset = dataset.remove_columns([c for c in dataset.column_names if c != "messages"])
 
 
-# Now drop rows that do not fit in `max_seq_length` **as a whole**. This one is
-# worth understanding, because the failure it prevents looks like a bug in the loss.
-# 
-# GKD's collator returns a `prompts` tensor alongside `input_ids`, and the loss
-# slices with it:
-# 
-# ```python
-# prompt_lengths = inputs["prompts"].shape[1]
-# shifted_student_logits = student_outputs.logits[:, prompt_lengths - 1 : -1, :]
-# ```
-# 
-# When a row is longer than `max_length` the collator truncates it, and the prompt
-# is what gets dropped. `prompts` comes back with width 0, so the slice becomes
-# `logits[:, -1:-1, :]`, which is empty, while the labels stay full width. That is
-# the `mask [1, 512] does not match ... tensor [1, 0, 262144]` failure.
-# 
-# Note this is about the **total** length, not the prompt's. A short prompt with a
-# long answer still overflows and still loses its prompt, so filtering on the
-# prompt alone does not help: on FineTome the median prompt is only 54 tokens while
-# completions run into the thousands.
+# Drop rows that do not fit `max_seq_length` **as a whole**. The collator
+# truncates an overlong row from the front, so `prompts` comes back empty and the
+# loss slices to nothing: `mask [1, 512] does not match ... tensor [1, 0, 262144]`.
 
 # In[ ]:
 
@@ -409,10 +333,8 @@ print(dataset[0]["messages"][:2])
 # ### Train
 # 
 # `lmbda`, `beta` and `temperature` are the distillation knobs; the rest is an
-# ordinary TRL config.
-# 
-# No `fp16` or `bf16` is set here on purpose. Unsloth picks the precision per
-# architecture, and overriding it breaks the ones it has already ruled out.
+# ordinary TRL config. No `fp16`/`bf16` on purpose: Unsloth picks precision per
+# architecture.
 
 # In[ ]:
 
@@ -457,8 +379,8 @@ print(f"args {type(trainer.args).__name__}: lmbda={trainer.args.lmbda} "
       f"beta={trainer.args.beta} temperature={trainer.args.temperature}")
 
 
-# A config that subclasses `SFTConfig` used to be silently rebuilt as a plain one,
-# dropping every distillation field, so the asserts above check rather than trust.
+# A config subclassing `SFTConfig` used to be silently rebuilt as a plain one,
+# dropping every distillation field, hence the asserts.
 
 # In[ ]:
 
@@ -481,15 +403,9 @@ assert changed > 0, "no adapter changed: the student did not learn"
 
 # ### What this does and does not cover
 # 
-# `GKDTrainer` holds the teacher in memory alongside the student, so the teacher
-# size is bounded by your GPU. Distilling a Deepseek- or Kimi-class teacher needs a
-# served teacher over HTTP or cached top-k teacher logprobs prepared ahead of
-# training; neither is wired into Unsloth yet.
-# 
-# Self-distillation (`teacher = None` above) is the cheapest configuration, since
-# under LoRA the frozen base is the teacher and costs no additional weights. It is
-# not a way to start from nothing, though: a fresh adapter is identical to the base
-# it would be learning from. Use it to continue from an adapter you already have.
+# `GKDTrainer` holds the teacher alongside the student, so your GPU bounds the
+# teacher size. A Deepseek- or Kimi-class teacher needs a served teacher or cached
+# top-k logprobs, neither wired into Unsloth yet.
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
 # Some other resources:
