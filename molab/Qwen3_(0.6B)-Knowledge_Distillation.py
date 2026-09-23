@@ -173,7 +173,8 @@ def _(mo):
     **gemma-4 needs `torch.compile` off on T4-class cards**, where the
     gradient-checkpoint recompute disagrees with the forward about tensor rank.
 
-    **qwen3.8 is blocked** on a `BFloat16 != Half` mismatch in the gated delta net.
+    **qwen3.8 is blocked on T4-class cards** by a `BFloat16 != Half` mismatch in
+    the gated delta net. It does not reproduce where bfloat16 is native.
     """)
     return
 
