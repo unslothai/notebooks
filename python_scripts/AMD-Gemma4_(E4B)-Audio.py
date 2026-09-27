@@ -186,12 +186,6 @@ model = FastModel.get_peft_model(
     target_modules = [
         "q_proj", "k_proj", "v_proj", "o_proj",
         "gate_proj", "up_proj", "down_proj",
-
-        # Audio layers
-        "post", "linear_start", "linear_end",
-        "embedding_projection",
-        "ffw_layer_1", "ffw_layer_2",
-        "output_proj",
     ]
 )
 
@@ -267,8 +261,8 @@ trainer = SFTTrainer(
     processing_class = processor.tokenizer,
     data_collator = UnslothVisionDataCollator(model, processor),
     args = SFTConfig(
-        per_device_train_batch_size = 8,
-        gradient_accumulation_steps = 1,
+        per_device_train_batch_size = 2,
+        gradient_accumulation_steps = 4,
         warmup_ratio = 0.03,
         # num_train_epochs = 1, # Use for full training runs
         max_steps = 60,

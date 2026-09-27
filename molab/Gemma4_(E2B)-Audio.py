@@ -277,13 +277,6 @@ def _(FastModel, model):
             "gate_proj",
             "up_proj",
             "down_proj",
-            "post",
-            "linear_start",
-            "linear_end",
-            "embedding_projection",
-            "ffw_layer_1",
-            "ffw_layer_2",
-            "output_proj",
         ],
     )
     return (model_1,)
