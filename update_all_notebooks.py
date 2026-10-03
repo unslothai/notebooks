@@ -124,15 +124,8 @@ PIN_OUTETTS_REF = "f5eac6e70d792844c6a6959d900a47af2c061a5b"
 
 SPACES = " " * 4
 
-# PyPI xformers 0.0.34 / 0.0.35 are CUDA 12.8 builds that need libcudart.so.12.
-# Colab's torch 2.11.0+cu130 ships only CUDA 13, so a PyPI xformers never loads
-# there and Unsloth silently falls back to SDPA (`Xformers = None` in the
-# banner). The PyTorch cu130 index wheel links libcudart.so.13, so CUDA 13
-# torches take that wheel by URL. 0.0.35 declares torch>=2.10 (0.0.34 pinned
-# torch==2.10.0), so it is the default for 2.10 and newer.
-# Every __XFORMERS_INSTALL__ placeholder sits inside the Colab `else:` branch at
-# four spaces, so the second line carries that indent itself; the assert after
-# the last consumer below checks both lines land at the same depth.
+# PyPI xformers wheels are CUDA 12.8 builds (libcudart.so.12), absent on CUDA 13 torch: take the cu130 index wheel there.
+# Line 2 carries the 4-space indent of the Colab `else:` branch; an assert below checks every consumer.
 XFORMERS_INSTALL = (
     """xformers = 'xformers==' + {'2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.35")\n"""
     + SPACES
@@ -914,20 +907,12 @@ installation_muse_glimmer_kaggle_content = update_or_append_pip_install(
     "!pip install transformers==5.15.0",
 )
 
-# causal_conv1d is not vendored in unsloth_zoo (the gated delta net fla kernels
-# are). Its release wheels follow the asset name below, one per torch minor,
-# CUDA major, Python and C++ ABI, so the URL is built instead of asking the
-# GitHub API. A combination with no wheel 404s at once and the notebook falls
-# back to transformers' plain conv1d for the depthwise convolution, rather than
-# spending ~10 minutes compiling it from source as the old
-# `pip install --no-build-isolation causal_conv1d==1.6.0` did on any torch but 2.8.
-# v1.7.0 ships torch 2.6 to 2.10, cu12 and cu13, cp310 to cp313.
+# A missing release wheel 404s and transformers falls back to torch conv1d, instead of a ~10 minute source build.
 QWEN3_5_CAUSAL_CONV1D = """# Prebuilt causal_conv1d when one exists for this torch, otherwise transformers' torch conv1d (no 10 minute build)
 import sys, torch; _t = ".".join(torch.__version__.split(".")[:2]); _cu = (torch.version.cuda or "0").split(".")[0]; _py = f"cp{sys.version_info[0]}{sys.version_info[1]}"; _abi = str(torch.compiled_with_cxx11_abi()).upper()
 !uv pip install -qqq "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0+cu{_cu}torch{_t}cxx11abi{_abi}-{_py}-{_py}-linux_x86_64.whl" || echo "No prebuilt causal_conv1d for torch {_t}, using the torch fallback"
 """
-# ROCm has no wheel to fetch and torch.version.cuda is None there, so the AMD
-# composer keeps the source build it always had.
+# ROCm has no wheel (torch.version.cuda is None), so the AMD composer keeps the source build.
 QWEN3_5_CAUSAL_CONV1D_AMD = "!uv pip install --no-build-isolation causal_conv1d==1.6.0\n"
 
 installation_qwen3_5_content = """%%capture
@@ -2218,9 +2203,7 @@ def _defer_torch_imports_past_downgrade(install_text):
     for line in install_text.split("\n"):
         if not _TORCH_IMPORT_STATEMENT.search(line):
             if probe_rewritten and "torch.version.cuda" in line:
-                # The xformers CUDA 13 check reads torch.version.cuda, but the
-                # probe above no longer imports torch. A PyTorch-index wheel
-                # carries the CUDA build in its local version label.
+                # torch is not imported here; the PyTorch-index version label carries the CUDA build.
                 line = line.replace(
                     'str(torch.version.cuda).startswith("13")',
                     '"+cu13" in _torch_meta.version("torch")',
