@@ -293,8 +293,12 @@ _qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_ma
 {_qat_torchao_fallback_snippet(default_torchao)}
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
+# PyPI fbgemm-gpu-genai and torchao are CUDA 12 builds (libcudart.so.12), which a
+# CUDA 13 torch cannot load; the cu130 index carries +cu130 builds of both.
+try: _qat_index = "--extra-index-url https://download.pytorch.org/whl/cu130" if str(torch.version.cuda).startswith("13") else ""
+except Exception: _qat_index = ""
 {QAT_NUMPY_PIN_BLOCK}
-!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}}"""
+!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}} {{_qat_index}}"""
 
 
 def update_or_append_pip_install(base_content, package_name, new_install_line):

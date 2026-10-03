@@ -539,6 +539,10 @@ _TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
         "molab does not pin torch for this notebook, so no arm is "
         "statically correct"
     ),
+    "_qat_index": (
+        "adds the PyTorch cu130 index only when the live torch is a CUDA 13 "
+        "build; it is a pip option, not a package"
+    ),
     "_cu": (
         "the causal_conv1d prebuilt wheel URL is built from the live torch "
         "minor, CUDA major, Python and C++ ABI; molab does not pin torch, so "
