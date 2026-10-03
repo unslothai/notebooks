@@ -240,7 +240,7 @@ for step in range(1, STEPS + 1):
     for _ in range(GRAD_ACCUM):
         if ptr >= len(order): random.shuffle(order); ptr = 0
         prompt_ids, x0, lm = examples[order[ptr]]; ptr += 1
-        out = model(input_ids = prompt_ids.unsqueeze(0).to(dev), canvas_ids = corrupt(x0),
+        out = model(input_ids = prompt_ids.unsqueeze(0).to(dev), decoder_input_ids = corrupt(x0),
                     self_conditioning_logits = None)
         logits = out.logits[0].float()       # [canvas_len, vocab]
         m = lm.to(dev)
