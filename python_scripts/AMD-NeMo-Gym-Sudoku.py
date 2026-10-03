@@ -24,7 +24,7 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 # In[ ]:
 
 
-get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" omegaconf')
+get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" omegaconf')
 get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 
 

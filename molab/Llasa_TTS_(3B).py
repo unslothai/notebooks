@@ -17,7 +17,7 @@
 #     "torchao>=0.16.0,<0.18.0",
 #     "torchcodec",
 #     "torchtune",
-#     "transformers==4.56.1",
+#     "transformers==4.57.6",
 #     "triton>=3.2.0",
 #     "trl==0.15.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",

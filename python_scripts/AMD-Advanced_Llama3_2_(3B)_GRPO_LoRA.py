@@ -41,7 +41,7 @@
 # 
 # import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 # 
-# get_ipython().system('uv pip install --system -qqq vllm sentencepiece protobuf "datasets>=3.4.1" huggingface_hub hf_transfer "transformers==4.56.2"')
+# get_ipython().system('uv pip install --system -qqq vllm sentencepiece protobuf "datasets>=3.4.1" huggingface_hub hf_transfer "transformers==4.57.6"')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # 
 # 
