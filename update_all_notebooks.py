@@ -124,7 +124,21 @@ PIN_OUTETTS_REF = "f5eac6e70d792844c6a6959d900a47af2c061a5b"
 
 SPACES = " " * 4
 
-XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.11':'0.0.35','2.10':'0.0.35','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.35")"""
+# PyPI xformers 0.0.34 / 0.0.35 are CUDA 12.8 builds that need libcudart.so.12.
+# Colab's torch 2.11.0+cu130 ships only CUDA 13, so a PyPI xformers never loads
+# there and Unsloth silently falls back to SDPA (`Xformers = None` in the
+# banner). The PyTorch cu130 index wheel links libcudart.so.13, so CUDA 13
+# torches take that wheel by URL. 0.0.35 declares torch>=2.10 (0.0.34 pinned
+# torch==2.10.0), so it is the default for 2.10 and newer.
+# Every __XFORMERS_INSTALL__ placeholder sits inside the Colab `else:` branch at
+# four spaces, so the second line carries that indent itself; the assert after
+# the last consumer below checks both lines land at the same depth.
+XFORMERS_INSTALL = (
+    """xformers = 'xformers==' + {'2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.35")\n"""
+    + SPACES
+    + 'if str(torch.version.cuda).startswith("13") and xformers.endswith("0.0.35"): '
+    'xformers = "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-manylinux_2_28_x86_64.whl"'
+)
 
 # torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
 # step: each release hard-codes the torch it was built against, in its own
@@ -1127,6 +1141,10 @@ __QAT_NATIVE_INSTALL__
     "__QAT_NATIVE_INSTALL__", build_qat_native_install_block()
 )
 installation_qat_kaggle_content = installation_qat_content
+
+for _xf_block in (installation_content, installation_gemma4_content, installation_diffusiongemma_content, installation_qat_content):
+    _xf_lines = [l for l in _xf_block.splitlines() if l.lstrip().startswith(("xformers = 'xformers=='", 'if str(torch.version.cuda).startswith("13")'))]
+    assert len(_xf_lines) == 2 and len({len(l) - len(l.lstrip()) for l in _xf_lines}) == 1, _xf_lines
 
 installation_ministral_content = installation_content
 installation_ministral_content = update_or_append_pip_install(
@@ -2191,8 +2209,19 @@ def _defer_torch_imports_past_downgrade(install_text):
     """
     had_trailing_newline = install_text.endswith("\n")
     kept, relocated = [], []
+    probe_rewritten = False
     for line in install_text.split("\n"):
         if not _TORCH_IMPORT_STATEMENT.search(line):
+            if probe_rewritten and "torch.version.cuda" in line:
+                # The xformers CUDA 13 check reads torch.version.cuda, but the
+                # probe above no longer imports torch. A PyTorch-index wheel
+                # carries the CUDA build in its local version label.
+                line = line.replace(
+                    'str(torch.version.cuda).startswith("13")',
+                    '"+cu13" in _torch_meta.version("torch")',
+                )
+                if "torch." in line.replace("download.pytorch.org", ""):
+                    raise RuntimeError(f"cannot rewrite a torch reference without importing torch: {line!r}")
             kept.append(line)
             continue
         if "torch.__version__" in line:
@@ -2205,6 +2234,7 @@ def _defer_torch_imports_past_downgrade(install_text):
                     f"torch: {line!r}"
                 )
             kept.append(rewritten)
+            probe_rewritten = True
             continue
         if line != line.lstrip():
             raise RuntimeError(
