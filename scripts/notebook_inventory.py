@@ -222,7 +222,7 @@ def read_pin_constants(
     pinned version string.
 
     Specifically reads the module-level assigns at lines 107-117:
-      PIN_TRANSFORMERS = "!pip install transformers==4.56.2"
+      PIN_TRANSFORMERS = "!pip install transformers==4.57.6"
       PIN_TRL          = "!pip install --no-deps trl==0.22.2"
       PIN_TOKENIZERS_SPEC = "tokenizers>=0.22.0,<=0.23.0"
     and any other ``PIN_<NAME>`` string assign that contains a literal

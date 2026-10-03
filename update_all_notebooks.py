@@ -103,7 +103,7 @@ general_announcement_content_meta = general_announcement_content.split(announcem
 general_announcement_content_meta = general_announcement_content_meta[0] + "\n\n" + '<a href="https://github.com/meta-llama/synthetic-data-kit"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/meta%20round%20logo.png" width="137"></a>' + general_announcement_content_meta[1]
 
 # CONSTANT
-PIN_TRANSFORMERS = "!pip install transformers==4.56.2"
+PIN_TRANSFORMERS = "!pip install transformers==4.57.6"
 UV_PIN_TRANSFORMERS = PIN_TRANSFORMERS.replace("pip", "uv pip")
 
 PIN_TRL = "!pip install --no-deps trl==0.22.2"
@@ -124,7 +124,14 @@ PIN_OUTETTS_REF = "f5eac6e70d792844c6a6959d900a47af2c061a5b"
 
 SPACES = " " * 4
 
-XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
+# PyPI xformers wheels are CUDA 12.8 builds (libcudart.so.12), absent on CUDA 13 torch: take the cu130 index wheel there.
+# Line 2 carries the 4-space indent of the Colab `else:` branch; an assert below checks every consumer.
+XFORMERS_INSTALL = (
+    """xformers = 'xformers==' + {'2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.35")\n"""
+    + SPACES
+    + 'if str(torch.version.cuda).startswith("13") and xformers.endswith("0.0.35"): '
+    'xformers = "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-manylinux_2_28_x86_64.whl"'
+)
 
 # torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
 # step: each release hard-codes the torch it was built against, in its own
@@ -222,12 +229,12 @@ def _qat_torchao_fallback_snippet(default_torchao=None):
         _qat_below = False
     _qat_torchao = "{QAT_PEFT_TORCHAO_FLOOR}" if _qat_below else "{default_torchao}"'''
 QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
-    "2.11": "1.5.0",
+    "2.11": "1.6.0",
     "2.10": "1.5.0",
     "2.9": "1.4.2",
     "2.8": "1.3.0",
 }
-QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.5.0"
+QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.6.0"
 
 # fbgemm-gpu-genai depends on an unpinned numpy, so a force-reinstall fetches
 # the newest one while `import torch` above has already loaded the old one into
@@ -279,8 +286,13 @@ _qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_ma
 {_qat_torchao_fallback_snippet(default_torchao)}
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
+# Each PyPI fbgemm-gpu-genai is built for one CUDA major (1.5.0 links
+# libcudart.so.12, 1.6.0 libcudart.so.13), so take the build from torch's own
+# CUDA index, which carries +cuXXX builds of both fbgemm-gpu-genai and torchao.
+try: _qat_index = "--extra-index-url https://download.pytorch.org/whl/cu" + torch.version.cuda.replace(".", "") if torch.version.cuda else ""
+except Exception: _qat_index = ""
 {QAT_NUMPY_PIN_BLOCK}
-!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}}"""
+!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}} {{_qat_index}}"""
 
 
 def update_or_append_pip_install(base_content, package_name, new_install_line):
@@ -524,19 +536,19 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \
-        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \
+        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.57.6" \
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
         "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
         git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps transformers==4.56.2 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
+!uv pip install --upgrade --no-deps transformers==4.57.6 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 # installation_gpt_oss_content = update_or_append_pip_install(
 #     installation_gpt_oss_content,
 #     "transformers",
-#     "!uv pip install transformers==4.56.2",
+#     "!uv pip install transformers==4.57.6",
 # )
 # installation_gpt_oss_content = update_or_append_pip_install(
 #     installation_gpt_oss_content,
@@ -566,7 +578,7 @@ os.remove("OuteTTS/outetts/__init__.py")
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
-# Llasa needs trl 0.15.2; the Colab recipe pairs it with transformers 4.56.1.
+# Llasa needs trl 0.15.2; the Colab recipe pairs it with transformers 4.57.6.
 # The Kaggle recipe below must use the SAME pair. It used to pin
 # transformers==4.48 while taking trl from the global PIN_TRL (0.22.2), and
 # that pair cannot work: trl 0.22.2 declares transformers>=4.55.0. Both are
@@ -587,7 +599,7 @@ installation_llasa_content += """\
 installation_llasa_content = update_or_append_pip_install(
     installation_llasa_content,
     "transformers",
-    "!pip install transformers==4.56.1",
+    "!pip install transformers==4.57.6",
 )
 
 installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx tiktoken xcodec2==0.1.5 --no-deps
@@ -596,7 +608,7 @@ installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip inst
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
     "transformers",
-    "!pip install transformers==4.56.1",
+    "!pip install transformers==4.57.6",
 )
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
@@ -628,7 +640,7 @@ installation_sesame_csm_content = installation_content + """\n!pip install torch
 installation_sesame_csm_content = update_or_append_pip_install(
     installation_sesame_csm_content,
     "transformers",
-    "!pip install transformers==4.52.3",
+    "!pip install transformers==4.57.6",
 )
 installation_sesame_csm_content = update_or_append_pip_install(
     installation_sesame_csm_content,
@@ -640,7 +652,7 @@ installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip
 installation_sesame_csm_kaggle_content = update_or_append_pip_install(
     installation_sesame_csm_kaggle_content,
     "transformers",
-    "!pip install transformers==4.52.3 torchcodec",
+    "!pip install transformers==4.57.6 torchcodec",
 )
 installation_sesame_csm_kaggle_content = update_or_append_pip_install(
     installation_sesame_csm_kaggle_content,
@@ -691,7 +703,7 @@ installation_gemma3n_kaggle_content += gemma3n_extra_content
 #
 # Gemma 4 needs transformers==5.5.0 (with --no-deps), torchcodec, and
 # torch._dynamo recompile_limit. Do NOT go through update_or_append_pip_install
-# here because Gemma 4 must not get the default transformers==4.56.2 pin or
+# here because Gemma 4 must not get the default transformers==4.57.6 pin or
 # the trl==0.22.2 --no-deps downgrade.
 # Colab ships torchao 0.10.0 preinstalled, but peft >= 0.19 raises ImportError
 # from is_torchao_available() unless torchao >= 0.16.0 is present, which trips
@@ -835,36 +847,36 @@ installation_qwen3_vl_content = installation_content
 installation_qwen3_vl_content = update_or_append_pip_install(
     installation_qwen3_vl_content,
     "transformers",
-    "!pip install transformers==4.57.1",
+    "!pip install transformers==4.57.6",
 )
 
 installation_qwen3_vl_kaggle_content  = installation_kaggle_content
 installation_qwen3_vl_kaggle_content  = update_or_append_pip_install(
     installation_qwen3_vl_kaggle_content,
     "transformers",
-    "!pip install transformers==4.57.1",
+    "!pip install transformers==4.57.6",
 )
 
 # LFM2.5-VL is an `lfm2_vl` checkpoint, and that architecture landed in
-# transformers 4.57.0, so the canonical 4.56.2 cannot load it: the notebook
+# transformers 4.57.0, so the old canonical 4.56.2 could not load it: the notebook
 # stopped at "`LiquidAI/LFM2.5-VL-1.6B` is not supported yet in
 # `transformers==4.56.2`". The text LFM2.5 notebooks are `lfm2`, which 4.56.2
 # does have, so only the vision one moves.
 installation_lfm2_vl_content = update_or_append_pip_install(
     installation_content,
     "transformers",
-    "!pip install transformers==4.57.1",
+    "!pip install transformers==4.57.6",
 )
 installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
     installation_kaggle_content,
     "transformers",
-    "!pip install transformers==4.57.1",
+    "!pip install transformers==4.57.6",
 )
 
 # The Liquid LFM2 notebooks installed transformers from git main, because `lfm2`
 # had no release when they were written. It has one now, and main is a moving
 # target the molab PEP 723 header builds before a single cell runs. They pin
-# 5.15.0 instead, and the default 4.56.2 has to move with them: two `==` pins of
+# 5.15.0 instead, and the default 4.57.6 has to move with them: two `==` pins of
 # the same length in one notebook leave the molab header nothing to choose on.
 installation_liquid_lfm2_content = update_or_append_pip_install(
     installation_content,
@@ -878,10 +890,10 @@ installation_liquid_lfm2_kaggle_content = update_or_append_pip_install(
 )
 
 # Muse Glimmer is a `muse_glimmer` checkpoint, and that architecture landed in
-# transformers 5.15.0, so the canonical 4.56.2 cannot load it. Replace the
+# transformers 5.15.0, so the canonical 4.57.6 cannot load it. Replace the
 # default pin rather than leaving it to be overridden by the notebook's own
 # install cell: two contradictory `transformers` pins in one notebook also mean
-# the molab PEP 723 header has to pick one, and it picked 4.56.2. Installing
+# the molab PEP 723 header has to pick one, and it picked the 4.x pin. Installing
 # with dependency resolution on is what pulls the `huggingface_hub>=1.5.0` and
 # `tokenizers>=0.22.0` that transformers 5.x requires.
 installation_muse_glimmer_content = update_or_append_pip_install(
@@ -894,6 +906,14 @@ installation_muse_glimmer_kaggle_content = update_or_append_pip_install(
     "transformers",
     "!pip install transformers==5.15.0",
 )
+
+# A missing release wheel 404s and transformers falls back to torch conv1d, instead of a ~10 minute source build.
+QWEN3_5_CAUSAL_CONV1D = """# Prebuilt causal_conv1d when one exists for this torch, otherwise transformers' torch conv1d (no 10 minute build)
+import sys, torch; _t = ".".join(torch.__version__.split(".")[:2]); _cu = (torch.version.cuda or "0").split(".")[0]; _py = f"cp{sys.version_info[0]}{sys.version_info[1]}"; _abi = str(torch.compiled_with_cxx11_abi()).upper()
+!uv pip install -qqq "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0+cu{_cu}torch{_t}cxx11abi{_abi}-{_py}-{_py}-linux_x86_64.whl" || echo "No prebuilt causal_conv1d for torch {_t}, using the torch fallback"
+"""
+# ROCm has no wheel (torch.version.cuda is None), so the AMD composer keeps the source build.
+QWEN3_5_CAUSAL_CONV1D_AMD = "!uv pip install --no-build-isolation causal_conv1d==1.6.0\n"
 
 installation_qwen3_5_content = """%%capture
 import os, importlib.util
@@ -912,9 +932,7 @@ elif importlib.util.find_spec("unsloth") is None:
 !uv pip install transformers==5.2.0
 # Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them
 !uv pip uninstall -qqq flash-linear-attention fla-core
-# causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
-!uv pip install --no-build-isolation causal_conv1d==1.6.0
-""".replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
+""".replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + QWEN3_5_CAUSAL_CONV1D + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
@@ -975,7 +993,7 @@ except Exception:
 # at once rather than the newest one.
 #
 # transformers 5.15.1 is the floor that does: `qwen3_5` (Qwen3.8) landed in
-# 5.15.1, `muse_glimmer` in 5.15.0, and Gemma-4 in 5.10.1. The canonical 4.56.2
+# 5.15.1, `muse_glimmer` in 5.15.0, and Gemma-4 in 5.10.1. The canonical 4.x pin
 # loads none of them, which is what the first Kaggle run of this notebook proved
 # three times over ("is not supported yet in transformers==4.56.2").
 #
@@ -1080,13 +1098,13 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
-        {_torch} "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
+        {_torch} "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.57.6" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
     !uv pip install -qqq --no-deps "torchcodec==0.5"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps transformers==4.56.2 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
+!uv pip install --upgrade --no-deps transformers==4.57.6 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 
 # Prebuilt for the torch pinned above. On Blackwell this builds from source,
 # which is the wait, not a failure.
@@ -1107,12 +1125,16 @@ else:
     !pip install --no-deps --upgrade "torchao>=0.16.0"
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
 __QAT_NATIVE_INSTALL__
-!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2""".replace(
+!pip install transformers==4.57.6 && pip install --no-deps trl==0.22.2""".replace(
     "__XFORMERS_INSTALL__", XFORMERS_INSTALL
 ).replace(
     "__QAT_NATIVE_INSTALL__", build_qat_native_install_block()
 )
 installation_qat_kaggle_content = installation_qat_content
+
+for _xf_block in (installation_content, installation_gemma4_content, installation_diffusiongemma_content, installation_qat_content):
+    _xf_lines = [l for l in _xf_block.splitlines() if l.lstrip().startswith(("xformers = 'xformers=='", 'if str(torch.version.cuda).startswith("13")'))]
+    assert len(_xf_lines) == 2 and len({len(l) - len(l.lstrip()) for l in _xf_lines}) == 1, _xf_lines
 
 installation_ministral_content = installation_content
 installation_ministral_content = update_or_append_pip_install(
@@ -1146,7 +1168,7 @@ installation_phone_content = installation_content
 installation_phone_content = update_or_append_pip_install(
     installation_phone_content,
     "transformers",
-    "!pip install transformers==4.57.3"
+    "!pip install transformers==4.57.6"
 )
 installation_phone_content = update_or_append_pip_install(
     installation_phone_content,
@@ -1160,7 +1182,7 @@ installation_phone_kaggle_content = installation_kaggle_content
 installation_phone_kaggle_content = update_or_append_pip_install(
     installation_phone_kaggle_content,
     "transformers",
-    "!pip install transformers==4.57.3"
+    "!pip install transformers==4.57.6"
 )
 installation_phone_kaggle_content = update_or_append_pip_install(
     installation_phone_kaggle_content,
@@ -2177,8 +2199,17 @@ def _defer_torch_imports_past_downgrade(install_text):
     """
     had_trailing_newline = install_text.endswith("\n")
     kept, relocated = [], []
+    probe_rewritten = False
     for line in install_text.split("\n"):
         if not _TORCH_IMPORT_STATEMENT.search(line):
+            if probe_rewritten and "torch.version.cuda" in line:
+                # torch is not imported here; the PyTorch-index version label carries the CUDA build.
+                line = line.replace(
+                    'str(torch.version.cuda).startswith("13")',
+                    '"+cu13" in _torch_meta.version("torch")',
+                )
+                if "torch." in line.replace("download.pytorch.org", ""):
+                    raise RuntimeError(f"cannot rewrite a torch reference without importing torch: {line!r}")
             kept.append(line)
             continue
         if "torch.__version__" in line:
@@ -2191,6 +2222,7 @@ def _defer_torch_imports_past_downgrade(install_text):
                     f"torch: {line!r}"
                 )
             kept.append(rewritten)
+            probe_rewritten = True
             continue
         if line != line.lstrip():
             raise RuntimeError(
@@ -3135,7 +3167,8 @@ def _iter_pip_install_arg_strings(text):
             r"(?:^|&&\s*)!?\s*(?:uv\s+)?pip\s+install\s+(.+?)(?=\s+&&\s+!?\s*(?:uv\s+)?pip\s+install\b|$)",
             line,
         ):
-            yield match.group(1).strip()
+            # `pip install X || echo ...` is a shell fallback, not more packages.
+            yield re.split(r"\s+\|\|\s+", match.group(1), maxsplit=1)[0].strip()
 
 
 def _split_pip_args(arg_string):
@@ -3157,6 +3190,9 @@ def _package_key_from_install_token(token):
         token = token.split(" @ ", 1)[0].strip()
     if token.startswith("git+") or "://" in token:
         repo = token.rstrip("/").rsplit("/", 1)[-1]
+        if repo.endswith(".whl"):
+            # A wheel URL names its distribution before the first dash.
+            return repo.split("-", 1)[0].lower().replace("-", "_") or None
         repo = repo.split(".git")[0].split("@")[0].split("#")[0]
         return repo.lower().replace("-", "_") if repo else None
     token = re.sub(r"\[.*?\]", "", token)
@@ -3540,6 +3576,10 @@ def _compose_amd_installation(notebook_path, source_install_texts):
          verbatim above the merged pip lines.
     """
     lowered = notebook_path.lower()
+    source_install_texts = [
+        text.replace(QWEN3_5_CAUSAL_CONV1D, QWEN3_5_CAUSAL_CONV1D_AMD) if text else text
+        for text in source_install_texts
+    ]
     source_install_blob = "\n".join(text for text in source_install_texts if text).lower()
     if is_path_contains_any(lowered, ["gemma4"]):
         if is_path_contains_any(lowered, ["(12b)"]):

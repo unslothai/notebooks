@@ -39,7 +39,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" "llama-index<0.14.21" "llama-index-core>=0.14.0,<0.14.21" llama-index-packs-raft-dataset')
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" "llama-index<0.14.21" "llama-index-core>=0.14.0,<0.14.21" llama-index-packs-raft-dataset')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # 
 # 

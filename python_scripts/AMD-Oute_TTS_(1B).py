@@ -45,7 +45,7 @@
 # os.remove("OuteTTS/outetts/interface.py")
 # os.remove("OuteTTS/outetts/__init__.py")
 # get_ipython().run_line_magic('env', 'UNSLOTH_DISABLE_FAST_GENERATION = 1')
-# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" omegaconf einx pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec')
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" omegaconf einx pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2" descript-audio-codec descript-audiotools julius')
 # 
 # 

@@ -40,7 +40,7 @@
 # 
 # 
 # import torch; torch._dynamo.config.recompile_limit = 64;
-# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" torchcodec')
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" torchcodec')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # get_ipython().system('uv pip install --system -qqq --upgrade --no-deps timm')
 # 

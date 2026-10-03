@@ -61,7 +61,7 @@
 #     # torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.
 #     get_torchao = "torchao>=0.16.0" if torch_version >= (2, 10) else "torchao>=0.16.0,<0.18.0"
 #     get_ipython().system('uv pip install -qqq --no-deps --upgrade "{get_torchao}"')
-# get_ipython().system('uv pip install transformers==4.55.4')
+# get_ipython().system('uv pip install transformers==4.57.6')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
 # 
 # 

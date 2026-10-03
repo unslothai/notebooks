@@ -7,7 +7,7 @@
 #     "torch>=2.8.0",
 #     "torchao>=0.16.0",
 #     "torchvision",
-#     "transformers==4.56.2",
+#     "transformers==4.57.6",
 #     "triton>=3.2.0",
 #     "triton_kernels @ git+https://github.com/triton-lang/triton.git@8240e7113a9baf826e423cc8748f93ff69cc1fbc#subdirectory=python/triton_kernels",
 #     "trl==0.22.2",
