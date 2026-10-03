@@ -371,7 +371,7 @@ match_format = re.compile(
     r"[\s]*$",
     flags = re.MULTILINE | re.DOTALL
 )
-match_format
+print(match_format)
 
 
 # We verify it works:

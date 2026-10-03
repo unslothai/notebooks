@@ -216,7 +216,7 @@ import re
 solution_end_regex = rf"{reasoning_end}(.*)"
 
 match_format = re.compile(solution_end_regex, re.DOTALL)
-match_format
+print(match_format)
 
 
 # We verify it works:
