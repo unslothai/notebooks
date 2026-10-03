@@ -123,6 +123,7 @@
   "Qwen3_VL_(8B)-Vision-GRPO": "ok",
   "Qwen_3_5_27B_A100(80GB)": "ok",
   "Sesame_CSM_(1B)-TTS": "ok",
+  "SmolLM3_(3B)-Conversational": "ok",
   "Spark_TTS_(0_5B)": "ok",
   "Synthetic_Data_Hackathon": "ok",
   "TinyLlama_(1.1B)-Alpaca": "ok",
