@@ -236,12 +236,12 @@ def _qat_torchao_fallback_snippet(default_torchao=None):
         _qat_below = False
     _qat_torchao = "{QAT_PEFT_TORCHAO_FLOOR}" if _qat_below else "{default_torchao}"'''
 QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
-    "2.11": "1.5.0",
+    "2.11": "1.6.0",
     "2.10": "1.5.0",
     "2.9": "1.4.2",
     "2.8": "1.3.0",
 }
-QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.5.0"
+QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.6.0"
 
 # fbgemm-gpu-genai depends on an unpinned numpy, so a force-reinstall fetches
 # the newest one while `import torch` above has already loaded the old one into
@@ -293,9 +293,10 @@ _qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_ma
 {_qat_torchao_fallback_snippet(default_torchao)}
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
-# PyPI fbgemm-gpu-genai and torchao are CUDA 12 builds (libcudart.so.12), which a
-# CUDA 13 torch cannot load; the cu130 index carries +cu130 builds of both.
-try: _qat_index = "--extra-index-url https://download.pytorch.org/whl/cu130" if str(torch.version.cuda).startswith("13") else ""
+# Each PyPI fbgemm-gpu-genai is built for one CUDA major (1.5.0 links
+# libcudart.so.12, 1.6.0 libcudart.so.13), so take the build from torch's own
+# CUDA index, which carries +cuXXX builds of both fbgemm-gpu-genai and torchao.
+try: _qat_index = "--extra-index-url https://download.pytorch.org/whl/cu" + torch.version.cuda.replace(".", "") if torch.version.cuda else ""
 except Exception: _qat_index = ""
 {QAT_NUMPY_PIN_BLOCK}
 !pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}} {{_qat_index}}"""
