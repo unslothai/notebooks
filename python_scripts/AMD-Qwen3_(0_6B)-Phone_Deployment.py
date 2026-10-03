@@ -39,7 +39,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.3" "optimum==1.24.0" pytorch-tokenizers "executorch==1.1.0"')
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" "optimum==1.24.0" pytorch-tokenizers "executorch==1.1.0"')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.25.1" git+https://github.com/huggingface/optimum-executorch.git@v0.1.0')
 # 
 # 

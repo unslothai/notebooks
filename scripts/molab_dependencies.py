@@ -539,6 +539,12 @@ _TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {
         "molab does not pin torch for this notebook, so no arm is "
         "statically correct"
     ),
+    "_cu": (
+        "the causal_conv1d prebuilt wheel URL is built from the live torch "
+        "minor, CUDA major, Python and C++ ABI; molab does not pin torch, so "
+        "no URL is statically correct, and transformers falls back to a "
+        "plain torch conv1d without it"
+    ),
 }
 
 # A pip token that is nothing but an expansion, e.g. ``{_torch}``.
@@ -779,8 +785,8 @@ def plan_dependencies(nb_path: Path) -> DependencyPlan:
     #   - transformers>=4.56.0  vllm 0.11.0+ depends on this; without
     #                        the bump the resolver deadlocks.  The
     #                        canonical install cell already runs
-    #                        ``!pip install transformers==4.56.2`` on
-    #                        Colab, so 4.56.x is known-working for the
+    #                        ``!pip install transformers==4.57.6`` on
+    #                        Colab, so 4.57.x is known-working for the
     #                        rest of the Unsloth / trl stack.
     #
     # The overlay REPLACES whatever was chosen (typically a bare name or

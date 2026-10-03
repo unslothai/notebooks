@@ -15,7 +15,7 @@
 #     "pytorch-tokenizers",
 #     "sentencepiece",
 #     "torchao==0.15.0",
-#     "transformers==4.57.3",
+#     "transformers==4.57.6",
 #     "triton>=3.2.0",
 #     "trl==0.25.1",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",

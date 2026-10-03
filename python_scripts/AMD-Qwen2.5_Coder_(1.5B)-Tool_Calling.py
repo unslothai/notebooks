@@ -39,7 +39,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().system('uv pip install --system -qqq sentencepiece "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2" "protobuf==3.20.3"')
+# get_ipython().system('uv pip install --system -qqq sentencepiece "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" "protobuf==3.20.3"')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2" transformers-cfg')
 # 
 # 

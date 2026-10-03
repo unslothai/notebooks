@@ -11,7 +11,7 @@
 #     "protobuf",
 #     "sentencepiece",
 #     "torchao>=0.16.0",
-#     "transformers==4.55.4",
+#     "transformers==4.57.6",
 #     "triton>=3.2.0",
 #     "trl==0.22.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",

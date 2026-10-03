@@ -452,7 +452,7 @@ def test_molab_forces_unsloth_git_for_phone_notebooks() -> None:
 
     assert "unsloth @ git+https://github.com/unslothai/unsloth" in deps
     assert "unsloth>=2026.5.7" not in deps
-    assert "transformers==4.57.3" in deps
+    assert "transformers==4.57.6" in deps
     assert "trl==0.25.1" in deps
     assert "trl==0.24.0" not in deps
 
@@ -469,7 +469,7 @@ def test_molab_git_overlay_avoids_excluded_transformers_release() -> None:
 
     assert "unsloth @ git+https://github.com/unslothai/unsloth" in deps
     assert "unsloth>=2026.5.7" not in deps
-    assert "transformers==4.57.3" in deps
+    assert "transformers==4.57.6" in deps
     assert "transformers==4.57.0" not in deps
     assert "trl==0.26.2" in deps
     assert "trl==0.24.0" not in deps
