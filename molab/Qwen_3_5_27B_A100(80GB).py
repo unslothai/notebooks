@@ -82,6 +82,14 @@ def _(mo):
     return
 
 
+@app.cell
+def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""

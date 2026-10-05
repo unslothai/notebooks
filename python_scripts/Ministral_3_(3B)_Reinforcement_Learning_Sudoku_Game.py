@@ -28,7 +28,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    !pip install --no-deps bitsandbytes accelerate peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n    !unsloth install-kernels xformers\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n# Install transformers branch for Ministral\n!pip install git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    !pip install --no-deps bitsandbytes accelerate peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n# Install transformers branch for Ministral\n!pip install git+https://github.com/huggingface/transformers.git@bf3f0ae70d0e902efab4b8517fce88f6697636ce\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth

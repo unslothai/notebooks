@@ -59,13 +59,28 @@ def test_retired_wheel_picks_are_gone():
 def test_kernel_line_follows_the_unsloth_install():
     seen = 0
     for path in _notebooks():
+        if path.name.startswith("AMD-"):
+            continue
+        earlier = ""
         for cell in _code_cells(path):
             for match in KERNELS.finditer(cell):
                 seen += 1
                 # Join `\`-continued pip lines, which name unsloth on a later physical line.
-                before = cell[: match.start()].replace("\\\n", " ")
+                before = (earlier + cell[: match.start()]).replace("\\\n", " ")
                 assert INSTALLS_UNSLOTH.search(before), (path.name, cell)
+            earlier += cell + "\n"
     assert seen > 100
+
+
+def test_ssm_notebooks_no_longer_build_kernels_from_source():
+    offenders = [
+        path.name
+        for path in _notebooks()
+        if not path.name.startswith("AMD-")
+        for cell in _code_cells(path)
+        if re.search(r"--no-build-isolation[^\n]*(mamba|causal)", cell)
+    ]
+    assert offenders == []
 
 
 def test_amd_cells_never_call_it():
@@ -74,7 +89,9 @@ def test_amd_cells_never_call_it():
     assert [p.name for p in amd for cell in _code_cells(p) if KERNELS.search(cell)] == []
 
 
-def test_molab_drops_the_line_with_the_install_cell():
+def test_molab_runs_the_kernel_install_as_its_own_cell():
     molab = sorted((REPO_ROOT / "molab").glob("*.py"))
-    assert molab
-    assert [p.name for p in molab if "install-kernels" in p.read_text(encoding="utf-8")] == []
+    texts = {p.name: p.read_text(encoding="utf-8") for p in molab}
+    # marimo cannot run `!` magics, and the PEP 723 header cannot pick a wheel per torch.
+    assert [n for n, t in texts.items() if "#! unsloth install-kernels" in t] == []
+    assert sum('subprocess.run(["unsloth", "install-kernels"])' in t for t in texts.values()) > 100

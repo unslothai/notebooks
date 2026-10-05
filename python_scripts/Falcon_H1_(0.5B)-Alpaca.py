@@ -42,13 +42,13 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels xformers\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', "# For faster training, we can use Mamba's CUDA function instead\n!pip install --no-deps causal-conv1d==1.5.0.post8\n!pip install --no-build-isolation mamba-ssm==2.2.4\n")
+# get_ipython().run_cell_magic('capture', '', "# For faster training, we can use Mamba's CUDA function instead\n!unsloth install-kernels causal_conv1d mamba_ssm\n")
 # 
 # 
 # # ### Unsloth

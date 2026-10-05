@@ -302,6 +302,10 @@ jobs:
         run: |
           python -m pytest tests/test_amd_templated_kernel_pins.py -q --tb=short
 
+      - name: tests/test_install_kernels_line.py
+        run: |
+          python -m pytest tests/test_install_kernels_line.py -q --tb=short
+
       - name: tests/test_amd_preserved_setup_lines.py
         # Only the fla cleanup line crosses into an AMD setup block, and it
         # carries --system exactly once.

@@ -90,6 +90,14 @@ def _(mo):
 
 @app.cell
 def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
     from unsloth import FastModel
     from transformers import WhisperForConditionalGeneration
     import torch
@@ -355,10 +363,9 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess
-    import subprocess
+    import subprocess as _molab_subprocess
 
-    subprocess.call(
+    _molab_subprocess.call(
         [
             "wget",
             "https://upload.wikimedia.org/wikipedia/commons/5/5b/Speech_12dB_s16.flac",

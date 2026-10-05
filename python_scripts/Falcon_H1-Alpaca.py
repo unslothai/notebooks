@@ -65,13 +65,13 @@ get_ipython().system('pip install "huggingface_hub>=1.5.0,<2.0" "safetensors>=0.
 # In[ ]:
 
 
-get_ipython().system('pip install --no-build-isolation git+https://github.com/Dao-AILab/causal-conv1d.git@main')
+get_ipython().system('unsloth install-kernels causal_conv1d')
 
 
 # In[ ]:
 
 
-get_ipython().system('pip install --no-build-isolation git+https://github.com/state-spaces/mamba.git@main')
+get_ipython().system('unsloth install-kernels mamba_ssm')
 
 
 # In[ ]:

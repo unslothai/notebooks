@@ -124,9 +124,9 @@ PIN_OUTETTS_REF = "f5eac6e70d792844c6a6959d900a47af2c061a5b"
 
 SPACES = " " * 4
 
-# The xformers wheel for the resident torch + CUDA (PyPI's are CUDA 12.8 only), or nothing so
-# attention stays on SDPA. Runs the `unsloth` CLI, so it must follow the unsloth install.
-KERNELS_INSTALL = "!unsloth install-kernels xformers"
+# Every prebuilt kernel (xformers, flash-attn, causal_conv1d, mamba_ssm) for the resident torch +
+# CUDA, each skipped when no wheel matches. Runs the `unsloth` CLI, so it must follow the unsloth install.
+KERNELS_INSTALL = "!unsloth install-kernels"
 
 # torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
 # step: each release hard-codes the torch it was built against, in its own
@@ -919,7 +919,7 @@ installation_muse_glimmer_kaggle_content = update_or_append_pip_install(
 
 # The prebuilt causal_conv1d for this torch, or none so transformers keeps its torch conv1d (never a
 # ~10 minute source build). No fla uninstall: unsloth_zoo's vendored kernels already win over an older pip fla.
-QWEN3_5_CAUSAL_CONV1D = "!unsloth install-kernels causal_conv1d\n"
+QWEN3_5_CAUSAL_CONV1D = KERNELS_INSTALL + "\n"
 # ROCm has no wheel, so the AMD composer keeps its fla uninstall and the source build.
 QWEN3_5_CAUSAL_CONV1D_AMD = (
     "# Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them\n"
@@ -1082,23 +1082,13 @@ installation_ernie_4_5_vl_kaggle_content = installation_kaggle_content
 installation_ernie_4_5_vl_kaggle_content += """\n!pip install decord"""
 
 installation_nemotron_nano_content = """%%capture
-import os, importlib.util, subprocess
+import os, importlib.util, importlib.metadata
 !pip install --upgrade -qqq uv
-# mamba_ssm 2.2.5 / causal_conv1d 1.5.2 ship wheels for torch 2.7.1 only, so
-# pin it: without a wheel they build from source and the cell takes ~30 min.
-# That wheel stops at sm_90, so Blackwell (cc 10 and 12) keeps its own torch
-# and the newer pair, and pays the build. T4/A100/L4 stay on the fast path.
-# Read from nvidia-smi, not torch: importing torch and then replacing it under
-# the live kernel breaks torchvision ("torchvision::nms does not exist").
-try: _cc = int(subprocess.run(["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"], capture_output=True, text=True).stdout.split()[0].split(".")[0])
-except: _cc = 0
-if _cc >= 10:
-    # Safe to import: this branch pins torch to what is already loaded.
-    try: import torch as _t; _torch = f"torch=={_t.__version__.split('+')[0]}"
-    except: _torch = "torch"
-    _mamba, _conv = "mamba_ssm==2.3.2.post1", "causal_conv1d==1.6.2.post1"
-else:
-    _torch, _mamba, _conv = "torch==2.7.1", "mamba_ssm==2.2.5", "causal_conv1d==1.5.2"
+# Keep the resident torch: `unsloth install-kernels` below takes the mamba_ssm / causal_conv1d
+# wheels built for it, so there is no torch downgrade and no ~30 minute source build. Read the
+# version from metadata: importing torch first would break torchvision if uv then replaced it.
+try: _torch = "torch==" + importlib.metadata.version("torch").split("+")[0]
+except importlib.metadata.PackageNotFoundError: _torch = "torch"
 if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
@@ -1110,13 +1100,12 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps transformers==4.57.6 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
-
-# Prebuilt for the torch pinned above. On Blackwell this builds from source,
-# which is the wait, not a failure.
-!uv pip install --no-build-isolation {_mamba} {_conv}
-""".replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
+""".replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + KERNELS_INSTALL + '\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
+# ROCm has no wheels: the AMD composer still reads the source-build line, whose
+# {_mamba} / {_conv} resolve through _AMD_VARIABLE_PACKAGE_FALLBACKS.
+NEMOTRON_KERNELS_AMD = "!uv pip install --no-build-isolation {_mamba} {_conv}\n"
 
 installation_qat_content = """%%capture
 import os, re
@@ -2093,12 +2082,13 @@ def _is_install_code(source_text):
         "pip install" in lower
         or "uv pip install" in lower
         or "pip3_autoremove" in lower
+        or "unsloth install-kernels" in lower
     )
 
 
 def _is_install_like_cell(cells, idx, source_text):
     lower = source_text.lower()
-    if "pip install" in lower or "uv pip install" in lower or "pip3_autoremove" in lower:
+    if _is_install_code(source_text):
         return True
     prev_md = ""
     if idx > 0 and cells[idx - 1].get("cell_type") == "markdown":
@@ -3566,6 +3556,52 @@ def _is_qwen3_moe_path(notebook_path):
     )
 
 
+# Template / hand-maintained cells whose `!unsloth install-kernels <names>` line replaced a pinned
+# kernel install. ROCm has no wheels, so AMD keeps reading the line it read before.
+_AMD_KERNEL_LINES = {
+    "Falcon_H1_(0.5B)-Alpaca": {
+        "!unsloth install-kernels causal_conv1d mamba_ssm":
+            "!pip install --no-deps causal-conv1d==1.5.0.post8\n!pip install --no-build-isolation mamba-ssm==2.2.4",
+    },
+    "Falcon_H1-Alpaca": {
+        "!unsloth install-kernels causal_conv1d":
+            "!pip install --no-build-isolation git+https://github.com/Dao-AILab/causal-conv1d.git@main",
+        "!unsloth install-kernels mamba_ssm":
+            "!pip install --no-build-isolation git+https://github.com/state-spaces/mamba.git@main",
+    },
+    "Granite4.0_350M": {
+        "!unsloth install-kernels causal_conv1d mamba_ssm":
+            "!pip install --no-build-isolation mamba_ssm==2.2.5\n!pip install --no-build-isolation causal_conv1d==1.5.2",
+    },
+    "Liquid_LFM2_(1.2B)-Conversational": {
+        "!unsloth install-kernels causal_conv1d # Install Mamba kernels":
+            "!pip install --no-deps causal-conv1d==1.5.0.post8 # Install Mamba kernels",
+    },
+    "Liquid_LFM2-Conversational": {
+        "!unsloth install-kernels causal_conv1d # Install Mamba kernels":
+            "!pip install --no-deps causal-conv1d==1.5.0.post8 # Install Mamba kernels",
+    },
+}
+
+
+def _amd_kernel_source(text, notebook_path):
+    """Give the AMD composer ROCm's kernel lines wherever a CUDA cell runs `unsloth install-kernels`.
+
+    The Qwen3.5 and SSM blocks carry the bare line at column zero; the Colab cells' indented copy
+    stays, and the composer ignores it like any other non-pip line.
+    """
+    if not text:
+        return text
+    stem = os.path.basename(notebook_path).removesuffix(".ipynb").removeprefix("AMD-")
+    for line, amd_lines in _AMD_KERNEL_LINES.get(stem, {}).items():
+        text = re.sub(rf"(?m)^{re.escape(line)}$", lambda _: amd_lines, text)
+    if "\n" + KERNELS_INSTALL + "\n" not in text:
+        return text
+    ssm_block = "trl==0.22.2 unsloth unsloth_zoo\n" + KERNELS_INSTALL in text and "transformers==4.57.6" in text
+    amd = NEMOTRON_KERNELS_AMD if ssm_block else QWEN3_5_CAUSAL_CONV1D_AMD
+    return text.replace("\n" + KERNELS_INSTALL + "\n", "\n" + amd, 1)
+
+
 def _compose_amd_installation(notebook_path, source_install_texts):
     """Build the AMD install cell(s) while preserving notebook-specific packages.
 
@@ -3586,10 +3622,7 @@ def _compose_amd_installation(notebook_path, source_install_texts):
          verbatim above the merged pip lines.
     """
     lowered = notebook_path.lower()
-    source_install_texts = [
-        text.replace(QWEN3_5_CAUSAL_CONV1D, QWEN3_5_CAUSAL_CONV1D_AMD) if text else text
-        for text in source_install_texts
-    ]
+    source_install_texts = [_amd_kernel_source(text, notebook_path) for text in source_install_texts]
     source_install_blob = "\n".join(text for text in source_install_texts if text).lower()
     if is_path_contains_any(lowered, ["gemma4"]):
         if is_path_contains_any(lowered, ["(12b)"]):

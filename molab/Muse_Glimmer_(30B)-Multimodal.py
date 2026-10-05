@@ -92,6 +92,14 @@ def _(mo):
 
 @app.cell
 def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
     # Muse Glimmer support ships in transformers 5.15.0, so install the release.
     # Pinned to that exact version so the notebook does not change underneath you.
     # Run this BEFORE anything imports transformers.

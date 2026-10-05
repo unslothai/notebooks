@@ -18,8 +18,9 @@
 
 """The AMD composer must resolve the runtime-templated kernel pins.
 
-The Colab cell picks mamba_ssm / causal_conv1d from compute capability, so the
-composer sees `{_mamba}` / `{_conv}`. An unresolved variable keys to nothing,
+The Colab cell installs mamba_ssm / causal_conv1d with `unsloth install-kernels`,
+which the composer maps back to the ROCm source build, so it sees `{_mamba}` /
+`{_conv}`. An unresolved variable keys to nothing,
 the whole `--no-build-isolation` group is dropped, and the AMD notebook ships
 without mamba_ssm. `_AMD_VARIABLE_PACKAGE_FALLBACKS` holds that resolution.
 """
@@ -93,9 +94,11 @@ def _composed_amd_kernel_line(colab_name, amd_name):
     "colab_name,amd_name", KERNEL_NOTEBOOKS, ids=[n for n, _ in KERNEL_NOTEBOOKS])
 def test_amd_composer_resolves_the_templated_kernel_pins(colab_name, amd_name):
     source, lines = _composed_amd_kernel_line(colab_name, amd_name)
-    assert "{_mamba}" in source and "{_conv}" in source, (
-        f"{colab_name} no longer templates the kernel pins, so this test is "
-        f"measuring nothing; retire it or repoint it."
+    # The CUDA cell delegates the kernels to `unsloth install-kernels`; ROCm has no wheels, so the
+    # composer maps that line back to the templated / pinned source build.
+    assert "unsloth install-kernels" in source, (
+        f"{colab_name} no longer installs its kernels through unsloth install-kernels, so this "
+        f"test is measuring nothing; retire it or repoint it."
     )
     assert lines, (
         f"composing {amd_name} produced no --no-build-isolation install line. "

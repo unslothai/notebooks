@@ -87,6 +87,14 @@ def _(mo):
 
 @app.cell
 def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
     # Only for Gemma 3N
     return
 
