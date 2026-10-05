@@ -925,6 +925,9 @@ def _collect_target_names(target: ast.expr, out: set[str]) -> None:
         _collect_target_names(target.value, out)
 
 
+_RE_KERNELS_INSTALL_LINE = re.compile(r"^[ \t]*!unsloth install-kernels\b.*\n?", re.MULTILINE)
+
+
 def _convert_bootstrap(nb_path: Path):
     """Convert ``nb_path`` (a Jupyter notebook) to a marimo IR.
 
@@ -952,7 +955,12 @@ def _convert_bootstrap(nb_path: Path):
         if cell.get("cell_type") != "code":
             continue
         src = "".join(cell.get("source", []))
-        rewritten = _strip_capture_magic(src)
+        rewritten = src
+        if _is_install_cell(src):
+            # The post-pass drops this cell, but marimo would first hoist the
+            # non-pip bang line's `import subprocess` into a cell of its own.
+            rewritten = _RE_KERNELS_INSTALL_LINE.sub("", rewritten)
+        rewritten = _strip_capture_magic(rewritten)
         rewritten = _rewrite_function_globals(rewritten)
         rewritten = _privatise_dead_demo_bindings(rewritten)
         if rewritten != src:

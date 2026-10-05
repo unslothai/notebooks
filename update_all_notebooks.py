@@ -124,14 +124,9 @@ PIN_OUTETTS_REF = "f5eac6e70d792844c6a6959d900a47af2c061a5b"
 
 SPACES = " " * 4
 
-# PyPI xformers wheels are CUDA 12.8 builds (libcudart.so.12), absent on CUDA 13 torch: take the cu130 index wheel there.
-# Line 2 carries the 4-space indent of the Colab `else:` branch; an assert below checks every consumer.
-XFORMERS_INSTALL = (
-    """xformers = 'xformers==' + {'2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.35")\n"""
-    + SPACES
-    + 'if str(torch.version.cuda).startswith("13") and xformers.endswith("0.0.35"): '
-    'xformers = "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-manylinux_2_28_x86_64.whl"'
-)
+# The xformers wheel for the resident torch + CUDA (PyPI's are CUDA 12.8 only), or nothing so
+# attention stays on SDPA. Runs the `unsloth` CLI, so it must follow the unsloth install.
+KERNELS_INSTALL = "!unsloth install-kernels xformers"
 
 # torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
 # step: each release hard-codes the torch it was built against, in its own
@@ -314,12 +309,11 @@ import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth  # Do this in local & cloud setups
 else:
-    import torch; v = re.match(r'[\d]{1,}\.[\d]{1,}', str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
-""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
 installation_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -713,15 +707,14 @@ import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth  # Do this in local & cloud setups
 else:
-    import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"
 !pip install "huggingface_hub>=1.5.0,<2.0"
 !pip install torchcodec
-import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
 
 # Gemma 4 12B needs a newer transformers (5.10.1) than the other Gemma 4 sizes,
 # which pin 5.5.0. Same install block otherwise, so derive it from the shared one.
@@ -740,15 +733,14 @@ if "COLAB_" not in "".join(os.environ.keys()):
     # the floor; --no-deps keeps that reinstall off numpy.
     !pip install --no-deps --upgrade --force-reinstall "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"
 else:
-    import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton
+    !pip install --no-deps bitsandbytes accelerate peft trl triton
     !pip install --no-deps --upgrade "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.11.0 "tokenizers>=0.22.0,<=0.23.0"
 !pip install "huggingface_hub>=1.5.0,<2.0"
-import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
 
 installation_diffusiongemma_kaggle_content = installation_diffusiongemma_content
 
@@ -925,13 +917,15 @@ installation_muse_glimmer_kaggle_content = update_or_append_pip_install(
     "!pip install transformers==5.15.0",
 )
 
-# A missing release wheel 404s and transformers falls back to torch conv1d, instead of a ~10 minute source build.
-QWEN3_5_CAUSAL_CONV1D = """# Prebuilt causal_conv1d when one exists for this torch, otherwise transformers' torch conv1d (no 10 minute build)
-import sys, torch; _t = ".".join(torch.__version__.split(".")[:2]); _cu = (torch.version.cuda or "0").split(".")[0]; _py = f"cp{sys.version_info[0]}{sys.version_info[1]}"; _abi = str(torch.compiled_with_cxx11_abi()).upper()
-!uv pip install -qqq "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.7.0/causal_conv1d-1.7.0+cu{_cu}torch{_t}cxx11abi{_abi}-{_py}-{_py}-linux_x86_64.whl" || echo "No prebuilt causal_conv1d for torch {_t}, using the torch fallback"
-"""
-# ROCm has no wheel (torch.version.cuda is None), so the AMD composer keeps the source build.
-QWEN3_5_CAUSAL_CONV1D_AMD = "!uv pip install --no-build-isolation causal_conv1d==1.6.0\n"
+# The prebuilt causal_conv1d for this torch, or none so transformers keeps its torch conv1d (never a
+# ~10 minute source build). No fla uninstall: unsloth_zoo's vendored kernels already win over an older pip fla.
+QWEN3_5_CAUSAL_CONV1D = "!unsloth install-kernels causal_conv1d\n"
+# ROCm has no wheel, so the AMD composer keeps its fla uninstall and the source build.
+QWEN3_5_CAUSAL_CONV1D_AMD = (
+    "# Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them\n"
+    "!uv pip uninstall -qqq flash-linear-attention fla-core\n"
+    "!uv pip install --no-build-isolation causal_conv1d==1.6.0\n"
+)
 
 installation_qwen3_5_content = """%%capture
 import os, importlib.util
@@ -948,8 +942,6 @@ elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 !uv pip install transformers==5.2.0
-# Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them
-!uv pip uninstall -qqq flash-linear-attention fla-core
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + QWEN3_5_CAUSAL_CONV1D + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
@@ -971,12 +963,7 @@ installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 installation_qwen3_8_content = update_or_append_pip_install(
     installation_content,
     "transformers",
-    # uv is not preinstalled on Colab and this block never needed it before, so the
-    # cleanup brings its own uv along; without it the uninstall is a silent no-op.
-    "!pip install transformers==5.15.1\n"
-    "# Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them\n"
-    "!pip install --upgrade -qqq uv\n"
-    "!uv pip uninstall -qqq flash-linear-attention fla-core",
+    "!pip install transformers==5.15.1",
 )
 # Written out rather than derived from installation_kaggle_content. That one opens
 # with `pip install torch torchvision torchaudio xformers --index-url .../cu128`,
@@ -1137,22 +1124,23 @@ if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth
 else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
-    import torch; v = re.match(r"[0-9]{1,}\.[0-9]{1,}", str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
-    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
 __QAT_NATIVE_INSTALL__
 !pip install transformers==4.57.6 && pip install --no-deps trl==0.22.2""".replace(
-    "__XFORMERS_INSTALL__", XFORMERS_INSTALL
+    "__KERNELS_INSTALL__", KERNELS_INSTALL
 ).replace(
     "__QAT_NATIVE_INSTALL__", build_qat_native_install_block()
 )
 installation_qat_kaggle_content = installation_qat_content
 
-for _xf_block in (installation_content, installation_gemma4_content, installation_diffusiongemma_content, installation_qat_content):
-    _xf_lines = [l for l in _xf_block.splitlines() if l.lstrip().startswith(("xformers = 'xformers=='", 'if str(torch.version.cuda).startswith("13")'))]
-    assert len(_xf_lines) == 2 and len({len(l) - len(l.lstrip()) for l in _xf_lines}) == 1, _xf_lines
+# The CLI exists only once unsloth is installed, so the kernel line must sit right after that install.
+for _kernels_block in (installation_content, installation_gemma4_content, installation_diffusiongemma_content, installation_qat_content):
+    _lines = _kernels_block.splitlines()
+    _at = _lines.index(SPACES + KERNELS_INSTALL)
+    assert re.search(r'(\s|")unsloth(\s|"|>|$)', _lines[_at - 1]) and "{xformers}" not in _kernels_block, _lines
 
 installation_ministral_content = installation_content
 installation_ministral_content = update_or_append_pip_install(

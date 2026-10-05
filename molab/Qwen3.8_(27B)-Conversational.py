@@ -16,7 +16,6 @@
 #     "trl==0.22.2",
 #     "unsloth @ git+https://github.com/unslothai/unsloth",
 #     "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo",
-#     "uv",
 # ]
 #
 # [tool.uv]
@@ -39,13 +38,6 @@ def _():
     import marimo as mo
 
     return (mo,)
-
-
-@app.cell
-def _():
-    import subprocess
-
-    return
 
 
 @app.cell(hide_code=True)
