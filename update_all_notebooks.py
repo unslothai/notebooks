@@ -1633,6 +1633,7 @@ README_TYPE_OVERRIDES = {
     "Qwen_3_5_27B_A100(80GB).ipynb": "Conversational",
     # Misc single-task notebooks
     "ModernBert.ipynb": "Classification",
+    "Qwen3_5_(4B)-Decision.ipynb": "Decision Model",
     "Deepseek_OCR_2_(3B).ipynb": "Fine Tuning",
     "LFM2.5_(1.2B)-Translation.ipynb": "Translation",
     "DiffusionGemma_(26B-A4B)-Sudoku.ipynb": "Sudoku",
