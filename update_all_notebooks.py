@@ -766,7 +766,7 @@ else:
     !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
     !pip install --no-deps --upgrade "torchao>=0.16.0"
-!pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@a14d472b296866270642e99f29843be775bb60b5" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
+!pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@main" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
 !pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
 installation_embeddinggemma2_kaggle_content = installation_embeddinggemma2_content
 
