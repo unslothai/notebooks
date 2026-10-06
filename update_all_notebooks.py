@@ -752,6 +752,24 @@ import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_
 
 installation_diffusiongemma_kaggle_content = installation_diffusiongemma_content
 
+# EmbeddingGemma 2 needs transformers >= 5.18.0 (embedding_gemma2), sentence-transformers >= 6.1.0
+# (ordered multimodal inputs), and the hub / tokenizers / safetensors floors that transformers
+# release declares. transformers goes in with --no-deps like Gemma 4, so those floors are spelled
+# out here or Colab keeps its older huggingface_hub and the import fails.
+installation_embeddinggemma2_content = """%%capture
+import os, re
+if "COLAB_" not in "".join(os.environ.keys()):
+    !pip install unsloth  # Do this in local & cloud setups
+else:
+    import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
+    __XFORMERS_INSTALL__
+    !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip install --no-deps --upgrade "torchao>=0.16.0"
+!pip install --no-deps "transformers>=5.18.0" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
+!pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+installation_embeddinggemma2_kaggle_content = installation_embeddinggemma2_content
+
 # ---------------------------------------------------------------------------
 # AMD Dev Cloud install template (single canonical %%bash cell shared by every
 # AMD notebook variant). Notebook-specific extra packages (vllm, torchcodec,
@@ -1615,6 +1633,10 @@ README_TYPE_OVERRIDES = {
     "All_MiniLM_L6_v2.ipynb": "Embeddings",
     "BGE_M3.ipynb": "Embeddings",
     "EmbeddingGemma_(300M).ipynb": "Embeddings",
+    "EmbeddingGemma2_(300M).ipynb": "Embeddings",
+    "EmbeddingGemma2_(300M)-Multimodal_Search.ipynb": "Embeddings",
+    "EmbeddingGemma2_(300M)-Image_Text.ipynb": "Embeddings",
+    "EmbeddingGemma2_(300M)-Audio.ipynb": "Embeddings",
     "Qwen3_Embedding_(0_6B).ipynb": "Embeddings",
     "Qwen3_Embedding_(4B).ipynb": "Embeddings",
     # Mixture of Experts
@@ -4961,6 +4983,13 @@ def update_notebook_sections(
                                 installation = installation_gemma4_12b_content
                             else:
                                 installation = installation_gemma4_content
+
+                        # EMBEDDINGGEMMA 2 INSTALLATION: transformers >= 5.18.0 + sentence-transformers >= 6.1.0.
+                        if is_path_contains_any(notebook_path.lower(), ["embeddinggemma2"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_embeddinggemma2_kaggle_content
+                            else:
+                                installation = installation_embeddinggemma2_content
 
                         # DIFFUSIONGEMMA INSTALLATION: unsloth + unsloth_zoo from PyPI, transformers 5.11.0.
                         if is_path_contains_any(notebook_path.lower(), ["diffusiongemma"]):
