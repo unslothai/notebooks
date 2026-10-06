@@ -324,7 +324,7 @@ def _(dataset_1):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    We now have to apply the chat template for `Gemma-4` onto the conversations, and save it to `text`. We remove the `<bos>` token using removeprefix(`'<bos>'`) since we're finetuning. The Processor will add this token before training and the model expects only one.
+    We now have to apply the chat template for `Gemma-4` onto the conversations, and save it to `text`. We keep the `<bos>` token the chat template adds: the trainer then tokenizes without adding special tokens, so the model sees exactly one `<bos>`, as it does at inference.
     """)
     return
 
@@ -336,7 +336,7 @@ def _(dataset_1, tokenizer_1):
         texts = [
             tokenizer_1.apply_chat_template(
                 convo, tokenize=False, add_generation_prompt=False
-            ).removeprefix("<bos>")
+            )
             for convo in convos
         ]
         return {"text": texts}
@@ -348,7 +348,7 @@ def _(dataset_1, tokenizer_1):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Let's see how the chat template did! Notice there is no `<bos>` token as the processor tokenizer will be adding one.
+    Let's see how the chat template did! Notice the text starts with a single `<bos>` token.
     """)
     return
 
