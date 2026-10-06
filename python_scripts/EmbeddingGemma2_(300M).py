@@ -33,8 +33,19 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.35")\n    if str(torch.version.cuda).startswith("13") and xformers.endswith("0.0.35"): xformers = "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-manylinux_2_28_x86_64.whl"\n    !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps "transformers>=5.18.0" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"\n!pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec\n')
-# 
+# %%capture
+# import os, re
+# if "COLAB_" not in "".join(os.environ.keys()):
+#     !pip install unsloth  # Do this in local & cloud setups
+# else:
+#     import torch; v = re.match(r'[\d]{1,}\.[\d]{1,}', str(torch.__version__)).group(0)
+#     xformers = 'xformers==' + {'2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.35")
+#     if str(torch.version.cuda).startswith("13") and xformers.endswith("0.0.35"): xformers = "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-manylinux_2_28_x86_64.whl"
+#     !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer
+#     !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+#     !pip install --no-deps --upgrade "torchao>=0.16.0"
+# !pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@a14d472b296866270642e99f29843be775bb60b5" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
+# !pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec
 # 
 # # ### Unsloth
 
@@ -47,14 +58,8 @@ model = FastSentenceTransformer.from_pretrained(
     model_name = "unsloth/embeddinggemma-2",
     max_seq_length = 1024,   # The model supports up to 8192 tokens
     full_finetuning = False, # [NEW!] We have full finetuning now!
-    # EmbeddingGemma 2 also embeds images, audio and video. For text-only finetuning we skip
-    # loading the vision and audio encoders: 271M instead of 744M parameters.
-    config_kwargs = {"vision_config": None, "audio_config": None},
+    config_kwargs = {"vision_config": None, "audio_config": None}, # Text only
 )
-
-
-# EmbeddingGemma 2 does not support float16. On GPUs without bfloat16 (Tesla T4, V100) Unsloth
-# switches to float32 for the numerically sensitive parts automatically, so this notebook runs on a free Colab T4.
 
 # We now add LoRA adapters so we only need to update a small amount of parameters!
 
@@ -77,7 +82,6 @@ model = FastSentenceTransformer.get_peft_model(
     task_type = "FEATURE_EXTRACTION"
 )
 
-
 # <a name="Data"></a>
 # ### Data Prep
 # We now use the ``tomaarsen/miriad-4.4M-split`` dataset, a large-scale collection of 4.4 million medical question-answer pairs distilled from peer-reviewed biomedical literature. To maintain efficiency, we use data streaming to ingest a subset of 10,000 training samples and 2,000 evaluation samples.
@@ -93,7 +97,6 @@ stream_eval = list(load_dataset("tomaarsen/miriad-4.4M-split", split = "eval",st
 train_dataset = Dataset.from_generator(lambda: (yield from stream_train))
 eval_dataset = Dataset.from_generator(lambda: (yield from stream_eval))
 
-
 # Let's take a look at the dataset structure:
 
 # In[4]:
@@ -101,11 +104,8 @@ eval_dataset = Dataset.from_generator(lambda: (yield from stream_eval))
 
 train_dataset[0]
 
-
 # ## Baseline Performance
-# Before finetuning, we measure retrieval quality on the held-out medical questions, and on
-# [NanoBEIR](https://huggingface.co/collections/zeta-alpha-ai/nanobeir-66e1a0af21dfd93e620cd9f6),
-# small versions of standard BEIR / MTEB retrieval benchmarks, to check general quality is kept.
+# Retrieval quality before finetuning, on the medical eval set and on [NanoBEIR](https://huggingface.co/collections/zeta-alpha-ai/nanobeir-66e1a0af21dfd93e620cd9f6).
 
 # In[5]:
 
@@ -137,7 +137,6 @@ baseline_nano = nano_beir(model)
 print(f"Medical retrieval NDCG@10 : {baseline['miriad_cosine_ndcg@10']:.4f}")
 print(f"NanoBEIR mean NDCG@10     : {baseline_nano['NanoBEIR_mean_cosine_ndcg@10']:.4f}")
 
-
 # <a name="Train"></a>
 # ### Train the model
 # Now let's train our model. We use `MultipleNegativesRankingLoss`
@@ -154,8 +153,6 @@ from sentence_transformers.sentence_transformer import losses
 from sentence_transformers.sentence_transformer.training_args import BatchSamplers
 from unsloth import is_bf16_supported
 
-# This will use other positives in the same batch as negative examples.
-# For more negatives than fit in memory, use losses.CachedMultipleNegativesRankingLoss(model, mini_batch_size = 16).
 loss = losses.MultipleNegativesRankingLoss(model)
 
 trainer = SentenceTransformerTrainer(
@@ -186,7 +183,6 @@ trainer = SentenceTransformerTrainer(
     ),
 )
 
-
 # In[7]:
 
 
@@ -198,14 +194,12 @@ max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
 print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
-
 # Let's train the model! To resume a training run, set `trainer.train(resume_from_checkpoint = True)`
 
 # In[8]:
 
 
 trainer_stats = trainer.train()
-
 
 # In[9]:
 
@@ -224,7 +218,6 @@ print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
 print(f"Peak reserved memory % of max memory = {used_percentage} %.")
 print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
 
-
 # ### Now after finetuning, let's evaluate the model again!
 
 # In[15]:
@@ -234,9 +227,6 @@ after = evaluator(model)
 after_nano = nano_beir(model)
 print(f"Medical retrieval NDCG@10 : {baseline['miriad_cosine_ndcg@10']:.4f} -> {after['miriad_cosine_ndcg@10']:.4f}")
 print(f"NanoBEIR mean NDCG@10     : {baseline_nano['NanoBEIR_mean_cosine_ndcg@10']:.4f} -> {after_nano['NanoBEIR_mean_cosine_ndcg@10']:.4f}")
-
-
-# The medical retrieval score goes up after only 30 steps, while NanoBEIR, which measures general retrieval, stays roughly the same: the model learned the new domain without forgetting.
 
 # <a name="Inference"></a>
 # ### Inference
@@ -254,7 +244,6 @@ candidates = [
     "Gastroesophageal Reflux Disease (GERD) causes burning retrosternal pain usually after meals."
 ]
 
-# EmbeddingGemma 2 uses task prompts: "query" for questions, "document" for passages.
 query_emb = model.encode(query, prompt_name = "query", convert_to_tensor = True)
 candidate_embs = model.encode(candidates, prompt_name = "document", convert_to_tensor = True)
 similarities = model.similarity(query_emb, candidate_embs)
@@ -266,9 +255,7 @@ for idx in ranking.tolist():
     text = candidates[idx]
     print(f"{score:.4f} | {text}")
 
-
-# EmbeddingGemma 2 is trained with Matryoshka Representation Learning, so you can keep only the
-# first 512, 256 or 128 dimensions to save storage (queries and documents must use the same size):
+# Matryoshka: keep only the first 512, 256 or 128 dimensions with `truncate_dim`:
 
 # In[ ]:
 
@@ -278,7 +265,6 @@ for dim in [768, 256, 128]:
     c = model.encode(candidates, prompt_name = "document", truncate_dim = dim, normalize_embeddings = True, convert_to_tensor = True)
     best = model.similarity(q, c)[0].argmax().item()
     print(f"{dim:4d} dims -> top match: {candidates[best][:60]}")
-
 
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
@@ -294,7 +280,6 @@ model.tokenizer.save_pretrained("embeddinggemma_lora")
 # model.push_to_hub("your_name/embeddinggemma_lora", token = "YOUR_HF_TOKEN") # Online saving
 # model.tokenizer.push_to_hub("your_name/embeddinggemma_lora", token = "YOUR_HF_TOKEN") # Online saving
 
-
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
 # In[18]:
@@ -306,7 +291,6 @@ if False:
         "lora_model",
         config_kwargs = {"vision_config": None, "audio_config": None},
     )
-
 
 # ### Saving to float16 for VLLM
 # 
@@ -327,7 +311,6 @@ if False:
 if False: # Pushing to HF Hub
     model.push_to_hub("HF_USERNAME/embeddinggemma_lora", token = "YOUR_HF_TOKEN")
 
-
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
 # 
@@ -335,8 +318,6 @@ if False: # Pushing to HF Hub
 # * `q8_0` - Fast conversion. High resource use, but generally acceptable.
 # * `q4_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q4_K.
 # * `q5_k_m` - Recommended. Uses Q6_K for half of the attention.wv and feed_forward.w2 tensors, else Q5_K.
-# 
-# The merged model keeps the vision and audio encoders from the base checkpoint, so the finetuned text model still embeds images, audio and video in the same space.
 
 # In[ ]:
 
@@ -368,7 +349,6 @@ if False:
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
-
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
