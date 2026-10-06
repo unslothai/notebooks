@@ -255,20 +255,20 @@ dataset = standardize_data_formats(dataset)
 dataset[100]
 
 
-# We now have to apply the chat template for `Gemma-4` onto the conversations, and save it to `text`. We remove the `<bos>` token using removeprefix(`'<bos>'`) since we're finetuning. The Processor will add this token before training and the model expects only one.
+# We now have to apply the chat template for `Gemma-4` onto the conversations, and save it to `text`. We keep the `<bos>` token the chat template adds: the trainer then tokenizes without adding special tokens, so the model sees exactly one `<bos>`, as it does at inference.
 
 # In[16]:
 
 
 def formatting_prompts_func(examples):
    convos = examples["conversations"]
-   texts = [tokenizer.apply_chat_template(convo, tokenize = False, add_generation_prompt = False).removeprefix('<bos>') for convo in convos]
+   texts = [tokenizer.apply_chat_template(convo, tokenize = False, add_generation_prompt = False) for convo in convos]
    return { "text" : texts, }
 
 dataset = dataset.map(formatting_prompts_func, batched = True)
 
 
-# Let's see how the chat template did! Notice there is no `<bos>` token as the processor tokenizer will be adding one.
+# Let's see how the chat template did! Notice the text starts with a single `<bos>` token.
 
 # In[17]:
 
