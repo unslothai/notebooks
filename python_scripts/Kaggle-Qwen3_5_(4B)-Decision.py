@@ -38,7 +38,7 @@
 # 
 # # ### Unsloth
 # 
-# A decision model doesn't write text. It reads an input, looks at the options you give it, and picks one with a probability. `FastDecisionModel` turns an LLM into one: it adds a small head that scores each option.
+# A decision model doesn't write text. It reads an input, looks at the options you give it, and picks one with a probability. `FastDecisionModel` turns an LLM into one: it adds a small head that reads every question about an input in one pass and scores each option.
 # 
 # Change `model_name` to `unsloth/Llama-3.2-3B-Instruct` or `unsloth/gemma-4-E4B-it` to try other models.
 
@@ -92,9 +92,9 @@ print(json.dumps(json.loads(dataset[0]["questions"]), indent = 2)[:1000])
 print(dataset[0]["gold"])
 
 
-# `build_dataset` turns every question into one example, and tells you how many it skipped and why. To use your own data, give it a list of rows with the same `state`, `questions` and `gold` fields.
+# `build_dataset` turns every row into one example holding all of its questions, and tells you how many decisions it skipped and why. To use your own data, give it a list of rows with the same `state`, `questions` and `gold` fields.
 # 
-# `split_holdout` keeps some rows out of training, so we can check accuracy and calibrate the model later.
+# `split_holdout` keeps some rows out of training (80 rows, 400 decisions here), so we can check accuracy and calibrate the model later.
 
 # In[ ]:
 
@@ -103,10 +103,10 @@ items, report = FastDecisionModel.build_dataset(dataset, tokenizer, model)
 print(f"Skipped {report['skipped']} of {report['total']} decisions")
 
 train_items, eval_items = FastDecisionModel.split_holdout(items, seed = 3407)
-print(f"{len(train_items)} training decisions, {len(eval_items)} held out")
+print(f"{len(train_items)} training rows, {len(eval_items)} held out")
 
 
-# Let's check accuracy before training. The head is new, so it's about the same as guessing.
+# Let's check accuracy before training. The head is new, so it's about the same as guessing (about 30% accuracy in our runs).
 
 # In[ ]:
 
@@ -116,7 +116,7 @@ FastDecisionModel.evaluate(model, tokenizer, eval_items)
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, which reached 76% test accuracy in our run. For the full run, set `num_train_epochs = 2` and remove `max_steps`: it reached 81%, but takes about 3.5 hours on a free T4 GPU.
+# Now let's train our model. We do 60 steps (about 1.7 epochs) to speed things up, which reached 75% to 78% test accuracy in our runs and took about 2 hours on a free T4 GPU (12 minutes on an RTX PRO 6000). The T4 has no bfloat16 and Qwen3.5 gives NaNs in pure float16, so Unsloth trains it in float32 there, which is why the T4 is slow. For the full run, set `num_train_epochs = 2` and remove `max_steps`: that is 70 steps here, and it reached 78% test accuracy in 25 minutes on an A100.
 
 # In[ ]:
 
@@ -187,7 +187,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 
 # <a name="Inference"></a>
 # ### Inference
-# First we calibrate the model on the held-out rows. Calibration adjusts the probabilities, so an answer given with 90% confidence is right about 90% of the time. `ece` is the calibration error, lower is better.
+# First we calibrate the model on the held-out rows. Calibration adjusts the probabilities, so an answer given with 90% confidence is right about 90% of the time. `ece` is the calibration error, lower is better. After 60 steps we got 80% to 84% held-out accuracy and an `ece` of 0.02 to 0.06.
 
 # In[ ]:
 
@@ -195,7 +195,7 @@ print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.
 FastDecisionModel.calibrate(model, tokenizer, eval_items)
 
 
-# Let's check accuracy on the dataset's test split, which the model never saw:
+# Let's check accuracy on the dataset's test split, which the model never saw. We got 75% to 78% after 60 steps:
 
 # In[ ]:
 
