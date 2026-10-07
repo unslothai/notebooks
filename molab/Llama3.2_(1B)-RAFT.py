@@ -88,6 +88,14 @@ def _(mo):
 
 @app.cell
 def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
     # llama-index-core 0.14.21 deleted `llama_index.core.llama_pack`, and
     # llama-index-packs-raft-dataset still imports it, so an unpinned install
     # stops at `No module named 'llama_index.core.llama_pack'`. The pack allows
@@ -181,13 +189,10 @@ def _(mo):
 
 @app.cell
 def _(SimpleDirectoryReader):
-    import subprocess
-    import subprocess
+    import subprocess as _molab_subprocess
 
-    #! mkdir  -p ../data
-    subprocess.call(["mkdir", "-p", "../data"])
-    #! wget "https://arxiv.org/pdf/2405.00247.pdf" -O "../data/non_traditional_credentials.pdf"
-    subprocess.call(
+    _molab_subprocess.call(["mkdir", "-p", "../data"])
+    _molab_subprocess.call(
         [
             "wget",
             "https://arxiv.org/pdf/2405.00247.pdf",
@@ -195,7 +200,6 @@ def _(SimpleDirectoryReader):
             "../data/non_traditional_credentials.pdf",
         ]
     )
-
     docs = SimpleDirectoryReader("../data/").load_data(show_progress=True)
     return
 

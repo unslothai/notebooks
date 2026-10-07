@@ -502,11 +502,10 @@ _MOLAB_PER_NOTEBOOK_RELAX: dict[str, dict[str, str]] = {
 # one of these two tables -- test_molab_templated_pins.py fails on any that is
 # in neither, so a new pin cannot vanish the way torch 2.7.1 did.
 _TEMPLATE_STATIC_SPECS: dict[str, str] = {
-    # The Blackwell arm of the cell only avoids a ~30 minute source build, so
-    # molab takes the prebuilt non-Blackwell arm.
+    # The cell keeps the resident torch, which molab does not have. Pin one that
+    # every kernel publishes a wheel for; the generated `unsloth install-kernels`
+    # cell then installs mamba_ssm / causal_conv1d for it at runtime.
     "_torch": "torch==2.7.1",
-    "_mamba": "mamba_ssm==2.2.5",
-    "_conv": "causal_conv1d==1.5.2",
 }
 
 _TEMPLATE_NO_STATIC_SPEC: dict[str, str] = {

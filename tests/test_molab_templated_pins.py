@@ -58,9 +58,7 @@ _MAMBA_HYBRID_STEMS: tuple[str, ...] = (
     "Nemotron-Nano-3-30B-A3B_A100",
 )
 
-_MAMBA_HYBRID_PINS: frozenset[str] = frozenset(
-    {"torch==2.7.1", "mamba_ssm==2.2.5", "causal_conv1d==1.5.2"}
-)
+_MAMBA_HYBRID_PINS: frozenset[str] = frozenset({"torch==2.7.1"})
 
 
 def test_template_registries_are_disjoint() -> None:
@@ -170,11 +168,10 @@ def test_statically_resolved_template_reaches_the_plan(
 
 @pytest.mark.parametrize("stem", _MAMBA_HYBRID_STEMS)
 def test_mamba_hybrid_notebooks_keep_their_kernel_pins(stem: str) -> None:
-    """Granite 4.0 / Nemotron Nano molab headers carry the Mamba kernel trio.
+    """Granite 4.0 / Nemotron Nano molab notebooks get a torch the Mamba kernels have wheels for.
 
-    These hybrids cannot run without mamba_ssm / causal_conv1d pinned against a
-    pinned torch, and the cell picks all three through ``{var}``, so the planner
-    must resolve the non-Blackwell arm rather than drop them.
+    These hybrids cannot run without mamba_ssm / causal_conv1d. The header pins the
+    torch through ``{_torch}``, and the generated kernel cell installs both for it.
     """
     nb_path = REPO_ROOT / "nb" / f"{stem}.ipynb"
     if not nb_path.exists():
@@ -185,6 +182,10 @@ def test_mamba_hybrid_notebooks_keep_their_kernel_pins(stem: str) -> None:
     assert not missing, (
         f"MAMBA KERNEL PINS MISSING from the {stem} molab dependency plan: "
         f"{missing}.  Got {sorted(deps)}."
+    )
+    molab_text = (REPO_ROOT / "molab" / f"{stem}.py").read_text(encoding="utf-8")
+    assert 'subprocess.run(["unsloth", "install-kernels"])' in molab_text, (
+        f"molab/{stem}.py has no runtime kernel install cell, so it ships without mamba_ssm."
     )
 
 

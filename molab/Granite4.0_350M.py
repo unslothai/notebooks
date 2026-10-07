@@ -2,8 +2,6 @@
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
 #     "bitsandbytes>=0.43.0",
-#     "causal_conv1d==1.5.2",
-#     "mamba_ssm==2.2.5",
 #     "marimo",
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch==2.7.1",
@@ -85,8 +83,17 @@ def _(mo):
 
 @app.cell
 def _():
-    # These are mamba kernels and we must have these for faster training
+    import subprocess
 
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
+    import subprocess as _molab_subprocess
+
+    _molab_subprocess.call(["unsloth", "install-kernels", "causal_conv1d", "mamba_ssm"])
     return
 
 
