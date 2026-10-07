@@ -753,13 +753,12 @@ import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth  # Do this in local & cloud setups
 else:
-    import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer
-    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@a14d472b296866270642e99f29843be775bb60b5" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
-!pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+!pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
 installation_embeddinggemma2_kaggle_content = installation_embeddinggemma2_content
 
 # ---------------------------------------------------------------------------
@@ -1126,7 +1125,13 @@ __QAT_NATIVE_INSTALL__
 installation_qat_kaggle_content = installation_qat_content
 
 # The CLI exists only once unsloth is installed, so the kernel line must sit right after that install.
-for _kernels_block in (installation_content, installation_gemma4_content, installation_diffusiongemma_content, installation_qat_content):
+for _kernels_block in (
+    installation_content,
+    installation_gemma4_content,
+    installation_diffusiongemma_content,
+    installation_embeddinggemma2_content,
+    installation_qat_content,
+):
     _lines = _kernels_block.splitlines()
     _at = _lines.index(SPACES + KERNELS_INSTALL)
     assert re.search(r'(\s|")unsloth(\s|"|>|$)', _lines[_at - 1]) and "{xformers}" not in _kernels_block, _lines
