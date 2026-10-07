@@ -757,7 +757,7 @@ else:
     !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
     __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
-!pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@main" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
+!pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@92cd495f2720c064bc78eb2d93e28704c5bce51f" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
 !pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
 installation_embeddinggemma2_kaggle_content = installation_embeddinggemma2_content
 
