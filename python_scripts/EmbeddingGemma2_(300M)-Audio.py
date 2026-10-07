@@ -33,31 +33,12 @@
 # # In[ ]:
 # 
 # 
-# %%capture
-# import os, re
-# if "COLAB_" not in "".join(os.environ.keys()):
-#     !pip install unsloth  # Do this in local & cloud setups
-# else:
-#     !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer
-#     !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
-#     !unsloth install-kernels
-#     !pip install --no-deps --upgrade "torchao>=0.16.0"
-# !pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@a14d472b296866270642e99f29843be775bb60b5" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
-# !pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@92cd495f2720c064bc78eb2d93e28704c5bce51f" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"\n!pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec\n')
+# 
 # 
 # # ### Unsloth
 # 
 # Fine-tune **EmbeddingGemma 2** for sound to caption retrieval with LoRA and compare Recall@K before and after.
-
-# In[ ]:
-
-
-import os
-try:
-    from google.colab import userdata
-    os.environ.setdefault("HF_TOKEN", userdata.get("HF_TOKEN") or "")
-except Exception:
-    pass
 
 # In[ ]:
 
@@ -71,6 +52,7 @@ model = FastSentenceTransformer.from_pretrained(
     config_kwargs = {"vision_config": None}, # skip the vision tower: less VRAM
     full_finetuning = False,
 )
+
 
 # In[ ]:
 
@@ -97,6 +79,7 @@ def recall_at_k(similarity, positives, ks = (1, 5, 10)):
         top = ranking[:, :k].tolist()
         out[f"R@{k}"] = round(100 * sum(len(set(t) & positives[q]) > 0 for q, t in enumerate(top)) / len(top), 2)
     return out
+
 
 # <a name="Data"></a>
 # ### Data Prep
@@ -140,6 +123,7 @@ for i, r in enumerate(test_rows):
 print(f"train pairs: {len(train_dataset)}, test: {len(test_items)} clips / {len(test_texts)} captions")
 print(pairs[0]["anchor"]); display(Audio(filename = pairs[0]["positive"]))
 
+
 # ## Baseline Performance
 
 # In[ ]:
@@ -157,6 +141,7 @@ def evaluate(model):
 
 baseline = evaluate(model)
 print(baseline)
+
 
 # We add LoRA adapters to the language model and the audio encoder (`finetune_audio_layers = True`).
 
@@ -176,6 +161,7 @@ model = FastSentenceTransformer.get_peft_model(
     random_state = 3407,
     task_type = "FEATURE_EXTRACTION",
 )
+
 
 # <a name="Train"></a>
 # ### Train the model
@@ -209,6 +195,7 @@ trainer = SentenceTransformerTrainer(
     ),
 )
 
+
 # In[ ]:
 
 
@@ -219,10 +206,12 @@ max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
 print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
+
 # In[ ]:
 
 
 trainer_stats = trainer.train()
+
 
 # In[ ]:
 
@@ -232,6 +221,7 @@ used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
 print(f"{trainer_stats.metrics['train_runtime']} seconds used for training.")
 print(f"Peak reserved memory = {used_memory} GB of {max_memory} GB.")
 
+
 # ### Evaluate after fine-tuning
 
 # In[ ]:
@@ -240,6 +230,7 @@ print(f"Peak reserved memory = {used_memory} GB of {max_memory} GB.")
 finetuned = evaluate(model)
 for direction in baseline:
     print(f"{direction:12s} before {baseline[direction]}  after {finetuned[direction]}")
+
 
 # <a name="Inference"></a>
 # ### Inference
@@ -254,6 +245,7 @@ for query in ["birds chirping in a forest", "a car driving past on a wet road"]:
     print(f"{query} -> {test_texts[text_to_item.index(best)]} ({scores[best]:.3f})")
     display(Audio(filename = test_items[best]))
 
+
 # <a name="Save"></a>
 # ### Saving
 # `save_pretrained` saves the LoRA adapters, `save_pretrained_merged` the full model.
@@ -265,6 +257,7 @@ model.save_pretrained("embeddinggemma_lora")  # Local saving
 model.tokenizer.save_pretrained("embeddinggemma_lora")
 # model.push_to_hub("your_name/embeddinggemma_lora", token = "YOUR_HF_TOKEN") # Online saving
 
+
 # In[ ]:
 
 
@@ -273,6 +266,7 @@ if False:
     model.save_pretrained_merged("embeddinggemma_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit",)
 if False: # Pushing to HF Hub
     model.push_to_hub_merged("HF_USERNAME/embeddinggemma_finetune_16bit", tokenizer = model.tokenizer, save_method = "merged_16bit", token = "YOUR_HF_TOKEN")
+
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 

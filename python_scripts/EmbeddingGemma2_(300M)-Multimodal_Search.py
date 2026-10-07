@@ -33,31 +33,12 @@
 # # In[ ]:
 # 
 # 
-# %%capture
-# import os, re
-# if "COLAB_" not in "".join(os.environ.keys()):
-#     !pip install unsloth  # Do this in local & cloud setups
-# else:
-#     !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer
-#     !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
-#     !unsloth install-kernels
-#     !pip install --no-deps --upgrade "torchao>=0.16.0"
-# !pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@a14d472b296866270642e99f29843be775bb60b5" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
-# !pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@92cd495f2720c064bc78eb2d93e28704c5bce51f" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"\n!pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec\n')
+# 
 # 
 # # ### Unsloth
 # 
 # **EmbeddingGemma 2** embeds text, images, audio and video into one 768-dim space. Below are small search demos on Flickr30k, Clotho and MSR-VTT.
-
-# In[ ]:
-
-
-import os
-try:
-    from google.colab import userdata
-    os.environ.setdefault("HF_TOKEN", userdata.get("HF_TOKEN") or "")
-except Exception:
-    pass
 
 # In[ ]:
 
@@ -71,6 +52,7 @@ model = FastSentenceTransformer.from_pretrained(
 )
 print(model)
 print("dtype:", next(model.parameters()).dtype)
+
 
 # In[ ]:
 
@@ -98,6 +80,7 @@ def recall_at_k(similarity, positives, ks = (1, 5, 10)):
         out[f"R@{k}"] = round(100 * sum(len(set(t) & positives[q]) > 0 for q, t in enumerate(top)) / len(top), 2)
     return out
 
+
 # ### 1. Text search
 # Queries use `prompt_name = "query"`, documents `prompt_name = "document"`.
 
@@ -120,6 +103,7 @@ scores = model.similarity(query_embedding, doc_embeddings)[0]
 for i in scores.argsort(descending = True).tolist():
     print(f"{scores[i]:.3f} | {documents[i]}")
 
+
 # Other prompts: `QuestionAnswering`, `FactChecking`, `CodeRetrieval`, `SentenceSimilarity`, `Clustering`, `Classification`. Images, audio and video need no prompt.
 
 # In[ ]:
@@ -127,6 +111,7 @@ for i in scores.argsort(descending = True).tolist():
 
 for name, prompt in model.prompts.items():
     print(f"{name:26s} -> {prompt!r}")
+
 
 # ### 2. Image search on Flickr30k (1K test)
 
@@ -151,6 +136,7 @@ for i, r in enumerate(rows):
 print(len(flickr_images), "images,", len(flickr_captions), "captions")
 show_images(flickr_images[:6], [json.loads(r["raw"])[0] for r in rows[:6]])
 
+
 # In[ ]:
 
 
@@ -169,11 +155,13 @@ def search_images(text, k = 5):
 search_images("a dog jumping to catch a frisbee")
 search_images("people sitting at a cafe on a busy street")
 
+
 # In[ ]:
 
 
 scores = model.similarity(image_embeddings[7:8], image_embeddings)[0]
 show_images([flickr_images[i] for i in scores.topk(5).indices.tolist()])
+
 
 # Recall@K:
 
@@ -186,6 +174,7 @@ image_to_texts = [set(j for j, img in enumerate(caption_to_image) if img == i) f
 i2t = recall_at_k(text_to_image.T, image_to_texts)
 print("Flickr30k 1K  text->image:", t2i)
 print("Flickr30k 1K  image->text:", i2t)
+
 
 # ### 3. Matryoshka
 # Use `truncate_dim` for 512, 256 or 128 dimensions.
@@ -203,6 +192,7 @@ for dims in [768, 512, 256, 128]:
 
 small = model.encode(["a dog on the beach"], truncate_dim = 256, normalize_embeddings = True)
 print("truncated shape:", small.shape)
+
 
 # ### 4. Sound search on Clotho
 
@@ -239,6 +229,7 @@ r = recall_at_k(model.similarity(sound_caption_embeddings, clip_embeddings).floa
                 [{caption_to_clip[q]} for q in range(len(sound_captions))])
 print("Clotho (209 clips) text->audio:", r)
 
+
 # ### 5. Video search on MSR-VTT (first 40 test videos)
 
 # In[ ]:
@@ -267,6 +258,7 @@ best = model.similarity(model.encode(query, convert_to_tensor = True), video_emb
 print("Query:", query, "| best match:", videos[best], "| its caption:", video_captions[best])
 display(Video(videos[best], embed = True, width = 320))
 
+
 # ### 6. Interleaved queries
 # Use `<|image|>`, `<|audio|>` and `<|video|>` placeholders in the text.
 
@@ -282,6 +274,7 @@ mixed = model.encode(mixed_query, convert_to_tensor = True)
 print("one vector:", tuple(mixed.shape), "norm", round(mixed.norm().item(), 4))
 scores = model.similarity(mixed, image_embeddings)[0]
 show_images([flickr_images[i] for i in scores.topk(5).indices.tolist()])
+
 
 # ### 7. Load only what you need
 # Text only is 271M parameters instead of 744M.
@@ -304,6 +297,7 @@ for name, config_kwargs in variants.items():
     params = sum(p.numel() for p in m.parameters())
     print(f"{name:16s} {params / 1e6:9.1f}M {(torch.cuda.memory_allocated() - base) / 2**30:10.2f}")
     del m; gc.collect(); torch.cuda.empty_cache()
+
 
 # ### Next steps
 # * Fine-tune EmbeddingGemma 2 on your own text pairs: `EmbeddingGemma2_(300M).ipynb`
