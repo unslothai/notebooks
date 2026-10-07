@@ -43,17 +43,6 @@
 # In[ ]:
 
 
-import os
-try:
-    from google.colab import userdata
-    os.environ.setdefault("HF_TOKEN", userdata.get("HF_TOKEN") or "")
-except Exception:
-    pass
-
-
-# In[ ]:
-
-
 from unsloth import FastSentenceTransformer
 import torch
 

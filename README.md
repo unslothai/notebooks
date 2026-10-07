@@ -783,6 +783,10 @@ Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebo
 | **DiffusionGemma** **(26B A4B)** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/DiffusionGemma_(26B-A4B)-Sudoku.py) |
 | **ERNIE 4 5 21B A3B PT** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ERNIE_4_5_21B_A3B_PT-Conversational.py) |
 | **ERNIE 4 5 VL 28B A3B PT** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ERNIE_4_5_VL_28B_A3B_PT_Vision.py) |
+| **EmbeddingGemma 2** **(300M)** | Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/EmbeddingGemma2_(300M).py) |
+| **EmbeddingGemma 2** **(300M)** | Audio Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/EmbeddingGemma2_(300M)-Audio.py) |
+| **EmbeddingGemma 2** **(300M)** | Image Text Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/EmbeddingGemma2_(300M)-Image_Text.py) |
+| **EmbeddingGemma 2** **(300M)** | Multimodal Search | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/EmbeddingGemma2_(300M)-Multimodal_Search.py) |
 | **EmbeddingGemma** **(300M)** | Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/EmbeddingGemma_(300M).py) |
 | **Falcon H1** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Falcon_H1-Alpaca.py) |
 | **Falcon H1** **(0.5B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Falcon_H1_(0.5B)-Alpaca.py) |
