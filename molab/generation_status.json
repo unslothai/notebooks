@@ -117,6 +117,7 @@
   "Qwen3_(4B)_Instruct-QAT": "ok",
   "Qwen3_5_(0_8B)_Vision": "ok",
   "Qwen3_5_(2B)_Vision": "ok",
+  "Qwen3_5_(4B)-Decision": "ok",
   "Qwen3_5_(4B)_Vision": "ok",
   "Qwen3_5_(4B)_Vision_GRPO": "ok",
   "Qwen3_5_MoE": "ok",
