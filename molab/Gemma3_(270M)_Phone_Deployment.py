@@ -44,13 +44,6 @@ def _():
     return (mo,)
 
 
-@app.cell
-def _():
-    import subprocess
-
-    return
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -91,6 +84,14 @@ def _(mo):
 
     Visit our docs for all our [model uploads](https://unsloth.ai/docs/get-started/unsloth-model-catalog) and [notebooks](https://unsloth.ai/docs/get-started/unsloth-notebooks).
     """)
+    return
+
+
+@app.cell
+def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
     return
 
 

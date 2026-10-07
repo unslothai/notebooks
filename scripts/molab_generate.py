@@ -925,6 +925,9 @@ def _collect_target_names(target: ast.expr, out: set[str]) -> None:
         _collect_target_names(target.value, out)
 
 
+_RE_KERNELS_INSTALL_LINE = re.compile(r"^[ \t]*!unsloth install-kernels\b.*\n?", re.MULTILINE)
+
+
 def _convert_bootstrap(nb_path: Path):
     """Convert ``nb_path`` (a Jupyter notebook) to a marimo IR.
 
@@ -948,15 +951,26 @@ def _convert_bootstrap(nb_path: Path):
     except json.JSONDecodeError:
         return convert_from_ipynb_to_notebook_ir(raw)
 
+    cells = []
     for cell in nb.get("cells", []):
+        cells.append(cell)
         if cell.get("cell_type") != "code":
             continue
         src = "".join(cell.get("source", []))
-        rewritten = _strip_capture_magic(src)
+        rewritten = src
+        if _is_install_cell(src) and _RE_KERNELS_INSTALL_LINE.search(src):
+            # The post-pass drops the install cell (its pip deps go to the PEP 723
+            # header), but the kernel wheels depend on the torch molab resolves, so
+            # `unsloth install-kernels` moves to a cell of its own that runs.
+            rewritten = _RE_KERNELS_INSTALL_LINE.sub("", rewritten)
+            cells.append({"cell_type": "code", "metadata": {}, "outputs": [], "execution_count": None,
+                          "source": ["import subprocess\n", 'subprocess.run(["unsloth", "install-kernels"])\n']})
+        rewritten = _strip_capture_magic(rewritten)
         rewritten = _rewrite_function_globals(rewritten)
         rewritten = _privatise_dead_demo_bindings(rewritten)
         if rewritten != src:
             cell["source"] = rewritten.splitlines(keepends=True)
+    nb["cells"] = cells
 
     return convert_from_ipynb_to_notebook_ir(json.dumps(nb))
 

@@ -82,6 +82,14 @@ def _(mo):
     return
 
 
+@app.cell
+def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -92,11 +100,7 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess
-    import subprocess
-
-    # Unsloth bundles the gated delta net kernels, so flash-linear-attention does
-    # not need to be installed here.
+    import subprocess as _molab_subprocess
     import json, platform, sys, torch
     from urllib.request import urlopen
 
@@ -129,19 +133,17 @@ def _():
         "Dao-AILab/causal-conv1d",
         "v1.6.1.post4",
         lambda n: (
-            n.endswith(whl) and f"+cu{cu}torch{tv}" in n and f"cxx11abi{abi}" in n
+            n.endswith(whl) and f"+cu{cu}torch{tv}" in n and (f"cxx11abi{abi}" in n)
         ),
     )
     if not cc1d:
-        # Not fatal: the install cell above already builds causal_conv1d from source,
-        # and the model still trains if that is unavailable too.
         print(
             f"No prebuilt causal-conv1d wheel for torch {torch.__version__}/cu{cu}/{py}/abi{abi}, skipping it."
         )
-
-    wheels = " ".join(f'"{w}"' for w in (cc1d,) if w)
-    subprocess.call(["pip", "uninstall", "-y", "sentence-transformers", "torchcodec"])
-    # torchcodec import broken on molab
+    wheels = " ".join((f'"{w}"' for w in (cc1d,) if w))
+    _molab_subprocess.call(
+        ["pip", "uninstall", "-y", "sentence-transformers", "torchcodec"]
+    )
     return (torch,)
 
 

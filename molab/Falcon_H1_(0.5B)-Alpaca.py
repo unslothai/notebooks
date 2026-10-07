@@ -3,11 +3,9 @@
 # dependencies = [
 #     "accelerate",
 #     "bitsandbytes>=0.43.0",
-#     "causal-conv1d==1.5.0.post8",
 #     "datasets==4.3.0",
 #     "hf_transfer",
 #     "huggingface_hub>=0.34.0",
-#     "mamba-ssm==2.2.4",
 #     "marimo",
 #     "peft",
 #     "protobuf",
@@ -96,8 +94,17 @@ def _(mo):
 
 @app.cell
 def _():
-    # For faster training, we can use Mamba's CUDA function instead
+    import subprocess
 
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
+    import subprocess as _molab_subprocess
+
+    _molab_subprocess.call(["unsloth", "install-kernels", "causal_conv1d", "mamba_ssm"])
     return
 
 

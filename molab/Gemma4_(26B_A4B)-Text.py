@@ -88,6 +88,14 @@ def _(mo):
 
 @app.cell
 def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
     # For Gemma 4 vision/audio
     return
 

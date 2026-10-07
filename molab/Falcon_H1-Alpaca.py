@@ -1,9 +1,7 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
-#     "causal-conv1d @ git+https://github.com/Dao-AILab/causal-conv1d.git@main",
 #     "huggingface_hub>=1.5.0,<2.0",
-#     "mamba @ git+https://github.com/state-spaces/mamba.git@main",
 #     "marimo",
 #     "safetensors>=0.8.0",
 #     "tokenizers>=0.22.0,<=0.23.0",
@@ -33,6 +31,13 @@ def _():
     import marimo as mo
 
     return (mo,)
+
+
+@app.cell
+def _():
+    import subprocess
+
+    return
 
 
 @app.cell(hide_code=True)
@@ -70,14 +75,9 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess
-    import subprocess
+    import subprocess as _molab_subprocess
 
-    # Installs Unsloth, Xformers (Flash Attention) and all other packages!
-    # Get latest Unsloth
-    #! pip uninstall unsloth -y
-    subprocess.call(["pip", "uninstall", "unsloth", "-y"])
-
+    _molab_subprocess.call(["pip", "uninstall", "unsloth", "-y"])
     return
 
 
@@ -104,6 +104,22 @@ def _():
     # tests/test_transformers5_hub_floor.py holds the hub bound on this line,
     # and tests/test_force_reinstall_does_not_replace_numpy.py holds the flag.
 
+    return
+
+
+@app.cell
+def _():
+    import subprocess as _molab_subprocess_2
+
+    _molab_subprocess_2.call(["unsloth", "install-kernels", "causal_conv1d"])
+    return
+
+
+@app.cell
+def _():
+    import subprocess as _molab_subprocess_3
+
+    _molab_subprocess_3.call(["unsloth", "install-kernels", "mamba_ssm"])
     return
 
 

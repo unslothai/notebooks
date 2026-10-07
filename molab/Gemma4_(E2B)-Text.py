@@ -88,6 +88,14 @@ def _(mo):
 
 @app.cell
 def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
     # For Gemma 4 vision/audio
     return
 
@@ -233,11 +241,9 @@ def _():
 
 @app.cell
 def _():
-    import subprocess
-    import subprocess
+    import subprocess as _molab_subprocess
 
-    #! wget -qqq https://www.nasa.gov/wp-content/uploads/2015/01/591240main_JFKmoonspeech.mp3 -O audio.mp3
-    subprocess.call(
+    _molab_subprocess.call(
         [
             "wget",
             "-qqq",

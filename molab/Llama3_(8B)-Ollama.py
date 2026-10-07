@@ -83,6 +83,14 @@ def _(mo):
     return
 
 
+@app.cell
+def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -575,16 +583,13 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess
+    import subprocess as _molab_subprocess
 
-    # ollama's installer extracts a zstd archive and refuses to run without zstd, which molab does not ship
-    #! command -v zstd >/dev/null 2>&1 || (apt-get -qq update && apt-get -qq install -y zstd) >/dev/null 2>&1
-    subprocess.call(
+    _molab_subprocess.call(
         "command -v zstd >/dev/null 2>&1 || (apt-get -qq update && apt-get -qq install -y zstd) >/dev/null 2>&1",
         shell=True,
     )
-    #! curl -fsSL https://ollama.com/install.sh | sh
-    subprocess.call("curl -fsSL https://ollama.com/install.sh | sh", shell=True)
+    _molab_subprocess.call("curl -fsSL https://ollama.com/install.sh | sh", shell=True)
     return
 
 
@@ -661,11 +666,11 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess as _molab_subprocess
+    import subprocess as _molab_subprocess_2
     import time
     import requests
 
-    _molab_subprocess.Popen(["ollama", "serve"])
+    _molab_subprocess_2.Popen(["ollama", "serve"])
     for _ in range(60):
         try:
             if requests.get("http://localhost:11434/api/tags", timeout=2).ok:
@@ -705,9 +710,9 @@ def _(mo):
 
 @app.cell
 def _():
-    import subprocess as _molab_subprocess_2
+    import subprocess as _molab_subprocess_3
 
-    _molab_subprocess_2.call(
+    _molab_subprocess_3.call(
         ["ollama", "create", "unsloth_model", "-f", "./model/Modelfile"]
     )
     return

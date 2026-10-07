@@ -3,7 +3,6 @@
 # dependencies = [
 #     "accelerate",
 #     "bitsandbytes>=0.43.0",
-#     "causal-conv1d==1.5.0.post8",
 #     "cut_cross_entropy",
 #     "datasets>=3.4.1,<4.0.0",
 #     "hf_transfer",
@@ -89,6 +88,14 @@ def _(mo):
 
 @app.cell
 def _():
+    import subprocess
+
+    subprocess.run(["unsloth", "install-kernels"])
+    return
+
+
+@app.cell
+def _():
     # Liquid LFM2 needs 5.x; the release, not a moving main
     # --no-deps above is deliberate: without it pip re-resolves torch and replaces
     # the CUDA build the runtime already has. The cost is that pip enforces nothing
@@ -101,7 +108,15 @@ def _():
     # need raising; tokenizers 0.22.2 already sits inside its window and is pinned
     # only to hold it under the 0.23.0 cap that nothing else here enforces.
     # tests/test_transformers5_hub_floor.py holds the hub bound on this line.
-    # Install Mamba kernels
+
+    return
+
+
+@app.cell
+def _():
+    import subprocess as _molab_subprocess
+
+    _molab_subprocess.run(["unsloth", "install-kernels"])
     return
 
 

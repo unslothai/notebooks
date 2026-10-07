@@ -48,7 +48,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', "# For faster training, we can use Mamba's CUDA function instead\n!pip install --no-deps causal-conv1d==1.5.0.post8\n!pip install --no-build-isolation mamba-ssm==2.2.4\n")
+# get_ipython().run_cell_magic('capture', '', "# For faster training, we can use Mamba's CUDA function instead\n!unsloth install-kernels causal_conv1d mamba_ssm\n")
 # 
 # 
 # # ### Unsloth
