@@ -33,17 +33,8 @@
 # # In[ ]:
 # 
 # 
-# %%capture
-# import os, re
-# if "COLAB_" not in "".join(os.environ.keys()):
-#     !pip install unsloth  # Do this in local & cloud setups
-# else:
-#     !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer
-#     !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
-#     !unsloth install-kernels
-#     !pip install --no-deps --upgrade "torchao>=0.16.0"
-# !pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@a14d472b296866270642e99f29843be775bb60b5" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
-# !pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@92cd495f2720c064bc78eb2d93e28704c5bce51f" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"\n!pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec\n')
+# 
 # 
 # # ### Unsloth
 
@@ -58,6 +49,7 @@ model = FastSentenceTransformer.from_pretrained(
     full_finetuning = False, # [NEW!] We have full finetuning now!
     config_kwargs = {"vision_config": None, "audio_config": None}, # Text only
 )
+
 
 # We now add LoRA adapters so we only need to update a small amount of parameters!
 
@@ -80,6 +72,7 @@ model = FastSentenceTransformer.get_peft_model(
     task_type = "FEATURE_EXTRACTION"
 )
 
+
 # <a name="Data"></a>
 # ### Data Prep
 # We now use the ``tomaarsen/miriad-4.4M-split`` dataset, a large-scale collection of 4.4 million medical question-answer pairs distilled from peer-reviewed biomedical literature. To maintain efficiency, we use data streaming to ingest a subset of 10,000 training samples and 2,000 evaluation samples.
@@ -95,12 +88,14 @@ stream_eval = list(load_dataset("tomaarsen/miriad-4.4M-split", split = "eval",st
 train_dataset = Dataset.from_generator(lambda: (yield from stream_train))
 eval_dataset = Dataset.from_generator(lambda: (yield from stream_eval))
 
+
 # Let's take a look at the dataset structure:
 
 # In[4]:
 
 
 train_dataset[0]
+
 
 # ## Baseline Performance
 # Retrieval quality before finetuning, on the medical eval set and on [NanoBEIR](https://huggingface.co/collections/zeta-alpha-ai/nanobeir-66e1a0af21dfd93e620cd9f6).
@@ -134,6 +129,7 @@ baseline = evaluator(model)
 baseline_nano = nano_beir(model)
 print(f"Medical retrieval NDCG@10 : {baseline['miriad_cosine_ndcg@10']:.4f}")
 print(f"NanoBEIR mean NDCG@10     : {baseline_nano['NanoBEIR_mean_cosine_ndcg@10']:.4f}")
+
 
 # <a name="Train"></a>
 # ### Train the model
@@ -181,6 +177,7 @@ trainer = SentenceTransformerTrainer(
     ),
 )
 
+
 # In[7]:
 
 
@@ -192,12 +189,14 @@ max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
 print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
+
 # Let's train the model! To resume a training run, set `trainer.train(resume_from_checkpoint = True)`
 
 # In[8]:
 
 
 trainer_stats = trainer.train()
+
 
 # In[9]:
 
@@ -216,6 +215,7 @@ print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
 print(f"Peak reserved memory % of max memory = {used_percentage} %.")
 print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
 
+
 # ### Now after finetuning, let's evaluate the model again!
 
 # In[15]:
@@ -225,6 +225,7 @@ after = evaluator(model)
 after_nano = nano_beir(model)
 print(f"Medical retrieval NDCG@10 : {baseline['miriad_cosine_ndcg@10']:.4f} -> {after['miriad_cosine_ndcg@10']:.4f}")
 print(f"NanoBEIR mean NDCG@10     : {baseline_nano['NanoBEIR_mean_cosine_ndcg@10']:.4f} -> {after_nano['NanoBEIR_mean_cosine_ndcg@10']:.4f}")
+
 
 # <a name="Inference"></a>
 # ### Inference
@@ -253,6 +254,7 @@ for idx in ranking.tolist():
     text = candidates[idx]
     print(f"{score:.4f} | {text}")
 
+
 # Matryoshka: keep only the first 512, 256 or 128 dimensions with `truncate_dim`:
 
 # In[ ]:
@@ -263,6 +265,7 @@ for dim in [768, 256, 128]:
     c = model.encode(candidates, prompt_name = "document", truncate_dim = dim, normalize_embeddings = True, convert_to_tensor = True)
     best = model.similarity(q, c)[0].argmax().item()
     print(f"{dim:4d} dims -> top match: {candidates[best][:60]}")
+
 
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
@@ -278,6 +281,7 @@ model.tokenizer.save_pretrained("embeddinggemma_lora")
 # model.push_to_hub("your_name/embeddinggemma_lora", token = "YOUR_HF_TOKEN") # Online saving
 # model.tokenizer.push_to_hub("your_name/embeddinggemma_lora", token = "YOUR_HF_TOKEN") # Online saving
 
+
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
 # In[18]:
@@ -289,6 +293,7 @@ if False:
         "lora_model",
         config_kwargs = {"vision_config": None, "audio_config": None},
     )
+
 
 # ### Saving to float16 for VLLM
 # 
@@ -308,6 +313,7 @@ if False:
     model.save_pretrained("embeddinggemma_lora")
 if False: # Pushing to HF Hub
     model.push_to_hub("HF_USERNAME/embeddinggemma_lora", token = "YOUR_HF_TOKEN")
+
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
@@ -347,6 +353,7 @@ if False:
         quantization_method = ["q4_k_m", "q8_0", "q5_k_m",],
         token = "YOUR_HF_TOKEN", # Get a token at https://huggingface.co/settings/tokens
     )
+
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 # 
