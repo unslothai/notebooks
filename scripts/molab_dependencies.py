@@ -480,10 +480,12 @@ def _parse_pip_line(line: str) -> Optional[_PipLine]:
 # ``torch==2.8.0`` and ``torchcodec==0.7.0`` for Colab, where those exact
 # builds are wheel-available.  On molab uv cannot resolve either pin and
 # aborts the venv install silently.  Drop both to bare-name so molab
-# gets the latest compatible wheel.  Identical overlay for every member
-# of the family — declared once and reused below.
+# gets the latest compatible wheel.  ``torchaudio==2.8.0`` only exists to
+# match that torch pin, so it is relaxed with it.  Identical overlay for
+# every member of the family — declared once and reused below.
 _QWEN3_5_TORCH_RELAX: dict[str, str] = {
     "torch": "torch",
+    "torchaudio": "torchaudio",
     "torchcodec": "torchcodec",
 }
 

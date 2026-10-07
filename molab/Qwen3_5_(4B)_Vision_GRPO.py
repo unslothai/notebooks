@@ -6,6 +6,7 @@
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch",
 #     "torchao>=0.16.0",
+#     "torchaudio",
 #     "torchcodec",
 #     "torchvision",
 #     "transformers==5.2.0",

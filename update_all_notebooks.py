@@ -926,6 +926,8 @@ QWEN3_5_CAUSAL_CONV1D_AMD = (
     "!uv pip install --no-build-isolation causal_conv1d==1.6.0\n"
 )
 
+# torchaudio is pinned with torch: Colab preinstalls a torchaudio built for its newer torch, and
+# torchaudio >= 2.9 no longer pins torch, so an unpinned entry keeps that build and it fails to load.
 installation_qwen3_5_content = """%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
@@ -933,7 +935,7 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
-        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\
+        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision "torchaudio==2.8.0" bitsandbytes xformers==0.0.32.post2 \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
     !uv pip install -qqq --no-deps "torchcodec==0.7.0"
