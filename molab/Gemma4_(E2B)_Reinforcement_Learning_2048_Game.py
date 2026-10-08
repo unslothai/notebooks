@@ -918,13 +918,15 @@ def _(prompt, tokenizer):
     dataset = Dataset.from_list(
         [{"prompt": [{"role": "user", "content": prompt.strip()}], "answer": 0}] * 1000
     )
-    maximum_length = len(
-        tokenizer.apply_chat_template(
+    maximum_length = tokenizer(
+        text=tokenizer.apply_chat_template(
             [{"role": "user", "content": prompt.strip()}],
             add_generation_prompt=True,
-            tokenize=True,
-        )
-    )
+            tokenize=False,
+        ),
+        add_special_tokens=False,
+        return_tensors="pt",
+    )["input_ids"].shape[-1]
     print(maximum_length)
     dataset[0]
     return dataset, maximum_length
