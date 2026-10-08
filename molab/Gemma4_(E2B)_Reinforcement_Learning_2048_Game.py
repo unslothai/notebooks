@@ -8,7 +8,7 @@
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchvision",
-#     "transformers>=5.5.0",
+#     "transformers>=5.5.0,<5.16",
 #     "triton>=3.2.0",
 #     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl>=0.28.0",
@@ -918,13 +918,15 @@ def _(prompt, tokenizer):
     dataset = Dataset.from_list(
         [{"prompt": [{"role": "user", "content": prompt.strip()}], "answer": 0}] * 1000
     )
-    maximum_length = len(
-        tokenizer.apply_chat_template(
+    maximum_length = tokenizer(
+        text=tokenizer.apply_chat_template(
             [{"role": "user", "content": prompt.strip()}],
             add_generation_prompt=True,
-            tokenize=True,
-        )
-    )
+            tokenize=False,
+        ),
+        add_special_tokens=False,
+        return_tensors="pt",
+    )["input_ids"].shape[-1]
     print(maximum_length)
     dataset[0]
     return dataset, maximum_length

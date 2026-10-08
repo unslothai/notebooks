@@ -8,7 +8,7 @@
 #     "tokenizers>=0.22.0,<=0.23.0",
 #     "torch>=2.8.0",
 #     "torchvision",
-#     "transformers>=5.5.0",
+#     "transformers>=5.5.0,<5.16",
 #     "triton>=3.2.0",
 #     "triton_kernels @ git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels",
 #     "trl>=0.28.0",
