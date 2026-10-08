@@ -812,8 +812,8 @@ import os; os.environ["UNSLOTH_MOE_DISABLE_AUTOTUNE"] = "1"
 """
 
 installation_amd_extras_gemma4 = """\
-# Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
-!uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
+# Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0; 5.16+ needs tokenizers >= 0.23.1, past the pin above
+!uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0,<5.16" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
 """
 
 # Gemma 4 12B needs transformers >= 5.10.1 (newer than the other Gemma 4 sizes).
