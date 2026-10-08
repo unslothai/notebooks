@@ -7,6 +7,7 @@
 #     "einx",
 #     "hf_transfer",
 #     "huggingface_hub>=0.34.0",
+#     "loguru",
 #     "marimo",
 #     "omegaconf",
 #     "peft",
