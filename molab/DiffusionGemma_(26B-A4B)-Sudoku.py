@@ -134,7 +134,7 @@ def _():
     vocab = model.config.text_config.vocab_size
     canvas_len = model.config.canvas_length  # 256-token generation canvas
     print("vocab", vocab, "| canvas", canvas_len)
-    return FastModel, canvas_len, model, processor, torch, vocab
+    return FastModel, canvas_len, model, processor, torch
 
 
 @app.cell(hide_code=True)
@@ -274,7 +274,7 @@ def _():
     train_rows = [make_example(s) for s in range(N_TRAIN)]
     eval_rows = [make_example(s) for s in range(10000, 10000 + N_EVAL)]
     print(len(train_rows), "train /", len(eval_rows), "eval puzzles")
-    return eval_rows, random, train_rows
+    return eval_rows, train_rows
 
 
 @app.cell(hide_code=True)
@@ -299,106 +299,59 @@ def _(mo):
     <a name="Train"></a>
     # Block-diffusion finetuning
 
-    DiffusionGemma is not trained the autoregressive way (no `SFTTrainer`). Instead we use its own block-diffusion objective: pad the target solution to the 256-token canvas, **corrupt** the canvas by replacing each token with probability `t` by a random token, then ask the model to predict the clean grid. The loss is cross-entropy on the solution tokens plus the `eos` (the padding tail is ignored).
+    DiffusionGemma is not trained the autoregressive way, so we use Unsloth's `DiffusionTrainer`, which takes ordinary prompt / completion data and applies DiffusionGemma's own block-diffusion objective (the reference recipe of the released checkpoint):
+
+    * The reply is cut into 256-token canvases, one picked per example, with the tail past the end filled with `eos`.
+    * The canvas is **corrupted** by replacing each token with probability `t` by a random token, with `t` drawn per example.
+    * Half the time the model first denoises the canvas once and then conditions on its own guess (**self-conditioning**), as it does at generation time.
+    * The loss is cross-entropy against the clean canvas over every position, plus an autoregressive loss on the causal encoder.
     """)
     return
 
 
 @app.cell
-def _(canvas_len, model_1, processor, torch, train_rows):
-    eos = model_1.generation_config.eos_token_id or [1]
-    eos = eos[0] if isinstance(eos, (list, tuple)) else eos
-    tok = processor.tokenizer if hasattr(processor, "tokenizer") else processor
-    pad = tok.pad_token_id if tok.pad_token_id is not None else eos
+def _(train_rows):
+    from datasets import Dataset
+    from unsloth import DiffusionTrainer, DiffusionConfig
 
-    def build_examples(rows):
-        out = []
-        for r in rows:
-            prompt_ids = processor.apply_chat_template(
-                [r["messages"][0]],
-                tokenize=True,
-                add_generation_prompt=True,
-                return_tensors="pt",
-            )[0]
-            ids = tok.encode(r["messages"][1]["content"], add_special_tokens=False)
-            content = ids + [eos]
-            n = len(content)
-            if n > canvas_len:
-                continue
-            x0 = torch.tensor(content + [pad] * (canvas_len - n), dtype=torch.long)
-            mask = torch.zeros(canvas_len, dtype=torch.bool)
-            mask[:n] = True
-            out.append((prompt_ids, x0, mask))
-        return out
-
-    examples = build_examples(train_rows)
-    print("usable examples:", len(examples))
-    return examples, tok
+    # prompt = the puzzle, completion = the solved grid; only the completion is denoised.
+    dataset = Dataset.from_list(
+        [
+            {"prompt": [r["messages"][0]], "completion": [r["messages"][1]]}
+            for r in train_rows
+        ]
+    )
+    print(dataset[0])
+    return DiffusionConfig, DiffusionTrainer, dataset
 
 
 @app.cell
-def _(canvas_len, examples, model_1, random, torch, vocab):
-    import time
-
-    # compute device, not a "meta" param (offloaded weights report device = meta -> indexing fails)
-    dev = next(
-        (p.device for p in model_1.parameters() if p.device.type != "meta"),
-        torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+def _(DiffusionConfig, DiffusionTrainer, dataset, model_1, processor):
+    trainer = DiffusionTrainer(
+        model=model_1,
+        processing_class=processor,
+        train_dataset=dataset,
+        args=DiffusionConfig(
+            per_device_train_batch_size=1,
+            gradient_accumulation_steps=4,
+            max_steps=500,  # full run in our report: 4000 steps, 8 GPUs
+            learning_rate=0.0001,
+            warmup_steps=15,
+            lr_scheduler_type="cosine",
+            adam_beta2=0.95,
+            weight_decay=0.0,
+            logging_steps=20,
+            completion_only_loss=True,
+            max_length=512,
+            output_dir="outputs",
+            report_to="none",  # Use TrackIO/WandB etc
+            seed=3407,
+        ),
     )
-    STEPS, GRAD_ACCUM, LR, T_LO = (500, 4, 0.0001, 0.1)
-    model_1.config.use_cache = True  # full run in our report: 4000 steps, 8 GPUs
-    model_1.train()
-    opt = torch.optim.AdamW(
-        [p for p in model_1.parameters() if p.requires_grad],
-        lr=LR,
-        betas=(0.9, 0.95),
-        weight_decay=0.0,
+    trainer_stats = (
+        trainer.train()
     )
-    sched = torch.optim.lr_scheduler.OneCycleLR(
-        opt, max_lr=LR, total_steps=STEPS, pct_start=0.03, anneal_strategy="cos"
-    )
-
-    def corrupt(x0):
-        t = random.uniform(T_LO, 1.0)  # noise level
-        xt = x0.to(dev).clone()
-        m = torch.rand(canvas_len, device=dev) < t
-        xt[m] = torch.randint(0, vocab, (canvas_len,), device=dev)[m]
-        return xt.unsqueeze(0)  # noise level
-
-    order = list(range(len(examples)))
-    ptr = 0
-    t0 = time.time()
-    opt.zero_grad(set_to_none=True)
-    for step in range(1, STEPS + 1):
-        step_loss = 0.0
-        for _ in range(GRAD_ACCUM):
-            if ptr >= len(order):
-                random.shuffle(order)
-                ptr = 0
-            prompt_ids, x0, lm = examples[order[ptr]]
-            ptr = ptr + 1
-            out = model_1(
-                input_ids=prompt_ids.unsqueeze(0).to(dev),
-                canvas_ids=corrupt(x0),
-                self_conditioning_logits=None,
-            )
-            logits = out.logits[0].float()  # [canvas_len, vocab]
-            m = lm.to(dev)  # [canvas_len, vocab]
-            loss = torch.nn.functional.cross_entropy(logits[m], x0.to(dev)[m])
-            (loss / GRAD_ACCUM).backward()
-            step_loss = step_loss + loss.item() / GRAD_ACCUM
-        torch.nn.utils.clip_grad_norm_(
-            [p for p in model_1.parameters() if p.requires_grad], 1.0
-        )
-        opt.step()
-        sched.step()
-        opt.zero_grad(set_to_none=True)
-        if step % 20 == 0:
-            print(
-                f"step {step:4d}/{STEPS} | loss {step_loss:.4f} | {time.time() - t0:.0f}s",
-                flush=True,
-            )
-    return (dev,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -413,8 +366,15 @@ def _(mo):
 
 
 @app.cell
-def _(canvas_len, dev, eval_rows, model_1, processor, tok, torch):
+def _(canvas_len, eval_rows, model_1, processor, torch):
     import copy
+
+    tok = processor.tokenizer if hasattr(processor, "tokenizer") else processor
+    dev = next(
+        (p.device for p in model_1.parameters() if p.device.type != "meta"),
+        torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    )
+    # compute device, not a "meta" param (offloaded weights report device = meta)
 
     def parse_grid(text):
         ds = [int(ch) for ch in text if ch.isdigit()]

@@ -182,74 +182,51 @@ print(train_rows[0]["messages"][1]["content"])
 # <a name="Train"></a>
 # # Block-diffusion finetuning
 # 
-# DiffusionGemma is not trained the autoregressive way (no `SFTTrainer`). Instead we use its own block-diffusion objective: pad the target solution to the 256-token canvas, **corrupt** the canvas by replacing each token with probability `t` by a random token, then ask the model to predict the clean grid. The loss is cross-entropy on the solution tokens plus the `eos` (the padding tail is ignored).
+# DiffusionGemma is not trained the autoregressive way, so we use Unsloth's `DiffusionTrainer`, which takes ordinary prompt / completion data and applies DiffusionGemma's own block-diffusion objective (the reference recipe of the released checkpoint):
+# 
+# * The reply is cut into 256-token canvases, one picked per example, with the tail past the end filled with `eos`.
+# * The canvas is **corrupted** by replacing each token with probability `t` by a random token, with `t` drawn per example.
+# * Half the time the model first denoises the canvas once and then conditions on its own guess (**self-conditioning**), as it does at generation time.
+# * The loss is cross-entropy against the clean canvas over every position, plus an autoregressive loss on the causal encoder.
 
 # In[ ]:
 
 
-eos = (model.generation_config.eos_token_id or [1])
-eos = eos[0] if isinstance(eos, (list, tuple)) else eos
-tok = processor.tokenizer if hasattr(processor, "tokenizer") else processor
-pad = tok.pad_token_id if tok.pad_token_id is not None else eos
+from datasets import Dataset
+from unsloth import DiffusionTrainer, DiffusionConfig
 
-def build_examples(rows):
-    out = []
-    for r in rows:
-        prompt_ids = processor.apply_chat_template(
-            [r["messages"][0]], tokenize = True, add_generation_prompt = True, return_tensors = "pt")[0]
-        ids = tok.encode(r["messages"][1]["content"], add_special_tokens = False)
-        content = ids + [eos]
-        n = len(content)
-        if n > canvas_len: continue
-        x0 = torch.tensor(content + [pad]*(canvas_len - n), dtype = torch.long)
-        mask = torch.zeros(canvas_len, dtype = torch.bool); mask[:n] = True
-        out.append((prompt_ids, x0, mask))
-    return out
-
-examples = build_examples(train_rows)
-print("usable examples:", len(examples))
+# prompt = the puzzle, completion = the solved grid; only the completion is denoised.
+dataset = Dataset.from_list(
+    [{"prompt": [r["messages"][0]], "completion": [r["messages"][1]]} for r in train_rows]
+)
+print(dataset[0])
 
 
 # In[ ]:
 
 
-import time
-# compute device, not a "meta" param (offloaded weights report device = meta -> indexing fails)
-dev = next((p.device for p in model.parameters() if p.device.type != "meta"),
-           torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-STEPS, GRAD_ACCUM, LR, T_LO = 500, 4, 1e-4, 0.1  # full run in our report: 4000 steps, 8 GPUs
-
-model.config.use_cache = True
-model.train()
-opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr = LR,
-                        betas = (0.9, 0.95), weight_decay = 0.0)
-sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr = LR, total_steps = STEPS,
-                                            pct_start = 0.03, anneal_strategy = "cos")
-
-def corrupt(x0):
-    t = random.uniform(T_LO, 1.0)            # noise level
-    xt = x0.to(dev).clone()
-    m = torch.rand(canvas_len, device = dev) < t
-    xt[m] = torch.randint(0, vocab, (canvas_len,), device = dev)[m]
-    return xt.unsqueeze(0)
-
-order = list(range(len(examples))); ptr = 0; t0 = time.time()
-opt.zero_grad(set_to_none = True)
-for step in range(1, STEPS + 1):
-    step_loss = 0.0
-    for _ in range(GRAD_ACCUM):
-        if ptr >= len(order): random.shuffle(order); ptr = 0
-        prompt_ids, x0, lm = examples[order[ptr]]; ptr += 1
-        out = model(input_ids = prompt_ids.unsqueeze(0).to(dev), canvas_ids = corrupt(x0),
-                    self_conditioning_logits = None)
-        logits = out.logits[0].float()       # [canvas_len, vocab]
-        m = lm.to(dev)
-        loss = torch.nn.functional.cross_entropy(logits[m], x0.to(dev)[m])
-        (loss / GRAD_ACCUM).backward(); step_loss += loss.item() / GRAD_ACCUM
-    torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], 1.0)
-    opt.step(); sched.step(); opt.zero_grad(set_to_none = True)
-    if step % 20 == 0:
-        print(f"step {step:4d}/{STEPS} | loss {step_loss:.4f} | {time.time()-t0:.0f}s", flush = True)
+trainer = DiffusionTrainer(
+    model = model,
+    processing_class = processor,
+    train_dataset = dataset,
+    args = DiffusionConfig(
+        per_device_train_batch_size = 1,
+        gradient_accumulation_steps = 4,
+        max_steps = 500,  # full run in our report: 4000 steps, 8 GPUs
+        learning_rate = 1e-4,
+        warmup_steps = 15,
+        lr_scheduler_type = "cosine",
+        adam_beta2 = 0.95,
+        weight_decay = 0.0,
+        logging_steps = 20,
+        completion_only_loss = True,
+        max_length = 512,
+        output_dir = "outputs",
+        report_to = "none",  # Use TrackIO/WandB etc
+        seed = 3407,
+    ),
+)
+trainer_stats = trainer.train()
 
 
 # <a name="Eval"></a>
@@ -261,6 +238,11 @@ for step in range(1, STEPS + 1):
 
 
 import copy
+
+tok = processor.tokenizer if hasattr(processor, "tokenizer") else processor
+# compute device, not a "meta" param (offloaded weights report device = meta)
+dev = next((p.device for p in model.parameters() if p.device.type != "meta"),
+           torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
 def parse_grid(text):
     ds = [int(ch) for ch in text if ch.isdigit()]
@@ -313,7 +295,8 @@ model.save_pretrained("diffusiongemma_lora")
 processor.save_pretrained("diffusiongemma_lora")
 # model.push_to_hub("HF_ACCOUNT/diffusiongemma_lora", token = "YOUR_HF_TOKEN")
 
-# Keep the adapter unmerged for inference (merging can corrupt the clipped LoRA linears).
+# Keep the adapter unmerged: the encoder and decoder share base weights but train separate adapters,
+# so merging would add both updates to both (Unsloth refuses merge_and_unload here).
 
 
 # ### GGUF / llama.cpp
