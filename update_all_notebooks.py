@@ -1494,6 +1494,7 @@ KNOWN_TYPES_ORDERED = [
     "GRPO Sudoku",
     
     "ORPO",
+    "PPO",
     "GRPO",
     "DPO",
     "CPT",
@@ -5887,6 +5888,7 @@ def update_readme(
         is_grpo_trainer = trainer_class == "GRPOTrainer"
         is_dpo_trainer = trainer_class == "DPOTrainer"
         is_orpo_trainer = trainer_class == "ORPOTrainer"
+        is_ppo_trainer = trainer_class == "PPOTrainer"
         # GRPO / RL notebooks: identified by trainer class, model_type OR
         # filename. The trainer-class check catches notebooks whose type
         # the filename classifier assigned as "Vision GRPO" / "FP8 GRPO"
@@ -5895,6 +5897,7 @@ def update_readme(
             is_grpo_trainer
             or is_dpo_trainer
             or is_orpo_trainer
+            or is_ppo_trainer
             or model_type.startswith("GRPO")
             or "grpo" in basename_lower_for_rl
             or "nemo-gym" in basename_lower_for_rl
@@ -5908,6 +5911,8 @@ def update_readme(
             model_type = "DPO"
         elif is_orpo_trainer:
             model_type = "ORPO"
+        elif is_ppo_trainer:
+            model_type = "PPO"
         elif is_in_grpo_section:
             task = detect_rl_task(path)
             if task:

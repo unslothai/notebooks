@@ -62,6 +62,7 @@
   "Llama3.1_(8B)-Alpaca": "ok",
   "Llama3.1_(8B)-Inference": "ok",
   "Llama3.2_(11B)-Vision": "ok",
+  "Llama3.2_(1B)-PPO": "ok",
   "Llama3.2_(1B)-RAFT": "ok",
   "Llama3.2_(1B_and_3B)-Conversational": "ok",
   "Llama3.3_(70B)_A100-Conversational": "ok",
