@@ -74,7 +74,7 @@ _KNOWN_TYPES_ORDERED = [
     "Reasoning Conversational", "Vision GRPO", "Fine Tuning", "500K Context",
     "QAT", "Conversational", "Alpaca", "Vision", "Reasoning", "Completion",
     "Finetune", "Studio", "Coder", "Inference", "Ollama", "Audio", "Thinking",
-    "FP8 GRPO", "GRPO 2048", "GRPO Sudoku", "ORPO", "GRPO", "DPO", "CPT",
+    "FP8 GRPO", "GRPO 2048", "GRPO Sudoku", "ORPO", "PPO", "GRPO", "DPO", "CPT",
     "TTS", "LoRA", "VL", "RAFT", "Evaluation", "Eval", "Classification",
     "Mobile Actions",
 ]
