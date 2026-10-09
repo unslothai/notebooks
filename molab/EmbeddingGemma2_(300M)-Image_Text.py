@@ -181,7 +181,7 @@ def _(Image, show_images):
     os.makedirs("flickr8k", exist_ok=True)
     pairs = []  # image file paths keep the dataset small; sentence-transformers opens them on the fly
     for r in train_rows:
-        path = f"flickr8k/{r['image']['path']}"
+        path = f"flickr8k/{os.path.basename(r['image']['path'])}"
         open(path, "wb").write(r["image"]["bytes"])
         for k in range(5):
             pairs.append({"anchor": r[f"caption_{k}"], "positive": path})
