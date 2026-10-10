@@ -41,8 +41,17 @@
 # except: _numpy = "numpy"; _pil = "pillow"
 # try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 # except: is_t4 = False
-# _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
-# !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+# _triton = 'triton'
+# if is_t4:
+#     # Keep the machine's torch: upgrading it can pull a CUDA build the driver cannot load
+#     try:
+#         import importlib.metadata as _md
+#         _torch, _tv = (f'{_p}=={_md.version(_p).split("+")[0]}' for _p in ('torch', 'torchvision'))
+#     except Exception:
+#         _torch, _tv = 'torch', 'torchvision'
+#     !uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth
+# else:
+#     !uv pip install -qqq --upgrade vllm==0.19.1 {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
 # !uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"
 # try:
 #     import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])
@@ -51,8 +60,8 @@
 # # torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.
 # _torchao = "torchao>=0.16.0" if _torch_v >= (2, 10) else "torchao>=0.16.0,<0.18.0"
 # !uv pip install -qqq --no-deps --upgrade "{_torchao}"
-# !uv pip install transformers==4.57.6
-# !uv pip install --no-deps trl==0.22.2
+# !uv pip install transformers==5.15.1 "datasets>=4.7.0,<5.0.0"
+# !uv pip install --no-deps trl==1.13.0
 # 
 # # ### Unsloth
 
@@ -69,7 +78,9 @@
 
 
 from unsloth import FastLanguageModel
-import torch
+import torch, importlib.util
+# vllm needs transformers 5 for tool calling, which no vllm supports on a T4, so a T4 generates with transformers
+fast_inference = importlib.util.find_spec("vllm") is not None
 max_seq_length = 2048 # Covers the prompt plus every tool call and tool result
 lora_rank = 32 # Larger rank = smarter, but slower
 
@@ -77,7 +88,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Qwen3-4B-Instruct-2507",
     max_seq_length = max_seq_length,
     load_in_4bit = False, # False for LoRA 16bit
-    fast_inference = True, # Enable vllm fast inference
+    fast_inference = fast_inference, # Enable vllm fast inference
     max_lora_rank = lora_rank,
     gpu_memory_utilization = 0.9, # Reduce if out of memory
 )
@@ -245,7 +256,8 @@ def tool_use(completions, **kwargs):
     scores = []
     for completion in completions:
         results = [message for message in completion if message["role"] == "tool"]
-        errors = sum('"error"' in str(message.get("content", "")) for message in results)
+        # TRL writes a failed call as str({"error": ...}), so the key may carry either quote
+        errors = sum(str(message.get("content", "")).startswith(("{'error'", '{"error"')) for message in results)
         score = 0.5 if results else -0.5 # Encourage calling the calculator
         score -= 0.5 * errors            # Penalize malformed tool calls
         scores.append(score)
@@ -361,21 +373,29 @@ with safe_open("grpo_saved_lora/adapter_model.safetensors", framework = "pt") as
 # In[ ]:
 
 
-from vllm import SamplingParams
-sampling_params = SamplingParams(
-    temperature = 0.7,
-    top_p = 0.8,
-    top_k = 20,
-    max_tokens = 512,
-)
-lora_request = model.load_lora("grpo_saved_lora")
+if fast_inference:
+    from vllm import SamplingParams
+    sampling_params = SamplingParams(
+        temperature = 0.7,
+        top_p = 0.8,
+        top_k = 20,
+        max_tokens = 512,
+    )
+    lora_request = model.load_lora("grpo_saved_lora")
 
-def generate(text):
-    return model.fast_generate(
-        text,
-        sampling_params = sampling_params,
-        lora_request = lora_request,
-    )[0].outputs[0].text
+    def generate(text):
+        return model.fast_generate(
+            text,
+            sampling_params = sampling_params,
+            lora_request = lora_request,
+        )[0].outputs[0].text
+else:
+    FastLanguageModel.for_inference(model)
+
+    def generate(text):
+        inputs = tokenizer(text, return_tensors = "pt", add_special_tokens = False).to("cuda")
+        output = model.generate(**inputs, max_new_tokens = 512, do_sample = True, temperature = 0.7, top_p = 0.8, top_k = 20)
+        return tokenizer.decode(output[0, inputs["input_ids"].shape[1]:])
 
 problem = make_problem(random.Random(42))
 messages = run_tools(list(problem["prompt"]), tools, generate)

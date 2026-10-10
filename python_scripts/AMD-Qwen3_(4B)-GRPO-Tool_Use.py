@@ -59,8 +59,8 @@
 # 
 # import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 # 
-# !uv pip install --system -qqq vllm "transformers==4.57.6"
-# !uv pip install --system -qqq --no-deps "trl==0.22.2"
+# !uv pip install --system -qqq vllm "transformers==5.15.1" "datasets>=4.7.0,<5.0.0"
+# !uv pip install --system -qqq --no-deps "trl==1.13.0"
 # 
 # 
 # # In[ ]:
@@ -83,7 +83,9 @@
 
 
 from unsloth import FastLanguageModel
-import torch
+import torch, importlib.util
+# vllm needs transformers 5 for tool calling, which no vllm supports on a T4, so a T4 generates with transformers
+fast_inference = importlib.util.find_spec("vllm") is not None
 max_seq_length = 2048 # Covers the prompt plus every tool call and tool result
 lora_rank = 32 # Larger rank = smarter, but slower
 
@@ -91,7 +93,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Qwen3-4B-Instruct-2507",
     max_seq_length = max_seq_length,
     load_in_4bit = False, # False for LoRA 16bit
-    fast_inference = True, # Enable vllm fast inference
+    fast_inference = fast_inference, # Enable vllm fast inference
     max_lora_rank = lora_rank,
     gpu_memory_utilization = 0.9, # Reduce if out of memory
 )
@@ -259,7 +261,8 @@ def tool_use(completions, **kwargs):
     scores = []
     for completion in completions:
         results = [message for message in completion if message["role"] == "tool"]
-        errors = sum('"error"' in str(message.get("content", "")) for message in results)
+        # TRL writes a failed call as str({"error": ...}), so the key may carry either quote
+        errors = sum(str(message.get("content", "")).startswith(("{'error'", '{"error"')) for message in results)
         score = 0.5 if results else -0.5 # Encourage calling the calculator
         score -= 0.5 * errors            # Penalize malformed tool calls
         scores.append(score)
@@ -375,21 +378,29 @@ with safe_open("grpo_saved_lora/adapter_model.safetensors", framework = "pt") as
 # In[ ]:
 
 
-from vllm import SamplingParams
-sampling_params = SamplingParams(
-    temperature = 0.7,
-    top_p = 0.8,
-    top_k = 20,
-    max_tokens = 512,
-)
-lora_request = model.load_lora("grpo_saved_lora")
+if fast_inference:
+    from vllm import SamplingParams
+    sampling_params = SamplingParams(
+        temperature = 0.7,
+        top_p = 0.8,
+        top_k = 20,
+        max_tokens = 512,
+    )
+    lora_request = model.load_lora("grpo_saved_lora")
 
-def generate(text):
-    return model.fast_generate(
-        text,
-        sampling_params = sampling_params,
-        lora_request = lora_request,
-    )[0].outputs[0].text
+    def generate(text):
+        return model.fast_generate(
+            text,
+            sampling_params = sampling_params,
+            lora_request = lora_request,
+        )[0].outputs[0].text
+else:
+    FastLanguageModel.for_inference(model)
+
+    def generate(text):
+        inputs = tokenizer(text, return_tensors = "pt", add_special_tokens = False).to("cuda")
+        output = model.generate(**inputs, max_new_tokens = 512, do_sample = True, temperature = 0.7, top_p = 0.8, top_k = 20)
+        return tokenizer.decode(output[0, inputs["input_ids"].shape[1]:])
 
 problem = make_problem(random.Random(42))
 messages = run_tools(list(problem["prompt"]), tools, generate)
