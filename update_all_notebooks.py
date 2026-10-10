@@ -884,9 +884,8 @@ installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
 
 # The Liquid LFM2 notebooks installed transformers from git main, because `lfm2`
 # had no release when they were written. It has one now, and main is a moving
-# target the molab PEP 723 header builds before a single cell runs. They pin
-# 5.15.0 instead, and the default 4.57.6 has to move with them: two `==` pins of
-# the same length in one notebook leave the molab header nothing to choose on.
+# target. They pin 5.15.0 instead, and the default 4.57.6 has to move with them
+# so each notebook carries a single transformers pin.
 installation_liquid_lfm2_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -901,10 +900,10 @@ installation_liquid_lfm2_kaggle_content = update_or_append_pip_install(
 # Muse Glimmer is a `muse_glimmer` checkpoint, and that architecture landed in
 # transformers 5.15.0, so the canonical 4.57.6 cannot load it. Replace the
 # default pin rather than leaving it to be overridden by the notebook's own
-# install cell: two contradictory `transformers` pins in one notebook also mean
-# the molab PEP 723 header has to pick one, and it picked the 4.x pin. Installing
-# with dependency resolution on is what pulls the `huggingface_hub>=1.5.0` and
-# `tokenizers>=0.22.0` that transformers 5.x requires.
+# install cell, so the notebook never carries two contradictory `transformers`
+# pins. Installing with dependency resolution on is what pulls the
+# `huggingface_hub>=1.5.0` and `tokenizers>=0.22.0` that transformers 5.x
+# requires.
 installation_muse_glimmer_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -7250,26 +7249,5 @@ if __name__ == "__main__":
             max_workers=args.workers,
             executor_type=args.executor,
         )
-
-    # molab (marimo) notebooks. Generated from the molab manifest's curated
-    # allowlist into molab/*.py — a SEPARATE native-marimo tree, deliberately
-    # NOT routed through convert_folder()/python_scripts/. Two call sites:
-    # (1) regenerate molab/*.py, (2) refresh the README molab section between
-    # the <!-- MOLAB:START --> / <!-- MOLAB:END --> markers.
-    try:
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
-        import molab_generate as _molab_generate
-
-        for _molab_path in _molab_generate.generate_all():
-            print(f"Generated molab notebook {_molab_path}")
-        if _molab_generate.update_readme():
-            print("Updated README molab section.")
-    except Exception as _molab_exc:  # noqa: BLE001 - keep molab failures non-fatal
-        # Preserve the traceback so the operator can debug — mirrors the
-        # pattern used by the convert_folder handler in this same file
-        # (review P1 / PY-01 / C-1).
-        import traceback as _molab_tb
-        print(f"WARNING: molab generation step failed: {_molab_exc}")
-        _molab_tb.print_exc()
 
     _summarize_git_diff()
