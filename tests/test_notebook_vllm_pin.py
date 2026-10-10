@@ -53,8 +53,7 @@ def _logical_lines(source):
 
     A wrapped command is one statement: read a physical line at a time, its tail
     (`"vllm==0.15.1" unsloth`) reads as a bare requirement rather than as the
-    install carrying it, and the notebooks wrap nearly every install. Same fold
-    as `scripts/molab_dependencies._logical_lines`.
+    install carrying it, and the notebooks wrap nearly every install.
 
     Comments go first, and for both scans at once so `_CASES` and `_BINDINGS`
     keep comparing the same text. A line such as `# Pin "vllm==0.15.1" for CUDA

@@ -61,7 +61,7 @@ from packaging.version import Version
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOK_DIRS = ("nb", "kaggle", "original_template")
-SCRIPT_DIRS = ("python_scripts", "molab")
+SCRIPT_DIRS = ("python_scripts",)
 
 # Measured from the published wheels, one row per field.
 TRACKIO_ARGUMENT_FLOORS = {
