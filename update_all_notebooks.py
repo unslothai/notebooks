@@ -455,6 +455,43 @@ installation_grpo_kaggle_content = update_or_append_pip_install(
     UV_PIN_TRL,
 )
 
+# GRPO tool calling (`GRPOTrainer(tools=...)`, `max_tool_calling_iterations`) needs
+# trl >= 0.26 and transformers >= 5.0, but vllm 0.11.2 and 0.15.1 require
+# transformers < 5. vllm 0.19.1 is the first that takes transformers 5 (>= 5.5.1)
+# and still pins torch 2.10 (cu128). A T4 tops out at vllm 0.11.2, so the T4
+# branch installs no vLLM: the notebook then sets fast_inference = False and
+# generates with transformers. transformers 5.15.1 is the newest that keeps the
+# tokenizers <= 0.23.0 pin above and ships the response_template parser
+# (>= 5.13), so TRL needs no jmespath.
+TOOL_USE_PIN_TRANSFORMERS = "!uv pip install transformers==5.15.1 \"datasets>=4.7.0,<5.0.0\""
+TOOL_USE_PIN_TRL = "!uv pip install --no-deps trl==1.13.0"
+def _tool_use_installation(content, indent):
+    old = (
+        f"{indent}_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
+        f"{indent}!uv pip install -qqq --upgrade {{_vllm}} {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+    )
+    new = (
+        f"{indent}_triton = 'triton'\n"
+        f"{indent}if is_t4:\n"
+        f"{indent}    # Keep the machine's torch: upgrading it can pull a CUDA build the driver cannot load\n"
+        f"{indent}    try:\n"
+        f"{indent}        import importlib.metadata as _md\n"
+        f"{indent}        _torch, _tv = (f'{{_p}}=={{_md.version(_p).split(\"+\")[0]}}' for _p in ('torch', 'torchvision'))\n"
+        f"{indent}    except Exception:\n"
+        f"{indent}        _torch, _tv = 'torch', 'torchvision'\n"
+        f"{indent}    !uv pip install -qqq {{_numpy}} {{_pil}} {{_torch}} {{_tv}} bitsandbytes xformers unsloth\n"
+        f"{indent}else:\n"
+        f"{indent}    !uv pip install -qqq --upgrade vllm==0.19.1 {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+    )
+    assert old in content, "GRPO install layout moved; update _tool_use_installation"
+    content = content.replace(old, new)
+    content = update_or_append_pip_install(content, "transformers", TOOL_USE_PIN_TRANSFORMERS)
+    return update_or_append_pip_install(content, "trl", TOOL_USE_PIN_TRL)
+
+
+installation_extra_grpo_tool_use_content = _tool_use_installation(installation_extra_grpo_content, "    ")
+installation_grpo_tool_use_kaggle_content = _tool_use_installation(installation_grpo_kaggle_content, "")
+
 installation_synthetic_data_content = """%%capture
 import os
 !pip install --upgrade -qqq uv
@@ -801,6 +838,12 @@ installation_amd_extras_default = ""
 
 installation_amd_extras_grpo = """\
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
+"""
+
+# GRPO tool calling needs transformers >= 5 and trl >= 0.26 (see TOOL_USE_PIN_TRANSFORMERS).
+installation_amd_extras_grpo_tool_use = installation_amd_extras_grpo + """\
+!uv pip install --system -qqq vllm "transformers==5.15.1" "datasets>=4.7.0,<5.0.0"
+!uv pip install --system -qqq --no-deps "trl==1.13.0"
 """
 
 # The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off, so
@@ -3639,6 +3682,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
             variant_extras = installation_amd_extras_gemma4
     elif _is_qwen3_moe_path(notebook_path):
         variant_extras = installation_amd_extras_qwen3_moe
+    elif is_path_contains_any(lowered, ["grpo-tool_use"]):
+        variant_extras = installation_amd_extras_grpo_tool_use
     elif _is_amd_grpo_like_path(notebook_path) and "vllm" in source_install_blob:
         variant_extras = installation_amd_extras_grpo
     elif is_path_contains_any(lowered, ["llasa"]):
@@ -4878,8 +4923,9 @@ def update_notebook_sections(
 
                         # GRPO INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
+                            is_tool_use = is_path_contains_any(notebook_path.lower(), ["grpo-tool_use"])
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
-                                installation = installation_grpo_kaggle_content
+                                installation = installation_grpo_tool_use_kaggle_content if is_tool_use else installation_grpo_kaggle_content
                                 # Kaggle will delete the second cell instead -> Need to check
                                 if i + 2 < len(notebook_content["cells"]):
                                     del notebook_content["cells"][i + 2]
@@ -4892,7 +4938,7 @@ def update_notebook_sections(
                                 if _owns_extra_grpo_install_cell(
                                     notebook_path, notebook_content["cells"], i + 2
                                 ):
-                                    notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
+                                    notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_tool_use_content if is_tool_use else installation_extra_grpo_content
                                     extra_grpo_install_idx = i + 2
                                 elif is_path_contains_any(notebook_path.lower(), ["gemma4"]) and \
                                     _is_extra_grpo_install_cell(notebook_content["cells"], i + 2):
