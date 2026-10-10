@@ -38,8 +38,8 @@ The uv install is left unpinned on purpose. uv embeds the list of Python
 builds it can fetch, so pinning it below MIN_UV brings the failure above
 straight back: pin at or above MIN_UV, or not at all.
 
-nb/, python_scripts/ and molab/ are covered together: the last two are
-generated mirrors, so a one-layer fix disappears on the next regeneration.
+nb/ and python_scripts/ are covered together: the latter is a generated
+mirror, so a one-layer fix disappears on the next regeneration.
 """
 
 import ast
@@ -54,7 +54,7 @@ from packaging.version import InvalidVersion, Version
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Every artifact layer that can carry the NeMo Gym bootstrap.
-SEARCH_DIRS = ["nb", "kaggle", "python_scripts", "molab", "original_template"]
+SEARCH_DIRS = ["nb", "kaggle", "python_scripts", "original_template"]
 
 GYM_CLONE_URL = "https://github.com/NVIDIA-NeMo/Gym.git"
 
@@ -75,8 +75,6 @@ UV_UPGRADE = re.compile(
 # The checks below run over whatever discovery finds; this list only catches
 # discovery silently finding nothing, which would leave them with no cases.
 EXPECTED_FILES = {
-    "molab/NeMo-Gym-Multi-Environment.py",
-    "molab/NeMo-Gym-Sudoku.py",
     "nb/AMD-NeMo-Gym-Multi-Environment.ipynb",
     "nb/AMD-NeMo-Gym-Sudoku.ipynb",
     "nb/NeMo-Gym-Multi-Environment.ipynb",

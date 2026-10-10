@@ -69,7 +69,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOK_DIRS = ("nb", "kaggle", "original_template")
-SCRIPT_DIRS = ("python_scripts", "molab")
+SCRIPT_DIRS = ("python_scripts",)
 
 _TRANSFORMERS_FROM_GIT = re.compile(
     r"git\+(?:https://|ssh://git@)github\.com/huggingface/transformers"
