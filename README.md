@@ -96,12 +96,14 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Gemma4** **(E2B)** | Auto Kernel Creation | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma4_(E2B)_GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Gemma4** **(E2B)** | 2048 Game | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma4_(E2B)_Reinforcement_Learning_2048_Game.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3** **(4B)** | DAPO Math + vLLM | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3** **(4B)** | GRPO + vLLM | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-GRPO-Tool_Use.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Ministral3** **(3B)** | Sudoku | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
 ### Tool Calling Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **Qwen2.5 Coder** **(1.5B)** | Tool Calling | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3** **(4B)** | Tool Calling | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-Tool_Calling.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **FunctionGemma** **(270M)** | Tool Calling | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/FunctionGemma_(270M)-Multi-Turn-Tool-Calling.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **FunctionGemma** **(270M)** | Mobile Actions | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/FunctionGemma_(270M)-Mobile-Actions.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **FunctionGemma** **(270M)** | Inference | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/FunctionGemma_(270M)-LMStudio.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -381,11 +383,13 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Gemma3** **(1B)** | GSM8K Math | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(1B)-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **DeepSeek R1 0528 Qwen3** **(8B)** | DAPO Math + vLLM | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3** **(4B)** | DAPO Math + vLLM | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(4B)-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3** **(4B)** | GRPO + vLLM | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(4B)-GRPO-Tool_Use.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### Tool Calling Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **Qwen2.5 Coder** **(1.5B)** | Tool Calling | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3** **(4B)** | Tool Calling | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(4B)-Tool_Calling.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### Text-to-Speech (TTS) Notebooks
 | Model | Type | Notebook Link |
