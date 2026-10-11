@@ -80,6 +80,8 @@
 #     !uv pip install -qqq --no-deps --upgrade "{_torchao}"
 # !uv pip install transformers==5.15.1 "datasets>=4.7.0,<5.0.0"
 # !uv pip install --no-deps trl==1.13.0
+# !uv pip install -qqq --no-deps --force-reinstall "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo" "unsloth @ git+https://github.com/unslothai/unsloth"
+# 
 # 
 # # ### Unsloth
 

@@ -465,6 +465,12 @@ installation_grpo_kaggle_content = update_or_append_pip_install(
 # (>= 5.13), so TRL needs no jmespath.
 TOOL_USE_PIN_TRANSFORMERS = "!uv pip install transformers==5.15.1 \"datasets>=4.7.0,<5.0.0\""
 TOOL_USE_PIN_TRL = "!uv pip install --no-deps trl==1.13.0"
+# Tool calling GRPO needs Unsloth's TRL chat template fallback and tokenizer save fix, so install both from main.
+TOOL_USE_UNSLOTH_MAIN = (
+    '!uv pip install -qqq --no-deps --force-reinstall '
+    '"unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo" '
+    '"unsloth @ git+https://github.com/unslothai/unsloth"'
+)
 def _tool_use_installation(content, indent):
     old = (
         f"{indent}_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
@@ -486,7 +492,8 @@ def _tool_use_installation(content, indent):
     assert old in content, "GRPO install layout moved; update _tool_use_installation"
     content = content.replace(old, new)
     content = update_or_append_pip_install(content, "transformers", TOOL_USE_PIN_TRANSFORMERS)
-    return update_or_append_pip_install(content, "trl", TOOL_USE_PIN_TRL)
+    content = update_or_append_pip_install(content, "trl", TOOL_USE_PIN_TRL)
+    return content.rstrip("\n") + "\n" + TOOL_USE_UNSLOTH_MAIN + "\n"
 
 
 installation_extra_grpo_tool_use_content = _tool_use_installation(installation_extra_grpo_content, "    ")
