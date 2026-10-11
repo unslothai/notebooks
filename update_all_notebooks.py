@@ -455,6 +455,50 @@ installation_grpo_kaggle_content = update_or_append_pip_install(
     UV_PIN_TRL,
 )
 
+# GRPO tool calling (`GRPOTrainer(tools=...)`, `max_tool_calling_iterations`) needs
+# trl >= 0.26 and transformers >= 5.0, but vllm 0.11.2 and 0.15.1 require
+# transformers < 5. vllm 0.19.1 is the first that takes transformers 5 (>= 5.5.1)
+# and still pins torch 2.10 (cu128). A T4 tops out at vllm 0.11.2, so the T4
+# branch installs no vLLM: the notebook then sets fast_inference = False and
+# generates with transformers. transformers 5.15.1 is the newest that keeps the
+# tokenizers <= 0.23.0 pin above and ships the response_template parser
+# (>= 5.13), so TRL needs no jmespath.
+TOOL_USE_PIN_TRANSFORMERS = "!uv pip install transformers==5.15.1 \"datasets>=4.7.0,<5.0.0\""
+TOOL_USE_PIN_TRL = "!uv pip install --no-deps trl==1.13.0"
+# Tool calling GRPO needs Unsloth's TRL chat template fallback and tokenizer save fix, so install both from main.
+TOOL_USE_UNSLOTH_MAIN = (
+    '!uv pip install -qqq --no-deps --force-reinstall '
+    '"unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo" '
+    '"unsloth @ git+https://github.com/unslothai/unsloth"'
+)
+def _tool_use_installation(content, indent):
+    old = (
+        f"{indent}_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
+        f"{indent}!uv pip install -qqq --upgrade {{_vllm}} {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+    )
+    new = (
+        f"{indent}_triton = 'triton'\n"
+        f"{indent}if is_t4:\n"
+        f"{indent}    # Keep the machine's torch: upgrading it can pull a CUDA build the driver cannot load\n"
+        f"{indent}    try:\n"
+        f"{indent}        import importlib.metadata as _md\n"
+        f"{indent}        _torch, _tv = (f'{{_p}}=={{_md.version(_p).split(\"+\")[0]}}' for _p in ('torch', 'torchvision'))\n"
+        f"{indent}    except Exception:\n"
+        f"{indent}        _torch, _tv = 'torch', 'torchvision'\n"
+        f"{indent}    !uv pip install -qqq {{_numpy}} {{_pil}} {{_torch}} {{_tv}} bitsandbytes xformers unsloth\n"
+        f"{indent}else:\n"
+        f"{indent}    !uv pip install -qqq --upgrade vllm==0.19.1 {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+    )
+    assert old in content, "GRPO install layout moved; update _tool_use_installation"
+    content = content.replace(old, new)
+    content = update_or_append_pip_install(content, "transformers", TOOL_USE_PIN_TRANSFORMERS)
+    content = update_or_append_pip_install(content, "trl", TOOL_USE_PIN_TRL)
+    return content.rstrip("\n") + "\n" + TOOL_USE_UNSLOTH_MAIN + "\n"
+
+
+installation_extra_grpo_tool_use_content = _tool_use_installation(installation_extra_grpo_content, "    ")
+installation_grpo_tool_use_kaggle_content = _tool_use_installation(installation_grpo_kaggle_content, "")
+
 installation_synthetic_data_content = """%%capture
 import os
 !pip install --upgrade -qqq uv
@@ -587,7 +631,7 @@ installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', insta
 
 installation_llasa_content += """\
 
-!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx tiktoken xcodec2==0.1.5 --no-deps
+!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_content = update_or_append_pip_install(
@@ -596,7 +640,7 @@ installation_llasa_content = update_or_append_pip_install(
     "!pip install transformers==4.57.6",
 )
 
-installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx tiktoken xcodec2==0.1.5 --no-deps
+installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_kaggle_content = update_or_append_pip_install(
@@ -803,6 +847,12 @@ installation_amd_extras_grpo = """\
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 """
 
+# GRPO tool calling needs transformers >= 5 and trl >= 0.26 (see TOOL_USE_PIN_TRANSFORMERS).
+installation_amd_extras_grpo_tool_use = installation_amd_extras_grpo + """\
+!uv pip install --system -qqq vllm "transformers==5.15.1" "datasets>=4.7.0,<5.0.0"
+!uv pip install --system -qqq --no-deps "trl==1.13.0"
+"""
+
 # The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off, so
 # unsloth.kernels.moe.autotune_cache hands back heuristic configs instead of
 # searching per device capability. Their CUDA sources never carried it, so it
@@ -812,8 +862,8 @@ import os; os.environ["UNSLOTH_MOE_DISABLE_AUTOTUNE"] = "1"
 """
 
 installation_amd_extras_gemma4 = """\
-# Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
-!uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
+# Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0; 5.16+ needs tokenizers >= 0.23.1, past the pin above
+!uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0,<5.16" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
 """
 
 # Gemma 4 12B needs transformers >= 5.10.1 (newer than the other Gemma 4 sizes).
@@ -884,9 +934,8 @@ installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
 
 # The Liquid LFM2 notebooks installed transformers from git main, because `lfm2`
 # had no release when they were written. It has one now, and main is a moving
-# target the molab PEP 723 header builds before a single cell runs. They pin
-# 5.15.0 instead, and the default 4.57.6 has to move with them: two `==` pins of
-# the same length in one notebook leave the molab header nothing to choose on.
+# target. They pin 5.15.0 instead, and the default 4.57.6 has to move with them
+# so each notebook carries a single transformers pin.
 installation_liquid_lfm2_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -901,10 +950,10 @@ installation_liquid_lfm2_kaggle_content = update_or_append_pip_install(
 # Muse Glimmer is a `muse_glimmer` checkpoint, and that architecture landed in
 # transformers 5.15.0, so the canonical 4.57.6 cannot load it. Replace the
 # default pin rather than leaving it to be overridden by the notebook's own
-# install cell: two contradictory `transformers` pins in one notebook also mean
-# the molab PEP 723 header has to pick one, and it picked the 4.x pin. Installing
-# with dependency resolution on is what pulls the `huggingface_hub>=1.5.0` and
-# `tokenizers>=0.22.0` that transformers 5.x requires.
+# install cell, so the notebook never carries two contradictory `transformers`
+# pins. Installing with dependency resolution on is what pulls the
+# `huggingface_hub>=1.5.0` and `tokenizers>=0.22.0` that transformers 5.x
+# requires.
 installation_muse_glimmer_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -1494,6 +1543,7 @@ KNOWN_TYPES_ORDERED = [
     "GRPO Sudoku",
     
     "ORPO",
+    "PPO",
     "GRPO",
     "DPO",
     "CPT",
@@ -3639,6 +3689,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
             variant_extras = installation_amd_extras_gemma4
     elif _is_qwen3_moe_path(notebook_path):
         variant_extras = installation_amd_extras_qwen3_moe
+    elif is_path_contains_any(lowered, ["grpo-tool_use"]):
+        variant_extras = installation_amd_extras_grpo_tool_use
     elif _is_amd_grpo_like_path(notebook_path) and "vllm" in source_install_blob:
         variant_extras = installation_amd_extras_grpo
     elif is_path_contains_any(lowered, ["llasa"]):
@@ -4878,8 +4930,9 @@ def update_notebook_sections(
 
                         # GRPO INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
+                            is_tool_use = is_path_contains_any(notebook_path.lower(), ["grpo-tool_use"])
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
-                                installation = installation_grpo_kaggle_content
+                                installation = installation_grpo_tool_use_kaggle_content if is_tool_use else installation_grpo_kaggle_content
                                 # Kaggle will delete the second cell instead -> Need to check
                                 if i + 2 < len(notebook_content["cells"]):
                                     del notebook_content["cells"][i + 2]
@@ -4892,7 +4945,7 @@ def update_notebook_sections(
                                 if _owns_extra_grpo_install_cell(
                                     notebook_path, notebook_content["cells"], i + 2
                                 ):
-                                    notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
+                                    notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_tool_use_content if is_tool_use else installation_extra_grpo_content
                                     extra_grpo_install_idx = i + 2
                                 elif is_path_contains_any(notebook_path.lower(), ["gemma4"]) and \
                                     _is_extra_grpo_install_cell(notebook_content["cells"], i + 2):
@@ -5887,6 +5940,7 @@ def update_readme(
         is_grpo_trainer = trainer_class == "GRPOTrainer"
         is_dpo_trainer = trainer_class == "DPOTrainer"
         is_orpo_trainer = trainer_class == "ORPOTrainer"
+        is_ppo_trainer = trainer_class == "PPOTrainer"
         # GRPO / RL notebooks: identified by trainer class, model_type OR
         # filename. The trainer-class check catches notebooks whose type
         # the filename classifier assigned as "Vision GRPO" / "FP8 GRPO"
@@ -5895,6 +5949,7 @@ def update_readme(
             is_grpo_trainer
             or is_dpo_trainer
             or is_orpo_trainer
+            or is_ppo_trainer
             or model_type.startswith("GRPO")
             or "grpo" in basename_lower_for_rl
             or "nemo-gym" in basename_lower_for_rl
@@ -5908,6 +5963,8 @@ def update_readme(
             model_type = "DPO"
         elif is_orpo_trainer:
             model_type = "ORPO"
+        elif is_ppo_trainer:
+            model_type = "PPO"
         elif is_in_grpo_section:
             task = detect_rl_task(path)
             if task:
@@ -7245,26 +7302,5 @@ if __name__ == "__main__":
             max_workers=args.workers,
             executor_type=args.executor,
         )
-
-    # molab (marimo) notebooks. Generated from the molab manifest's curated
-    # allowlist into molab/*.py — a SEPARATE native-marimo tree, deliberately
-    # NOT routed through convert_folder()/python_scripts/. Two call sites:
-    # (1) regenerate molab/*.py, (2) refresh the README molab section between
-    # the <!-- MOLAB:START --> / <!-- MOLAB:END --> markers.
-    try:
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
-        import molab_generate as _molab_generate
-
-        for _molab_path in _molab_generate.generate_all():
-            print(f"Generated molab notebook {_molab_path}")
-        if _molab_generate.update_readme():
-            print("Updated README molab section.")
-    except Exception as _molab_exc:  # noqa: BLE001 - keep molab failures non-fatal
-        # Preserve the traceback so the operator can debug — mirrors the
-        # pattern used by the convert_folder handler in this same file
-        # (review P1 / PY-01 / C-1).
-        import traceback as _molab_tb
-        print(f"WARNING: molab generation step failed: {_molab_exc}")
-        _molab_tb.print_exc()
 
     _summarize_git_diff()

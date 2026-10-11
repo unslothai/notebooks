@@ -31,7 +31,6 @@ on:
       - 'nb/**'
       - 'kaggle/**'
       - 'python_scripts/**'
-      - 'molab/**'
       - 'update_all_notebooks.py'
       - 'replace_text.py'
       - 'update_max_seq_length.py'
@@ -86,20 +85,6 @@ jobs:
           # on every notebook that uses a cell magic.
           pip install pytest pyyaml nbformat nbconvert ipython \
             pyspellchecker tqdm huggingface_hub
-
-      - name: Install marimo + ruff (molab generator + format pass)
-        # Generator deps. Kept as a separate step so they are easy to spot
-        # and to pin/skip independently if either is yanked upstream.
-        #   marimo  — scripts/molab_generate.py (marimo.App / @app.cell
-        #             emission) + test_molab_marimo_validity.py (marimo
-        #             check) + test_molab_generation_parity.py
-        #   ruff    — scripts/molab_generate.py runs `ruff format` over
-        #             every generated notebook to re-wrap the lines that
-        #             marimo's IR conversion ast-unparses (rename pass).
-        #             Pinned so regeneration is byte-stable across CI runs.
-        # Exact pins: marimo stamps its version into __generated_with, so
-        # any release drifts parity. Bump pins together with a regen commit.
-        run: pip install 'marimo==0.23.8' 'ruff==0.15.16'
 
       - name: tests/test_notebook_json_validity.py
         run: |
@@ -203,8 +188,7 @@ jobs:
 
       - name: tests/test_no_unpinned_transformers_git_install.py
         # A transformers git install with no @ref builds whatever upstream's
-        # default branch holds at run time, and in molab it does so from the
-        # PEP 723 header, before the notebook body runs.
+        # default branch holds at run time.
         run: |
           python -m pytest tests/test_no_unpinned_transformers_git_install.py -q --tb=short
 
@@ -286,18 +270,6 @@ jobs:
         run: |
           python -m pytest tests/test_python_scripts_regen_parity.py -q --tb=short
 
-      - name: tests/test_molab_manifest.py
-        run: |
-          python -m pytest tests/test_molab_manifest.py -q --tb=short
-
-      - name: tests/test_molab_generation_parity.py
-        run: |
-          python -m pytest tests/test_molab_generation_parity.py -q --tb=short
-
-      - name: tests/test_molab_templated_pins.py
-        run: |
-          python -m pytest tests/test_molab_templated_pins.py -q --tb=short
-
       - name: tests/test_amd_templated_kernel_pins.py
         run: |
           python -m pytest tests/test_amd_templated_kernel_pins.py -q --tb=short
@@ -311,22 +283,6 @@ jobs:
         # carries --system exactly once.
         run: |
           python -m pytest tests/test_amd_preserved_setup_lines.py -q --tb=short
-
-      - name: tests/test_molab_marimo_validity.py
-        run: |
-          python -m pytest tests/test_molab_marimo_validity.py -q --tb=short
-
-      - name: tests/test_molab_dependency_parity.py
-        run: |
-          python -m pytest tests/test_molab_dependency_parity.py -q --tb=short
-
-      - name: tests/test_molab_readme_links.py
-        run: |
-          python -m pytest tests/test_molab_readme_links.py -q --tb=short
-
-      - name: tests/test_molab_no_colab_markers.py
-        run: |
-          python -m pytest tests/test_molab_no_colab_markers.py -q --tb=short
 
       - name: tests/test_no_backgrounded_shell_command.py
         run: |

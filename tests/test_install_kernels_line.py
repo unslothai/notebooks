@@ -87,11 +87,3 @@ def test_amd_cells_never_call_it():
     amd = [path for path in _notebooks() if path.name.startswith("AMD-")]
     assert amd
     assert [p.name for p in amd for cell in _code_cells(p) if KERNELS.search(cell)] == []
-
-
-def test_molab_runs_the_kernel_install_as_its_own_cell():
-    molab = sorted((REPO_ROOT / "molab").glob("*.py"))
-    texts = {p.name: p.read_text(encoding="utf-8") for p in molab}
-    # marimo cannot run `!` magics, and the PEP 723 header cannot pick a wheel per torch.
-    assert [n for n, t in texts.items() if "#! unsloth install-kernels" in t] == []
-    assert sum('subprocess.run(["unsloth", "install-kernels"])' in t for t in texts.values()) > 100
