@@ -17,30 +17,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
-# 
-# 
-# # In[ ]:
-# 
-# 
-# #@title Colab Extra Install { display-mode: "form" }
-# get_ipython().run_line_magic('%capture', '')
-# import os
-# get_ipython().system('pip install --upgrade -qqq uv')
-# if "COLAB_" not in "".join(os.environ.keys()):
-#     # If you're not in Colab, just use pip install!
-#     get_ipython().system('pip install unsloth vllm')
-# else:
-#     try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
-#     except: _numpy = "numpy"; _pil = "pillow"
-#     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-#     except: is_t4 = False
-#     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
-#     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
-#     get_ipython().system('uv pip install -qqq {_triton}')
-#     get_ipython().system('uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"')
-# get_ipython().system('uv pip install transformers==4.56.2')
-# get_ipython().system('uv pip install --no-deps trl==0.22.2')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"\n!pip install "huggingface_hub>=1.5.0,<2.0"\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
 # 
 # 
 # # ### Unsloth
@@ -334,12 +311,10 @@ except Exception as e:
 # In[ ]:
 
 
-def create_locked_down_function(function):
-    output_function = {}
-    exec(function, {}, output_function)
-    new_matmul = output_function["matmul"]
-    new_matmul = types.FunctionType(new_matmul.__code__, {})
-    return new_matmul
+# Unsloth's create_locked_down_function executes the generated code with a
+# restricted set of builtins and a restricted importer, so a reward hacking
+# completion cannot reach os, subprocess, sockets or the filesystem.
+from unsloth import create_locked_down_function
 
 
 # # Countering Reward Hacking 3: Stop caching
@@ -687,7 +662,11 @@ def speed_check(completions, **kwargs):
 
 from datasets import Dataset
 dataset = Dataset.from_list([{"prompt" : [{"role": "user", "content": prompt.strip()}], "answer" : 0}]*1000)
-maximum_length = len(tokenizer.apply_chat_template([{"role":"user", "content":prompt.strip()}], add_generation_prompt = True, tokenize = True))
+maximum_length = tokenizer(
+    text = tokenizer.apply_chat_template([{"role":"user", "content":prompt.strip()}], add_generation_prompt = True, tokenize = False),
+    add_special_tokens = False,
+    return_tensors = "pt",
+)["input_ids"].shape[-1]
 print(maximum_length)
 dataset[0]
 
@@ -798,7 +777,7 @@ tokenizer.save_pretrained("gemma_4_lora")
 from safetensors import safe_open
 
 tensors = {}
-with safe_open("grpo_saved_lora/adapter_model.safetensors", framework = "pt") as f:
+with safe_open("gemma_4_lora/adapter_model.safetensors", framework = "pt") as f:
     # Verify both A and B are non zero
     for key in f.keys():
         tensor = f.get_tensor(key)

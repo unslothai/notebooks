@@ -55,6 +55,16 @@ _KNOWN_PIN_OUTLIERS: set[tuple[str, str, str]] = {
     ("nb/AMD-Openenv_wordle_grpo.ipynb", "trl", "0.29.1"),
     ("nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb", "transformers", "4.57.0"),
     ("nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb", "trl", "0.26.2"),
+    # Minted from the nb/ copy above, so it inherits that pin.
+    ("nb/AMD-Qwen3_VL_(8B)-Vision-GRPO.ipynb", "trl", "0.26.2"),
+    # Muse Glimmer needs the device map planner and the GRPO log-softmax fix,
+    # which are in trl 1.9.2 and in no release the canonical pin can move to
+    # without dragging every other notebook along. The template carries the
+    # pin, and the three generated copies inherit it.
+    ("original_template/Muse_Glimmer_(30B)-GRPO.ipynb", "trl", "1.9.2"),
+    ("nb/Muse_Glimmer_(30B)-GRPO.ipynb", "trl", "1.9.2"),
+    ("nb/Kaggle-Muse_Glimmer_(30B)-GRPO.ipynb", "trl", "1.9.2"),
+    ("nb/HuggingFace Course-Muse_Glimmer_(30B)-GRPO.ipynb", "trl", "1.9.2"),
 }
 
 
@@ -91,7 +101,9 @@ def test_notebook_pip_pins_match_generator_canonical_or_override(path: Path) -> 
     we care about, assert each is in the union of canonical PIN_*
     constants + the per-model override pins extracted from the
     generator."""
-    rel_path = str(path.relative_to(REPO_ROOT))
+    # as_posix, not str: on Windows str() gives `nb\X.ipynb`, which matches no
+    # key in _KNOWN_PIN_OUTLIERS, so every allowed outlier fires as drift.
+    rel_path = path.relative_to(REPO_ROOT).as_posix()
     bad: list[tuple[int, str, str]] = []
     for cell_idx, src in ni.iter_code_cells(path):
         for pkg, ver in ni.extract_pip_pins_from_cell(src):

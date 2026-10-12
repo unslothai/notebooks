@@ -1,7 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Openenv_wordle_grpo.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+# To run this, press "*Run*" and press "*Run All*" on **AMD Dev Cloud**!
+# <div class="align-center">
+# <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+# <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# </div>
+# 
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# 
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
 
 # # Goal: Make Qwen3-4B play games with Reinforcement Learning
 # 
@@ -23,8 +32,9 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 
-get_ipython().system('uv pip install --system -qqq vllm "transformers==4.56.2" trackio')
-get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.29.1"')
+get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
+get_ipython().system('uv pip install --system -qqq vllm "transformers==4.57.6" trackio')
+get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "huggingface_hub>=0.34.0,<1.0" "trl==0.29.1"')
 
 
 # We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) from source:
@@ -32,7 +42,7 @@ get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.2
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel --prefer-binary\n!pip install "openenv-core[core]>=0.2.1"\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./envs\')  # Add OpenEnv envs for textarena_env module\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().absolute())\n')
+get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel --prefer-binary\n# openenv-core[core] pulls gradio>=4.0.0, and gradio 6.x wants\n# huggingface_hub>=1.16.0, which would take the hub past the <1.0 wall\n# transformers 4.57.6 checks on import. Carrying the bound keeps pip on a\n# gradio that is happy with hub 0.36.\n!pip install "openenv-core[core]>=0.2.1" "huggingface_hub>=0.34.0,<1.0"\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./envs\')  # Add OpenEnv envs for textarena_env module\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().absolute())\n')
 
 
 # We'll load Qwen3-4B and set some parameters:
@@ -514,7 +524,11 @@ grpo_config = GRPOConfig(
     # Logging / reporting
     output_dir = 'outputs',                  # Directory for checkpoints and logs
     report_to = "trackio",                      # Experiment tracking tool (integrates with HF Spaces)
-    trackio_space_id = 'outputs',            # HF Space where experiment tracking will be saved
+    # To sync runs to a Hugging Face Space, set the id the way the transformers
+    # you installed expects: TRACKIO_SPACE_ID="user/space" in the environment on
+    # 4.56 to 5.0, or trackio_space_id = "user/space" here on 4.57 and later.
+    # No single spelling works on both, and this notebook pins 4.57.6. Unset,
+    # trackio logs to a local dashboard, which needs no Hub token.
     logging_steps = 10,                        # Log metrics every N steps
     # save_steps = 10,                          # Interval for saving checkpoints
 

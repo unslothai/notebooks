@@ -16,12 +16,11 @@
 
 # ### News
 
-# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 # 
-# <table><tr>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-# </tr></table>
+# <p>
+# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
+# </p>
 # 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
@@ -36,7 +35,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n!pip install --upgrade -qqq uv\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install!\n    !pip install unsloth vllm synthetic-data-kit==0.0.3\nelse:\n    try: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\n    except: _numpy = "numpy"; _pil = "pillow"\n    try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\n    except: is_t4 = False\n    _vllm, _triton = (\'vllm==0.9.2\', \'triton==3.2.0\') if is_t4 else (\'vllm==0.15.1\', \'triton\')\n    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n    !uv pip install -qqq {_triton}\n    !uv pip install synthetic-data-kit==0.0.3\n    !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install transformers==4.56.2\n!uv pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n!pip install --upgrade -qqq uv\nif "COLAB_" not in "".join(os.environ.keys()):\n    # If you\'re not in Colab, just use pip install!\n    !pip install unsloth vllm synthetic-data-kit==0.0.3\nelse:\n    try: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\n    except: _numpy = "numpy"; _pil = "pillow"\n    try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\n    except: is_t4 = False\n    _vllm, _triton = (\'vllm==0.11.2\', \'triton\') if is_t4 else (\'vllm==0.15.1\', \'triton\')\n    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n    !uv pip install -qqq {_triton}\n    !uv pip install synthetic-data-kit==0.0.3\n    try:\n        import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])\n    except Exception:\n        _torch_v = ()\n    # torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.\n    _torchao = "torchao>=0.16.0" if _torch_v >= (2, 10) else "torchao>=0.16.0,<0.18.0"\n    !uv pip install -qqq --no-deps --upgrade "{_torchao}"\n!uv pip install transformers==4.57.6\n!uv pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # In[ ]:
@@ -54,11 +53,17 @@
 #     except: _numpy = "numpy"; _pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
-#     _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+#     _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
 #     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
 #     get_ipython().system('uv pip install -qqq {_triton}')
-#     get_ipython().system('uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"')
-# get_ipython().system('uv pip install transformers==4.56.2')
+#     try:
+#         import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])
+#     except Exception:
+#         _torch_v = ()
+#     # torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.
+#     _torchao = "torchao>=0.16.0" if _torch_v >= (2, 10) else "torchao>=0.16.0,<0.18.0"
+#     get_ipython().system('uv pip install -qqq --no-deps --upgrade "{_torchao}"')
+# get_ipython().system('uv pip install transformers==4.57.6')
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
 # 
 # 
@@ -69,16 +74,63 @@
 # In[3]:
 
 
-# Load and run the model using vllm
-# we prepend "nohup" and postpend "&" to make the Colab cell run in background
-get_ipython().system(' nohup python -m vllm.entrypoints.openai.api_server                    --model unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit                    --trust-remote-code                    --dtype half                    --quantization bitsandbytes                    --max-model-len 10000                    --tensor-parallel-size 1                    --gpu-memory-utilization 0.7                    --enable-chunked-prefill                    --port 8000                    > vllm.log &')
+# Popen, not `!... &`: IPython's `system_piped`, which every kernel except
+# Colab's uses, raises OSError on a trailing `&`, so on Kaggle, plain Jupyter
+# or papermill this cell could never run.
+import socket, subprocess, sys
+
+# Refuse an occupied port. Otherwise the readiness probe below is answered by
+# whoever already holds 8000 -- a rerun of this cell, or another vllm with a
+# different model -- while the server we just spawned quietly dies of
+# "address already in use" and we generate against the wrong one.
+with socket.socket() as probe:
+    if probe.connect_ex(("127.0.0.1", 8000)) == 0:
+        raise RuntimeError(
+            "Something is already serving localhost:8000. Stop it first: this "
+            "cell cannot tell its replies apart from the server it starts.")
+
+server = subprocess.Popen(
+    [sys.executable, "-m", "vllm.entrypoints.openai.api_server",
+     "--model", "unsloth/Llama-3.1-8B-Instruct-unsloth-bnb-4bit",
+     "--trust-remote-code",
+     "--dtype", "half",
+     "--quantization", "bitsandbytes",
+     "--max-model-len", "10000",
+     "--tensor-parallel-size", "1",
+     "--gpu-memory-utilization", "0.7",
+     "--enable-chunked-prefill",
+     "--port", "8000"],
+    stdout = open("vllm.log", "w"), stderr = subprocess.STDOUT,
+)
 
 
 # In[4]:
 
 
-# tail vllm logs. Check server has been started correctly
-get_ipython().system('while ! grep -q "Application startup complete" vllm.log; do tail -n 1 vllm.log; sleep 5; done')
+# Bounded, and it notices a server that died. The old shell loop grepped
+# vllm.log with no timeout, so a start that failed hung the notebook instead
+# of reporting anything.
+import time, urllib.request
+
+deadline = time.time() + 900
+while time.time() < deadline:
+    if server.poll() is not None:
+        raise RuntimeError(
+            f"vllm exited with {server.returncode}. Last of vllm.log:\n"
+            + open("vllm.log").read()[-2000:])
+    try:
+        urllib.request.urlopen("http://localhost:8000/v1/models", timeout = 5)
+        break
+    except Exception:
+        time.sleep(5)
+else:
+    # Reap it, or it keeps the GPU and port 8000 and the next launch attempt
+    # either fails to bind or talks to the orphan.
+    server.terminate()
+    try: server.wait(timeout = 30)
+    except subprocess.TimeoutExpired: server.kill(); server.wait()
+    raise TimeoutError("vllm was not ready in 900s. See vllm.log")
+print("vllm server ready")
 
 
 # Optional: Function to check if vllm server is running. Change False to True and run cell
@@ -404,7 +456,7 @@ def formatting_prompts_func(examples):
     return { "text" : texts, }
 
 from datasets import load_dataset, Dataset
-dataset = Dataset.from_json("/content/data/final/ai_meta_com_qa_pairs_cleaned_ft.json")
+dataset = Dataset.from_json("data/final/ai_meta_com_qa_pairs_cleaned_ft.json")
 dataset = dataset.map(formatting_prompts_func, batched = True,)
 
 

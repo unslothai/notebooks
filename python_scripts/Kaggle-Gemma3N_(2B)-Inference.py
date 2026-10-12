@@ -14,12 +14,11 @@
 
 # ### News
 
-# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 # 
-# <table><tr>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-# </tr></table>
+# <p>
+# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
+# </p>
 # 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
@@ -34,7 +33,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!pip install torchcodec\nimport torch; torch._dynamo.config.recompile_limit = 64;\n')
+# get_ipython().run_cell_magic('capture', '', '!pip install "sglang[all]==0.5.16"\n!pip install --force-reinstall --no-deps "torchvision==0.26.0" "torchaudio==2.11.0"\n')
 # 
 # 
 # # ### Unsloth
@@ -44,11 +43,96 @@
 # In[2]:
 
 
-# Load and run the model using sglang
-get_ipython().system('nohup python -m sglang.launch_server --model-path unsloth/gemma-3n-E2B-it --attention-backend fa3 --port 8000 > sglang.log &')
+# sglang publishes no Turing kernels. sgl-kernel dropped its compute_75
+# gencode flag in sgl-project/sglang#9207, so the sglang-kernel 0.4.5 that
+# sglang 0.5.16 pins carries SASS for sm_80, sm_89, sm_90, sm_90a, sm_100a,
+# sm_103a and sm_120a, and no PTX to JIT a Turing kernel from. On a T4
+# (sm_75) `import sgl_kernel` raises while the server is still parsing its
+# arguments, and all this cell would report is "Server process exited with
+# code 1". Check the GPU first and name the fix.
+import torch
 
-# tail vllm logs. Check server has been started correctly
-get_ipython().system('while ! grep -q "The server is fired up and ready to roll" sglang.log; do tail -n 1 sglang.log; sleep 5; done')
+if not torch.cuda.is_available():
+    raise RuntimeError(
+        "sglang needs an NVIDIA GPU, and this session has none. Switch the "
+        "runtime to one with an L4 or A100 attached."
+    )
+
+_capability = torch.cuda.get_device_capability()
+if _capability < (8, 0):
+    raise RuntimeError(
+        f"sglang cannot run on this GPU: {torch.cuda.get_device_name(0)} is "
+        f"compute capability {_capability[0]}.{_capability[1]}, and the "
+        "sglang-kernel wheels carry kernels for compute capability 8.0 and "
+        "newer only. Switch the runtime to an Ampere or newer GPU, such as "
+        "an L4 or an A100."
+    )
+
+# Load and run the model using sglang.
+#
+# Popen, not `!... &`: IPython's `system_piped`, which every kernel except
+# Colab's uses, raises OSError on a trailing `&`, so on Kaggle, plain Jupyter
+# or papermill this cell could never run.
+# Backend left to sglang: `fa3` is Hopper (sm90) only, so it fails on the
+# T4 / L4 / A100 a session actually hands out.
+import glob, os, subprocess, sys
+from sglang.utils import wait_for_server
+
+# sglang-kernel's common_ops library links libnvrtc.so.13 and carries no
+# RUNPATH, so it loads only if that exact file is already in the process or
+# on the loader path. torch preloads one libnvrtc by absolute path
+# (`_preload_cuda_deps` in torch/__init__.py) and looks in
+# `nvidia/cuda_nvrtc/lib` before `nvidia/cu13/lib`. A session that still
+# carries the CUDA 12 `nvidia-cuda-nvrtc-cu12` wheel beside the CUDA 13 one
+# -- which Colab does, because installing sglang replaces torch but leaves
+# the old torch's NVIDIA wheels installed -- therefore preloads
+# libnvrtc.so.12 and never .so.13, and the server exits inside
+# `import sgl_kernel` with "libnvrtc.so.13: cannot open shared object
+# file". Hand the child the directory holding the libnvrtc that matches
+# this torch.
+_site_packages = os.path.dirname(os.path.dirname(torch.__file__))
+_cuda_major = (torch.version.cuda or "").split(".")[0]
+_nvrtc_dirs = sorted({
+    os.path.dirname(_path)
+    for _path in glob.glob(os.path.join(
+        _site_packages, "nvidia", "*", "lib", f"libnvrtc.so.{_cuda_major}",
+    ))
+}) if _cuda_major else []
+
+_env = dict(os.environ)
+if _nvrtc_dirs:
+    _previous = _env.get("LD_LIBRARY_PATH", "")
+    _env["LD_LIBRARY_PATH"] = os.pathsep.join(
+        _nvrtc_dirs + ([_previous] if _previous else [])
+    )
+
+log = open("sglang.log", "w")
+server = subprocess.Popen(
+    [sys.executable, "-m", "sglang.launch_server",
+     "--model-path", "unsloth/gemma-3n-E2B-it",
+     "--port", "8000"],
+    stdout = log, stderr = subprocess.STDOUT, env = _env,
+)
+
+# Both arguments matter. `wait_for_server` defaults to timeout = None, which is
+# wait forever, so without one this is the same unbounded hang as the shell
+# `while ! grep -q` loop it replaces. `process` makes it poll the subprocess and
+# raise as soon as a failed launch exits, instead of waiting out the timeout.
+try:
+    wait_for_server("http://localhost:8000", timeout = 900, process = server)
+except Exception:
+    # On the timeout path the server is still alive, and the kernel outlives the
+    # cell, so re-raising alone would leave it holding the GPU and port 8000 and
+    # the retry would fail on address-in-use rather than on the real problem.
+    server.terminate()
+    try:
+        server.wait(timeout = 30)
+    except subprocess.TimeoutExpired:
+        server.kill()
+    log.close()
+    # The server's own log is the only thing that says why it did not start.
+    print(open("sglang.log").read()[-4000:])
+    raise
 
 
 # ### Image helper functions
@@ -65,7 +149,17 @@ import requests
 from io import BytesIO
 
 def load_image_from_url(url):
-    response = requests.get(url)
+    response = requests.get(url, timeout = 60)
+    # A moved or deleted file still answers, with a 404 whose body is text.
+    # `Image.open` on that reports "cannot identify image file <BytesIO ...>",
+    # which names neither the URL nor the status, so check the response.
+    response.raise_for_status()
+    content_type = response.headers.get("Content-Type", "")
+    if not content_type.startswith("image/"):
+        raise ValueError(
+            f"{url} answered with Content-Type {content_type!r}, not an "
+            f"image. The link has most likely moved or been deleted."
+        )
     img = Image.open(BytesIO(response.content))
     return img
 
@@ -97,7 +191,7 @@ def process_image(image: ImageFile) -> str:
 # ## Gemma3n Inference using sglang (source model: https://huggingface.co/unsloth/gemma-3n-E2B-it)
 
 # ## Inference 1
-# Image source file "https://raw.githubusercontent.com/sgl-project/sglang/refs/heads/main/test/lang/example_image.png"
+# Image source file "https://raw.githubusercontent.com/sgl-project/sglang/196b940aed024fd4a072dcae9f96d3ce153e57ed/examples/assets/example_image.png"
 
 # load image from url source
 
@@ -105,7 +199,7 @@ def process_image(image: ImageFile) -> str:
 
 
 from IPython.display import display
-image = load_image_from_url("https://raw.githubusercontent.com/sgl-project/sglang/refs/heads/main/test/lang/example_image.png")
+image = load_image_from_url("https://raw.githubusercontent.com/sgl-project/sglang/196b940aed024fd4a072dcae9f96d3ce153e57ed/examples/assets/example_image.png")
 display(image)
 
 

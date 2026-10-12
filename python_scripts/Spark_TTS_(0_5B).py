@@ -14,12 +14,11 @@
 
 # ### News
 
-# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 # 
-# <table><tr>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-# </tr></table>
+# <p>
+# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
+# </p>
 # 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
@@ -34,7 +33,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n!git clone https://github.com/SparkAudio/Spark-TTS\n!pip install omegaconf einx torchcodec "datasets>=3.4.1,<4.0.0"\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet 2f1ea9082400547242641f5271b6f941c9f439d1\n!pip install omegaconf einx torchcodec "datasets>=3.4.1,<4.0.0"\n')
 # 
 # 
 # # ### Unsloth
@@ -362,62 +361,97 @@ def generate_speech_from_text(
 
     model_inputs = tokenizer([prompt], return_tensors = "pt").to(device)
 
-    print("Generating token sequence...")
-    generated_ids = model.generate(
-        **model_inputs,
-        max_new_tokens = max_new_audio_tokens, # Limit generation length
-        do_sample = True,
-        temperature = temperature,
-        top_k = top_k,
-        top_p = top_p,
-        eos_token_id = tokenizer.eos_token_id, # Stop token
-        pad_token_id = tokenizer.pad_token_id # Use models pad token id
+    # The codec's speaker projection is a fixed-size nn.Linear. SpeakerEncoder
+    # .detokenize does `x = zq.reshape(zq.shape[0], -1); self.project(x)`, so
+    # it needs exactly as many global tokens as the codec was built for, and
+    # generation here is sampled, so the count is not fixed. Sweep runs of this
+    # notebook found 32 (which works) and 31 (which does not) on the same
+    # environment, and one token short reads as
+    #   RuntimeError: mat1 and mat2 shapes cannot be multiplied
+    #                 (1x3968 and 4096x1024)
+    # which says nothing at all about tokens. 31 x 128 = 3968 is the whole
+    # story. So sample again instead of dying, and if it still will not line
+    # up, say what was actually wrong.
+    max_generation_attempts = 5
+    last_global_count = None
+
+    for attempt in range(1, max_generation_attempts + 1):
+        print(f"Generating token sequence (attempt {attempt}/{max_generation_attempts})...")
+        generated_ids = model.generate(
+            **model_inputs,
+            max_new_tokens = max_new_audio_tokens, # Limit generation length
+            do_sample = True,
+            temperature = temperature,
+            top_k = top_k,
+            top_p = top_p,
+            eos_token_id = tokenizer.eos_token_id, # Stop token
+            pad_token_id = tokenizer.pad_token_id # Use models pad token id
+        )
+        print("Token sequence generated.")
+
+        generated_ids_trimmed = generated_ids[:, model_inputs.input_ids.shape[1]:]
+
+        predicts_text = tokenizer.batch_decode(generated_ids_trimmed, skip_special_tokens = False)[0]
+        # print(f"\nGenerated Text (for parsing):\n{predicts_text}\n") # Debugging
+
+        # Extract semantic token IDs using regex
+        semantic_matches = re.findall(r"<\|bicodec_semantic_(\d+)\|>", predicts_text)
+        if not semantic_matches:
+            print("Warning: No semantic tokens found in the generated output.")
+            # Handle appropriately - perhaps return silence or raise error
+            return np.array([], dtype = np.float32)
+
+        pred_semantic_ids = torch.tensor([int(token) for token in semantic_matches]).long().unsqueeze(0) # Add batch dim
+
+        # Extract global token IDs using regex (assuming controllable mode also generates these)
+        global_matches = re.findall(r"<\|bicodec_global_(\d+)\|>", predicts_text)
+        if not global_matches:
+             print("Warning: No global tokens found in the generated output (controllable mode). Might use defaults or fail.")
+             pred_global_ids = torch.zeros((1, 1), dtype = torch.long)
+        else:
+             pred_global_ids = torch.tensor([int(token) for token in global_matches]).long().unsqueeze(0) # Add batch dim
+
+        pred_global_ids = pred_global_ids.unsqueeze(0) # Shape becomes (1, 1, N_global)
+
+        print(f"Found {pred_semantic_ids.shape[1]} semantic tokens.")
+        print(f"Found {pred_global_ids.shape[2]} global tokens.")
+
+        # 5. Detokenize using BiCodecTokenizer
+        print("Detokenizing audio tokens...")
+        # Ensure audio_tokenizer and its internal model are on the correct device
+        audio_tokenizer.device = device
+        audio_tokenizer.model.to(device)
+        try:
+            # Squeeze the extra dimension from global tokens as seen in SparkTTS example
+            wav_np = audio_tokenizer.detokenize(
+                pred_global_ids.to(device).squeeze(0), # Shape (1, N_global)
+                pred_semantic_ids.to(device)           # Shape (1, N_semantic)
+            )
+        except RuntimeError as detokenize_error:
+            # Matched narrowly: any other RuntimeError from the codec is a real
+            # failure and resampling would only hide it behind five identical
+            # tracebacks.
+            if "mat1 and mat2 shapes cannot be multiplied" not in str(detokenize_error):
+                raise
+            last_global_count = pred_global_ids.shape[2]
+            print(
+                f"  {last_global_count} global tokens do not fit the codec's "
+                f"speaker projection; sampling again."
+            )
+            continue
+
+        print("Detokenization complete.")
+
+        return wav_np
+
+    raise RuntimeError(
+        f"The model did not produce a usable number of global tokens in "
+        f"{max_generation_attempts} attempts (last: {last_global_count}). "
+        f"Spark-TTS's speaker encoder flattens the global tokens into a "
+        f"fixed-size Linear, so the count has to match exactly. A model that "
+        f"has only been fine-tuned for a handful of steps often stops the "
+        f"global block early; training for longer is the fix."
     )
-    print("Token sequence generated.")
-
-
-    generated_ids_trimmed = generated_ids[:, model_inputs.input_ids.shape[1]:]
-
-
-    predicts_text = tokenizer.batch_decode(generated_ids_trimmed, skip_special_tokens = False)[0]
-    # print(f"\nGenerated Text (for parsing):\n{predicts_text}\n") # Debugging
-
-    # Extract semantic token IDs using regex
-    semantic_matches = re.findall(r"<\|bicodec_semantic_(\d+)\|>", predicts_text)
-    if not semantic_matches:
-        print("Warning: No semantic tokens found in the generated output.")
-        # Handle appropriately - perhaps return silence or raise error
-        return np.array([], dtype = np.float32)
-
-    pred_semantic_ids = torch.tensor([int(token) for token in semantic_matches]).long().unsqueeze(0) # Add batch dim
-
-    # Extract global token IDs using regex (assuming controllable mode also generates these)
-    global_matches = re.findall(r"<\|bicodec_global_(\d+)\|>", predicts_text)
-    if not global_matches:
-         print("Warning: No global tokens found in the generated output (controllable mode). Might use defaults or fail.")
-         pred_global_ids = torch.zeros((1, 1), dtype = torch.long)
-    else:
-         pred_global_ids = torch.tensor([int(token) for token in global_matches]).long().unsqueeze(0) # Add batch dim
-
-    pred_global_ids = pred_global_ids.unsqueeze(0) # Shape becomes (1, 1, N_global)
-
-    print(f"Found {pred_semantic_ids.shape[1]} semantic tokens.")
-    print(f"Found {pred_global_ids.shape[2]} global tokens.")
-
-
-    # 5. Detokenize using BiCodecTokenizer
-    print("Detokenizing audio tokens...")
-    # Ensure audio_tokenizer and its internal model are on the correct device
-    audio_tokenizer.device = device
-    audio_tokenizer.model.to(device)
-    # Squeeze the extra dimension from global tokens as seen in SparkTTS example
-    wav_np = audio_tokenizer.detokenize(
-        pred_global_ids.to(device).squeeze(0), # Shape (1, N_global)
-        pred_semantic_ids.to(device)           # Shape (1, N_semantic)
-    )
-    print("Detokenization complete.")
-
-    return wav_np
 
 if __name__ == "__main__":
     print(f"Generating speech for: '{input_text}'")

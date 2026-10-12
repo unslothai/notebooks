@@ -1,7 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/FunctionGemma_(270M)-LMStudio.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+# To run this, press "*Run*" and press "*Run All*" on **AMD Dev Cloud**!
+# <div class="align-center">
+# <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
+# <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
+# <a href="https://unsloth.ai/docs/"><img src="https://github.com/unslothai/unsloth/blob/main/images/documentation%20green%20button.png?raw=true" width="125"></a> Join Discord if you need help + ⭐ <i>Star us on <a href="https://github.com/unslothai/unsloth">Github</a> </i> ⭐
+# </div>
+# 
+# To install Unsloth on your local device, follow [our guide](https://unsloth.ai/docs/get-started/install). This notebook is licensed [LGPL-3.0](https://github.com/unslothai/notebooks?tab=LGPL-3.0-1-ov-file#readme).
+# 
+# You will learn how to do [data prep](#Data), how to [train](#Train), how to [run the model](#Inference), & how to save it
 
 # ## Unsloth + LM Studio
 # <img src="https://user-uploads.lmstudio.ai/umbrella-editor-assets/2025/12/22/5gwufx8h-image.png" width="400" />
@@ -25,7 +34,7 @@ get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-us
 # In[ ]:
 
 
-get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.3"')
+get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6"')
 get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 
 

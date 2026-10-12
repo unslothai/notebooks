@@ -14,12 +14,11 @@
 
 # ### News
 
-# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 # 
-# <table><tr>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-# </tr></table>
+# <p>
+# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
+# </p>
 # 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
@@ -34,13 +33,13 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    !pip install --no-deps bitsandbytes accelerate xformers==0.0.29.post3 peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    !pip install --no-deps bitsandbytes accelerate peft trl triton cut_cross_entropy unsloth_zoo\n    !pip install sentencepiece protobuf "datasets>=3.4.1,<4.0.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n')
 # 
 # 
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', '!pip install --no-deps git+https://github.com/huggingface/transformers.git # Need main branch for Liquid LFM2 models\n!pip install --no-deps causal-conv1d==1.5.0.post8 # Install Mamba kernels\n')
+# get_ipython().run_cell_magic('capture', '', '!pip install --no-deps transformers==5.15.0 # Liquid LFM2 needs 5.x; the release, not a moving main\n# --no-deps above is deliberate: without it pip re-resolves torch and replaces\n# the CUDA build the runtime already has. The cost is that pip enforces nothing\n# the pinned transformers declares. It only warns, and still exits 0, so\n# every requirement it lists is a delayed import error waiting to happen. The\n# rule, rather than adding one more floor each time one surfaces: take\n# install_requires from the pinned release and raise every entry the\n# base images fall short of. Measured on hardware, both images reach this cell\n# on huggingface_hub 0.36.2 and Kaggle ships safetensors 0.7.0, so those two\n# need raising; tokenizers 0.22.2 already sits inside its window and is pinned\n# only to hold it under the 0.23.0 cap that nothing else here enforces.\n# tests/test_transformers5_hub_floor.py holds the hub bound on this line.\n!pip install "huggingface_hub>=1.5.0,<2.0" "safetensors>=0.8.0" "tokenizers>=0.22.0,<=0.23.0"\n!unsloth install-kernels causal_conv1d # Install Mamba kernels\n')
 # 
 # 
 # # ### Unsloth

@@ -33,13 +33,7 @@
 # In[ ]:
 
 
-get_ipython().system('pip install unsloth unsloth_zoo omegaconf')
-
-# If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:
-# !source /home/ubuntu/.venv/bin/activate
-# !python -m ensurepip --upgrade
-# !python -m pip install -U pip
-# !python -m pip install -U unsloth
+get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth omegaconf  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer omegaconf\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n\n# If your jupyter kernel and pip python do not match, check where the jupyter kernel python is, and install there, for example:\n# !source /home/ubuntu/.venv/bin/activate\n# !python -m ensurepip --upgrade\n# !python -m pip install -U pip\n# !python -m pip install -U unsloth\n')
 
 
 # # Load the model
@@ -92,7 +86,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # If you are using Google Colab, add the flag `uv_pip_set_python=true` to `ng_run` command.
 # 
 # The cell below will automatically:
-# 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (requires Python 3.12+ and `uv` on the system)
+# 1. Clone [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) (needs `uv` on the system; `uv` provisions the exact Python that NeMo Gym pins in its `.python-version`)
 # 2. Set up the virtual environment and install dependencies
 # 3. Create the mini sudoku training dataset
 # 4. Start the resources server in the background
@@ -103,6 +97,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 
 
 import subprocess
+import sys
 import os
 import time
 import atexit
@@ -126,29 +121,97 @@ if not os.path.exists(GYM_DIR):
     )
 
 # Step 2: Create venv and install dependencies
-if not os.path.exists(os.path.join(GYM_DIR, ".venv", "bin", "python")):
-    print("Setting up NeMo Gym environment (this may take a few minutes)...")
-    subprocess.run(["uv", "venv", "--python", "3.12"], cwd = GYM_DIR, check = True)
-    subprocess.run(
-        ["bash", "-c", "source .venv/bin/activate && uv sync"],
-        cwd = GYM_DIR, check = True,
-    )
-    subprocess.run(
-        ["bash", "-c", "source .venv/bin/activate && uv pip install reasoning-gym"],
-        cwd = GYM_DIR, check = True,
-    )
-# Ensure matplotlib is installed (required by reasoning-gym via cellpylib)
+#
+# NeMo Gym pins its interpreter to one patch release. Gym/.python-version holds
+# 3.13.14 and `uv sync` honours that file, so no other interpreter is accepted;
+# `requires-python = ">=3.13.14"` in their pyproject.toml is only the floor.
+#
+# The uv preinstalled on Colab predates that release, so 3.13.14 is missing from
+# its embedded list of Python downloads and `uv sync` exits 2 with
+#   error: No interpreter found for Python 3.13.14 in managed installations or
+#   search path
+#   hint: uv embeds available Python downloads and may require an update to
+#   install new versions.
+# Upgrade uv first, then `uv python install` fetches exactly what the checkout
+# asks for. Call uv through the binary its wheel ships rather than the name
+# `uv`, because the copy already on PATH is the stale one being replaced.
+#
+# Asking for the floor instead is not a substitute: uv then picks the newest
+# release it knows of, which is a 3.14, and `uv sync` dies compiling yappi (a
+# NeMo Gym dependency with no cp314 wheel) from source.
+#
+# `uv sync` owns the venv too. It creates Gym/.venv when missing and rebuilds it
+# when the interpreter inside does not match the pin, which is what repairs the
+# 3.14 venv a failed earlier attempt leaves on disk. So there is no separate
+# `uv venv` call and no guard on .venv already existing -- that guard skipped
+# the repair for exactly the people who needed it.
+print("Setting up NeMo Gym environment (this may take a few minutes)...")
 subprocess.run(
-    ["bash", "-c", "source .venv/bin/activate && uv pip install matplotlib"],
-    cwd = GYM_DIR, check = True, stdout = subprocess.DEVNULL,
+    [sys.executable, "-m", "pip", "install", "--quiet", "--upgrade", "uv"],
+    check = True,
 )
+import uv as _uv_module
+_UV = _uv_module.find_uv_bin()
+subprocess.run([_UV, "python", "install"], cwd = GYM_DIR, check = True)
+subprocess.run([_UV, "sync"], cwd = GYM_DIR, check = True)
+# Everything below drives Gym/.venv by path, so fail here rather than several
+# subprocesses later if uv placed the environment somewhere this cell cannot
+# reach.
+_gym_venv_python = os.path.join(GYM_DIR, ".venv", "bin", "python")
+if not os.path.exists(_gym_venv_python):
+    raise RuntimeError(
+        f"uv sync finished but {_gym_venv_python} does not exist, so the NeMo "
+        "Gym environment is not where the rest of this cell looks for it."
+    )
+# reasoning-gym and matplotlib, installed unconditionally and aimed at the
+# venv's interpreter by path rather than by `source activate`.
+#
+# Inside the `.venv` existence guard this cell used to carry, `uv pip install
+# reasoning-gym` ran
+# and exited 0, and create_dataset.py then died on
+#   ModuleNotFoundError: No module named 'reasoning_gym'
+# so whatever `source activate` selected was not the environment the following
+# `python` resolves to. --python names it outright, and the import is checked
+# afterwards instead of assumed: a package manager reporting success is not
+# evidence the module is importable. matplotlib gets the same treatment since
+# reasoning-gym reaches it through cellpylib.
+# MPLBACKEND is inherited from the notebook kernel, and on Colab it is
+# `module://matplotlib_inline.backend_inline`. That backend lives in the
+# KERNEL's environment, not in this venv, so matplotlib raises
+#   ValueError: Key backend: 'module://matplotlib_inline.backend_inline' is
+#   not a valid value for backend
+# the moment anything here imports it -- and reasoning_gym does, through
+# game_of_life -> cellpylib -> matplotlib.pyplot. Every child below is
+# headless, so pin a backend that always exists rather than inheriting one
+# that only works inside the parent kernel.
+_gym_env = dict(os.environ, MPLBACKEND = "Agg")
+
+_rg_install = subprocess.run(
+    ["bash", "-c",
+     "uv pip install --python .venv/bin/python reasoning-gym matplotlib"],
+    cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
+)
+_rg_check = subprocess.run(
+    ["bash", "-c", ".venv/bin/python -c 'import reasoning_gym'"],
+    cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
+)
+if _rg_check.returncode != 0:
+    print(_rg_install.stdout[-3000:])
+    print(_rg_install.stderr[-3000:])
+    print(_rg_check.stdout[-2000:])
+    print(_rg_check.stderr[-2000:])
+    raise RuntimeError(
+        "reasoning-gym is not importable from the NeMo Gym venv even after "
+        "installing it, so create_dataset.py cannot run. Install and import "
+        "output above."
+    )
 # Step 3: Create dataset
 _sudoku_ds = os.path.join(
     GYM_DIR, "resources_servers/reasoning_gym/data/train_mini_sudoku.jsonl"
 )
 if not os.path.exists(_sudoku_ds):
     print("Creating mini_sudoku dataset (2000 examples)...")
-    subprocess.run(
+    _made = subprocess.run(
         [
             "bash", "-c",
             "source .venv/bin/activate && python "
@@ -156,14 +219,22 @@ if not os.path.exists(_sudoku_ds):
             "--task mini_sudoku --size 2000 --seed 42 "
             f"--output {_sudoku_ds}",
         ],
-        cwd = GYM_DIR, check = True,
+        cwd = GYM_DIR, capture_output = True, text = True, env = _gym_env,
     )
+    if _made.returncode != 0:
+        # The child writes to the kernel's real stderr, which the notebook
+        # capture layer does not record. A bare check = True therefore
+        # raises with the command line and nothing else, and the reason
+        # this failed is simply gone.
+        print(_made.stdout[-4000:])
+        print(_made.stderr[-4000:])
+        _made.check_returncode()
 # Start NeMo Gym server if not already running
 try:
     requests.get("http://127.0.0.1:11000/global_config_dict_yaml", timeout = 2)
     print("NeMo Gym server already running on port 11000.")
 except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-    _colab_flag = " +uv_pip_set_python=true"
+    _colab_flag = " +uv_pip_set_python=true" if _on_colab else ""
     print("Starting NeMo Gym server...")
     _ng_log = open(os.path.join(GYM_DIR, "ng_run.log"), "w")
     ng_process = subprocess.Popen(
@@ -176,6 +247,7 @@ except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         cwd = GYM_DIR,
         stdout = _ng_log,
         stderr = subprocess.STDOUT,
+        env = _gym_env,
     )
 
     def _cleanup_ng():
@@ -304,7 +376,13 @@ with open(dataset_path, "r") as f:
 
         prompt_length = len(
             tokenizer.apply_chat_template(
-                [{"role": "user", "content": task_prompt}], add_generation_prompt = True
+                [{"role": "user", "content": task_prompt}],
+                add_generation_prompt = True,
+                # transformers 5 flipped apply_chat_template's return_dict default from
+                # False to True. Without asking for the list explicitly, len() would count
+                # BatchEncoding keys (2) instead of tokens, and every prompt would be
+                # truncated to a few tokens.
+                return_dict = False,
             )
         )
         max_length_seen = max(max_length_seen, prompt_length)
