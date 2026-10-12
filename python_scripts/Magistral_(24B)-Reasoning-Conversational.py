@@ -65,7 +65,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     load_in_4bit = True,     # 4bit uses much less memory
     load_in_8bit = False,    # A bit more accurate, uses 2x memory
     full_finetuning = False, # We have full finetuning now!
-    device_map = "balanced", # Uses 2x Tesla T4s
+    device_map = "unsloth_balanced", # Uses 2x Tesla T4s
     # token = "YOUR_HF_TOKEN",      # HF Token for gated models
 )
 
