@@ -303,11 +303,12 @@ def update_or_append_pip_install(base_content, package_name, new_install_line):
 
 # torchcodec declares no torch requirement and each release before 0.12 loads against one torch
 # minor (0.12+ loads on any torch >= 2.11), so a bare `pip install torchcodec` beside an older torch
-# fails to import (#304). Pick the line matching the torch the cell left installed.
+# fails to import (#304). Pick the line matching the torch the cell left installed; a build that
+# already matches (Colab ships torchcodec 0.11.0+cu130 with torch 2.11.0+cu130) is kept.
 TORCHCODEC_FOR_TORCH = """import importlib.metadata as _md
 try: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])
 except Exception: _tv = (2, 11)
-_torchcodec = {(2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 11) else "torchcodec")"""
+_torchcodec = {(2, 11): "torchcodec>=0.11.0", (2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 12) else "torchcodec")"""
 _RE_BARE_TORCHCODEC = re.compile(r"(?<![\w\"'{./-])torchcodec(?![\w.=<>~!\[-])")
 
 
