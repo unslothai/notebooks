@@ -301,6 +301,28 @@ def update_or_append_pip_install(base_content, package_name, new_install_line):
         output = updated_content
     return output
 
+# torchcodec declares no torch requirement and each release before 0.12 loads against one torch
+# minor (0.12+ loads on any torch >= 2.11), so a bare `pip install torchcodec` beside an older torch
+# fails to import (#304). Pick the line matching the torch the cell left installed.
+TORCHCODEC_FOR_TORCH = """import importlib.metadata as _md
+try: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])
+except Exception: _tv = (2, 11)
+_torchcodec = {(2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 11) else "torchcodec")"""
+_RE_BARE_TORCHCODEC = re.compile(r"(?<![\w\"'{./-])torchcodec(?![\w.=<>~!\[-])")
+
+
+def pin_torchcodec_to_torch(install_text):
+    """Replace every bare `torchcodec` in a !pip install line with the build for the installed torch."""
+    out = []
+    for line in install_text.split("\n"):
+        body = line.lstrip()
+        if body.startswith("!") and "pip install" in body and _RE_BARE_TORCHCODEC.search(body):
+            indent = line[: len(line) - len(body)]
+            out += [indent + spec_line for spec_line in TORCHCODEC_FOR_TORCH.split("\n")]
+            line = indent + _RE_BARE_TORCHCODEC.sub('"{_torchcodec}"', body)
+        out.append(line)
+    return "\n".join(out)
+
 # Colab ships torchao 0.10.0 preinstalled; peft >= 0.19 raises ImportError
 # from is_torchao_available() unless torchao >= 0.16.0 is present, so any path
 # that calls get_peft_model fails. Bump torchao on Colab.
@@ -3107,6 +3129,8 @@ def _extract_pip_packages(install_text):
     packages = set()
     for m in _RE_PIP_INSTALL_LINE.finditer(install_text):
         for token in m.group(1).split():
+            if token.strip("\"'") == "{_torchcodec}":
+                token = "torchcodec"
             if any(token.startswith(p) for p in _INSTALL_FLAG_PREFIXES):
                 continue
             if "git+" in token or "://" in token:
@@ -5223,6 +5247,7 @@ def update_notebook_sections(
                         if not is_path_contains_any(notebook_path.lower(), ["qwen3_5"]):
                             new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
                         if not is_amd_notebook:
+                            new_install_text = pin_torchcodec_to_torch(new_install_text)
                             _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
 
                         # The extra install cell pins vLLM, which pins one exact
