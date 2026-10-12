@@ -1,6 +1,8 @@
 # Unsloth Notebooks - Notebooks for Unsloth
 # Copyright 2023-present Daniel Han-Chen, Michael Han-Chen & the Unsloth team. All rights reserved.
 #
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
