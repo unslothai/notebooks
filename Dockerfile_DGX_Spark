@@ -23,9 +23,7 @@ RUN git clone -b v0.0.33 --depth=1 https://github.com/facebookresearch/xformers 
     python setup.py install && \
     cd ..
 
-# Install unsloth and its dependencies (transformers, trl, bitsandbytes resolve
-# to unsloth's supported versions). NGC's torch and torchvision are pinned so pip
-# fails instead of swapping in PyPI builds that break the source builds above.
+# Pin NGC's torch/torchvision: pip must fail, not swap in PyPI builds that break the source builds above.
 RUN pip list --format=freeze | grep -iE '^(torch|torchvision)==' > /tmp/ngc_torch.txt && \
     pip install --no-cache-dir -c /tmp/ngc_torch.txt unsloth unsloth_zoo && \
     rm /tmp/ngc_torch.txt
