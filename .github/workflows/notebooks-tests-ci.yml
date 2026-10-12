@@ -278,6 +278,10 @@ jobs:
         run: |
           python -m pytest tests/test_install_kernels_line.py -q --tb=short
 
+      - name: tests/test_torchcodec_matches_torch.py
+        run: |
+          python -m pytest tests/test_torchcodec_matches_torch.py -q --tb=short
+
       - name: tests/test_amd_preserved_setup_lines.py
         # Only the fla cleanup line crosses into an AMD setup block, and it
         # carries --system exactly once.
