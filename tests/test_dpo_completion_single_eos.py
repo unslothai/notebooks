@@ -3,13 +3,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-"""DPO completions must not already end in EOS (unslothai/unsloth#3228).
-
-TRL's DPOTrainer appends EOS to string completions (unconditionally up to
-0.28; from 0.29 unless the text ends with it). Zephyr's chat template ends
-every turn with `</s>\\n`, so an unstripped completion trained on
-`</s> \\n</s>` with every TRL version.
-"""
+"""DPOTrainer appends EOS to string completions, so a DPO notebook's completions
+must not already end in one (unslothai/unsloth#3228: Zephyr trained on `</s> \\n</s>`)."""
 from __future__ import annotations
 
 import ast
