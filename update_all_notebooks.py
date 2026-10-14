@@ -1605,14 +1605,13 @@ DONT_UPDATE_EXCEPTIONS = [
 # builds of torch==2.11.0 and sglang-kernel==0.4.5, so the Colab line would
 # drop a CUDA torch on top of the ROCm one. The AMD path is a prebuilt
 # `lmsysorg/sglang:v0.5.16-rocm*` image or a `setup_rocm.py` compile, neither
-# of which fits in an install cell. `Unsloth_Studio` launches through Studio's
-# Colab-only helper (`/content` paths, `from colab import start`).
+# of which fits in an install cell. `Unsloth_Studio` uses Studio's Colab-only launcher.
 AMD_SKIP_NOTEBOOKS = [
     "Gemma3N_(2B)-Inference.ipynb",
     "Unsloth_Studio.ipynb",
 ]
 
-# Notebooks that get no Kaggle counterpart: same Colab-only Studio launcher.
+# No Kaggle counterpart: Studio's launcher is Colab-only.
 KAGGLE_SKIP_NOTEBOOKS = [
     "Unsloth_Studio.ipynb",
 ]

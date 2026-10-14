@@ -16,10 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Studio notebook = the live Colab launcher, with no Kaggle / AMD variant (unslothai/unsloth#4944).
-
-The old template cloned the deleted `unslothai/studio` repo; Kaggle and AMD lack the Colab helper.
-"""
+"""Studio notebook: the live Colab launcher, no Kaggle / AMD variant (unslothai/unsloth#4944)."""
 
 from __future__ import annotations
 
