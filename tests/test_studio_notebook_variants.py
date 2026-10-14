@@ -16,14 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""The Studio notebook is Colab-only and must stay the live launcher.
+"""Studio notebook = the live Colab launcher, with no Kaggle / AMD variant (unslothai/unsloth#4944).
 
-`original_template/Unsloth_Studio.ipynb` was the 2024 chat notebook that clones
-the deleted `unslothai/studio` repo, so every regeneration overwrote the
-hand-uploaded Colab notebook and minted Kaggle / AMD variants that hang on a
-hidden GitHub username prompt (unslothai/unsloth#4944). The current notebook
-launches through Studio's Colab helper (`/content`, `from colab import start`),
-which fails on Kaggle and AMD Dev Cloud, so neither gets a variant.
+The old template cloned the deleted `unslothai/studio` repo; Kaggle and AMD lack the Colab helper.
 """
 
 from __future__ import annotations
