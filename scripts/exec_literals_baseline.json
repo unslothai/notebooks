@@ -12,27 +12,6 @@
   ],
   "entries": [
     {
-      "file": "nb/AMD-Unsloth_Studio.ipynb",
-      "sink": "exec",
-      "digest": "3363559101310ae6",
-      "count": 1,
-      "reason": "Runs the chat module the notebook itself just downloaded from the Studio release."
-    },
-    {
-      "file": "nb/Kaggle-Unsloth_Studio.ipynb",
-      "sink": "exec",
-      "digest": "3363559101310ae6",
-      "count": 1,
-      "reason": "Runs the chat module the notebook itself just downloaded from the Studio release."
-    },
-    {
-      "file": "original_template/Unsloth_Studio.ipynb",
-      "sink": "exec",
-      "digest": "3363559101310ae6",
-      "count": 1,
-      "reason": "Runs the chat module the notebook itself just downloaded from the Studio release."
-    },
-    {
       "file": "original_template/gpt_oss_(20B)_GRPO_BF16.ipynb",
       "sink": "exec",
       "digest": "76276d8b8b63d99d",

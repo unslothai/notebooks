@@ -1605,9 +1605,15 @@ DONT_UPDATE_EXCEPTIONS = [
 # builds of torch==2.11.0 and sglang-kernel==0.4.5, so the Colab line would
 # drop a CUDA torch on top of the ROCm one. The AMD path is a prebuilt
 # `lmsysorg/sglang:v0.5.16-rocm*` image or a `setup_rocm.py` compile, neither
-# of which fits in an install cell.
+# of which fits in an install cell. `Unsloth_Studio` uses Studio's Colab-only launcher.
 AMD_SKIP_NOTEBOOKS = [
     "Gemma3N_(2B)-Inference.ipynb",
+    "Unsloth_Studio.ipynb",
+]
+
+# No Kaggle counterpart: Studio's launcher is Colab-only.
+KAGGLE_SKIP_NOTEBOOKS = [
+    "Unsloth_Studio.ipynb",
 ]
 
 # Notebooks that live ONLY under nb/ (not original_template/) but for which we
@@ -1721,9 +1727,7 @@ README_TYPE_OVERRIDES = {
 # Per-notebook (Model, Type) overrides that apply ONLY to the AMD Notebooks
 # section, keyed by the prefix-stripped basename. Colab/Kaggle keep the shared
 # overrides above and the filename-derived name/type.
-README_AMD_NAME_TYPE_OVERRIDES = {
-    "Unsloth_Studio.ipynb": ("Unsloth Studio", "Chat UI"),
-}
+README_AMD_NAME_TYPE_OVERRIDES = {}
 
 
 FIRST_MAPPING_NAME = {
@@ -5410,7 +5414,8 @@ def update_notebook_sections(
 
                 # Check if notebook has partial footer content but missing LGPL line
                 has_partial_footer = any(marker in existing_text for marker in footer_markers[:2])  # First two markers only
-                has_lgpl = lgpl_marker in existing_text
+                # Unsloth_Studio states its own AGPL-3.0 licence; an LGPL line under it contradicts it.
+                has_lgpl = lgpl_marker in existing_text or "This notebook is licensed" in existing_text
 
                 # Add content if:
                 # 1. No footer markers at all, OR
@@ -6557,6 +6562,17 @@ def copy_and_update_notebooks(
         _preserve_outputs(destination_notebook_path, template_notebook_path)
         print(f"Copied '{colab_notebook_name}' to '{destination_dir}'")
 
+        update_notebook_sections(
+            os.path.join(destination_dir, colab_notebook_name),
+            general_announcement,
+            installation,
+            installation_kaggle,
+            new_announcement,
+        )
+
+        if notebook_name in KAGGLE_SKIP_NOTEBOOKS:
+            continue
+
         kaggle_notebook_name = "Kaggle-" + notebook_name
         destination_notebook_path = os.path.join(destination_dir, kaggle_notebook_name)
 
@@ -6569,14 +6585,6 @@ def copy_and_update_notebooks(
             destination_notebook_path = os.path.join(destination_dir, hf_course_notebook_name)
             _preserve_outputs(destination_notebook_path, template_notebook_path)
             print(f"Copied f'{hf_course_name}-{notebook_name}' to '{destination_notebook_path}'")
-
-        update_notebook_sections(
-            os.path.join(destination_dir, colab_notebook_name),
-            general_announcement,
-            installation,
-            installation_kaggle,
-            new_announcement,
-        )
 
         update_notebook_sections(
             destination_notebook_path,

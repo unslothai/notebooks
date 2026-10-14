@@ -589,7 +589,6 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Muse Glimmer** **(30B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Muse_Glimmer_(30B)-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Muse Glimmer** **(30B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Muse_Glimmer_(30B)-Multimodal.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **CodeForces CoT Reasoning**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Unsloth**  | Studio | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Unsloth_Studio.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 </details>
 
@@ -598,7 +597,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 
 | Model | Type | Notebook |
 | --- | --- | --- |
-| **Unsloth Studio** | Chat UI | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Unsloth_Studio.ipynb) |
 | **Gemma4** **(E2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Vision.ipynb) |
 | **Qwen3 5** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision.ipynb) |
 | **Qwen3 5** **(2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(2B)_Vision.ipynb) |
