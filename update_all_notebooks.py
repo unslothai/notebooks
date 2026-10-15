@@ -1101,6 +1101,16 @@ installation_knowledge_distillation_kaggle_content = installation_qwen3_8_kaggle
     '!uv pip install -qqq --no-deps trl==0.25.1',
 )
 assert "trl==0.25.1" in installation_knowledge_distillation_kaggle_content
+# GKD needs 2026.10.5 or newer: older releases downcast GKDConfig to SFTConfig
+# (unslothai/unsloth#11440) and have no chunked JSD (unslothai/unsloth#12136).
+# The installs below say a bare `unsloth`, which pip treats as satisfied by ANY
+# installed version, so a runtime already holding an older one keeps it and
+# quietly runs plain SFT. Measured: with 2026.9.7 present, `pip install unsloth`
+# left 2026.9.7 in place. Kaggle images can carry unsloth too.
+installation_knowledge_distillation_kaggle_content += (
+    '\n!uv pip install -qqq --no-deps --upgrade "unsloth>=2026.10.5" "unsloth_zoo>=2026.10.5"'
+)
+assert "unsloth>=2026.10.5" in installation_knowledge_distillation_kaggle_content
 installation_knowledge_distillation_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -1115,6 +1125,10 @@ installation_knowledge_distillation_content = installation_knowledge_distillatio
 )
 assert "trl==0.25.1" in installation_knowledge_distillation_content
 assert "trl==0.22.2" not in installation_knowledge_distillation_content
+installation_knowledge_distillation_content += (
+    '\n!pip install --no-deps --upgrade "unsloth>=2026.10.5" "unsloth_zoo>=2026.10.5"'
+)
+assert "unsloth>=2026.10.5" in installation_knowledge_distillation_content
 
 # A wheel, not a source build of `main`: every sglang release pins ONE exact
 # transformers, so cloning main and then forcing transformers==4.53.0 left the
