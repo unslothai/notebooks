@@ -33,17 +33,7 @@
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\n# Pin Kaggle\'s torch and torchvision: upgrading them pulls a CUDA 13.0 torch onto\n# Kaggle\'s CUDA 12.8 torchaudio, which then refuses to import. Pin the base version,\n# since the local +cu128 label does not exist on the index.\ntry:\n    import torch, torchvision\n    _torch = f\'torch=={torch.__version__.split("+")[0]}\'\n    _tv = f\'torchvision=={torchvision.__version__.split("+")[0]}\'\nexcept Exception:\n    _torch, _tv = "torch", "torchvision"\n!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth\n!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"\n!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install -qqq transformers==5.15.1\n!uv pip install -qqq --no-deps trl==0.25.1\n')
-
-
-# GKD needs unslothai/unsloth#11440 and unslothai/unsloth-zoo#1310, on main but
-# not yet released. Without them `GKDConfig` is downcast to `SFTConfig` and
-# distillation silently becomes plain SFT. Delete the next cell once released.
-
-# In[ ]:
-
-
-get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
+get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\n# Pin Kaggle\'s torch and torchvision: upgrading them pulls a CUDA 13.0 torch onto\n# Kaggle\'s CUDA 12.8 torchaudio, which then refuses to import. Pin the base version,\n# since the local +cu128 label does not exist on the index.\ntry:\n    import torch, torchvision\n    _torch = f\'torch=={torch.__version__.split("+")[0]}\'\n    _tv = f\'torchvision=={torchvision.__version__.split("+")[0]}\'\nexcept Exception:\n    _torch, _tv = "torch", "torchvision"\n!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth\n!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"\n!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"\n!uv pip install -qqq transformers==5.15.1\n!uv pip install -qqq --no-deps trl==0.25.1\n!uv pip install -qqq --no-deps --upgrade "unsloth>=2026.10.5" "unsloth_zoo>=2026.10.5"\n')
 
 
 # ### Knowledge distillation with Unsloth
@@ -58,15 +48,20 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 
 # ### Pick a configuration
 # 
-# GKD holds full `(batch, seq, vocab)` logits for **both** models, so peak memory
-# follows the vocabulary, not the weights.
+# Unsloth projects hidden states through each `lm_head` in chunks, so the full
+# `(batch, seq, vocab)` logits never exist for either model: 3.0 GB peak below
+# against 9.9 GB for TRL's dense loss (`UNSLOTH_GKD_CHUNKED=0`), same loss to 2e-5,
+# about 30% slower at batch 1 and not at larger batches.
 # 
-# | config | weights | measured on a Kaggle 2x T4 |
+# | config | weights | measured |
 # | --- | --- | --- |
-# | `qwen3` | 1.2 + 3.4 GB | PASS, loss 0.413, 392/392 adapters, 10.9 GB |
-# | `gemma-4` | 8.1 + 10.9 GB | PASS, loss 0.079, 410/410 adapters, 14.3 GB |
+# | `qwen3` | 1.2 + 3.4 GB | PASS on one free T4: loss 0.367, 392/392 adapters, 3.36 GB |
+# | `gemma-4` | 8.1 + 10.9 GB | PASS on a Kaggle 2x T4: loss 0.079, 410/410 adapters, 14.3 GB |
 # | `muse-glimmer` | 22.2 GB | self-distillation, OOM by 208 MiB at seq 384 |
 # | `qwen3.8` | 22.3 GB | self-distillation, blocked on a dtype mismatch |
+# 
+# Only `qwen3` has been re-measured since the chunked loss landed, which is why it
+# now fits one card. The others predate it and are pessimistic.
 # 
 # `unsloth/gemma-4-26B-A4B-it` needs an A100 or better, so add it yourself.
 
@@ -122,6 +117,29 @@ print(f"student: {student_name}")
 # backslash before Python 3.12, and the apostrophe needs one.
 teacher_label = teacher_name or "(self-distillation: the student's own frozen base)"
 print(f"teacher: {teacher_label}")
+
+
+# Older releases downcast `GKDConfig` to `SFTConfig` and have no chunked loss, so
+# distillation would quietly run as plain SFT. A runtime that already had unsloth
+# keeps its own copy, so check the capability is really there. Restart the runtime
+# if this fails.
+
+# In[ ]:
+
+
+# Probing the capability, not a version string: the notebook generator
+# rewrites every version literal in a cell, which silently defangs a pin.
+# unsloth first: unsloth_zoo refuses to import until it sets UNSLOTH_IS_PRESENT.
+import unsloth
+from unsloth.models.rl_replacements import RL_FUNCTIONS
+from unsloth_zoo.rl_replacements import distillation_chunked_jsd
+
+_patches = [getattr(f, "__name__", "") for f in RL_FUNCTIONS.get("gkd_trainer", [])]
+assert any("compute_loss" in n for n in _patches), (
+    "this unsloth does not route GKD through the chunked loss; restart the "
+    f"runtime so the install upgrade applies (gkd patches: {_patches})"
+)
+print(f"GKD chunked loss wired: {_patches}")
 
 
 # ### Load the student
