@@ -33,32 +33,14 @@
 # # In[ ]:
 # 
 # 
-# %%bash
-# python -m pip install -qU uv --root-user-action=ignore
-# 
-# ROCM_TAG="$({ command -v amd-smi >/dev/null 2>&1 && amd-smi version 2>/dev/null | awk -F'ROCm version: ' 'NF>1{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}'; } || { [ -r /opt/rocm/.info/version ] && awk -F. '{print "rocm"$1"."$2; exit}' /opt/rocm/.info/version; } || { command -v hipconfig >/dev/null 2>&1 && hipconfig --version 2>/dev/null | awk -F': *' '/HIP version/{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}'; } || { command -v dpkg-query >/dev/null 2>&1 && ver="$(dpkg-query -W -f='${Version}\n' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F'[.-]' '{print "rocm"$1"."$2; exit}' <<<"$ver"; } || { command -v rpm >/dev/null 2>&1 && ver="$(rpm -q --qf '%{VERSION}\n' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F'[.-]' '{print "rocm"$1"."$2; exit}' <<<"$ver"; })"
-# [ -n "$ROCM_TAG" ] || { echo "Could not detect ROCm. Install ROCm first or set ROCM_TAG manually."; exit 1; }
-# case "$ROCM_TAG" in
-#   rocm6.[0-4]|rocm7.[02]) T="$ROCM_TAG" ;;
-#   rocm6.*) T="rocm6.4" ;;
-#   *) T="rocm7.1" ;;
-# esac
-# pip install bitsandbytes
-# PYTORCH_INDEX_URL="https://download.pytorch.org/whl/${T}"
-# uv pip install --system -U --force-reinstall \
-#     torch torchvision torchaudio triton-rocm \
-#     --index-url "$PYTORCH_INDEX_URL"
-# uv pip install --system cut-cross-entropy torchao --no-deps
-# uv pip install --system -U --no-deps "unsloth[amd]" "unsloth_zoo[amd]"
-# uv pip install --system --no-deps -r "$(python -c 'import pathlib,site;print(next(p for r in [*site.getsitepackages(),site.getusersitepackages()] if (p:=pathlib.Path(r,"studio/backend/requirements/no-torch-runtime.txt")).exists()))')" torchao
-# uv pip install --system --no-deps -U "tokenizers>=0.22.0,<=0.23.0"
+# get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-user-action=ignore\n\nROCM_TAG="$({ command -v amd-smi >/dev/null 2>&1 && amd-smi version 2>/dev/null | awk -F\'ROCm version: \' \'NF>1{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { [ -r /opt/rocm/.info/version ] && awk -F. \'{print "rocm"$1"."$2; exit}\' /opt/rocm/.info/version; } || { command -v hipconfig >/dev/null 2>&1 && hipconfig --version 2>/dev/null | awk -F\': *\' \'/HIP version/{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { command -v dpkg-query >/dev/null 2>&1 && ver="$(dpkg-query -W -f=\'${Version}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; } || { command -v rpm >/dev/null 2>&1 && ver="$(rpm -q --qf \'%{VERSION}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; })"\n[ -n "$ROCM_TAG" ] || { echo "Could not detect ROCm. Install ROCm first or set ROCM_TAG manually."; exit 1; }\ncase "$ROCM_TAG" in\n  rocm6.[0-4]|rocm7.[02]) T="$ROCM_TAG" ;;\n  rocm6.*) T="rocm6.4" ;;\n  *) T="rocm7.1" ;;\nesac\npip install bitsandbytes\nPYTORCH_INDEX_URL="https://download.pytorch.org/whl/${T}"\nuv pip install --system -U --force-reinstall \\\n    torch torchvision torchaudio triton-rocm \\\n    --index-url "$PYTORCH_INDEX_URL"\nuv pip install --system cut-cross-entropy torchao --no-deps\nuv pip install --system -U --no-deps "unsloth[amd]" "unsloth_zoo[amd]"\nuv pip install --system --no-deps -r "$(python -c \'import pathlib,site;print(next(p for r in [*site.getsitepackages(),site.getusersitepackages()] if (p:=pathlib.Path(r,"studio/backend/requirements/no-torch-runtime.txt")).exists()))\')" torchao\nuv pip install --system --no-deps -U "tokenizers>=0.22.0,<=0.23.0"\n')
 # 
 # 
 # # In[ ]:
 # 
 # 
-# !uv pip install --system -qqq sentencepiece "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" "protobuf==3.20.3"
-# !uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2" transformers-cfg
+# get_ipython().system('uv pip install --system -qqq sentencepiece "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" "protobuf==3.20.3"')
+# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2" transformers-cfg')
 # 
 # 
 # # ### Unsloth
@@ -82,6 +64,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     # token = "YOUR_HF_TOKEN", # HF Token for gated models
 )
 
+
 # We now add LoRA adapters so we only need to update a small amount of parameters!
 
 # In[ ]:
@@ -102,6 +85,7 @@ model = FastLanguageModel.get_peft_model(
     loftq_config = None, # And LoftQ
 )
 
+
 # <a name="Data"></a>
 # ### Data Prep
 # We use NousResearch's [Hermes Function Calling dataset](https://huggingface.co/datasets/NousResearch/hermes-function-calling-v1) (Apache 2.0). Each row has a list of tools and a conversation where the assistant calls tools and then answers with their results.
@@ -119,12 +103,14 @@ tokenizer = get_chat_template(
     chat_template = "qwen3-instruct",
 )
 
+
 # In[ ]:
 
 
 from datasets import load_dataset
 dataset = load_dataset("NousResearch/hermes-function-calling-v1", "func_calling", split = "train")
 dataset
+
 
 # In[ ]:
 
@@ -171,12 +157,14 @@ dataset = dataset.map(formatting_prompts_func, batched = True)
 dataset = dataset.filter(lambda x: len(x["text"]) != 0)
 dataset
 
+
 # Let's see how the chat template renders a conversation with tool calls:
 
 # In[ ]:
 
 
 print(dataset[0]["text"])
+
 
 # <a name="Train"></a>
 # ### Train the model
@@ -208,6 +196,7 @@ trainer = SFTTrainer(
     ),
 )
 
+
 # We only train on what the **assistant** writes: its tool calls and its replies. The user turns and the tool results are masked out of the loss, since the model should learn to call tools and use their answers, not to predict what the tools return.
 # 
 # Qwen3 sends tool results back inside a user turn, so Unsloth's `train_on_responses_only` masks them together with the user's messages.
@@ -222,12 +211,14 @@ trainer = train_on_responses_only(
     response_part = "<|im_start|>assistant\n",
 )
 
+
 # Let's verify the masking. Only the assistant's tool calls and replies should be left:
 
 # In[ ]:
 
 
 tokenizer.decode([tokenizer.pad_token_id if x == -100 else x for x in trainer.train_dataset[0]["labels"]]).replace(tokenizer.pad_token, " ")
+
 
 # In[ ]:
 
@@ -239,12 +230,14 @@ max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
 print(f"GPU = {gpu_stats.name}. Max memory = {max_memory} GB.")
 print(f"{start_gpu_memory} GB of memory reserved.")
 
+
 # Let's train the model! To resume a training run, set `trainer.train(resume_from_checkpoint = True)`
 
 # In[ ]:
 
 
 trainer_stats = trainer.train()
+
 
 # In[ ]:
 
@@ -262,6 +255,7 @@ print(f"Peak reserved memory = {used_memory} GB.")
 print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
 print(f"Peak reserved memory % of max memory = {used_percentage} %.")
 print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
+
 
 # <a name="Inference"></a>
 # ### Inference
@@ -303,6 +297,7 @@ def run_tools(messages, tools, generate, max_rounds = 5):
             messages.append({"role" : "tool", "name" : call.get("name"), "content" : json.dumps(result)})
     return messages
 
+
 # In[ ]:
 
 
@@ -335,6 +330,7 @@ messages = run_tools(
 )
 print(messages[-1]["content"])
 
+
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
 # To save the final model as LoRA adapters, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save.
@@ -348,6 +344,7 @@ model.save_pretrained("qwen_lora")  # Local saving
 tokenizer.save_pretrained("qwen_lora")
 # model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 # tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+
 
 # <a name="Save"></a>
 # ### Saving to float16 for VLLM
@@ -372,6 +369,7 @@ if False:
 if False:
     model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
     tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
@@ -399,6 +397,7 @@ if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantiz
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
 if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
+
 
 # Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
 # 

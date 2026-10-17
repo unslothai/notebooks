@@ -33,36 +33,7 @@
 # # In[ ]:
 # 
 # 
-# %%capture
-# import os
-# os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
-# !pip install --upgrade -qqq uv
-# try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
-# except: _numpy = "numpy"; _pil = "pillow"
-# try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
-# except: is_t4 = False
-# _triton = 'triton'
-# if is_t4:
-#     # Keep the machine's torch: upgrading it can pull a CUDA build the driver cannot load
-#     try:
-#         import importlib.metadata as _md
-#         _torch, _tv = (f'{_p}=={_md.version(_p).split("+")[0]}' for _p in ('torch', 'torchvision'))
-#     except Exception:
-#         _torch, _tv = 'torch', 'torchvision'
-#     !uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth
-# else:
-#     !uv pip install -qqq --upgrade vllm==0.19.1 {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
-# !uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"
-# try:
-#     import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])
-# except Exception:
-#     _torch_v = ()
-# # torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.
-# _torchao = "torchao>=0.16.0" if _torch_v >= (2, 10) else "torchao>=0.16.0,<0.18.0"
-# !uv pip install -qqq --no-deps --upgrade "{_torchao}"
-# !uv pip install transformers==5.15.1 "datasets>=4.7.0,<5.0.0"
-# !uv pip install --no-deps trl==1.13.0
-# !uv pip install -qqq --no-deps --force-reinstall "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo" "unsloth @ git+https://github.com/unslothai/unsloth"
+# get_ipython().run_cell_magic('capture', '', 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!\n!pip install --upgrade -qqq uv\ntry: import numpy, PIL; _numpy = f\'numpy=={numpy.__version__}\'; _pil = f\'pillow=={PIL.__version__}\'\nexcept: _numpy = "numpy"; _pil = "pillow"\ntry: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))\nexcept: is_t4 = False\n_triton = \'triton\'\nif is_t4:\n    # Keep the machine\'s torch: upgrading it can pull a CUDA build the driver cannot load\n    try:\n        import importlib.metadata as _md\n        _torch, _tv = (f\'{_p}=={_md.version(_p).split("+")[0]}\' for _p in (\'torch\', \'torchvision\'))\n    except Exception:\n        _torch, _tv = \'torch\', \'torchvision\'\n    !uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth\nelse:\n    !uv pip install -qqq --upgrade vllm==0.19.1 {_numpy} {_pil} torchvision bitsandbytes xformers unsloth\n!uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"\ntry:\n    import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])\nexcept Exception:\n    _torch_v = ()\n# torchao 0.18.0 imports torch.nn.functional.ScalingType, added in torch 2.10; peft >= 0.19 needs the 0.16.0 floor.\n_torchao = "torchao>=0.16.0" if _torch_v >= (2, 10) else "torchao>=0.16.0,<0.18.0"\n!uv pip install -qqq --no-deps --upgrade "{_torchao}"\n!uv pip install transformers==5.15.1 "datasets>=4.7.0,<5.0.0"\n!uv pip install --no-deps trl==1.13.0\n!uv pip install -qqq --no-deps --force-reinstall "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo" "unsloth @ git+https://github.com/unslothai/unsloth"\n')
 # 
 # 
 # # ### Unsloth
@@ -107,6 +78,7 @@ model = FastLanguageModel.get_peft_model(
     random_state = 3407,
 )
 
+
 # We use the `qwen3-instruct` chat template, which formats tools and tool calls the same way as the official Qwen3-Instruct-2507 template, so TRL can parse the model's tool calls.
 
 # In[ ]:
@@ -114,6 +86,7 @@ model = FastLanguageModel.get_peft_model(
 
 from unsloth.chat_templates import get_chat_template
 tokenizer = get_chat_template(tokenizer, chat_template = "qwen3-instruct")
+
 
 # ### Tools
 # A tool is a plain Python function with **type hints** and a **Google style docstring**. TRL converts each one into a JSON schema that the chat template shows to the model, so the docstring is what the model reads to decide which tool to call.
@@ -164,6 +137,7 @@ def multiply(a: int, b: int) -> int:
 
 tools = [add, subtract, multiply]
 
+
 # Let's see how the chat template shows the tools to the model:
 
 # In[ ]:
@@ -175,6 +149,7 @@ print(tokenizer.apply_chat_template(
     add_generation_prompt = True,
     tokenize = False,
 ))
+
 
 # <a name="Data"></a>
 # ### Data Prep
@@ -214,6 +189,7 @@ def make_problem(rng):
 rng = random.Random(3407)
 dataset = Dataset.from_list([make_problem(rng) for _ in range(2000)])
 dataset[0]
+
 
 # ### Reward functions
 # With tools, each completion is a **list of messages**: the assistant's tool calls, the `tool` results, and the final assistant reply. So reward functions can check both the final answer and how the tools were used.
@@ -265,6 +241,7 @@ def tool_use(completions, **kwargs):
         scores.append(score)
     return scores
 
+
 # <a name="Train"></a>
 # ### Train the model
 # 
@@ -297,6 +274,7 @@ training_args = GRPOConfig(
     output_dir = "outputs",
 )
 
+
 # And let's run the trainer! The goal is to see the `reward` column increase. The `tools/call_frequency` and `tools/failure_frequency` columns show how often the model calls tools and how often those calls fail.
 
 # In[ ]:
@@ -314,6 +292,7 @@ trainer = GRPOTrainer(
     train_dataset = dataset,
 )
 trainer.train()
+
 
 # <a name="Inference"></a>
 # ### Inference
@@ -355,6 +334,7 @@ def run_tools(messages, tools, generate, max_rounds = 5):
             messages.append({"role" : "tool", "name" : call.get("name"), "content" : json.dumps(result)})
     return messages
 
+
 # We first save the LoRA, and check it is actually trained:
 
 # In[ ]:
@@ -369,6 +349,7 @@ with safe_open("grpo_saved_lora/adapter_model.safetensors", framework = "pt") as
         tensor = f.get_tensor(key)
         n_zeros = (tensor == 0).sum() / tensor.numel()
         assert(n_zeros.item() != tensor.numel())
+
 
 # Now we load the LoRA into vLLM and run the agent loop on a new problem:
 
@@ -404,6 +385,7 @@ messages = run_tools(list(problem["prompt"]), tools, generate)
 print(messages[-1]["content"])
 print("True answer:", problem["answer"])
 
+
 # <a name="Save"></a>
 # ### Saving to float16 for VLLM
 # 
@@ -427,6 +409,7 @@ if False:
 if False:
     model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
     tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
@@ -454,6 +437,7 @@ if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantiz
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
 if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
+
 
 # Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
 # 
