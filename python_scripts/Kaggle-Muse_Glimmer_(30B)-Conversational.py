@@ -369,6 +369,12 @@ class KeepEmbeddingOffloaded(TrainerCallback):
         hook = getattr(embed_tokens, "_hf_hook", None)
         if getattr(hook, "execution_device", None) is not None:
             return control
+        # Only when Unsloth offloaded it: the loader keeps the embedding on the GPU when memory
+        # allows, and then installs no hooks, so moving it would split the forward across devices.
+        model = kwargs["model"]
+        base = model.get_base_model() if hasattr(model, "get_base_model") else model
+        if not getattr(base, "_unsloth_embedding_offloaded", False):
+            return control
         if embed_tokens.weight.device.type != "cpu":
             embed_tokens.to("cpu")
             torch.cuda.empty_cache()
