@@ -33,25 +33,7 @@
 # # In[ ]:
 # 
 # 
-# %%bash
-# python -m pip install -qU uv --root-user-action=ignore
-# 
-# ROCM_TAG="$({ command -v amd-smi >/dev/null 2>&1 && amd-smi version 2>/dev/null | awk -F'ROCm version: ' 'NF>1{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}'; } || { [ -r /opt/rocm/.info/version ] && awk -F. '{print "rocm"$1"."$2; exit}' /opt/rocm/.info/version; } || { command -v hipconfig >/dev/null 2>&1 && hipconfig --version 2>/dev/null | awk -F': *' '/HIP version/{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}'; } || { command -v dpkg-query >/dev/null 2>&1 && ver="$(dpkg-query -W -f='${Version}\n' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F'[.-]' '{print "rocm"$1"."$2; exit}' <<<"$ver"; } || { command -v rpm >/dev/null 2>&1 && ver="$(rpm -q --qf '%{VERSION}\n' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F'[.-]' '{print "rocm"$1"."$2; exit}' <<<"$ver"; })"
-# [ -n "$ROCM_TAG" ] || { echo "Could not detect ROCm. Install ROCm first or set ROCM_TAG manually."; exit 1; }
-# case "$ROCM_TAG" in
-#   rocm6.[0-4]|rocm7.[02]) T="$ROCM_TAG" ;;
-#   rocm6.*) T="rocm6.4" ;;
-#   *) T="rocm7.1" ;;
-# esac
-# pip install bitsandbytes
-# PYTORCH_INDEX_URL="https://download.pytorch.org/whl/${T}"
-# uv pip install --system -U --force-reinstall \
-#     torch torchvision torchaudio triton-rocm \
-#     --index-url "$PYTORCH_INDEX_URL"
-# uv pip install --system cut-cross-entropy torchao --no-deps
-# uv pip install --system -U --no-deps "unsloth[amd]" "unsloth_zoo[amd]"
-# uv pip install --system --no-deps -r "$(python -c 'import pathlib,site;print(next(p for r in [*site.getsitepackages(),site.getusersitepackages()] if (p:=pathlib.Path(r,"studio/backend/requirements/no-torch-runtime.txt")).exists()))')" torchao
-# uv pip install --system --no-deps -U "tokenizers>=0.22.0,<=0.23.0"
+# get_ipython().run_cell_magic('bash', '', 'python -m pip install -qU uv --root-user-action=ignore\n\nROCM_TAG="$({ command -v amd-smi >/dev/null 2>&1 && amd-smi version 2>/dev/null | awk -F\'ROCm version: \' \'NF>1{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { [ -r /opt/rocm/.info/version ] && awk -F. \'{print "rocm"$1"."$2; exit}\' /opt/rocm/.info/version; } || { command -v hipconfig >/dev/null 2>&1 && hipconfig --version 2>/dev/null | awk -F\': *\' \'/HIP version/{split($2,a,"."); print "rocm"a[1]"."a[2]; ok=1; exit} END{exit !ok}\'; } || { command -v dpkg-query >/dev/null 2>&1 && ver="$(dpkg-query -W -f=\'${Version}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; } || { command -v rpm >/dev/null 2>&1 && ver="$(rpm -q --qf \'%{VERSION}\\n\' rocm-core 2>/dev/null)" && [ -n "$ver" ] && awk -F\'[.-]\' \'{print "rocm"$1"."$2; exit}\' <<<"$ver"; })"\n[ -n "$ROCM_TAG" ] || { echo "Could not detect ROCm. Install ROCm first or set ROCM_TAG manually."; exit 1; }\ncase "$ROCM_TAG" in\n  rocm6.[0-4]|rocm7.[02]) T="$ROCM_TAG" ;;\n  rocm6.*) T="rocm6.4" ;;\n  *) T="rocm7.1" ;;\nesac\npip install bitsandbytes\nPYTORCH_INDEX_URL="https://download.pytorch.org/whl/${T}"\nuv pip install --system -U --force-reinstall \\\n    torch torchvision torchaudio triton-rocm \\\n    --index-url "$PYTORCH_INDEX_URL"\nuv pip install --system cut-cross-entropy torchao --no-deps\nuv pip install --system -U --no-deps "unsloth[amd]" "unsloth_zoo[amd]"\nuv pip install --system --no-deps -r "$(python -c \'import pathlib,site;print(next(p for r in [*site.getsitepackages(),site.getusersitepackages()] if (p:=pathlib.Path(r,"studio/backend/requirements/no-torch-runtime.txt")).exists()))\')" torchao\nuv pip install --system --no-deps -U "tokenizers>=0.22.0,<=0.23.0"\n')
 # 
 # 
 # # In[ ]:
@@ -59,14 +41,16 @@
 # 
 # import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 # 
-# !uv pip install --system -qqq vllm "transformers==5.15.1" "datasets>=4.7.0,<5.0.0"
-# !uv pip install --system -qqq --no-deps "trl==1.13.0"
+# get_ipython().system('uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
+# get_ipython().system('uv pip install --system -qqq vllm "transformers==5.15.1" "datasets>=4.7.0,<5.0.0"')
+# get_ipython().system('uv pip install --system -qqq --no-deps "trl==1.13.0"')
 # 
 # 
 # # In[ ]:
 # 
 # 
 # # Placeholder
+# 
 # 
 # # ### Unsloth
 
@@ -110,6 +94,7 @@ model = FastLanguageModel.get_peft_model(
     random_state = 3407,
 )
 
+
 # We use the `qwen3-instruct` chat template, which formats tools and tool calls the same way as the official Qwen3-Instruct-2507 template, so TRL can parse the model's tool calls.
 
 # In[ ]:
@@ -117,6 +102,7 @@ model = FastLanguageModel.get_peft_model(
 
 from unsloth.chat_templates import get_chat_template
 tokenizer = get_chat_template(tokenizer, chat_template = "qwen3-instruct")
+
 
 # ### Tools
 # A tool is a plain Python function with **type hints** and a **Google style docstring**. TRL converts each one into a JSON schema that the chat template shows to the model, so the docstring is what the model reads to decide which tool to call.
@@ -167,6 +153,7 @@ def multiply(a: int, b: int) -> int:
 
 tools = [add, subtract, multiply]
 
+
 # Let's see how the chat template shows the tools to the model:
 
 # In[ ]:
@@ -178,6 +165,7 @@ print(tokenizer.apply_chat_template(
     add_generation_prompt = True,
     tokenize = False,
 ))
+
 
 # <a name="Data"></a>
 # ### Data Prep
@@ -217,6 +205,7 @@ def make_problem(rng):
 rng = random.Random(3407)
 dataset = Dataset.from_list([make_problem(rng) for _ in range(2000)])
 dataset[0]
+
 
 # ### Reward functions
 # With tools, each completion is a **list of messages**: the assistant's tool calls, the `tool` results, and the final assistant reply. So reward functions can check both the final answer and how the tools were used.
@@ -268,6 +257,7 @@ def tool_use(completions, **kwargs):
         scores.append(score)
     return scores
 
+
 # <a name="Train"></a>
 # ### Train the model
 # 
@@ -300,6 +290,7 @@ training_args = GRPOConfig(
     output_dir = "outputs",
 )
 
+
 # And let's run the trainer! The goal is to see the `reward` column increase. The `tools/call_frequency` and `tools/failure_frequency` columns show how often the model calls tools and how often those calls fail.
 
 # In[ ]:
@@ -317,6 +308,7 @@ trainer = GRPOTrainer(
     train_dataset = dataset,
 )
 trainer.train()
+
 
 # <a name="Inference"></a>
 # ### Inference
@@ -358,6 +350,7 @@ def run_tools(messages, tools, generate, max_rounds = 5):
             messages.append({"role" : "tool", "name" : call.get("name"), "content" : json.dumps(result)})
     return messages
 
+
 # We first save the LoRA, and check it is actually trained:
 
 # In[ ]:
@@ -372,6 +365,7 @@ with safe_open("grpo_saved_lora/adapter_model.safetensors", framework = "pt") as
         tensor = f.get_tensor(key)
         n_zeros = (tensor == 0).sum() / tensor.numel()
         assert(n_zeros.item() != tensor.numel())
+
 
 # Now we load the LoRA into vLLM and run the agent loop on a new problem:
 
@@ -407,6 +401,7 @@ messages = run_tools(list(problem["prompt"]), tools, generate)
 print(messages[-1]["content"])
 print("True answer:", problem["answer"])
 
+
 # <a name="Save"></a>
 # ### Saving to float16 for VLLM
 # 
@@ -430,6 +425,7 @@ if False:
 if False:
     model.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
     tokenizer.push_to_hub("HF_USERNAME/qwen_lora", token = "YOUR_HF_TOKEN")
+
 
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now! We clone `llama.cpp` and we default save it to `q8_0`. We allow all methods like `q4_k_m`. Use `save_pretrained_gguf` for local saving and `push_to_hub_gguf` for uploading to HF.
@@ -457,6 +453,7 @@ if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantiz
 # Save to q4_k_m GGUF
 if False: model.save_pretrained_gguf("qwen_finetune", tokenizer, quantization_method = "q4_k_m")
 if False: model.push_to_hub_gguf("HF_USERNAME/qwen_finetune", tokenizer, quantization_method = "q4_k_m", token = "YOUR_HF_TOKEN")
+
 
 # Now, use the `qwen_finetune.Q8_0.gguf` file or `qwen_finetune.Q4_K_M.gguf` file in llama.cpp.
 # 

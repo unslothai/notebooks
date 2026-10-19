@@ -5242,7 +5242,11 @@ def update_notebook_sections(
                                 is_path_contains_any(notebook_path.lower(), ["grpo"])
                                 and not is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"])
                             ):
-                                source_install_texts.append(installation_extra_grpo_content)
+                                source_install_texts.append(
+                                    installation_extra_grpo_tool_use_content
+                                    if is_path_contains_any(notebook_path.lower(), ["grpo-tool_use"])
+                                    else installation_extra_grpo_content
+                                )
                             if is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
                                 # AMD path: causal_conv1d is the only kernel
                                 # package propagated. The gated delta net
