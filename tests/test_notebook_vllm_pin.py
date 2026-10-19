@@ -48,8 +48,7 @@ _VLLM_SPEC_RE = re.compile(
 )
 
 
-# `find_spec("vllm")` names the import, not a requirement. Matched on the whole cell,
-# so whitespace, extra parentheses and a call split over lines are all covered.
+# `find_spec("vllm")` names a module, not a requirement; whole-cell so wrapped calls match too.
 _MODULE_LOOKUP_RE = re.compile(
     r"""\b(?:find_spec|import_module|__import__)\s*\(\s*(?:\(\s*)*['"]vllm['"]""",
     re.IGNORECASE,
@@ -460,7 +459,6 @@ def test_a_vllm_string_that_is_not_a_requirement_is_left_alone():
 
 
 def test_a_module_lookup_is_not_a_requirement():
-    """The tool-use notebooks set `fast_inference` from `find_spec("vllm")`."""
     for source in (
         'fast_inference = importlib.util.find_spec("vllm") is not None',
         "fast_inference = importlib.util.find_spec( 'vllm' ) is not None",
