@@ -63,9 +63,11 @@ MODEL_NAME = "unsloth/Qwen3.8-27B"  # unsloth resolves this to its 4-bit build
 
 import torch
 
-assert torch.cuda.device_count() >= 2, (
-    "Qwen3.8-27B in 4-bit needs more than one 16 GB card. On Kaggle pick the "
-    "T4 x2 accelerator (Settings -> Accelerator -> GPU T4 x2)."
+# Peaks near 22.5 GB in 4-bit: one 40 GB card (A100), or two 16 GB cards (Kaggle GPU T4 x2).
+total_gb = sum(torch.cuda.get_device_properties(i).total_memory for i in range(torch.cuda.device_count())) / 2**30
+assert total_gb >= 28, (
+    f"Qwen3.8-27B in 4-bit needs about 28 GB of GPU memory in total, this machine has {total_gb:.1f} GB. "
+    "On Kaggle pick the T4 x2 accelerator (Settings -> Accelerator -> GPU T4 x2)."
 )
 
 
@@ -82,7 +84,7 @@ model, tokenizer = FastModel.from_pretrained(
     load_in_4bit      = True,
     full_finetuning   = False,
 )
-print(f"placed over {len(set(model.hf_device_map.values()))} devices")
+print(f"placed over {len(set(getattr(model, 'hf_device_map', {'': 0}).values()))} devices")
 
 
 # Do not pass `dtype = torch.float16`, and do not set `fp16 = True` on the trainer below.
