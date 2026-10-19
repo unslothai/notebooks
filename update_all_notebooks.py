@@ -2661,7 +2661,7 @@ def _assert_amd_install_runtime(notebook_files, max_workers=1, executor_type="pr
 def _get_base_name_from_filename(filename):
     """Extract a base name from the notebook filename for dynamic model naming."""
     name = os.path.splitext(os.path.basename(filename))[0]
-    for prefix in ("Kaggle-", "HuggingFace Course-", "AMD-"):
+    for prefix in ("Kaggle-", "HuggingFace Course-", "AMD-", "Intel-"):
         if name.startswith(prefix):
             name = name[len(prefix):]
             break
@@ -4810,6 +4810,8 @@ def update_notebook_sections(
 
         updated = False
         is_amd_notebook = is_path_contains_any(notebook_path, ["AMD-"])
+        is_intel_notebook = is_path_contains_any(notebook_path, ["Intel-"])
+        is_vendor_gpu_notebook = is_amd_notebook or is_intel_notebook
 
         first_markdown_index = -1
         news_markdown_index = -1
@@ -4851,12 +4853,15 @@ def update_notebook_sections(
             general_announcement = general_announcement.replace(
                 "on a **free** Tesla T4 Google Colab instance!", "on your L4 Google Colab Pro instance!")
 
+        if is_intel_notebook:
+            general_announcement = general_announcement_content_intel
+
         # Update the general announcement section
         if first_markdown_index != -1:
             first_markdown_source = "".join(
                 notebook_content["cells"][first_markdown_index]["source"]
             ).strip()
-            if is_amd_notebook and _is_stale_amd_announcement(first_markdown_source):
+            if is_vendor_gpu_notebook and _is_stale_amd_announcement(first_markdown_source):
                 notebook_content["cells"][first_markdown_index]["source"] = _source_lines(general_announcement)
                 updated = True
             elif news_markdown_index == first_markdown_index:
@@ -4882,7 +4887,7 @@ def update_notebook_sections(
                 notebook_content["cells"][first_markdown_index]["source"] = _source_lines(general_announcement)
                 updated = True
 
-        if is_amd_notebook:
+        if is_vendor_gpu_notebook:
             stale_announcement_indices = []
             for cell_index, cell in enumerate(notebook_content["cells"]):
                 if cell_index == first_markdown_index or cell.get("cell_type") != "markdown":
@@ -4901,7 +4906,7 @@ def update_notebook_sections(
                     news_markdown_index -= removed_before_news
                 updated = True
 
-        i = 0 if (is_amd_notebook or news_markdown_index == -1) else news_markdown_index
+        i = 0 if (is_vendor_gpu_notebook or news_markdown_index == -1) else news_markdown_index
 
         is_gguf = False
         is_ollama = False
@@ -4931,7 +4936,7 @@ def update_notebook_sections(
                         notebook_content["cells"][i + 1]["source"] = _source_lines(announcement)
                         updated = True
                         i += 1
-                elif _is_installation_heading(source_str, is_amd_notebook):
+                elif _is_installation_heading(source_str, is_vendor_gpu_notebook):
                     if (
                         i + 1 < len(notebook_content["cells"])
                         and notebook_content["cells"][i + 1]["cell_type"] == "code"
@@ -4941,7 +4946,7 @@ def update_notebook_sections(
                         old_install_src = _cell_source_text(notebook_content["cells"][i + 1])
                         source_install_texts.append(old_install_src)
                         amd_followup_install_cells = []
-                        if is_amd_notebook:
+                        if is_vendor_gpu_notebook:
                             amd_followup_install_cells = _adjacent_install_like_code_cells(
                                 notebook_content["cells"], i + 1
                             )
@@ -4979,7 +4984,7 @@ def update_notebook_sections(
                                 # Kaggle will delete the second cell instead -> Need to check
                                 if i + 2 < len(notebook_content["cells"]):
                                     del notebook_content["cells"][i + 2]
-                            elif is_amd_notebook:
+                            elif is_vendor_gpu_notebook:
                                 installation = installation_grpo_content
                             else:
                                 installation = installation_grpo_content
@@ -5005,7 +5010,7 @@ def update_notebook_sections(
                                 # Kaggle will delete the second cell instead -> Need to check
                                 if i + 2 < len(notebook_content["cells"]):
                                     del notebook_content["cells"][i + 2]
-                            elif is_amd_notebook:
+                            elif is_vendor_gpu_notebook:
                                 installation = installation_synthetic_data_content
                             else:
                                 installation = installation_synthetic_data_content
@@ -5254,6 +5259,17 @@ def update_notebook_sections(
                             installation, amd_extras_cell_text = _compose_amd_installation(
                                 notebook_path, source_install_texts
                             )
+                        elif is_intel_notebook:
+                            selected_install_text = "".join(installation) if isinstance(installation, list) else installation
+                            source_install_texts.insert(0, selected_install_text)
+                            installation, amd_extras_cell_text = _compose_intel_installation(
+                                notebook_path, source_install_texts
+                            )
+                            amd_followup_install_cells += _intel_stale_followup_cells(
+                                notebook_content["cells"],
+                                max([i + 1] + [idx for idx, _ in amd_followup_install_cells]),
+                                amd_extras_cell_text,
+                            )
 
                         # Guard: warn if the replacement drops packages
                         old_install_src = notebook_content["cells"][i + 1].get("source", "")
@@ -5265,7 +5281,7 @@ def update_notebook_sections(
                             new_install_text = installation
                         if not is_path_contains_any(notebook_path.lower(), ["qwen3_5"]):
                             new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
-                        if not is_amd_notebook:
+                        if not is_vendor_gpu_notebook:
                             new_install_text = pin_torchcodec_to_torch(new_install_text)
                             _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
 
@@ -5276,7 +5292,7 @@ def update_notebook_sections(
                         # fail to register: `operator torchvision::nms does not
                         # exist`. AMD composes everything into one cell, so it
                         # has no before/after to get wrong.
-                        if extra_grpo_install_idx is not None and not is_amd_notebook:
+                        if extra_grpo_install_idx is not None and not is_vendor_gpu_notebook:
                             new_install_text, relocated_torch_lines = (
                                 _defer_torch_imports_past_downgrade(new_install_text)
                             )
@@ -5288,13 +5304,13 @@ def update_notebook_sections(
                                 )
 
                         notebook_content["cells"][i + 1]["source"] = new_install_text
-                        if is_amd_notebook:
+                        if is_vendor_gpu_notebook:
                             for cell_index, _source_text in reversed(amd_followup_install_cells):
                                 del notebook_content["cells"][cell_index]
                         # Insert/replace the AMD extras cell directly after the
                         # canonical install cell so per-variant tweaks and
                         # notebook-specific extras run after the bash setup.
-                        if is_amd_notebook and amd_extras_cell_text and amd_extras_cell_text.strip():
+                        if is_vendor_gpu_notebook and amd_extras_cell_text and amd_extras_cell_text.strip():
                             extras_cell = {
                                 "cell_type": "code",
                                 "metadata": {},
@@ -5306,14 +5322,14 @@ def update_notebook_sections(
                         updated = True
                         # TODO: Remove after GRPO numpy bug fixed!
                         # Error: ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                        if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["kaggle"]) and not is_path_contains_any(notebook_path, ["AMD-"]):
+                        if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["kaggle"]) and not is_vendor_gpu_notebook:
                             i += 2
                         else:
                             i += 1
 
             i += 1
 
-        if is_amd_notebook and is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
+        if is_vendor_gpu_notebook and is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
             remove_indices = set()
             for cell_index, cell in enumerate(notebook_content["cells"]):
                 source_text = _cell_source_text(cell)
@@ -5334,7 +5350,7 @@ def update_notebook_sections(
                     del notebook_content["cells"][cell_index]
                 updated = True
 
-        if is_amd_notebook and not install_section_updated:
+        if is_vendor_gpu_notebook and not install_section_updated:
             notebook_code = "\n".join(
                 _cell_source_text(cell)
                 for cell in notebook_content["cells"]
@@ -5346,7 +5362,10 @@ def update_notebook_sections(
                     if is_path_contains_any(notebook_path.lower(), ["synthetic_data"])
                     else installation_content
                 ]
-                installation, amd_extras_cell_text = _compose_amd_installation(
+                compose_installation = (
+                    _compose_intel_installation if is_intel_notebook else _compose_amd_installation
+                )
+                installation, amd_extras_cell_text = compose_installation(
                     notebook_path, source_install_texts
                 )
                 install_cells = [
@@ -5377,7 +5396,7 @@ def update_notebook_sections(
                 notebook_content["cells"][insert_at:insert_at] = install_cells
                 updated = True
 
-        if is_amd_notebook:
+        if is_vendor_gpu_notebook:
             remove_indices = set()
             for cell_index, cell in enumerate(notebook_content["cells"]):
                 cell_type = cell.get("cell_type")
@@ -5490,6 +5509,9 @@ def update_notebook_sections(
             if notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"].get("state") != {}:
                 notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"]["state"] = {}
                 updated = True
+
+        if is_intel_notebook and _apply_intel_cell_rules(notebook_path, notebook_content["cells"]):
+            updated = True
 
         if updated:
             _write_notebook(notebook_path, notebook_content)
@@ -5941,7 +5963,7 @@ def update_readme(
         # it keeps size/name extraction clean (a "AMD-(OpenEnv)-..." prefix would
         # otherwise be misread as the model size).
         platform_prefix = next(
-            (p for p in ("Kaggle-", "AMD-") if notebook_name.startswith(p)), ""
+            (p for p in ("Kaggle-", "AMD-", "Intel-") if notebook_name.startswith(p)), ""
         )
         bare_basename = notebook_name[len(platform_prefix):]
         if bare_basename in FIRST_MAPPING_NAME:
@@ -6143,6 +6165,7 @@ def update_readme(
                 "created_at_key": created_at_key,
                 "is_grpo_trainer": is_grpo_trainer,
                 "is_amd": is_amd_notebook,
+                "is_intel": os.path.basename(path).startswith("Intel-"),
             }
         )
 
@@ -6165,6 +6188,8 @@ def update_readme(
         # AMD notebooks are rendered in their own section at the end, not
         # in any per-architecture / cross-cutting table.
         if data.get("is_amd"):
+            continue
+        if data.get("is_intel"):
             continue
         model_prefix = "(A100) " if data.get('requires_a100', False) else ""
         platform = "Kaggle" if "kaggle" in data['link'].lower() else "Colab"
@@ -6393,6 +6418,11 @@ def update_readme(
         # at 6); the rest folds into a Kaggle-style collapsible.
         amd_entries = [d for d in notebook_data if d.get("is_amd")]
         amd_section = ""
+        github_blob_base = "https://github.com/unslothai/notebooks/blob/main/"
+        amd_table_header = (
+            "| Model | Type | Notebook |\n"
+            "| --- | --- | --- |\n"
+        )
         if amd_entries:
             import urllib.parse as _urlparse
 
@@ -6442,12 +6472,6 @@ def update_readme(
                 reverse=True,
             )
 
-            github_blob_base = "https://github.com/unslothai/notebooks/blob/main/"
-            amd_table_header = (
-                "| Model | Type | Notebook |\n"
-                "| --- | --- | --- |\n"
-            )
-
             def _render_amd_row(d):
                 gh_url = (github_blob_base + d["path"]).replace(" ", "%20")
                 display_model = d.get("model") or os.path.basename(d["path"]).replace(".ipynb", "")
@@ -6483,6 +6507,24 @@ def update_readme(
                     amd_section += _render_amd_row(d)
                 amd_section += "\n</details>\n\n"
 
+        intel_entries = [d for d in notebook_data if d.get("is_intel")]
+        intel_section = ""
+        if intel_entries:
+            intel_section = (
+                "# Intel GPU Notebooks\n"
+                "These notebooks target Intel GPUs (XPU) and are not available in Colab. "
+                "View / download them directly from GitHub:\n\n"
+                + amd_table_header
+            )
+            for d in intel_entries:
+                gh_url = (github_blob_base + d["path"]).replace(" ", "%20")
+                display_model = d.get("model") or os.path.basename(d["path"]).replace(".ipynb", "")
+                # The section header already says Intel, as with AMD's rows.
+                display_model = display_model.removeprefix("Intel-").removeprefix("Intel ")
+                model_cell = f"**{display_model}** {d.get('size') or ''}".rstrip()
+                intel_section += f"| {model_cell} | {d.get('type', '')} | [GitHub]({gh_url}) |\n"
+            intel_section += "\n"
+
         now = datetime.now()
         timestamp = f"\n"
 
@@ -6491,6 +6533,7 @@ def update_readme(
             + colab_updated_notebooks_links
             + kaggle_updated_notebooks_links
             + amd_section
+            + intel_section
             + timestamp
             + content_after
         )
@@ -6513,6 +6556,7 @@ def update_readme(
                 + colab_updated_notebooks_links
                 + kaggle_updated_notebooks_links
                 + amd_section
+                + intel_section
                 + timestamp
                 + content_after
              )
@@ -6769,7 +6813,7 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
     files_in_nb = {f for f in os.listdir(nb_abs) if os.path.isfile(os.path.join(nb_abs, f))}
     files_in_original_template = {f for f in os.listdir(original_template_abs) if os.path.isfile(os.path.join(original_template_abs, f))}
 
-    files_in_nb = {f for f in files_in_nb if not (f.startswith("Kaggle") or f.startswith("HuggingFace Course") or f.startswith("AMD-"))}
+    files_in_nb = {f for f in files_in_nb if not (f.startswith("Kaggle") or f.startswith("HuggingFace Course") or f.startswith("AMD-") or f.startswith("Intel-"))}
     files_in_original_template = {f for f in files_in_original_template if not f.startswith("Kaggle")}
 
     only_in_nb = files_in_nb - files_in_original_template
@@ -7041,6 +7085,392 @@ def _summarize_git_diff():
         print(f"\n=== Git Diff Summary: error ({e}) ===")
 
 
+def _postprocess_generated_notebooks(notebook_paths, max_workers=1, executor_type="process"):
+    """The clean-up passes of the --amd run, applied to the notebooks an --intel run generated."""
+    _map_with_executor(
+        _apply_global_fixes,
+        notebook_paths,
+        max_workers=max_workers,
+        executor_type=executor_type,
+        progress_desc="Global notebook fixes",
+    )
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Hide memory stats"):
+        _ensure_memory_stats_hidden(nb_path)
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Normalize LGPL"):
+        _normalize_lgpl_blank_line(nb_path)
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Normalize sources"):
+        try:
+            with open(nb_path, "r", encoding="utf-8", newline="") as f:
+                nb_data = json.load(f)
+            changed = False
+            for cell in nb_data.get("cells", []):
+                source = cell.get("source", [])
+                if isinstance(source, list):
+                    while source and source[-1] == "":
+                        source.pop()
+                        changed = True
+                    if source and source[-1].endswith("\n"):
+                        source[-1] = source[-1][:-1]
+                        changed = True
+            if changed:
+                _write_notebook(nb_path, nb_data)
+        except Exception:
+            pass
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Restore outputs"):
+        _restore_original_outputs(nb_path)
+
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+    from fix_html_tags import fix_outputs as _fix_html_outputs
+    from fix_html_tags import fix_comments as _fix_html_comments
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Fix HTML tags"):
+        try:
+            with open(nb_path, "r", encoding="utf-8", newline="") as f:
+                nb_data = json.load(f)
+            output_fixes = _fix_html_outputs(nb_data)
+            comment_fixes = _fix_html_comments(nb_data)
+            if output_fixes + comment_fixes > 0:
+                _write_notebook(nb_path, nb_data)
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Intel GPU (XPU) notebooks
+# ---------------------------------------------------------------------------
+
+general_announcement_content_intel = general_announcement_content.replace(
+    "on a **free** Tesla T4 Google Colab instance!", "on your local **Intel GPU**!"
+).replace(
+    'press "*Runtime*" and press "*Run all*"', 'press "*Run*" and press "*Run All*"'
+)
+
+
+INTEL_XPU_INDEX_URL = "https://download.pytorch.org/whl/xpu"
+INTEL_TORCH_SPECS = ('"torch==2.13.0"', '"torchvision==0.28.0"')
+INTEL_TORCHAO_SPEC = '"torchao==0.18.0"'
+INTEL_TRITON_XPU_SPEC = '"triton-xpu==3.7.2"'
+# 0.50.0 is the first manylinux wheel that ships libbitsandbytes_xpu.so.
+INTEL_BITSANDBYTES_SPEC = '"bitsandbytes>=0.50.0"'
+
+installation_intel_cell = f"""%%capture
+# Torch comes from the PyTorch XPU index. A plain `pip install unsloth` would pull CUDA torch.
+!pip install --upgrade -qqq uv
+!uv pip install -qqq {" ".join(INTEL_TORCH_SPECS)} --index-url {INTEL_XPU_INDEX_URL}
+# torch is already satisfied, so uv keeps the +xpu wheel.
+!uv pip install -qqq {INTEL_BITSANDBYTES_SPEC} unsloth unsloth_zoo
+!uv pip install -qqq --no-deps {INTEL_TORCHAO_SPEC} --index-url {INTEL_XPU_INDEX_URL}
+!uv pip install -qqq --no-deps -U "{PIN_TOKENIZERS_SPEC}"
+"""
+
+# vLLM notebooks (fast_inference = True). vLLM's XPU wheel must equal INTEL_TORCH_SPECS.
+# unsloth_zoo's XPU standby mode needs vLLM >= 0.23.0.
+# Bump these together, from vLLM's requirements/xpu.txt.
+INTEL_VLLM_VERSION = "0.30.0"
+INTEL_VLLM_SPEC = f'"vllm=={INTEL_VLLM_VERSION}"'
+# vLLM 0.30 needs transformers >= 5.10.4, and 5.16+ needs tokenizers >= 0.23.1
+INTEL_VLLM_TRANSFORMERS_SPEC = '"transformers>=5.10.4,<5.16"'
+INTEL_VLLM_INDEX_ARGS = (
+    f"--extra-index-url https://wheels.vllm.ai/{INTEL_VLLM_VERSION}/xpu "
+    f"--extra-index-url https://wheels.vllm.ai/xpu "
+    f"--extra-index-url {INTEL_XPU_INDEX_URL} --index-strategy=unsafe-best-match"
+)
+
+installation_intel_vllm_cell = f"""%%capture
+# vLLM's XPU wheel requires one exact torch, so it goes first and brings that torch.
+!pip install --upgrade -qqq uv
+!uv pip install -qqq {INTEL_VLLM_SPEC} {" ".join(INTEL_TORCH_SPECS)} {INTEL_VLLM_TRANSFORMERS_SPEC} {INTEL_VLLM_INDEX_ARGS}
+# torch and triton are already satisfied, so uv keeps the XPU builds.
+!uv pip install -qqq {INTEL_BITSANDBYTES_SPEC} unsloth unsloth_zoo
+{build_vllm_torchao_spec_block()}
+!uv pip install -qqq --no-deps --index-url {INTEL_XPU_INDEX_URL} "{{_torchao}}"
+!uv pip install -qqq --no-deps -U "{PIN_TOKENIZERS_SPEC}"
+"""
+
+# Non-vLLM recipe only. unsloth_zoo depends on generic `triton`, which overwrites the
+# `triton` package directory owned by triton-xpu. Uninstall triton first, then reinstall triton-xpu
+INTEL_XPU_FINALIZE = f"""\
+!uv pip uninstall -qqq triton
+!uv pip install -qqq --reinstall --no-deps {INTEL_TRITON_XPU_SPEC} --index-url {INTEL_XPU_INDEX_URL}
+"""
+
+installation_intel_extras_default = ""
+
+# Large models are spread across multiple XPUs. Used in installation_intel_extras_multi_gpu.
+INTEL_MULTI_GPU_MODELS = (
+    "unsloth/Qwen3.5-35B-A3B", # bf16 35B MoE
+)
+
+installation_intel_extras_multi_gpu = """\
+# Disable expandable segments for PyTorch memory allocator on Intel XPU to enable multi-device workload
+%env PYTORCH_ALLOC_CONF=expandable_segments:False
+"""
+
+# Allowlist for notebooks that get an Intel- (XPU).
+# Sourced from original_template/ when it is there, else from nb/.
+INTEL_NOTEBOOKS = [
+    "Qwen3_5_MoE.ipynb",
+    "Qwen3_(4B)-GRPO.ipynb",
+]
+
+
+# What the Intel cell owns plus packages with no XPU build.
+_INTEL_INSTALL_PACKAGE_IGNORE = _AMD_INSTALL_PACKAGE_IGNORE | frozenset({
+    "causal_conv1d", "mamba_ssm", "flash_attn", "vllm", "torchcodec",
+    # Owned by INTEL_XPU_FINALIZE. The generator runs update_notebook_sections twice,
+    # and the second pass reads the composed extras cell back as source.
+    "triton_xpu",
+})
+
+
+def _intel_stale_followup_cells(cells, last_idx, extras_text):
+    """Find leftover cells after the Intel install cell, so they can be deleted.
+
+    Two kinds of leftover:
+    - An unused ``# Placeholder`` cell from the template.
+    - A copy of the extras cell from the generator's first pass. The generator runs
+      twice, and without this the second pass would add the extras cell again.
+    """
+    stale = []
+    matches = {"# Placeholder"}
+    if extras_text and extras_text.strip():
+        matches.add(extras_text.strip())
+    idx = last_idx + 1
+    while idx < len(cells) and cells[idx].get("cell_type") == "code":
+        text = _cell_source_text(cells[idx])
+        if text.strip() not in matches:
+            break
+        stale.append((idx, text))
+        idx += 1
+    return stale
+
+
+def _format_intel_pip_call(flags, specs):
+    parts = ["!uv pip install -qqq"]
+    parts.extend(flags)
+    parts.extend(_amd_shell_quote_spec(spec) for spec in specs)
+    return " ".join(parts)
+
+
+def _compose_intel_installation(notebook_path, source_install_texts):
+    """Return the two Intel install cells: the shared install cell, and a second cell.
+
+    The second cell keeps the original notebook's own package versions (trl,
+    transformers, ...), leaving out the ones the Intel install handles, and ends
+    with the triton fix. It is None when there is nothing to put in it.
+
+    Notebooks that use vLLM (``fast_inference = True``) get the vLLM install cell
+    instead. vLLM sets its own transformers version and needs no triton fix.
+    """
+    uses_vllm = notebook_uses_fast_inference(notebook_path)
+    ignore = _INTEL_INSTALL_PACKAGE_IGNORE | ({"transformers"} if uses_vllm else set())
+    if _notebook_loads_intel_multi_gpu_model(notebook_path):
+        variant_extras = installation_intel_extras_multi_gpu
+    else:
+        variant_extras = installation_intel_extras_default
+
+    variant_header = _extract_variant_header(variant_extras)
+    merged_groups = {}
+    seen_keys = set()
+    setup_lines = []
+    for text in source_install_texts:
+        if not text:
+            continue
+        for line in _extract_preserved_setup_lines(text):
+            # _extract_preserved_setup_lines adds AMD's --system to uninstall lines.
+            line = line.replace("!uv pip uninstall --system", "!uv pip uninstall", 1)
+            # The second pass sees the header's %env line again as a setup line.
+            if line not in setup_lines and line not in variant_header:
+                setup_lines.append(line)
+        for flags, specs in _extract_install_package_groups(text):
+            for spec in specs:
+                key = _package_key_from_install_token(spec)
+                if not key or key in ignore or key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                merged_groups.setdefault(flags, []).append(spec)
+
+    blocks = []
+    if variant_header:
+        blocks.append("\n".join(variant_header))
+    if setup_lines:
+        blocks.append("\n".join(setup_lines))
+    replace_specs = _extract_git_main_unsloth_specs(source_install_texts)
+    if not replace_specs:
+        replace_specs = _extract_forced_unsloth_release_specs(source_install_texts)
+    pip_lines = []
+    if replace_specs:
+        pip_lines.append(
+            _format_intel_pip_call(("--upgrade", "--force-reinstall", "--no-deps"), replace_specs)
+        )
+    for flags, specs in merged_groups.items():
+        if specs:
+            pip_lines.append(_format_intel_pip_call(flags, specs))
+    if pip_lines:
+        blocks.append("\n".join(pip_lines))
+    if uses_vllm:
+        install_cell = installation_intel_vllm_cell
+    else:
+        blocks.append(INTEL_XPU_FINALIZE.rstrip("\n"))
+        install_cell = installation_intel_cell
+    if not blocks:
+        return install_cell, None
+    return install_cell, _prepend_missing_stdlib_imports("\n\n".join(blocks) + "\n")
+
+
+# regex for changing torch.cuda to torch.xpu equivalents
+_RE_TORCH_CUDA_NAMESPACE = re.compile(r"\btorch\.cuda\.")
+_RE_CUDA_DEVICE_LITERAL = re.compile(r"""(["'])cuda(:\d+)?\1""")
+
+
+def _rewrite_cuda_to_xpu(source_text):
+    """Change a code cell's hardcoded CUDA device to XPU."""
+    source_text = _RE_TORCH_CUDA_NAMESPACE.sub("torch.xpu.", source_text)
+    return _RE_CUDA_DEVICE_LITERAL.sub(lambda m: f"{m.group(1)}xpu{m.group(2) or ''}{m.group(1)}", source_text)
+
+
+# The model-name argument line of a from_pretrained call
+# or  model_name = "unsloth/...",  -- device_map goes on the line after it.
+_RE_MODEL_NAME_LINE = re.compile(
+    r"""^(?P<indent>[ \t]+)(?:model_name\s*=\s*)?(["'])(?P<model>[^"']+)\2\s*,[^\n]*\n""",
+    re.MULTILINE,
+)
+_INTEL_DEVICE_MAP_ARG = 'device_map = "balanced", # Split the model across every Intel GPU'
+
+
+def _notebook_loads_intel_multi_gpu_model(notebook_path):
+    """True when a code cell of the notebook names a model in INTEL_MULTI_GPU_MODELS."""
+    try:
+        with open(notebook_path, "r", encoding="utf-8") as f:
+            cells = json.load(f).get("cells", [])
+    except (OSError, json.JSONDecodeError):
+        return False
+    code = "\n".join(_cell_source_text(c) for c in cells if c.get("cell_type") == "code")
+    return any(model in code for model in INTEL_MULTI_GPU_MODELS)
+
+
+def _add_intel_device_map(source_text):
+    """Add device_map after the model-name line of a from_pretrained call on a multi-GPU model.
+
+    Returns the new text and whether a multi-GPU model was found. Raises an error when the model is
+    loaded in a shape the line pattern does not cover.
+    """
+    if "from_pretrained" not in source_text or not any(m in source_text for m in INTEL_MULTI_GPU_MODELS):
+        return source_text, False
+    if "device_map" in source_text:
+        return source_text, True
+    for match in _RE_MODEL_NAME_LINE.finditer(source_text):
+        if match.group("model") in INTEL_MULTI_GPU_MODELS:
+            insert = f"{match.group('indent')}{_INTEL_DEVICE_MAP_ARG}\n"
+            return source_text[:match.end()] + insert + source_text[match.end():], True
+    raise RuntimeError(
+        "from_pretrained loads a model in INTEL_MULTI_GPU_MODELS, but not on its own "
+        "argument line; update _RE_MODEL_NAME_LINE"
+    )
+
+
+def _apply_intel_cell_rules(notebook_path, cells):
+    """Code-cell edits for Intel- notebooks. Returns True when a cell changed."""
+    changed = False
+    for cell in cells:
+        if cell.get("cell_type") != "code":
+            continue
+        source_text = _cell_source_text(cell)
+        new_text = _rewrite_cuda_to_xpu(source_text)
+        try:
+            new_text, _ = _add_intel_device_map(new_text)
+        except RuntimeError as e:
+            raise RuntimeError(f"{notebook_path}: {e}") from None
+        if new_text != source_text:
+            cell["source"] = _source_lines(new_text)
+            changed = True
+    return changed
+
+
+def copy_and_update_intel_notebooks(
+    template_dir,
+    destination_dir,
+    general_announcement,
+    installation,
+    installation_kaggle,
+    new_announcement,
+):
+    """Generate Intel- notebooks for INTEL_NOTEBOOKS into destination_dir."""
+    os.makedirs(destination_dir, exist_ok=True)
+    intel_paths = []
+    for notebook_name in INTEL_NOTEBOOKS:
+        template_path = os.path.join(template_dir, notebook_name)
+        nb_path = os.path.join(destination_dir, notebook_name)
+        if notebook_name in DONT_UPDATE_EXCEPTIONS or not os.path.isfile(template_path):
+            source_path = nb_path
+        else:
+            source_path = template_path
+        if not os.path.isfile(source_path):
+            raise FileNotFoundError(f"INTEL_NOTEBOOKS lists {notebook_name}, but neither {template_path} nor {nb_path} exists")
+        intel_path = os.path.join(destination_dir, "Intel-" + notebook_name)
+        _cache_original_outputs(intel_path)
+        shutil.copyfile(source_path, intel_path)
+        _set_file_permissions(intel_path)
+        _cache_notebook_format(intel_path)
+        if source_path != template_path:
+            _restore_news_section(intel_path, template_path, new_announcement)
+        update_notebook_sections(
+            intel_path,
+            general_announcement,
+            installation,
+            installation_kaggle,
+            new_announcement,
+        )
+        intel_paths.append(intel_path)
+        print(f"Copied 'Intel-{notebook_name}' to '{destination_dir}'")
+    return intel_paths
+
+
+# CUDA-only content that must not be copied into an Intel- notebook.
+_INTEL_FORBIDDEN_MARKERS = (
+    "torch.cuda.", '"cuda"', "'cuda'", "xformers", "causal_conv1d", "causal-conv1d",
+    "nvidia-smi", "COLAB_", "unsloth install-kernels",
+)
+
+
+def _validate_intel_notebook(notebook_path):
+    """Return the issues found in one generated Intel- notebook."""
+    with open(notebook_path, "r", encoding="utf-8") as f:
+        cells = json.load(f)["cells"]
+    code = "\n".join(_cell_source_text(c) for c in cells if c.get("cell_type") == "code")
+    issues = [f"contains {marker!r}" for marker in _INTEL_FORBIDDEN_MARKERS if marker in code]
+    if INTEL_XPU_INDEX_URL not in code:
+        issues.append("has no Intel XPU install cell")
+    if _RE_FAST_INFERENCE_TRUE.search(code):
+        if INTEL_VLLM_SPEC not in code or f"wheels.vllm.ai/{INTEL_VLLM_VERSION}/xpu" not in code:
+            issues.append("uses fast_inference = True but has no Intel vLLM install")
+    elif "triton-xpu" not in code:
+        issues.append("is missing the INTEL_XPU_FINALIZE triton swap")
+
+    if any(model in code for model in INTEL_MULTI_GPU_MODELS) and 'device_map = "balanced"' not in code:
+        issues.append('is missing device_map = "balanced"')
+    return issues
+
+
+def _assert_intel_notebooks(notebook_paths):
+    failures = {}
+    for path in notebook_paths:
+        issues = _validate_intel_notebook(path)
+        if issues:
+            failures[path] = issues
+    if not failures:
+        return
+    print("\nERROR: Intel notebooks failed validation:")
+    for path, issues in sorted(failures.items()):
+        for issue in issues:
+            print(f"  {os.path.basename(path)} {issue}")
+    raise RuntimeError("Intel notebook validation failed")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -7095,6 +7525,11 @@ if __name__ == "__main__":
         "--no-progress",
         action="store_true",
         help="Disable tqdm progress bars.",
+    )
+    parser.add_argument(
+        "--intel",
+        action="store_true",
+        help="Only regenerate Intel GPU (XPU) notebooks and their python scripts.",
     )
     args = parser.parse_args()
 
@@ -7229,6 +7664,30 @@ if __name__ == "__main__":
             )
             _assert_amd_script_count()
 
+        _summarize_git_diff()
+        exit(0)
+
+    if args.intel:
+        intel_paths = copy_and_update_intel_notebooks(
+            "original_template",
+            "nb",
+            general_announcement_content,
+            installation_content,
+            installation_kaggle_content,
+            new_announcement,
+        )
+        main(max_workers=args.workers, executor_type=args.executor, notebook_files=intel_paths)
+        _assert_intel_notebooks(intel_paths)
+        _postprocess_generated_notebooks(intel_paths, args.workers, args.executor)
+        if not args.disable_convert_to_script:
+            convert_folder(
+                "nb",
+                "python_scripts",
+                max_workers=args.workers,
+                executor_type=args.executor,
+                include_prefix="Intel-",
+                clean_output_folder=False,
+            )
         _summarize_git_diff()
         exit(0)
 
