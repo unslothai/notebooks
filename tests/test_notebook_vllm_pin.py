@@ -41,9 +41,10 @@ import notebook_inventory as ni  # noqa: E402
 # on purpose, since "everything up to the closing quote" also swallows
 # "vllm.entrypoints.openai.api_server". Case-insensitive because PEP 503
 # lowercases the name, so `VLLM` resolves the same CUDA 13 wheel; no separators,
-# which is what keeps `VLLM_USE_V1` out.
+# which is what keeps `VLLM_USE_V1` out. A module lookup such as
+# `find_spec("vllm")` names the import, not a requirement.
 _VLLM_SPEC_RE = re.compile(
-    r"""['"](vllm(?:\[[^\[\]'"]*\])?\s*(?:[=<>!~]=?[^'"]*)?)['"]""",
+    r"""(?<!find_spec\()(?<!import_module\()['"](vllm(?:\[[^\[\]'"]*\])?\s*(?:[=<>!~]=?[^'"]*)?)['"]""",
     re.IGNORECASE,
 )
 
@@ -446,6 +447,8 @@ def test_a_vllm_string_that_is_not_a_requirement_is_left_alone():
         '!pkill -f "vllm.entrypoints.openai.api_server"',
         'with open("vllm_requirements.txt", "wb") as file:',
         'print(f"vllm server is running.")',
+        'fast_inference = importlib.util.find_spec("vllm") is not None',
+        'vllm = importlib.import_module("vllm")',
     ):
         assert _VLLM_SPEC_RE.findall(line) == []
 
