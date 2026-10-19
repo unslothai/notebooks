@@ -41,10 +41,17 @@ import notebook_inventory as ni  # noqa: E402
 # on purpose, since "everything up to the closing quote" also swallows
 # "vllm.entrypoints.openai.api_server". Case-insensitive because PEP 503
 # lowercases the name, so `VLLM` resolves the same CUDA 13 wheel; no separators,
-# which is what keeps `VLLM_USE_V1` out. A module lookup such as
-# `find_spec("vllm")` names the import, not a requirement.
+# which is what keeps `VLLM_USE_V1` out.
 _VLLM_SPEC_RE = re.compile(
-    r"""(?<!find_spec\()(?<!import_module\()['"](vllm(?:\[[^\[\]'"]*\])?\s*(?:[=<>!~]=?[^'"]*)?)['"]""",
+    r"""['"](vllm(?:\[[^\[\]'"]*\])?\s*(?:[=<>!~]=?[^'"]*)?)['"]""",
+    re.IGNORECASE,
+)
+
+
+# `find_spec("vllm")` names the import, not a requirement. Matched on the whole cell,
+# so whitespace, extra parentheses and a call split over lines are all covered.
+_MODULE_LOOKUP_RE = re.compile(
+    r"""\b(?:find_spec|import_module|__import__)\s*\(\s*(?:\(\s*)*['"]vllm['"]""",
     re.IGNORECASE,
 )
 
@@ -63,7 +70,8 @@ def _logical_lines(source):
     commands in the tree already carry a trailing comment.
     """
     lines, pending = [], ""
-    for line in ni.strip_comments(source).splitlines():
+    source = _MODULE_LOOKUP_RE.sub("", ni.strip_comments(source))
+    for line in source.splitlines():
         pending = f"{pending} {line.strip()}" if pending else line
         if line.rstrip().endswith("\\"):
             pending = pending.rstrip()[:-1]
@@ -447,10 +455,22 @@ def test_a_vllm_string_that_is_not_a_requirement_is_left_alone():
         '!pkill -f "vllm.entrypoints.openai.api_server"',
         'with open("vllm_requirements.txt", "wb") as file:',
         'print(f"vllm server is running.")',
-        'fast_inference = importlib.util.find_spec("vllm") is not None',
-        'vllm = importlib.import_module("vllm")',
     ):
         assert _VLLM_SPEC_RE.findall(line) == []
+
+
+def test_a_module_lookup_is_not_a_requirement():
+    """The tool-use notebooks set `fast_inference` from `find_spec("vllm")`."""
+    for source in (
+        'fast_inference = importlib.util.find_spec("vllm") is not None',
+        "fast_inference = importlib.util.find_spec( 'vllm' ) is not None",
+        'fast_inference = importlib.util.find_spec(("vllm"))',
+        'fast_inference = importlib.util.find_spec(\n    "vllm",\n) is not None',
+        'vllm = importlib.import_module("vllm")',
+    ):
+        assert list(_selector_cases(source)) == [], source
+    # A requirement on the same line as a lookup is still read.
+    assert [s for _l, s in _selector_cases('_vllm = "vllm" if find_spec("vllm") else None')] == ["vllm"]
 
 
 def test_extras_and_other_operators_still_read_as_requirements():
