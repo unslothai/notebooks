@@ -59,6 +59,7 @@
 # 
 # import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 # 
+# !uv pip install --system -qqq --upgrade --force-reinstall --no-deps git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth
 # !uv pip install --system -qqq vllm "transformers==5.15.1" "datasets>=4.7.0,<5.0.0"
 # !uv pip install --system -qqq --no-deps "trl==1.13.0"
 # 
