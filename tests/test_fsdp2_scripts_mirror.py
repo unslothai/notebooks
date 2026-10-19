@@ -367,10 +367,13 @@ def test_the_main_pass_calls_the_generator_after_both_conversions():
         gen = [c for c in after if c.startswith("generate_fsdp2_scripts(")]
         check = [c for c in after if c.startswith("_assert_fsdp2_mirror(")]
         assert gen and check, f"no fsdp2 generation after {calls[converts[0]][:60]}"
-        prefixed = "include_prefix='AMD-'" in calls[converts[0]]
-        assert prefixed == ("include_prefix='AMD-'" in gen[0]) == ("include_prefix='AMD-'" in check[0])
-        found.append(prefixed)
-    assert sorted(found) == [False, True], f"expected the full and the AMD-only pass, got {found}"
+        prefix = re.search(r"include_prefix='([^']*)'", calls[converts[0]])
+        prefix = prefix.group(1) if prefix else ""
+        assert all((f"include_prefix='{prefix}'" in c) == bool(prefix) for c in (gen[0], check[0])), (
+            f"the {prefix or 'full'} pass generates or checks a different prefix than it converted"
+        )
+        found.append(prefix)
+    assert sorted(found) == ["", "AMD-", "Intel-"], f"expected the full, AMD-only and Intel-only passes, got {found}"
 
 
 def test_unchanged_launchers_get_their_permissions_reset(tmp_path):

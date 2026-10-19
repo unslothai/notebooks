@@ -335,6 +335,14 @@ jobs:
         run: |
           python -m pytest tests/test_omnivoice_notebook.py -q --tb=short
 
+      - name: tests/test_intel_generator_rules.py
+        run: |
+          python -m pytest tests/test_intel_generator_rules.py -q --tb=short
+
+      - name: tests/test_intel_generation.py
+        run: |
+          python -m pytest tests/test_intel_generation.py -q --tb=short
+
   api-drift:
     # The flagship matrix: assert every classmethod / kwarg the
     # notebooks invoke on unsloth / unsloth_zoo / trl / transformers /
