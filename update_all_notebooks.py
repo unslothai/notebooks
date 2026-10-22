@@ -649,9 +649,7 @@ os.remove("OuteTTS/outetts/__init__.py")
 #                   '_VALID_DICT_FIELDS'
 # which names neither pin. Seen live on Kaggle in rerun19.
 # installation_llasa_content = re.sub(r'\bunsloth\b(==[\d\.]*)?', 'unsloth==2025.4.1', installation_content)
-# xcodec2 0.1.5 declares vector-quantize-pytorch==1.17.8, which --no-deps skips.
-# 1.26.0 made ResidualFSQ preserve_symmetry=True, so XCodec2 maps codes to other
-# embeddings than Llasa was trained on and some finetuned samples ramble (#131).
+# xcodec2 0.1.5 needs vector-quantize-pytorch==1.17.8 (--no-deps skips it): 1.26.0 remaps ResidualFSQ codes (#131).
 installation_llasa_content = installation_content
 installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', installation_llasa_content)
 

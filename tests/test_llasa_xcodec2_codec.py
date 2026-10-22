@@ -11,12 +11,9 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 
-"""XCodec2 must encode real speech codes, or Llasa finetunes on silence (notebooks#131).
+"""XCodec2 must encode real speech codes, or Llasa finetunes on silence and outputs noise (#131).
 
-transformers >= 4.49 stopped renaming the checkpoint's SnakeBeta `act.beta` to `act.bias`, so
-the encoder's bias stays uninitialized, `encode_code` returns all-zero codes, training loss
-collapses to ~0.02 and inference outputs noise. xcodec2 also declares
-vector-quantize-pytorch==1.17.8, which `--no-deps` skips.
+transformers >= 4.49 no longer maps the checkpoint's SnakeBeta `act.beta` onto `act.bias`.
 """
 from __future__ import annotations
 
