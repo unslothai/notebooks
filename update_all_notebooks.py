@@ -649,12 +649,15 @@ os.remove("OuteTTS/outetts/__init__.py")
 #                   '_VALID_DICT_FIELDS'
 # which names neither pin. Seen live on Kaggle in rerun19.
 # installation_llasa_content = re.sub(r'\bunsloth\b(==[\d\.]*)?', 'unsloth==2025.4.1', installation_content)
+# xcodec2 0.1.5 declares vector-quantize-pytorch==1.17.8, which --no-deps skips.
+# 1.26.0 made ResidualFSQ preserve_symmetry=True, so XCodec2 maps codes to other
+# embeddings than Llasa was trained on and some finetuned samples ramble (#131).
 installation_llasa_content = installation_content
 installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', installation_llasa_content)
 
 installation_llasa_content += """\
 
-!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
+!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch==1.17.8 torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_content = update_or_append_pip_install(
@@ -663,7 +666,7 @@ installation_llasa_content = update_or_append_pip_install(
     "!pip install transformers==4.57.6",
 )
 
-installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
+installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch==1.17.8 torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_kaggle_content = update_or_append_pip_install(

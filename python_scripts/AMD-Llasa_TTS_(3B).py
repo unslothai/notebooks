@@ -46,7 +46,7 @@
 # 
 # get_ipython().run_line_magic('env', 'UNSLOTH_DISABLE_FAST_GENERATION = 1')
 # get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6" omegaconf torchcodec')
-# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.15.2" torchtune vector_quantize_pytorch torch_einops_utils einx loguru tiktoken "xcodec2==0.1.5"')
+# get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.15.2" torchtune "vector_quantize_pytorch==1.17.8" torch_einops_utils einx loguru tiktoken "xcodec2==0.1.5"')
 # 
 # 
 # # ### Unsloth
@@ -373,9 +373,16 @@ class MemmapTTSDataset(Dataset):
 
 try:
     codec_model = XCodec2Model.from_pretrained(XCODEC2_MODEL_NAME)
+    # Newer transformers no longer load the checkpoint's SnakeBeta `act.beta` into
+    # `act.bias`, leaving it uninitialized: encode_code returns NaN -> all-zero codes.
+    from huggingface_hub import hf_hub_download
+    from safetensors.torch import load_file
+    _codec_sd = load_file(hf_hub_download(XCODEC2_MODEL_NAME, "model.safetensors"))
+    codec_model.load_state_dict({k[:-len("beta")] + "bias": v for k, v in _codec_sd.items() if k.endswith(".act.beta")}, strict = False)
+    del _codec_sd
 
 except Exception as e:
-    raise f"ERROR loading XCodec2 model: {e}."
+    raise RuntimeError(f"ERROR loading XCodec2 model: {e}.")
 
 preprocess_and_save(
         dataset = dataset,

@@ -33,7 +33,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0,<0.18.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.15.2\n!pip install torchtune "torchao<0.18.0" vector_quantize_pytorch torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps\nimport importlib.metadata as _md\ntry: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])\nexcept Exception: _tv = (2, 11)\n_torchcodec = {(2, 11): "torchcodec>=0.11.0", (2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 12) else "torchcodec")\n!pip install omegaconf "{_torchcodec}" "datasets>=3.4.1,<4.0.0"\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0,<0.18.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.15.2\n!pip install torchtune "torchao<0.18.0" vector_quantize_pytorch==1.17.8 torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps\nimport importlib.metadata as _md\ntry: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])\nexcept Exception: _tv = (2, 11)\n_torchcodec = {(2, 11): "torchcodec>=0.11.0", (2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 12) else "torchcodec")\n!pip install omegaconf "{_torchcodec}" "datasets>=3.4.1,<4.0.0"\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
 # 
 # 
 # # ### Unsloth
@@ -360,9 +360,16 @@ class MemmapTTSDataset(Dataset):
 
 try:
     codec_model = XCodec2Model.from_pretrained(XCODEC2_MODEL_NAME)
+    # Newer transformers no longer load the checkpoint's SnakeBeta `act.beta` into
+    # `act.bias`, leaving it uninitialized: encode_code returns NaN -> all-zero codes.
+    from huggingface_hub import hf_hub_download
+    from safetensors.torch import load_file
+    _codec_sd = load_file(hf_hub_download(XCODEC2_MODEL_NAME, "model.safetensors"))
+    codec_model.load_state_dict({k[:-len("beta")] + "bias": v for k, v in _codec_sd.items() if k.endswith(".act.beta")}, strict = False)
+    del _codec_sd
 
 except Exception as e:
-    raise f"ERROR loading XCodec2 model: {e}."
+    raise RuntimeError(f"ERROR loading XCodec2 model: {e}.")
 
 preprocess_and_save(
         dataset = dataset,
