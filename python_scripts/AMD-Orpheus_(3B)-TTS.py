@@ -116,6 +116,27 @@ dataset = load_dataset("Etherll/kaira", split = "train")
 # In[ ]:
 
 
+# Orpheus special token ids. Change these to fine-tune another Orpheus-style model with a different base tokenizer.
+tokeniser_length = 128256
+start_of_text = 128000
+end_of_text = 128009
+
+start_of_speech = tokeniser_length + 1
+end_of_speech = tokeniser_length + 2
+
+start_of_human = tokeniser_length + 3
+end_of_human = tokeniser_length + 4
+
+start_of_ai = tokeniser_length + 5
+end_of_ai =  tokeniser_length + 6
+pad_token = tokeniser_length + 7
+
+audio_tokens_start = tokeniser_length + 10
+
+
+# In[ ]:
+
+
 #@title Tokenization Function
 
 import locale
@@ -142,13 +163,13 @@ def tokenise_audio(waveform):
 
   all_codes = []
   for i in range(codes[0].shape[1]):
-    all_codes.append(codes[0][0][i].item()+128266)
-    all_codes.append(codes[1][0][2*i].item()+128266+4096)
-    all_codes.append(codes[2][0][4*i].item()+128266+(2*4096))
-    all_codes.append(codes[2][0][(4*i)+1].item()+128266+(3*4096))
-    all_codes.append(codes[1][0][(2*i)+1].item()+128266+(4*4096))
-    all_codes.append(codes[2][0][(4*i)+2].item()+128266+(5*4096))
-    all_codes.append(codes[2][0][(4*i)+3].item()+128266+(6*4096))
+    all_codes.append(codes[0][0][i].item()+audio_tokens_start)
+    all_codes.append(codes[1][0][2*i].item()+audio_tokens_start+4096)
+    all_codes.append(codes[2][0][4*i].item()+audio_tokens_start+(2*4096))
+    all_codes.append(codes[2][0][(4*i)+1].item()+audio_tokens_start+(3*4096))
+    all_codes.append(codes[1][0][(2*i)+1].item()+audio_tokens_start+(4*4096))
+    all_codes.append(codes[2][0][(4*i)+2].item()+audio_tokens_start+(5*4096))
+    all_codes.append(codes[2][0][(4*i)+3].item()+audio_tokens_start+(6*4096))
 
 
   return all_codes
@@ -171,22 +192,6 @@ def add_codes(example):
     return example
 
 dataset = dataset.map(add_codes, remove_columns = ["audio"])
-
-tokeniser_length = 128256
-start_of_text = 128000
-end_of_text = 128009
-
-start_of_speech = tokeniser_length + 1
-end_of_speech = tokeniser_length + 2
-
-start_of_human = tokeniser_length + 3
-end_of_human = tokeniser_length + 4
-
-start_of_ai = tokeniser_length + 5
-end_of_ai =  tokeniser_length + 6
-pad_token = tokeniser_length + 7
-
-audio_tokens_start = tokeniser_length + 10
 
 dataset = dataset.filter(lambda x: x["codes_list"] is not None)
 dataset = dataset.filter(lambda x: len(x["codes_list"]) > 0)
@@ -354,8 +359,8 @@ for prompt in prompts_:
   input_ids = tokenizer(prompt, return_tensors = "pt").input_ids
   all_input_ids.append(input_ids)
 
-start_token = torch.tensor([[ 128259]], dtype = torch.int64) # Start of human
-end_tokens = torch.tensor([[128009, 128260]], dtype = torch.int64) # End of text, End of human
+start_token = torch.tensor([[start_of_human]], dtype = torch.int64) # Start of human
+end_tokens = torch.tensor([[end_of_text, end_of_human]], dtype = torch.int64) # End of text, End of human
 
 all_modified_input_ids = []
 for input_ids in all_input_ids:
@@ -367,7 +372,7 @@ all_attention_masks = []
 max_length = max([modified_input_ids.shape[1] for modified_input_ids in all_modified_input_ids])
 for modified_input_ids in all_modified_input_ids:
   padding = max_length - modified_input_ids.shape[1]
-  padded_tensor = torch.cat([torch.full((1, padding), 128263, dtype = torch.int64), modified_input_ids], dim = 1)
+  padded_tensor = torch.cat([torch.full((1, padding), pad_token, dtype = torch.int64), modified_input_ids], dim = 1)
   attention_mask = torch.cat([torch.zeros((1, padding), dtype = torch.int64), torch.ones((1, modified_input_ids.shape[1]), dtype = torch.int64)], dim = 1)
   all_padded_tensors.append(padded_tensor)
   all_attention_masks.append(attention_mask)
@@ -386,11 +391,11 @@ generated_ids = model.generate(
       top_p = 0.95,
       repetition_penalty = 1.1,
       num_return_sequences = 1,
-      eos_token_id = 128258,
+      eos_token_id = end_of_speech,
      use_cache = True
   )
-token_to_find = 128257
-token_to_remove = 128258
+token_to_find = start_of_speech
+token_to_remove = end_of_speech
 
 token_indices = (generated_ids == token_to_find).nonzero(as_tuple = True)
 
@@ -414,7 +419,7 @@ for row in processed_rows:
     row_length = row.size(0)
     new_length = (row_length // 7) * 7
     trimmed_row = row[:new_length]
-    trimmed_row = [t - 128266 for t in trimmed_row]
+    trimmed_row = [t - audio_tokens_start for t in trimmed_row]
     code_lists.append(trimmed_row)
 
 
