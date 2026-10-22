@@ -382,12 +382,12 @@ if False: # Change to True to upload GGUF
     )
 
 
-# ### LiteRT-LM (`.litertlm`) for Android, iOS and Web
+# ### LiteRT-LM (`.litertlm`) for Android and iOS
 # To run the finetune on a phone with Google's [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM) runtime, which replaces MediaPipe's LLM Inference API and its `.task` files, set `if False` to `if True`. This merges the LoRA adapters to 16bit, converts the merged model on the CPU with Google's `litert-torch export_hf` into an int8 `.litertlm` file of about 290MB, then asks it one question on the CPU.
 # 
 # The converter is installed into its own `litert_env` environment, so the training packages above stay as they are. The export takes a few minutes and about 7GB of RAM.
 # 
-# Copy `gemma_3_finetune_litertlm/model.litertlm` to your phone and load it in the [Google AI Edge Gallery](https://github.com/google-ai-edge/gallery) app, or call it from your own app with LiteRT-LM's Kotlin, Swift or JavaScript APIs.
+# Copy `gemma_3_finetune_litertlm/model.litertlm` to your phone and load it in the [Google AI Edge Gallery](https://github.com/google-ai-edge/gallery) app, or call it from your own app with LiteRT-LM's Kotlin or Swift APIs.
 
 # In[ ]:
 
