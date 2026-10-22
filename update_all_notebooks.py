@@ -50,12 +50,11 @@ try:
 except Exception:
     _tqdm = None
 
-new_announcement = """Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+new_announcement = """Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 
-<table><tr>
-<td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-<td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-</tr></table>
+<p>
+<a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
+</p>
 
 Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 
@@ -104,7 +103,7 @@ general_announcement_content_meta = general_announcement_content.split(announcem
 general_announcement_content_meta = general_announcement_content_meta[0] + "\n\n" + '<a href="https://github.com/meta-llama/synthetic-data-kit"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/meta%20round%20logo.png" width="137"></a>' + general_announcement_content_meta[1]
 
 # CONSTANT
-PIN_TRANSFORMERS = "!pip install transformers==4.56.2"
+PIN_TRANSFORMERS = "!pip install transformers==4.57.6"
 UV_PIN_TRANSFORMERS = PIN_TRANSFORMERS.replace("pip", "uv pip")
 
 PIN_TRL = "!pip install --no-deps trl==0.22.2"
@@ -116,22 +115,135 @@ PIN_TOKENIZERS_SPEC = "tokenizers>=0.22.0,<=0.23.0"
 PIN_TOKENIZERS = f'!pip install --no-deps "{PIN_TOKENIZERS_SPEC}"'
 UV_PIN_TOKENIZERS = PIN_TOKENIZERS.replace("pip", "uv pip")
 
+# The TTS codec sources are cloned and imported, so an unpinned clone runs
+# whatever upstream's default branch holds on the day the notebook is opened.
+# These are the same revisions Unsloth Studio pins, so a notebook and Studio
+# import identical codec code.
+PIN_SPARK_TTS_REF = "2f1ea9082400547242641f5271b6f941c9f439d1"
+PIN_OUTETTS_REF = "f5eac6e70d792844c6a6959d900a47af2c061a5b"
+
 SPACES = " " * 4
 
-XFORMERS_INSTALL = """xformers = 'xformers==' + {'2.10':'0.0.34','2.9':'0.0.33.post1','2.8':'0.0.32.post2'}.get(v, "0.0.34")"""
+# Every prebuilt kernel (xformers, flash-attn, causal_conv1d, mamba_ssm) for the resident torch +
+# CUDA, each skipped when no wheel matches. Runs the `unsloth` CLI, so it must follow the unsloth install.
+KERNELS_INSTALL = "!unsloth install-kernels"
 
-QAT_TORCHAO_BY_TORCH_MINOR = {
-    "2.10": "0.16.0",
-    "2.9": "0.15.0",
-    "2.8": "0.14.1",
+# torchao declares no torch dependency on PyPI, so pip cannot keep the pair in
+# step: each release hard-codes the torch it was built against, in its own
+# __init__.py, and silently skips its cpp extensions otherwise. Below 0.17.0
+# that gate wants the exact torch version; 0.17.0 and up want torch >= 2.11.
+#
+# Two bounds squeeze the choice, and both beat matching torch exactly. From
+# below, peft 0.19 raised TORCHAO_MINIMUM_VERSION to 0.16.0 and raises
+# ImportError under it, which `get_peft_model` reaches; these notebooks install
+# peft unpinned. From above, torchao 0.18.0 imports `ScalingType` from
+# `torch.nn.functional`, added in torch 2.11, so `import torchao` itself fails.
+#
+# 0.16.0 is the only release that imports on every torch from 2.8 up and still
+# clears peft, so it takes every row below 2.11. Its extensions load only on
+# torch 2.10.0; the older rows keep the skip warning, slower but alive, where
+# either bound would have been a dead run.
+QAT_PEFT_TORCHAO_FLOOR = "0.16.0"
+# Below this torch, torchao 0.17.0 and up cannot be imported at all.
+QAT_TORCHAO_NEWEST_TORCH = "2.11"
+QAT_TORCHAO_BY_TORCH_VERSION = {
+    "2.8.0": "0.16.0",
+    "2.9.0": "0.16.0",
+    "2.9.1": "0.16.0",
+    "2.10.0": "0.16.0",
 }
-QAT_DEFAULT_TORCHAO_VERSION = "0.16.0"
+# Fallback for a patch release the exact table has not seen yet.
+QAT_TORCHAO_BY_TORCH_MINOR = {
+    "2.11": "0.18.0",
+    "2.10": "0.16.0",
+    "2.9": "0.16.0",
+    "2.8": "0.16.0",
+}
+QAT_DEFAULT_TORCHAO_VERSION = "0.18.0"
+
+# The same skew as above, reached from the other direction: the vLLM install
+# cells do not choose a torch, they inherit whichever one their pinned vLLM
+# drags in, and both of those are older than the machine's.
+#   vllm==0.11.2 (the T4 branch) -> torch 2.9.0
+#   vllm==0.15.1 (everything else) -> torch 2.9.1
+# The T4 branch was vllm==0.9.2 -> torch 2.7.0 when this was written; the pin
+# moved for the reasons set out above installation_grpo_content, and 2.9.0 is
+# still below the 2.10 ceiling below, so it still takes the capped spec.
+# torchao 0.18.0, published 2026-08-03, opens with
+#     from torch.nn.functional import ScalingType, scaled_grouped_mm
+# and neither name exists before torch 2.10, so the unbounded
+# "torchao>=0.16.0" those cells carried resolved to 0.18.0 and the next
+# `import transformers` stopped inside transformers/modeling_utils.py, which
+# imports torchao whenever it is installed:
+#     ImportError: cannot import name 'ScalingType' from 'torch.nn.functional'
+# In Meta-Synthetic-Data-Llama3.1 (8B) that killed the vLLM server subprocess,
+# and the notebook could only report "vllm exited with 1" plus a TensorFlow
+# banner, because the real traceback was in the server's own log.
+# `--no-deps` is what makes this ours to get right: it is exactly the flag that
+# stops the resolver from reading torchao's own torch requirement.
+TORCHAO_SCALING_TYPE_TORCH = "2.10"     # first torch with ScalingType
+TORCHAO_SCALING_TYPE_RELEASE = "0.18.0" # first torchao that imports it
+
+
+def build_vllm_torchao_spec_block(indent=""):
+    """Lines that bind `_torchao` to a spec the installed torch can import.
+
+    Read the installed distribution metadata rather than `import torch`: the
+    line above has just replaced torch on disk, and importing it here would
+    cost a multi-second CUDA import in every install cell and pin the module
+    in a kernel that is about to be told a different version is present.
+
+    An undetectable torch falls to the capped spec on purpose. The cap imports
+    on every torch these notebooks can see, so the unknown case fails safe.
+    """
+    ceiling = tuple(int(part) for part in TORCHAO_SCALING_TYPE_TORCH.split("."))
+    lines = [
+        "try:",
+        '    import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])',
+        "except Exception:",
+        "    _torch_v = ()",
+        f"# torchao {TORCHAO_SCALING_TYPE_RELEASE} imports torch.nn.functional.ScalingType, added in torch {TORCHAO_SCALING_TYPE_TORCH}; peft >= 0.19 needs the {QAT_PEFT_TORCHAO_FLOOR} floor.",
+        f'_torchao = "torchao>={QAT_PEFT_TORCHAO_FLOOR}" if _torch_v >= {ceiling} else "torchao>={QAT_PEFT_TORCHAO_FLOOR},<{TORCHAO_SCALING_TYPE_RELEASE}"',
+    ]
+    return "\n".join(indent + line for line in lines)
+
+
+def _qat_torchao_fallback_snippet(default_torchao=None):
+    """Resolve an unlisted torch to a torchao that can actually import.
+
+    The tables cover 2.8-2.11. Anything else fell through to the newest pin, so
+    a local torch 2.7 got torchao 0.18.0 and died importing `ScalingType`. Pick
+    on the detected version instead; below the ceiling the floor is the only pin
+    that imports and clears peft. An undetectable torch keeps the old default.
+    """
+    default_torchao = default_torchao or QAT_DEFAULT_TORCHAO_VERSION
+    return f'''if not _qat_torchao:
+    try:
+        _qat_below = tuple(int(_p) for _p in _qat_torch_minor.split(".")) < tuple(int(_p) for _p in "{QAT_TORCHAO_NEWEST_TORCH}".split("."))
+    except Exception:
+        _qat_below = False
+    _qat_torchao = "{QAT_PEFT_TORCHAO_FLOOR}" if _qat_below else "{default_torchao}"'''
 QAT_FBGEMM_GENAI_BY_TORCH_MINOR = {
+    "2.11": "1.6.0",
     "2.10": "1.5.0",
     "2.9": "1.4.2",
     "2.8": "1.3.0",
 }
-QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.5.0"
+QAT_DEFAULT_FBGEMM_GENAI_VERSION = "1.6.0"
+
+# fbgemm-gpu-genai depends on an unpinned numpy, so a force-reinstall fetches
+# the newest one while `import torch` above has already loaded the old one into
+# this kernel. Every QAT install must carry this pin, so it lives here rather
+# than in one of the two blocks that need it.
+QAT_NUMPY_PIN_BLOCK = """# fbgemm-gpu-genai depends on an unpinned numpy, so --force-reinstall fetches
+# the newest one while `import torch` above has already loaded the old one
+# into this kernel. Hold numpy where it is; otherwise the next import stops
+# with "numpy was upgraded mid-session ... but the kernel still has the old
+# version" and the notebook cannot continue without a restart.
+try:
+    import numpy; _qat_numpy = "numpy==" + numpy.__version__
+except Exception:
+    _qat_numpy = "numpy\""""
 
 
 def build_qat_native_install_block(
@@ -139,12 +251,18 @@ def build_qat_native_install_block(
     default_torchao=QAT_DEFAULT_TORCHAO_VERSION,
     fbgemm_genai_by_torch_minor=None,
     default_fbgemm_genai=QAT_DEFAULT_FBGEMM_GENAI_VERSION,
+    torchao_by_torch_version=None,
 ):
     """Build runtime torchao/fbgemm native install block for QAT notebooks."""
     if torchao_by_torch_minor is None:
         torchao_by_torch_minor = QAT_TORCHAO_BY_TORCH_MINOR
     if fbgemm_genai_by_torch_minor is None:
         fbgemm_genai_by_torch_minor = QAT_FBGEMM_GENAI_BY_TORCH_MINOR
+    if torchao_by_torch_version is None:
+        torchao_by_torch_version = QAT_TORCHAO_BY_TORCH_VERSION
+    torchao_exact_mapping = json.dumps(
+        torchao_by_torch_version, sort_keys=True, separators=(",", ":")
+    )
     torchao_mapping = json.dumps(
         torchao_by_torch_minor, sort_keys=True, separators=(",", ":")
     )
@@ -152,14 +270,24 @@ def build_qat_native_install_block(
         fbgemm_genai_by_torch_minor, sort_keys=True, separators=(",", ":")
     )
     return f"""try:
-    import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
+    import torch; _qat_torch_version = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 except Exception:
-    _qat_torch_minor = ""
+    _qat_torch_version = _qat_torch_minor = ""
+# peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch
+# 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
+_qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
-_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{default_torchao}")
+_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor)
+{_qat_torchao_fallback_snippet(default_torchao)}
 _qat_fbgemm_map = {fbgemm_mapping}
 _qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{default_fbgemm_genai}")
-!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}}"""
+# Each PyPI fbgemm-gpu-genai is built for one CUDA major (1.5.0 links
+# libcudart.so.12, 1.6.0 libcudart.so.13), so take the build from torch's own
+# CUDA index, which carries +cuXXX builds of both fbgemm-gpu-genai and torchao.
+try: _qat_index = "--extra-index-url https://download.pytorch.org/whl/cu" + torch.version.cuda.replace(".", "") if torch.version.cuda else ""
+except Exception: _qat_index = ""
+{QAT_NUMPY_PIN_BLOCK}
+!pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}} {{_qat_index}}"""
 
 
 def update_or_append_pip_install(base_content, package_name, new_install_line):
@@ -173,6 +301,29 @@ def update_or_append_pip_install(base_content, package_name, new_install_line):
         output = updated_content
     return output
 
+# torchcodec declares no torch requirement and each release before 0.12 loads against one torch
+# minor (0.12+ loads on any torch >= 2.11), so a bare `pip install torchcodec` beside an older torch
+# fails to import (#304). Pick the line matching the torch the cell left installed; a build that
+# already matches (Colab ships torchcodec 0.11.0+cu130 with torch 2.11.0+cu130) is kept.
+TORCHCODEC_FOR_TORCH = """import importlib.metadata as _md
+try: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])
+except Exception: _tv = (2, 11)
+_torchcodec = {(2, 11): "torchcodec>=0.11.0", (2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 12) else "torchcodec")"""
+_RE_BARE_TORCHCODEC = re.compile(r"(?<![\w\"'{./-])torchcodec(?![\w.=<>~!\[-])")
+
+
+def pin_torchcodec_to_torch(install_text):
+    """Replace every bare `torchcodec` in a !pip install line with the build for the installed torch."""
+    out = []
+    for line in install_text.split("\n"):
+        body = line.lstrip()
+        if body.startswith("!") and "pip install" in body and _RE_BARE_TORCHCODEC.search(body):
+            indent = line[: len(line) - len(body)]
+            out += [indent + spec_line for spec_line in TORCHCODEC_FOR_TORCH.split("\n")]
+            line = indent + _RE_BARE_TORCHCODEC.sub('"{_torchcodec}"', body)
+        out.append(line)
+    return "\n".join(out)
+
 # Colab ships torchao 0.10.0 preinstalled; peft >= 0.19 raises ImportError
 # from is_torchao_available() unless torchao >= 0.16.0 is present, so any path
 # that calls get_peft_model fails. Bump torchao on Colab.
@@ -181,12 +332,11 @@ import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth  # Do this in local & cloud setups
 else:
-    import torch; v = re.match(r'[\d]{1,}\.[\d]{1,}', str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
-""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
 installation_content = update_or_append_pip_install(
     installation_content,
     "transformers",
@@ -219,6 +369,48 @@ installation_kaggle_content = update_or_append_pip_install(
     PIN_TRL,
 )
 
+# The four install blocks below split their vLLM pin on `is_t4`, because a free
+# Colab T4 is Turing (sm75) and recent vLLM cannot serve attention there. Four
+# constraints bracket the T4 side from both directions, and they leave exactly
+# one usable window:
+#
+# 1. At or above 0.10.0. Up to 0.9.2 `vllm/transformers_utils/configs/ovis.py`
+#    ran `AutoConfig.register("aimv2", AIMv2Config)`, and transformers took that
+#    same bare name in 4.54, so `import vllm` raises `ValueError: 'aimv2' is
+#    already used by a Transformers config` against the transformers these cells
+#    pin. 0.10.0 dropped the bare registration and kept only the
+#    `aimv2_visual_tokenizer` one. This is why the old `vllm==0.9.2` had to go.
+# 2. At or above 0.11.0, and outside `[0.14.0, 0.15.0)`. Every one of these cells
+#    sets `UNSLOTH_VLLM_STANDBY = "1"` a few lines below, and with standby on
+#    `unsloth_zoo.vllm_utils.patch_vllm` hard-raises for
+#    `Version("0.10.0") <= vllm < Version("0.11.0")` (std::bad_alloc in
+#    CuMemAllocator) and for `Version("0.14.0") <= vllm < Version("0.15.0")`
+#    (cudaErrorIllegalAddress). So the whole 0.10.x line is unusable here even
+#    though it imports cleanly, which is what a real Colab T4 run showed.
+# 3. At or below 0.11.2, because of Turing. The sm75 cubins survive further than
+#    that -- `cuobjdump --list-elf` on the published x86_64 wheels still finds
+#    `sm_75` in `_C` and `_moe_C` at 0.15.1 -- but the attention backend does
+#    not. 0.11.2 ships `vllm/v1/attention/backends/xformers.py` and
+#    `platforms/cuda.py` falls back to `XFORMERS` for "Volta/Turing GPUs or FA
+#    not supported"; 0.12.0 deleted that file, and by 0.15.1 xformers is gone
+#    from the dependency list entirely. FLASH_ATTN needs sm80, so past 0.11.2 a
+#    T4 has no backend left to fall back to.
+#
+# That leaves {0.11.0, 0.11.1, 0.11.2}, and 0.11.2 is both the newest of them and
+# the version the standby guard's own error message asks for. `triton==3.2.0`
+# rode along with the old pin and is dropped: vllm 0.11.2 pins torch==2.9.0,
+# which wants triton 3.5.0, and forcing 3.2.0 back on top breaks every compiled
+# kernel. Bare `triton` is safe because that line carries no `--upgrade`, so an
+# already-satisfied triton is left alone.
+#
+# The non-T4 side stays on 0.15.1: it is past both standby windows, and Turing
+# never applies there.
+#
+# Worth knowing that this window is the last one. 0.11.2 is the newest vLLM a T4
+# can serve attention on at all, so the next constraint that moves leaves the T4
+# branch with nothing to pin, and the answer then is a different shape for this
+# case -- keeping vLLM off the T4 path, or turning standby off there -- rather
+# than another version bump.
 installation_grpo_content = """%%capture
 import os
 os.environ["UNSLOTH_VLLM_STANDBY"] = "1" # [NEW] Extra 30% context lengths!
@@ -240,10 +432,11 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+    _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
-    !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+""" + build_vllm_torchao_spec_block("    ") + """
+    !uv pip install -qqq --no-deps --upgrade "{_torchao}"
 """
 
 installation_extra_grpo_content = update_or_append_pip_install(
@@ -266,10 +459,11 @@ try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=
 except: _numpy = "numpy"; _pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
 !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
 !uv pip install -qqq {_triton} "huggingface_hub>=0.34.0" "datasets==4.3.0"
-!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+""" + build_vllm_torchao_spec_block() + """
+!uv pip install -qqq --no-deps --upgrade "{_torchao}"
 """
 
 installation_grpo_kaggle_content = update_or_append_pip_install(
@@ -284,6 +478,50 @@ installation_grpo_kaggle_content = update_or_append_pip_install(
     UV_PIN_TRL,
 )
 
+# GRPO tool calling (`GRPOTrainer(tools=...)`, `max_tool_calling_iterations`) needs
+# trl >= 0.26 and transformers >= 5.0, but vllm 0.11.2 and 0.15.1 require
+# transformers < 5. vllm 0.19.1 is the first that takes transformers 5 (>= 5.5.1)
+# and still pins torch 2.10 (cu128). A T4 tops out at vllm 0.11.2, so the T4
+# branch installs no vLLM: the notebook then sets fast_inference = False and
+# generates with transformers. transformers 5.15.1 is the newest that keeps the
+# tokenizers <= 0.23.0 pin above and ships the response_template parser
+# (>= 5.13), so TRL needs no jmespath.
+TOOL_USE_PIN_TRANSFORMERS = "!uv pip install transformers==5.15.1 \"datasets>=4.7.0,<5.0.0\""
+TOOL_USE_PIN_TRL = "!uv pip install --no-deps trl==1.13.0"
+# Tool calling GRPO needs Unsloth's TRL chat template fallback and tokenizer save fix, so install both from main.
+TOOL_USE_UNSLOTH_MAIN = (
+    '!uv pip install -qqq --no-deps --force-reinstall '
+    '"unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo" '
+    '"unsloth @ git+https://github.com/unslothai/unsloth"'
+)
+def _tool_use_installation(content, indent):
+    old = (
+        f"{indent}_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
+        f"{indent}!uv pip install -qqq --upgrade {{_vllm}} {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+    )
+    new = (
+        f"{indent}_triton = 'triton'\n"
+        f"{indent}if is_t4:\n"
+        f"{indent}    # Keep the machine's torch: upgrading it can pull a CUDA build the driver cannot load\n"
+        f"{indent}    try:\n"
+        f"{indent}        import importlib.metadata as _md\n"
+        f"{indent}        _torch, _tv = (f'{{_p}}=={{_md.version(_p).split(\"+\")[0]}}' for _p in ('torch', 'torchvision'))\n"
+        f"{indent}    except Exception:\n"
+        f"{indent}        _torch, _tv = 'torch', 'torchvision'\n"
+        f"{indent}    !uv pip install -qqq {{_numpy}} {{_pil}} {{_torch}} {{_tv}} bitsandbytes xformers unsloth\n"
+        f"{indent}else:\n"
+        f"{indent}    !uv pip install -qqq --upgrade vllm==0.19.1 {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+    )
+    assert old in content, "GRPO install layout moved; update _tool_use_installation"
+    content = content.replace(old, new)
+    content = update_or_append_pip_install(content, "transformers", TOOL_USE_PIN_TRANSFORMERS)
+    content = update_or_append_pip_install(content, "trl", TOOL_USE_PIN_TRL)
+    return content.rstrip("\n") + "\n" + TOOL_USE_UNSLOTH_MAIN + "\n"
+
+
+installation_extra_grpo_tool_use_content = _tool_use_installation(installation_extra_grpo_content, "    ")
+installation_grpo_tool_use_kaggle_content = _tool_use_installation(installation_grpo_kaggle_content, "")
+
 installation_synthetic_data_content = """%%capture
 import os
 !pip install --upgrade -qqq uv
@@ -295,11 +533,12 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
-    _vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+    _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
     !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
     !uv pip install synthetic-data-kit==0.0.3
-    !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+""" + build_vllm_torchao_spec_block("    ") + """
+    !uv pip install -qqq --no-deps --upgrade "{_torchao}"
 """
 
 installation_synthetic_data_content = update_or_append_pip_install(
@@ -320,12 +559,13 @@ try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=
 except: _numpy = "numpy"; _pil = "pillow"
 try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 except: is_t4 = False
-_vllm, _triton = ('vllm==0.9.2', 'triton==3.2.0') if is_t4 else ('vllm==0.15.1', 'triton')
+_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
 !uv pip install -qqq --upgrade unsloth {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers
 !uv pip install -qqq {_triton}
 !uv pip install "huggingface_hub>=0.34.0" "datasets==4.3.0"
 !uv pip install synthetic-data-kit==0.0.3
-!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+""" + build_vllm_torchao_spec_block() + """
+!uv pip install -qqq --no-deps --upgrade "{_torchao}"
 """
 installation_grpo_synthetic_data_content = update_or_append_pip_install(
     installation_grpo_synthetic_data_content,
@@ -345,9 +585,9 @@ installation_orpheus_kaggle_content = installation_kaggle_content + """\n!pip in
 installation_whisper_content = installation_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
 installation_whisper_kaggle_content = installation_kaggle_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
-installation_spark_content = installation_content + """\n!git clone https://github.com/SparkAudio/Spark-TTS
+installation_spark_content = installation_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
-installation_spark_kaggle_content = installation_kaggle_content + """\n!git clone https://github.com/SparkAudio/Spark-TTS
+installation_spark_kaggle_content = installation_kaggle_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 installation_gpt_oss_content = r"""%%capture
@@ -357,19 +597,19 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \
-        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \
+        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.57.6" \
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
         "unsloth[base] @ git+https://github.com/unslothai/unsloth" \
         git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps transformers==4.56.2 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
+!uv pip install --upgrade --no-deps transformers==4.57.6 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 """.replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 # installation_gpt_oss_content = update_or_append_pip_install(
 #     installation_gpt_oss_content,
 #     "transformers",
-#     "!uv pip install transformers==4.56.2",
+#     "!uv pip install transformers==4.57.6",
 # )
 # installation_gpt_oss_content = update_or_append_pip_install(
 #     installation_gpt_oss_content,
@@ -379,55 +619,78 @@ elif importlib.util.find_spec("unsloth") is None:
 
 installation_gpt_oss_kaggle_content = installation_gpt_oss_content
 
-installation_oute_content = installation_content + """\n!pip install omegaconf einx
-!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
+installation_oute_content = installation_content + f"""\n!pip install omegaconf einx
+!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS && git -C OuteTTS checkout --quiet {PIN_OUTETTS_REF}
 import os
-os.remove("/content/OuteTTS/outetts/models/gguf_model.py")
-os.remove("/content/OuteTTS/outetts/interface.py")
-os.remove("/content/OuteTTS/outetts/__init__.py")
+os.remove("OuteTTS/outetts/models/gguf_model.py")
+os.remove("OuteTTS/outetts/interface.py")
+os.remove("OuteTTS/outetts/__init__.py")
 !pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
-installation_oute_kaggle_content = installation_kaggle_content + """\n!pip install omegaconf einx
-!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS
+installation_oute_kaggle_content = installation_kaggle_content + f"""\n!pip install omegaconf einx
+!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS && git -C OuteTTS checkout --quiet {PIN_OUTETTS_REF}
 import os
-os.remove("/content/OuteTTS/outetts/models/gguf_model.py")
-os.remove("/content/OuteTTS/outetts/interface.py")
-os.remove("/content/OuteTTS/outetts/__init__.py")
+os.remove("OuteTTS/outetts/models/gguf_model.py")
+os.remove("OuteTTS/outetts/interface.py")
+os.remove("OuteTTS/outetts/__init__.py")
 !pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
-# Llasa Need Unsloth==2025.4.1, Transformers==4.48 to running stable, and trl ==0.15.2
+# Llasa needs trl 0.15.2; the Colab recipe pairs it with transformers 4.57.6.
+# The Kaggle recipe below must use the SAME pair. It used to pin
+# transformers==4.48 while taking trl from the global PIN_TRL (0.22.2), and
+# that pair cannot work: trl 0.22.2 declares transformers>=4.55.0. Both are
+# installed with --no-deps, so pip never checks and the run gets all the way
+# to the trainer before dying with
+#   AttributeError: type object 'TrainingArguments' has no attribute
+#                   '_VALID_DICT_FIELDS'
+# which names neither pin. Seen live on Kaggle in rerun19.
 # installation_llasa_content = re.sub(r'\bunsloth\b(==[\d\.]*)?', 'unsloth==2025.4.1', installation_content)
 installation_llasa_content = installation_content
 installation_llasa_content = re.sub(r'\btrl\b(==[\d\.]*)?', 'trl==0.15.2', installation_llasa_content)
 
 installation_llasa_content += """\
 
-!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
+!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_content = update_or_append_pip_install(
     installation_llasa_content,
     "transformers",
-    "!pip install transformers==4.56.1",
+    "!pip install transformers==4.57.6",
 )
 
-installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune torchao vector_quantize_pytorch einx tiktoken xcodec2==0.1.5 --no-deps
+installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
     "transformers",
-    "!pip install transformers==4.48",
+    "!pip install transformers==4.57.6",
 )
 installation_llasa_kaggle_content = update_or_append_pip_install(
     installation_llasa_kaggle_content,
     "trl",
-    PIN_TRL,
+    "!pip install --no-deps trl==0.15.2",
 )
+
+# Llasa is the one family that also needs an UPPER bound on torchao, so the
+# shared "torchao>=0.16.0" inherited from installation_content is capped here
+# and nowhere else. torchao 0.18.0 (published 2026-08-03) moved
+# torchao/dtypes/nf4tensor.py to torchao/quantization/quantize_/workflows/nf4/;
+# torchtune still imports the old path and xcodec2 imports torchtune, so the
+# install cell succeeds and cell 1 dies on
+#   ModuleNotFoundError: No module named 'torchao.dtypes.nf4tensor'
+# Scoped to llasa deliberately: the other notebooks do not go through
+# torchtune and capping them would be unrelated churn.
+_LLASA_TORCHAO_CAP = (r'("torchao>=0\.16\.0)"', r'\1,<0.18.0"')
+installation_llasa_content = re.sub(
+    _LLASA_TORCHAO_CAP[0], _LLASA_TORCHAO_CAP[1], installation_llasa_content)
+installation_llasa_kaggle_content = re.sub(
+    _LLASA_TORCHAO_CAP[0], _LLASA_TORCHAO_CAP[1], installation_llasa_kaggle_content)
 
 installation_tool_calling_content = installation_content + """\n!pip install protobuf==3.20.3 # required
 !pip install --no-deps transformers-cfg"""
@@ -438,7 +701,7 @@ installation_sesame_csm_content = installation_content + """\n!pip install torch
 installation_sesame_csm_content = update_or_append_pip_install(
     installation_sesame_csm_content,
     "transformers",
-    "!pip install transformers==4.52.3",
+    "!pip install transformers==4.57.6",
 )
 installation_sesame_csm_content = update_or_append_pip_install(
     installation_sesame_csm_content,
@@ -450,7 +713,7 @@ installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip
 installation_sesame_csm_kaggle_content = update_or_append_pip_install(
     installation_sesame_csm_kaggle_content,
     "transformers",
-    "!pip install transformers==4.52.3 torchcodec",
+    "!pip install transformers==4.57.6 torchcodec",
 )
 installation_sesame_csm_kaggle_content = update_or_append_pip_install(
     installation_sesame_csm_kaggle_content,
@@ -493,9 +756,15 @@ installation_gemma3n_content += gemma3n_extra_content
 installation_gemma3n_kaggle_content = installation_kaggle_content
 installation_gemma3n_kaggle_content += gemma3n_extra_content
 
+# transformers 5.x needs hub >=1.5.0, 4.x needs <1.0, and the `--no-deps` pin
+# below means pip never enforces it: the `huggingface_hub>=0.34.0` floor is
+# already satisfied by Colab's preinstalled 0.36.2, so the next import dies.
+# Its own line, outside the Colab branch, because a local `pip install unsloth`
+# pulls a 4.x-era hub and the same `--no-deps` swaps transformers out from it.
+#
 # Gemma 4 needs transformers==5.5.0 (with --no-deps), torchcodec, and
 # torch._dynamo recompile_limit. Do NOT go through update_or_append_pip_install
-# here because Gemma 4 must not get the default transformers==4.56.2 pin or
+# here because Gemma 4 must not get the default transformers==4.57.6 pin or
 # the trl==0.22.2 --no-deps downgrade.
 # Colab ships torchao 0.10.0 preinstalled, but peft >= 0.19 raises ImportError
 # from is_torchao_available() unless torchao >= 0.16.0 is present, which trips
@@ -505,14 +774,14 @@ import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth  # Do this in local & cloud setups
 else:
-    import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.5.0 "tokenizers>=0.22.0,<=0.23.0"
+!pip install "huggingface_hub>=1.5.0,<2.0"
 !pip install torchcodec
-import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
 
 # Gemma 4 12B needs a newer transformers (5.10.1) than the other Gemma 4 sizes,
 # which pin 5.5.0. Same install block otherwise, so derive it from the shared one.
@@ -520,24 +789,44 @@ installation_gemma4_12b_content = installation_gemma4_content.replace(
     "transformers==5.5.0", "transformers==5.10.1"
 )
 
-# DiffusionGemma: FastDiffusionModel is in unsloth main (not a release yet), so install unsloth +
-# unsloth_zoo from main. transformers 5.11.0 ships the diffusion_gemma architecture (model saved at 5.8.0.dev0).
+# DiffusionGemma: FastDiffusionModel shipped in unsloth 2026.6.5, so install the PyPI releases
+# instead of the git main branches (unsloth/models/diffusion.py is absent before 2026.6.5).
+# transformers 5.11.0 ships the diffusion_gemma architecture (model saved at 5.8.0.dev0).
 installation_diffusiongemma_content = """%%capture
 import os, re
 if "COLAB_" not in "".join(os.environ.keys()):
-    !pip install unsloth  # local & cloud: pull deps, then upgrade unsloth + unsloth_zoo to main below
-    !pip install --no-deps --upgrade --force-reinstall git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git
+    !pip install "unsloth>=2026.6.5"  # local & cloud: pull deps, then upgrade unsloth + unsloth_zoo below
+    # --force-reinstall replaces a git build left by the old cell, whose version already satisfies
+    # the floor; --no-deps keeps that reinstall off numpy.
+    !pip install --no-deps --upgrade --force-reinstall "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"
 else:
-    import torch; v = re.match(r'[\\d]{1,}\\.[\\d]{1,}', str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
-    !pip install --no-deps bitsandbytes accelerate {xformers} peft trl triton
-    !pip install --no-deps --upgrade git+https://github.com/unslothai/unsloth-zoo.git git+https://github.com/unslothai/unsloth.git
+    !pip install --no-deps bitsandbytes accelerate peft trl triton
+    !pip install --no-deps --upgrade "unsloth_zoo>=2026.6.5" "unsloth>=2026.6.5"
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
 !pip install --no-deps transformers==5.11.0 "tokenizers>=0.22.0,<=0.23.0"
-import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__XFORMERS_INSTALL__", XFORMERS_INSTALL)
+!pip install "huggingface_hub>=1.5.0,<2.0"
+import torch; torch._dynamo.config.recompile_limit = 64;""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
 
 installation_diffusiongemma_kaggle_content = installation_diffusiongemma_content
+
+# EmbeddingGemma 2 needs transformers >= 5.18.0 (embedding_gemma2), sentence-transformers >= 6.1.0
+# (ordered multimodal inputs), and the hub / tokenizers / safetensors floors that transformers
+# release declares. transformers goes in with --no-deps like Gemma 4, so those floors are spelled
+# out here or Colab keeps its older huggingface_hub and the import fails.
+installation_embeddinggemma2_content = """%%capture
+import os, re
+if "COLAB_" not in "".join(os.environ.keys()):
+    !pip install unsloth  # Do this in local & cloud setups
+else:
+    !pip install sentencepiece protobuf "datasets==4.3.0" hf_transfer
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
+    __KERNELS_INSTALL__
+    !pip install --no-deps --upgrade "torchao>=0.16.0"
+!pip install --no-deps "transformers @ git+https://github.com/huggingface/transformers@92cd495f2720c064bc78eb2d93e28704c5bce51f" "tokenizers>=0.23.1,<0.24" "safetensors>=0.8.0"
+!pip install "huggingface_hub>=1.31.0,<2.0" "sentence-transformers>=6.1.0" torchcodec""".replace("__KERNELS_INSTALL__", KERNELS_INSTALL)
+installation_embeddinggemma2_kaggle_content = installation_embeddinggemma2_content
 
 # ---------------------------------------------------------------------------
 # AMD Dev Cloud install template (single canonical %%bash cell shared by every
@@ -581,15 +870,49 @@ installation_amd_extras_grpo = """\
 import os; os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
 """
 
+# GRPO tool calling needs transformers >= 5 and trl >= 0.26 (see TOOL_USE_PIN_TRANSFORMERS).
+installation_amd_extras_grpo_tool_use = installation_amd_extras_grpo + """\
+!uv pip install --system -qqq vllm "transformers==5.15.1" "datasets>=4.7.0,<5.0.0"
+!uv pip install --system -qqq --no-deps "trl==1.13.0"
+"""
+
+# The AMD Qwen3.5/3.6 MoE notebooks were authored with MoE autotuning off, so
+# unsloth.kernels.moe.autotune_cache hands back heuristic configs instead of
+# searching per device capability. Their CUDA sources never carried it, so it
+# lives here or a regeneration drops it.
+installation_amd_extras_qwen3_moe = """\
+import os; os.environ["UNSLOTH_MOE_DISABLE_AUTOTUNE"] = "1"
+"""
+
 installation_amd_extras_gemma4 = """\
-# Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
-!uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
+# Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0; 5.16+ needs tokenizers >= 0.23.1, past the pin above
+!uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0,<5.16" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" unsloth unsloth_zoo
 """
 
 # Gemma 4 12B needs transformers >= 5.10.1 (newer than the other Gemma 4 sizes).
 installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace("Gemma 4 requires", "Gemma 4 12B requires")
+
+# The cap cannot be applied on AMD (see below), so at least say so where the
+# person who hits it will be reading. Comment-only: variant_extras pip lines go
+# through the ignore list, which is what blocks the cap in the first place.
+installation_amd_extras_llasa = """\
+# xcodec2 pulls in torchtune, which imports torchao.dtypes.nf4tensor, removed in
+# torchao 0.18.0. The ROCm cell above owns the torchao version, so if inference
+# fails with that ImportError, run:
+#   uv pip install --system --no-deps "torchao>=0.16.0,<0.18.0"
+"""
+
+# Llasa needs torchao capped below 0.18.0 on every platform (see the Colab
+# recipe below for why), but AMD is the one place that cap cannot be expressed:
+# torchao is in _AMD_INSTALL_PACKAGE_IGNORE, so the ROCm base cell owns the
+# version and no variant extras line can override it. That rule is deliberate
+# -- torchao is built against the ROCm torch installed one line earlier -- and
+# was left alone rather than special-cased for one family on hardware this
+# harness cannot execute. AMD-Llasa therefore still installs whatever torchao
+# the base cell resolves. The torch_einops_utils half of the fix does reach
+# AMD, because it propagates from the shared Llasa install line.
 
 # Backwards-compatible aliases. Several places in the script (and external
 # callers) reference these names; keep them pointing at the shared template
@@ -606,16 +929,77 @@ installation_qwen3_vl_content = installation_content
 installation_qwen3_vl_content = update_or_append_pip_install(
     installation_qwen3_vl_content,
     "transformers",
-    "!pip install transformers==4.57.1",
+    "!pip install transformers==4.57.6",
 )
 
 installation_qwen3_vl_kaggle_content  = installation_kaggle_content
 installation_qwen3_vl_kaggle_content  = update_or_append_pip_install(
     installation_qwen3_vl_kaggle_content,
     "transformers",
-    "!pip install transformers==4.57.1",
+    "!pip install transformers==4.57.6",
 )
 
+# LFM2.5-VL is an `lfm2_vl` checkpoint, and that architecture landed in
+# transformers 4.57.0, so the old canonical 4.56.2 could not load it: the notebook
+# stopped at "`LiquidAI/LFM2.5-VL-1.6B` is not supported yet in
+# `transformers==4.56.2`". The text LFM2.5 notebooks are `lfm2`, which 4.56.2
+# does have, so only the vision one moves.
+installation_lfm2_vl_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==4.57.6",
+)
+installation_lfm2_vl_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "transformers",
+    "!pip install transformers==4.57.6",
+)
+
+# The Liquid LFM2 notebooks installed transformers from git main, because `lfm2`
+# had no release when they were written. It has one now, and main is a moving
+# target. They pin 5.15.0 instead, and the default 4.57.6 has to move with them
+# so each notebook carries a single transformers pin.
+installation_liquid_lfm2_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.15.0",
+)
+installation_liquid_lfm2_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "transformers",
+    "!pip install transformers==5.15.0",
+)
+
+# Muse Glimmer is a `muse_glimmer` checkpoint, and that architecture landed in
+# transformers 5.15.0, so the canonical 4.57.6 cannot load it. Replace the
+# default pin rather than leaving it to be overridden by the notebook's own
+# install cell, so the notebook never carries two contradictory `transformers`
+# pins. Installing with dependency resolution on is what pulls the
+# `huggingface_hub>=1.5.0` and `tokenizers>=0.22.0` that transformers 5.x
+# requires.
+installation_muse_glimmer_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.15.0",
+)
+installation_muse_glimmer_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content,
+    "transformers",
+    "!pip install transformers==5.15.0",
+)
+
+# The prebuilt causal_conv1d for this torch, or none so transformers keeps its torch conv1d (never a
+# ~10 minute source build). No fla uninstall: unsloth_zoo's vendored kernels already win over an older pip fla.
+QWEN3_5_CAUSAL_CONV1D = KERNELS_INSTALL + "\n"
+# ROCm has no wheel, so the AMD composer keeps its fla uninstall and the source build.
+QWEN3_5_CAUSAL_CONV1D_AMD = (
+    "# Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them\n"
+    "!uv pip uninstall -qqq flash-linear-attention fla-core\n"
+    "!uv pip install --no-build-isolation causal_conv1d==1.6.0\n"
+)
+
+# torchaudio is pinned with torch: Colab preinstalls a torchaudio built for its newer torch, and
+# torchaudio >= 2.9 no longer pins torch, so an unpinned entry keeps that build and it fails to load.
 installation_qwen3_5_content = """%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
@@ -623,7 +1007,7 @@ if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.k
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
-        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes xformers==0.0.32.post2 \\
+        "torch==2.8.0" "triton>=3.3.0" {_numpy} {_pil} torchvision "torchaudio==2.8.0" bitsandbytes xformers==0.0.32.post2 \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
     !uv pip install -qqq --no-deps "torchcodec==0.7.0"
@@ -631,24 +1015,143 @@ elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
 !uv pip install --upgrade --no-deps "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
 !uv pip install transformers==5.2.0
-# causal_conv1d is supported only on torch==2.8.0. If you have newer torch versions, please wait 10 minutes!
-!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0
-import torch
-if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
-    !uv pip install --no-deps "apache-tvm-ffi==0.1.9" "tilelang==0.1.8"
-else:
-    os.environ["FLA_TILELANG"] = "0"
-""".replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
+""".replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + QWEN3_5_CAUSAL_CONV1D + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_qwen3_5_kaggle_content = installation_qwen3_5_content
 
-installation_sglang_content = """%%capture
-import sys
+# Qwen3.8 is a `qwen3_5` checkpoint but does NOT reuse the block above.
+#
+# No `causal_conv1d`. Its wheels track one exact torch, so on any other torch
+# the cell builds from source for ~10 minutes, which costs a Kaggle kernel real
+# time. transformers falls back to a plain conv1d for the gated delta net's
+# depthwise convolution, which is a small part of the step -- the measured
+# numbers in the notebook were taken without it.
+#
+# transformers 5.15.1 rather than the 5.2.0 the Qwen3.5 block pins: that is the
+# release this notebook was actually run against end to end. Note the two are not
+# equivalent for the gated delta net kernels. 5.2.0 does
+# `from fla.ops.gated_delta_rule import ...` at module scope, which Unsloth's
+# vendor patch can rebind; 5.15.x resolves the kernels through
+# `use_kernel_func_from_hub_with_fallback` at import time instead.
+installation_qwen3_8_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.15.1",
+)
+# Written out rather than derived from installation_kaggle_content. That one opens
+# with `pip install torch torchvision torchaudio xformers --index-url .../cu128`,
+# which replaces Kaggle's entire preinstalled torch stack; on a T4 x2 kernel that
+# spent 20 minutes and then left `import unsloth` failing. The GRPO Kaggle
+# notebooks use uv and leave Kaggle's torch alone, which is what works there.
+installation_qwen3_8_kaggle_content = """%%capture
 import os
-!git clone https://github.com/sgl-project/sglang.git && cd sglang && pip install -e "python[all]"
-!pip install -U transformers==4.53.0
-sys.path.append(f'{os.getcwd()}/sglang/')
-sys.path.append(f'{os.getcwd()}/sglang/python')"""
+
+!pip install --upgrade -qqq uv
+try: import numpy, PIL; _numpy = f'numpy=={numpy.__version__}'; _pil = f'pillow=={PIL.__version__}'
+except: _numpy = "numpy"; _pil = "pillow"
+# Pin Kaggle's torch and torchvision: upgrading them pulls a CUDA 13.0 torch onto
+# Kaggle's CUDA 12.8 torchaudio, which then refuses to import. Pin the base version,
+# since the local +cu128 label does not exist on the index.
+try:
+    import torch, torchvision
+    _torch = f'torch=={torch.__version__.split("+")[0]}'
+    _tv = f'torchvision=={torchvision.__version__.split("+")[0]}'
+except Exception:
+    _torch, _tv = "torch", "torchvision"
+!uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth
+!uv pip install -qqq triton "huggingface_hub>=0.34.0" "datasets==4.3.0"
+!uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
+!uv pip install -qqq transformers==5.15.1
+!uv pip install -qqq --no-deps trl==0.22.2"""
+
+# KNOWLEDGE DISTILLATION INSTALLATION.
+#
+# This notebook is not tied to one architecture: its CONFIGS dict spans Qwen3,
+# Gemma-4, Qwen3.8 and Muse Glimmer, so the install has to satisfy all of them
+# at once rather than the newest one.
+#
+# transformers 5.15.1 is the floor that does: `qwen3_5` (Qwen3.8) landed in
+# 5.15.1, `muse_glimmer` in 5.15.0, and Gemma-4 in 5.10.1. The canonical 4.x pin
+# loads none of them, which is what the first Kaggle run of this notebook proved
+# three times over ("is not supported yet in transformers==4.56.2").
+#
+# trl 0.22.2 with --no-deps is the other half, and the --no-deps is load-bearing.
+# GKDTrainer is only importable from the top level of trl 0.22.2 through 0.28;
+# 1.9.2 has neither GKD nor Distillation there, and 1.10+ has DistillationTrainer
+# instead. Resolving trl's dependencies would drag transformers back below the
+# floor above, so the pin goes on without them. That is the same pairing the
+# Qwen3.8 conversational Kaggle notebook already ships.
+# trl 0.25.1, NOT the 0.22.2 the Qwen3.8 block pins, and the difference is one
+# clause. TRL's prepare_peft_model calls peft's prepare_model_for_kbit_training,
+# which freezes every parameter and then upcasts each one that is not Params4bit
+# to float32. The only such parameter that matters is the lm_head, which Unsloth
+# deliberately leaves dense so the distillation projection can read it. On
+# 0.22.2 the call is guarded by `if is_qlora and not is_sharded_qlora`; from
+# 0.24.0 it is `... and not isinstance(model, PeftModel)`, which is our case,
+# since Unsloth has already applied LoRA by the time the trainer is built.
+#
+# Without that clause the upcast costs 4.74 GiB on Qwen3.8 (248320 tokens) and
+# 5.01 GiB on Muse Glimmer, for a tensor that is frozen and therefore gains
+# nothing from fp32 master weights. Both models OOMed on Kaggle 2x T4 building
+# the trainer, with the weights already loaded and sharded across both cards.
+# 0.24.0 through 0.26.2 all have the clause and still expose GKDTrainer at the
+# top level; 0.25.1 is the one this notebook was run against.
+installation_knowledge_distillation_kaggle_content = installation_qwen3_8_kaggle_content.replace(
+    '!uv pip install -qqq --no-deps trl==0.22.2',
+    '!uv pip install -qqq --no-deps trl==0.25.1',
+)
+assert "trl==0.25.1" in installation_knowledge_distillation_kaggle_content
+# GKD needs 2026.10.5 or newer: older releases downcast GKDConfig to SFTConfig
+# (unslothai/unsloth#11440) and have no chunked JSD (unslothai/unsloth#12136).
+# The installs below say a bare `unsloth`, which pip treats as satisfied by ANY
+# installed version, so a runtime already holding an older one keeps it and
+# quietly runs plain SFT. Measured: with 2026.9.7 present, `pip install unsloth`
+# left 2026.9.7 in place. Kaggle images can carry unsloth too.
+installation_knowledge_distillation_kaggle_content += (
+    '\n!uv pip install -qqq --no-deps --upgrade "unsloth>=2026.10.5" "unsloth_zoo>=2026.10.5"'
+)
+assert "unsloth>=2026.10.5" in installation_knowledge_distillation_kaggle_content
+installation_knowledge_distillation_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.15.1",
+)
+# Same TRL pin as the Kaggle variant above. The Colab and local outputs would
+# otherwise keep the global 0.22.2, so the notebook would be running against a
+# different TRL from the one it was verified on.
+installation_knowledge_distillation_content = installation_knowledge_distillation_content.replace(
+    "!pip install --no-deps trl==0.22.2",
+    "!pip install --no-deps trl==0.25.1",
+)
+assert "trl==0.25.1" in installation_knowledge_distillation_content
+assert "trl==0.22.2" not in installation_knowledge_distillation_content
+installation_knowledge_distillation_content += (
+    '\n!pip install --no-deps --upgrade "unsloth>=2026.10.5" "unsloth_zoo>=2026.10.5"'
+)
+assert "unsloth>=2026.10.5" in installation_knowledge_distillation_content
+
+# A wheel, not a source build of `main`: every sglang release pins ONE exact
+# transformers, so cloning main and then forcing transformers==4.53.0 left the
+# two disagreeing.
+#
+# sglang pins torch==2.11.0, whose default CUDA build disagrees with Colab's
+# torchvision ("PyTorch has CUDA Version=13.0 and torchvision has CUDA
+# Version=12.8"). PEP 440 ignores a local label, so `torchvision==0.26.0` is
+# already satisfied by Colab's 0.26.0+cu128; force-reinstalling the same
+# version is what pulls it from the index the new torch came from.
+#
+# torchaudio is the same story and needs the same line. sglang 0.5.16 does pin
+# `torchaudio==2.11.0`, but that pin is already satisfied by Colab's
+# 2.11.0+cu128, so pip leaves the CUDA 12.8 build in place next to the new
+# CUDA 13.0 torch. torchaudio checks the two at import and raises
+# "Detected that PyTorch and TorchAudio were compiled with different CUDA
+# versions", and sglang imports torchaudio (srt/utils/common.py, the multimodal
+# processors, the realtime session), so launch_server never comes up. PyPI's
+# torchaudio 2.11.0 is itself a +cu130 build, so pulling it from the same index
+# as torch is all that is needed.
+installation_sglang_content = """%%capture
+!pip install "sglang[all]==0.5.16"
+!pip install --force-reinstall --no-deps "torchvision==0.26.0" "torchaudio==2.11.0\""""
 installation_sglang_kaggle_content = installation_sglang_content
 
 installation_deepseek_ocr_content = installation_content
@@ -666,25 +1169,30 @@ installation_ernie_4_5_vl_kaggle_content = installation_kaggle_content
 installation_ernie_4_5_vl_kaggle_content += """\n!pip install decord"""
 
 installation_nemotron_nano_content = """%%capture
-import os, importlib.util
+import os, importlib.util, importlib.metadata
 !pip install --upgrade -qqq uv
+# Keep the resident torch: `unsloth install-kernels` below takes the mamba_ssm / causal_conv1d
+# wheels built for it, so there is no torch downgrade and no ~30 minute source build. Read the
+# version from metadata: importing torch first would break torchvision if uv then replaced it.
+try: _torch = "torch==" + importlib.metadata.version("torch").split("+")[0]
+except importlib.metadata.PackageNotFoundError: _torch = "torch"
 if importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):
     try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"
     except: _numpy = "numpy"; _pil = "pillow"
     !uv pip install -qqq \\
-        "torch==2.7.1" "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.56.2" \\
+        {_torch} "triton>=3.3.0" {_numpy} {_pil} torchvision bitsandbytes "transformers==4.57.6" \\
         "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\
         "unsloth[base] @ git+https://github.com/unslothai/unsloth"
     !uv pip install -qqq --no-deps "torchcodec==0.5"
 elif importlib.util.find_spec("unsloth") is None:
     !uv pip install -qqq unsloth
-!uv pip install --upgrade --no-deps transformers==4.56.2 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
-
-# Mamba is supported only on torch==2.7.1. If you have newer torch versions, please wait 30 minutes!
-!uv pip install --no-build-isolation mamba_ssm==2.2.5 causal_conv1d==1.5.2
-""".replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + '!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
+!uv pip install --upgrade --no-deps transformers==4.57.6 "{PIN_TOKENIZERS_SPEC}" trl==0.22.2 unsloth unsloth_zoo
+""".replace("{PIN_TOKENIZERS_SPEC}", PIN_TOKENIZERS_SPEC) + KERNELS_INSTALL + '\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"'
 
 installation_nemotron_nano_kaggle_content = installation_nemotron_nano_content
+# ROCm has no wheels: the AMD composer still reads the source-build line, whose
+# {_mamba} / {_conv} resolve through _AMD_VARIABLE_PACKAGE_FALLBACKS.
+NEMOTRON_KERNELS_AMD = "!uv pip install --no-build-isolation {_mamba} {_conv}\n"
 
 installation_qat_content = """%%capture
 import os, re
@@ -692,18 +1200,29 @@ if "COLAB_" not in "".join(os.environ.keys()):
     !pip install unsloth
 else:
     # Do this only in Colab notebooks! Otherwise use pip install unsloth
-    import torch; v = re.match(r"[0-9]{1,}\.[0-9]{1,}", str(torch.__version__)).group(0)
-    __XFORMERS_INSTALL__
-    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth
+    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth
+    __KERNELS_INSTALL__
     !pip install --no-deps --upgrade "torchao>=0.16.0"
     !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer
 __QAT_NATIVE_INSTALL__
-!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2""".replace(
-    "__XFORMERS_INSTALL__", XFORMERS_INSTALL
+!pip install transformers==4.57.6 && pip install --no-deps trl==0.22.2""".replace(
+    "__KERNELS_INSTALL__", KERNELS_INSTALL
 ).replace(
     "__QAT_NATIVE_INSTALL__", build_qat_native_install_block()
 )
 installation_qat_kaggle_content = installation_qat_content
+
+# The CLI exists only once unsloth is installed, so the kernel line must sit right after that install.
+for _kernels_block in (
+    installation_content,
+    installation_gemma4_content,
+    installation_diffusiongemma_content,
+    installation_embeddinggemma2_content,
+    installation_qat_content,
+):
+    _lines = _kernels_block.splitlines()
+    _at = _lines.index(SPACES + KERNELS_INSTALL)
+    assert re.search(r'(\s|")unsloth(\s|"|>|$)', _lines[_at - 1]) and "{xformers}" not in _kernels_block, _lines
 
 installation_ministral_content = installation_content
 installation_ministral_content = update_or_append_pip_install(
@@ -737,7 +1256,7 @@ installation_phone_content = installation_content
 installation_phone_content = update_or_append_pip_install(
     installation_phone_content,
     "transformers",
-    "!pip install transformers==4.57.3"
+    "!pip install transformers==4.57.6"
 )
 installation_phone_content = update_or_append_pip_install(
     installation_phone_content,
@@ -751,7 +1270,7 @@ installation_phone_kaggle_content = installation_kaggle_content
 installation_phone_kaggle_content = update_or_append_pip_install(
     installation_phone_kaggle_content,
     "transformers",
-    "!pip install transformers==4.57.3"
+    "!pip install transformers==4.57.6"
 )
 installation_phone_kaggle_content = update_or_append_pip_install(
     installation_phone_kaggle_content,
@@ -838,6 +1357,15 @@ _RE_SAVE_LORA = re.compile(
 )
 _RE_PUSH_LORA = re.compile(
     r"(\b(?:model|tokenizer|processor)\.push_to_hub\(\s*)([\"\'])([^\"\']*)([\"\'])"
+)
+# `safe_open("<dir>/adapter_model.safetensors", ...)` reads back the adapter
+# that a save_pretrained("<dir>") above wrote, so it has to follow the same
+# rename. Only for directories the rename actually moved: notebooks that write
+# the adapter with model.save_lora("grpo_saved_lora") are untouched by
+# _RE_SAVE_LORA, and rewriting their safe_open would point it at a directory
+# nothing ever writes.
+_RE_SAFE_OPEN_LORA = re.compile(
+    r"(safe_open\(\s*)([\"\'])([^\"\']*)(/adapter_model\.safetensors)([\"\'])"
 )
 _RE_LORA_LOAD = re.compile(
     r"(model_name\s*=\s*)([\"\'])([^\"\']*)([\"\'])([^\n]*YOUR MODEL YOU USED FOR TRAINING)"
@@ -1021,6 +1549,7 @@ TYPE_MAPPING = {
 }
 
 KNOWN_TYPES_ORDERED = [
+    "Knowledge Distillation",
     "Tool Calling",          
     "Text Completion",       
     "Synthetic Data",        
@@ -1051,6 +1580,7 @@ KNOWN_TYPES_ORDERED = [
     "GRPO Sudoku",
     
     "ORPO",
+    "PPO",
     "GRPO",
     "DPO",
     "CPT",
@@ -1082,6 +1612,22 @@ DONT_UPDATE_EXCEPTIONS = [
     "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb", # OpenEnv BF16 variant
     "Synthetic_Data_Hackathon.ipynb",                                  # Hackathon-specific notebook
     "Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb",       # Custom Sudoku RL environment
+]
+
+# Notebooks that get no AMD counterpart at all. `Gemma3N_(2B)-Inference` only
+# serves through sglang, which publishes no ROCm wheel: 0.5.16 wants CUDA-13
+# builds of torch==2.11.0 and sglang-kernel==0.4.5, so the Colab line would
+# drop a CUDA torch on top of the ROCm one. The AMD path is a prebuilt
+# `lmsysorg/sglang:v0.5.16-rocm*` image or a `setup_rocm.py` compile, neither
+# of which fits in an install cell. `Unsloth_Studio` uses Studio's Colab-only launcher.
+AMD_SKIP_NOTEBOOKS = [
+    "Gemma3N_(2B)-Inference.ipynb",
+    "Unsloth_Studio.ipynb",
+]
+
+# No Kaggle counterpart: Studio's launcher is Colab-only.
+KAGGLE_SKIP_NOTEBOOKS = [
+    "Unsloth_Studio.ipynb",
 ]
 
 # Notebooks that live ONLY under nb/ (not original_template/) but for which we
@@ -1164,6 +1710,10 @@ README_TYPE_OVERRIDES = {
     "All_MiniLM_L6_v2.ipynb": "Embeddings",
     "BGE_M3.ipynb": "Embeddings",
     "EmbeddingGemma_(300M).ipynb": "Embeddings",
+    "EmbeddingGemma2_(300M).ipynb": "Embeddings",
+    "EmbeddingGemma2_(300M)-Multimodal_Search.ipynb": "Multimodal Search",
+    "EmbeddingGemma2_(300M)-Image_Text.ipynb": "Image Embeddings",
+    "EmbeddingGemma2_(300M)-Audio.ipynb": "Audio Embeddings",
     "Qwen3_Embedding_(0_6B).ipynb": "Embeddings",
     "Qwen3_Embedding_(4B).ipynb": "Embeddings",
     # Mixture of Experts
@@ -1182,6 +1732,7 @@ README_TYPE_OVERRIDES = {
     "Qwen_3_5_27B_A100(80GB).ipynb": "Conversational",
     # Misc single-task notebooks
     "ModernBert.ipynb": "Classification",
+    "Qwen3_5_(4B)-Decision.ipynb": "Decision Model",
     "Deepseek_OCR_2_(3B).ipynb": "Fine Tuning",
     "LFM2.5_(1.2B)-Translation.ipynb": "Translation",
     "DiffusionGemma_(26B-A4B)-Sudoku.ipynb": "Sudoku",
@@ -1190,9 +1741,7 @@ README_TYPE_OVERRIDES = {
 # Per-notebook (Model, Type) overrides that apply ONLY to the AMD Notebooks
 # section, keyed by the prefix-stripped basename. Colab/Kaggle keep the shared
 # overrides above and the filename-derived name/type.
-README_AMD_NAME_TYPE_OVERRIDES = {
-    "Unsloth_Studio.ipynb": ("Unsloth Studio", "Chat UI"),
-}
+README_AMD_NAME_TYPE_OVERRIDES = {}
 
 
 FIRST_MAPPING_NAME = {
@@ -1610,6 +2159,10 @@ def validate_notebook_syntax(notebook_path):
 
 _RE_FAST_INFERENCE_TRUE = re.compile(r"\bfast_inference\s*=\s*true\b", re.IGNORECASE)
 _RE_INSTALL_SECTION_MD = re.compile(r"\b(installation|install|setup)\b", re.IGNORECASE)
+# A heading introducing a dependency install, e.g. "### Install
+# causal-conv-1d". Not `_RE_INSTALL_SECTION_MD`, which also matches
+# "setup" anywhere in the line and so accepts "### Setup the model".
+_RE_DEPENDENCY_HEADING = re.compile(r"^#+\s*(?:\d+[.)]\s*)?install", re.IGNORECASE)
 
 
 def _cell_source_text(cell):
@@ -1621,9 +2174,20 @@ def _cell_source_text(cell):
     return str(source)
 
 
+def _is_install_code(source_text):
+    """Install evidence in the cell itself, ignoring what sits above it."""
+    lower = source_text.lower()
+    return (
+        "pip install" in lower
+        or "uv pip install" in lower
+        or "pip3_autoremove" in lower
+        or "unsloth install-kernels" in lower
+    )
+
+
 def _is_install_like_cell(cells, idx, source_text):
     lower = source_text.lower()
-    if "pip install" in lower or "uv pip install" in lower or "pip3_autoremove" in lower:
+    if _is_install_code(source_text):
         return True
     prev_md = ""
     if idx > 0 and cells[idx - 1].get("cell_type") == "markdown":
@@ -1633,6 +2197,154 @@ def _is_install_like_cell(cells, idx, source_text):
     # Most install blocks live near the top and include setup/capture boilerplate.
     if idx <= 6 and ("%%capture" in lower or "colab" in lower) and ("unsloth" in lower or "pip" in lower):
         return True
+    return False
+
+
+def _owns_extra_grpo_install_cell(notebook_path, cells, idx):
+    """True when the GRPO extra install block may be written into ``cells[idx]``.
+
+    The GRPO branch used to assign into ``cells[i + 2]`` unconditionally, so it
+    stamped the block onto whatever happened to sit there. In
+    ``Qwen3_5_(4B)_Vision_GRPO.ipynb`` that was a markdown cell: the install code
+    could never run, and the transformers pin it carried contradicted the
+    Qwen3.5 install block selected further below. Two conditions now apply.
+
+    1. The target must be a code cell. Templates park a ``# Placeholder`` code
+       cell there for the generator to fill, so this keeps the existing
+       behaviour for every template-backed GRPO notebook while refusing to
+       overwrite prose.
+    2. The Qwen3.5 / Qwen3.6 family is excluded. Those notebooks use
+       ``installation_qwen3_5_content``, which pins transformers 5.x and needs no
+       separate vLLM install cell.
+    3. Gemma4 is excluded for the same reason. ``installation_gemma4_content``
+       installs ``transformers==5.5.0``, but the extra block's own
+       ``uv pip install transformers==4.56.2`` (from ``UV_PIN_TRANSFORMERS``,
+       there because vLLM requires transformers<5) ran after it and won, so
+       ``Gemma4_(E2B)_GRPO.ipynb`` died on
+
+           `unsloth/gemma-4-E2B-it` is not supported yet in `transformers==4.56.2`
+
+       and it never used that vLLM anyway: the notebook sets
+       ``fast_inference = False``.
+
+    Unlike Qwen3.5, the Gemma4 cell at ``idx`` is real code with no
+    ``original_template`` to regenerate from, so the caller deletes it.
+    """
+    if is_path_contains_any(
+        notebook_path.lower(),
+        ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6", "gemma4"],
+    ):
+        return False
+    if idx < 0 or idx >= len(cells):
+        return False
+    return cells[idx].get("cell_type") == "code"
+
+
+# Recognises a generated extra GRPO block without matching a hand-written install cell.
+_EXTRA_GRPO_INSTALL_MARKERS = ("Colab Extra Install", "vllm==")
+
+
+def _is_extra_grpo_install_cell(cells, idx):
+    """Is ``cells[idx]`` a previously generated GRPO extra install cell?
+
+    Only asked before deleting one. The excluded families still carry the block
+    from before they were excluded, and leaving it keeps the pin that broke
+    them; deleting whatever happens to sit at ``i + 2`` would be worse.
+    """
+    if idx < 0 or idx >= len(cells):
+        return False
+    if cells[idx].get("cell_type") != "code":
+        return False
+    text = _cell_source_text(cells[idx])
+    return all(marker in text for marker in _EXTRA_GRPO_INSTALL_MARKERS)
+
+
+# `import torch` as a statement, including after a `;` or as the body of a
+# one-line `else:`. Install cells write both shapes.
+_TORCH_IMPORT_STATEMENT = re.compile(
+    r"(?:^|(?<=[;:]))\s*(?:import\s+torch\b|from\s+torch[\s.])"
+)
+
+
+def _defer_torch_imports_past_downgrade(install_text):
+    """Stop the first install cell from loading libtorch before the vLLM cell.
+
+    The GRPO extra install cell pins vLLM, and vLLM pins one exact torch
+    (`vllm==0.15.1` wants `torch==2.9.1` / `torchvision==0.24.1`), so on Colab
+    (`torch 2.11.0+cu128`) it DOWNGRADES both on disk. That is survivable while
+    nothing has imported torch yet, which is why the 44 GRPO notebooks built on
+    `installation_grpo_content` are fine: that block never imports torch.
+
+    The family-specific install blocks selected further below --
+    `installation_gemma4_content`, `installation_qwen3_vl_content` -- do import
+    torch, and they overwrite the GRPO choice for cell i+1 while the extra cell
+    at i+2 stays. libtorch 2.11.0 is then already live in the kernel when the
+    downgrade lands, so torchvision 0.24.1's `_C.so` cannot register its
+    operators against it and the next `import torchvision` dies with
+    `RuntimeError: operator torchvision::nms does not exist`.
+
+    Reinstalling torchvision does not help: on disk torch 2.9.1 and torchvision
+    0.24.1 are already a matched pair. The split is live-kernel versus disk, so
+    the only fix is to not load libtorch first. Two rewrites do that:
+
+    1. The xformers version probe reads `importlib.metadata` instead of
+       importing torch. It returns the same string for the installed
+       distribution (`2.11.0+cu128`) without loading the extension module.
+    2. Any remaining torch-importing line is handed back to the caller to
+       re-emit at the END of the extra install cell, i.e. after the downgrade,
+       where it binds the torch that is actually on disk.
+
+    Returns ``(rewritten_install_text, lines_to_relocate)``.
+    """
+    had_trailing_newline = install_text.endswith("\n")
+    kept, relocated = [], []
+    probe_rewritten = False
+    for line in install_text.split("\n"):
+        if not _TORCH_IMPORT_STATEMENT.search(line):
+            if probe_rewritten and "torch.version.cuda" in line:
+                # torch is not imported here; the PyTorch-index version label carries the CUDA build.
+                line = line.replace(
+                    'str(torch.version.cuda).startswith("13")',
+                    '"+cu13" in _torch_meta.version("torch")',
+                )
+                if "torch." in line.replace("download.pytorch.org", ""):
+                    raise RuntimeError(f"cannot rewrite a torch reference without importing torch: {line!r}")
+            kept.append(line)
+            continue
+        if "torch.__version__" in line:
+            rewritten = line.replace(
+                "import torch;", "import importlib.metadata as _torch_meta;"
+            ).replace("torch.__version__", '_torch_meta.version("torch")')
+            if _TORCH_IMPORT_STATEMENT.search(rewritten):
+                raise RuntimeError(
+                    "cannot rewrite the torch version probe without importing "
+                    f"torch: {line!r}"
+                )
+            kept.append(rewritten)
+            probe_rewritten = True
+            continue
+        if line != line.lstrip():
+            raise RuntimeError(
+                "an indented `import torch` cannot be moved past the vLLM "
+                f"downgrade without changing control flow: {line!r}"
+            )
+        relocated.append(line.strip())
+    while kept and not kept[-1].strip():
+        kept.pop()
+    rewritten_text = "\n".join(kept)
+    if had_trailing_newline:
+        rewritten_text += "\n"
+    return rewritten_text, relocated
+
+
+def _notebook_imports_sglang(notebook_content):
+    """Whether any code cell imports sglang."""
+    for cell in notebook_content.get("cells", []):
+        if cell.get("cell_type") != "code":
+            continue
+        source = _cell_source_text(cell)
+        if re.search(r"^\s*(?:import\s+sglang|from\s+sglang)", source, re.MULTILINE):
+            return True
     return False
 
 
@@ -1652,15 +2364,46 @@ def _is_installation_heading(source_text, is_amd_notebook=False):
 
 
 def _adjacent_install_like_code_cells(cells, first_code_idx):
+    """Install cells following `first_code_idx`, stepping over their headings.
+
+    Stopping at the first non-code cell missed a second install cell behind its
+    own heading: Qwen3_5_MoE / Qwen3_6_MoE hid a CUDA-wheel resolver behind
+    "### Install causal-conv-1d", which survived into the AMD variant and made
+    `_assert_amd_install_runtime` refuse the whole `--amd` run. The heading
+    comes back too, or it would point at nothing.
+    """
     install_cells = []
     idx = first_code_idx + 1
+    pending_headings = []
     while idx < len(cells):
         cell = cells[idx]
+        if cell.get("cell_type") == "markdown":
+            # Only a dependency-install heading. When any heading qualified,
+            # the cell behind it passed `_is_install_like_cell` on that alone,
+            # so `### Start Unsloth Studio` collected the Studio launch code,
+            # which the caller deletes.
+            text = _cell_source_text(cell).strip()
+            if len(text.splitlines()) > 1 or not _RE_DEPENDENCY_HEADING.match(text):
+                break
+            # `None` marks a heading: deleted with the cell, but kept out of
+            # the install text the AMD recipe is built from.
+            pending_headings.append((idx, None))
+            idx += 1
+            continue
         if cell.get("cell_type") != "code":
             break
         source_text = _cell_source_text(cell)
-        if not _is_install_like_cell(cells, idx, source_text):
+        # Past the first cell, judge on the cell's own content:
+        # `_is_install_like_cell` also says yes for the preceding markdown, so
+        # "### Install the trainer" over ordinary code would qualify it and the
+        # caller would delete both.
+        if pending_headings or install_cells:
+            if not _is_install_code(source_text):
+                break
+        elif not _is_install_like_cell(cells, idx, source_text):
             break
+        install_cells.extend(pending_headings)
+        pending_headings = []
         install_cells.append((idx, source_text))
         idx += 1
     return install_cells
@@ -1684,9 +2427,19 @@ def _is_residual_non_amd_install_cell(cells, idx, source_text):
 
 def _is_stale_amd_announcement(source_text):
     lower = source_text.lower()
-    return "to run this, press" in lower and any(
+    if "to run this, press" in lower and any(
         marker in lower
         for marker in ("google colab", "open in colab", "tesla t4", "runtime")
+    ):
+        return True
+    # A bare "Open in Colab" badge, which is how some hand-maintained notebooks
+    # open. With no "to run this, press" the test above walked past it and the
+    # AMD variant kept a button pointing at the CUDA notebook.
+    stripped = source_text.strip()
+    return (
+        stripped.startswith("<a href=")
+        and "colab.research.google.com" in lower
+        and "\n\n" not in stripped
     )
 
 
@@ -2044,6 +2797,21 @@ def update_old_unsloth(filename):
         base_16 = f"{base}_finetune_16bit"
         base_4 = f"{base}_finetune_4bit"
 
+    # Directories that the LoRA rename below moves to `base_lora`. Collected
+    # over the whole notebook up front because the save_pretrained() call and
+    # the safe_open() that reads the adapter back live in different cells, and
+    # the rewrite runs one cell at a time.
+    renamed_lora_dirs = set()
+    for _cell in notebook_content.get("cells", []):
+        if not isinstance(_cell.get("source"), list):
+            continue
+        if _cell.get("cell_type") != "code":
+            continue
+        for _match in _RE_SAVE_LORA.finditer("".join(_cell["source"])):
+            if "phone_model" in _match.group(3):
+                continue
+            renamed_lora_dirs.add(_match.group(3))
+
     def replace_hf_prefix(name, new_name):
         if "/" in name:
             prefix = name.split("/", 1)[0]
@@ -2226,6 +2994,16 @@ def update_old_unsloth(filename):
 
         text = _RE_SAVE_LORA.sub(_replace_save_lora, text)
 
+        def _replace_safe_open_lora(match):
+            if match.group(3) not in renamed_lora_dirs:
+                return match.group(0)
+            return (
+                f"{match.group(1)}{match.group(2)}{base_lora}"
+                f"{match.group(4)}{match.group(5)}"
+            )
+
+        text = _RE_SAFE_OPEN_LORA.sub(_replace_safe_open_lora, text)
+
         def _replace_push_lora(match):
             if "phone_model" in match.group(3):
                 return match.group(0)
@@ -2370,6 +3148,8 @@ def _extract_pip_packages(install_text):
     packages = set()
     for m in _RE_PIP_INSTALL_LINE.finditer(install_text):
         for token in m.group(1).split():
+            if token.strip("\"'") == "{_torchcodec}":
+                token = "torchcodec"
             if any(token.startswith(p) for p in _INSTALL_FLAG_PREFIXES):
                 continue
             if "git+" in token or "://" in token:
@@ -2406,6 +3186,8 @@ _AMD_INSTALL_PACKAGE_IGNORE = frozenset({
     # NVIDIA/Hopper TileLang backend deps; do not auto-propagate into ROCm
     # AMD notebooks. AMD users get a separate ROCm install path or skip.
     "apache_tvm_ffi", "apache-tvm-ffi", "tilelang", "torch_c_dlpack_ext",
+    # unsloth_zoo vendors the fla kernels; without this the committed AMD cell re-seeds the install.
+    "flash_linear_attention", "flash-linear-attention", "fla_core", "fla-core",
 })
 
 _AMD_VARIABLE_PACKAGE_FALLBACKS = {
@@ -2414,6 +3196,14 @@ _AMD_VARIABLE_PACKAGE_FALLBACKS = {
     "{_numpy}": "numpy",
     "{_pil}": "pillow",
     "{xformers}": "xformers",
+    # Unresolved these key to nothing and the whole --no-build-isolation group
+    # is dropped. ROCm never gets the torch 2.7.1 CUDA wheel 2.2.5/1.5.2 needs,
+    # so AMD takes the newer pair unconditionally.
+    "{_mamba}": "mamba_ssm==2.3.2.post1",
+    "{_conv}": "causal_conv1d==1.6.2.post1",
+    # torch is owned by the ROCm bootstrap and already ignored; named so the
+    # variable is never emitted literally into a %%bash cell.
+    "{_torch}": "torch",
 }
 
 _AMD_PIP_VALUE_FLAGS = {
@@ -2428,6 +3218,26 @@ _AMD_PRESERVE_SETUP_PREFIXES = (
     "sys.path.append(",
     "%env ",
 )
+
+# The one uninstall carried into AMD cells. Anything else `!uv pip uninstall`
+# removes is left to the source cell, since the extractor sees stripped lines and
+# would re-emit a conditional uninstall unconditionally after the ROCm bootstrap.
+_AMD_PRESERVE_UNINSTALL_PACKAGES = frozenset({"flash-linear-attention", "fla-core"})
+
+
+def _is_preserved_uninstall_line(raw_line):
+    """True for a column-zero `!uv pip uninstall` of exactly the fla packages."""
+    if raw_line != raw_line.lstrip():
+        return False
+    line = raw_line.strip()
+    if not line.startswith("!uv pip uninstall"):
+        return False
+    packages = [
+        token
+        for token in _split_pip_args(line[len("!uv pip uninstall"):])
+        if not token.startswith("-")
+    ]
+    return set(packages) == _AMD_PRESERVE_UNINSTALL_PACKAGES
 
 
 def _logical_install_lines(text):
@@ -2458,7 +3268,8 @@ def _iter_pip_install_arg_strings(text):
             r"(?:^|&&\s*)!?\s*(?:uv\s+)?pip\s+install\s+(.+?)(?=\s+&&\s+!?\s*(?:uv\s+)?pip\s+install\b|$)",
             line,
         ):
-            yield match.group(1).strip()
+            # `pip install X || echo ...` is a shell fallback, not more packages.
+            yield re.split(r"\s+\|\|\s+", match.group(1), maxsplit=1)[0].strip()
 
 
 def _split_pip_args(arg_string):
@@ -2480,6 +3291,9 @@ def _package_key_from_install_token(token):
         token = token.split(" @ ", 1)[0].strip()
     if token.startswith("git+") or "://" in token:
         repo = token.rstrip("/").rsplit("/", 1)[-1]
+        if repo.endswith(".whl"):
+            # A wheel URL names its distribution before the first dash.
+            return repo.split("-", 1)[0].lower().replace("-", "_") or None
         repo = repo.split(".git")[0].split("@")[0].split("#")[0]
         return repo.lower().replace("-", "_") if repo else None
     token = re.sub(r"\[.*?\]", "", token)
@@ -2631,13 +3445,107 @@ def _extract_preserved_setup_lines(text):
         line = raw_line.strip()
         if not line:
             continue
-        if line.startswith(_AMD_PRESERVE_SETUP_PREFIXES):
+        if _is_preserved_uninstall_line(raw_line):
+            # AMD pip calls run --system (no venv in the ROCm images); this line skips _format_amd_pip_call.
+            if "--system" not in _split_pip_args(line):
+                line = line.replace(
+                    "!uv pip uninstall", "!uv pip uninstall --system", 1
+                )
             preserved.append(line)
+        elif line.startswith(_AMD_PRESERVE_SETUP_PREFIXES):
+            preserved.append(line)
+        elif line.startswith('os.environ["FLA_TILELANG"]'):
+            # Leftover from the removed TileLang install; unsloth_zoo sets it itself.
+            continue
         elif line.startswith("os.environ["):
             preserved.append(line)
         elif "torch._dynamo.config.recompile_limit" in line:
             preserved.append(line)
     return preserved
+
+
+# unsloth / unsloth_zoo sit in _AMD_INSTALL_PACKAGE_IGNORE and the parity
+# validator subtracts the same set, so dropping them is invisible. A source
+# installs them from git main only for a feature no release carries yet
+# (FastDiffusionModel), so the git specs are re-emitted in the extras cell.
+_AMD_GIT_MAIN_PROJECTS = frozenset({"unsloth", "unsloth_zoo"})
+
+
+def _iter_install_tokens(text):
+    """Install tokens from `!pip install ...` lines and `_pip(...)` blocks."""
+    for arg_string in _iter_pip_install_arg_strings(text):
+        yield from _split_pip_args(arg_string)
+    in_pip_call = False
+    pip_call_lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not in_pip_call and not line.startswith("_pip("):
+            continue
+        in_pip_call = True
+        pip_call_lines.append(line)
+        if ")" not in line:
+            continue
+        block = "\n".join(pip_call_lines)
+        for match in re.findall(r"\"([^\"]+)\"|'([^']+)'", block):
+            yield match[0] or match[1]
+        in_pip_call = False
+        pip_call_lines = []
+
+
+def _extract_git_main_unsloth_specs(source_install_texts):
+    """Git URLs for unsloth / unsloth_zoo the source installs from main.
+
+    Both the bare ``git+https://...`` form and the PEP 508 ``unsloth[base] @
+    git+https://...`` reference count. Only the URL half is kept, since the AMD
+    re-install is ``--no-deps`` and an extra would be a no-op.
+    """
+    specs = []
+    seen = set()
+    for text in source_install_texts:
+        if not text:
+            continue
+        for token in _iter_install_tokens(text):
+            spec = _clean_install_spec(token)
+            if " @ " in spec:
+                spec = spec.split(" @ ", 1)[1].strip()
+            if not spec.startswith("git+"):
+                continue
+            if _package_key_from_install_token(spec) not in _AMD_GIT_MAIN_PROJECTS:
+                continue
+            if spec not in seen:
+                seen.add(spec)
+                specs.append(spec)
+    return specs
+
+
+def _extract_forced_unsloth_release_specs(source_install_texts):
+    """Released unsloth / unsloth_zoo specs the source force-reinstalls.
+
+    A source passes ``--force-reinstall`` when it means to replace whatever
+    build is already installed. The AMD base cell installs the same two
+    packages with a plain ``-U``, which leaves an equal-or-newer build (a
+    leftover git one) in place, so those specs are re-emitted like the git
+    ones. Only lines carrying the flag count; a plain install is already
+    covered by the base cell.
+    """
+    specs = []
+    seen = set()
+    for text in source_install_texts:
+        if not text:
+            continue
+        for arg_string in _iter_pip_install_arg_strings(text):
+            if "--force-reinstall" not in arg_string:
+                continue
+            for token in _split_pip_args(arg_string):
+                spec = _clean_install_spec(token)
+                if spec.startswith("git+") or " @ " in spec:
+                    continue
+                if _package_key_from_install_token(spec) not in _AMD_GIT_MAIN_PROJECTS:
+                    continue
+                if spec not in seen:
+                    seen.add(spec)
+                    specs.append(spec)
+    return specs
 
 
 _AMD_SHELL_BARE_RE = re.compile(r'^[A-Za-z0-9_\-./+:@]+$')
@@ -2666,6 +3574,9 @@ def _format_amd_pip_call(flags, specs):
 
 
 def _build_qat_version_vars_block():
+    torchao_exact_mapping = json.dumps(
+        QAT_TORCHAO_BY_TORCH_VERSION, sort_keys=True, separators=(",", ":")
+    )
     torchao_mapping = json.dumps(
         QAT_TORCHAO_BY_TORCH_MINOR, sort_keys=True, separators=(",", ":")
     )
@@ -2674,13 +3585,37 @@ def _build_qat_version_vars_block():
     )
     return f"""import re
 try:
-    import torch; _qat_torch_minor = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0)
+    import torch; _qat_torch_version = re.match(r"[0-9]{{1,}}\\.[0-9]{{1,}}\\.[0-9]{{1,}}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]
 except Exception:
-    _qat_torch_minor = ""
+    _qat_torch_version = _qat_torch_minor = ""
+# peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch
+# 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.
+_qat_torchao_exact_map = {torchao_exact_mapping}
 _qat_torchao_map = {torchao_mapping}
-_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "{QAT_DEFAULT_TORCHAO_VERSION}")
+_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor)
+{_qat_torchao_fallback_snippet()}
 _qat_fbgemm_map = {fbgemm_mapping}
-_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")"""
+_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "{QAT_DEFAULT_FBGEMM_GENAI_VERSION}")
+{QAT_NUMPY_PIN_BLOCK}"""
+
+
+def _pin_qat_numpy_beside_fbgemm(merged_groups):
+    """Put the numpy and torchao pins in the command that force-reinstalls fbgemm.
+
+    A later command is too late for numpy: pip has already resolved a newer one
+    and the kernel is holding the old one. torchao belongs here because the AMD
+    variant seeds a bare `torchao` with lock = True, so `_merge_spec` drops the
+    source's `torchao=={_qat_torchao}` as Colab drift and AMD installs the
+    newest release, the mismatch this block exists to prevent. Overriding the
+    lock is safe: the AMD config names no torchao version of its own.
+    """
+    for specs in merged_groups.values():
+        if not any("fbgemm-gpu-genai" in spec for spec in specs):
+            continue
+        if "{_qat_numpy}" not in specs:
+            specs.append("{_qat_numpy}")
+        if not any("torchao" in spec for spec in specs):
+            specs.append("torchao=={_qat_torchao}")
 
 
 def _is_amd_grpo_like_path(notebook_path):
@@ -2714,6 +3649,60 @@ def _extract_variant_header(variant_extras):
     return out
 
 
+def _is_qwen3_moe_path(notebook_path):
+    """The Qwen3.5/3.6 MoE pair, not the Qwen3.5 Vision notebooks beside them."""
+    lowered = os.path.basename(notebook_path).lower()
+    return "moe" in lowered and is_path_contains_any(
+        lowered, ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6"]
+    )
+
+
+# Template / hand-maintained cells whose `!unsloth install-kernels <names>` line replaced a pinned
+# kernel install. ROCm has no wheels, so AMD keeps reading the line it read before.
+_AMD_KERNEL_LINES = {
+    "Falcon_H1_(0.5B)-Alpaca": {
+        "!unsloth install-kernels causal_conv1d mamba_ssm":
+            "!pip install --no-deps causal-conv1d==1.5.0.post8\n!pip install --no-build-isolation mamba-ssm==2.2.4",
+    },
+    "Falcon_H1-Alpaca": {
+        "!unsloth install-kernels causal_conv1d":
+            "!pip install --no-build-isolation git+https://github.com/Dao-AILab/causal-conv1d.git@main",
+        "!unsloth install-kernels mamba_ssm":
+            "!pip install --no-build-isolation git+https://github.com/state-spaces/mamba.git@main",
+    },
+    "Granite4.0_350M": {
+        "!unsloth install-kernels causal_conv1d mamba_ssm":
+            "!pip install --no-build-isolation mamba_ssm==2.2.5\n!pip install --no-build-isolation causal_conv1d==1.5.2",
+    },
+    "Liquid_LFM2_(1.2B)-Conversational": {
+        "!unsloth install-kernels causal_conv1d # Install Mamba kernels":
+            "!pip install --no-deps causal-conv1d==1.5.0.post8 # Install Mamba kernels",
+    },
+    "Liquid_LFM2-Conversational": {
+        "!unsloth install-kernels causal_conv1d # Install Mamba kernels":
+            "!pip install --no-deps causal-conv1d==1.5.0.post8 # Install Mamba kernels",
+    },
+}
+
+
+def _amd_kernel_source(text, notebook_path):
+    """Give the AMD composer ROCm's kernel lines wherever a CUDA cell runs `unsloth install-kernels`.
+
+    The Qwen3.5 and SSM blocks carry the bare line at column zero; the Colab cells' indented copy
+    stays, and the composer ignores it like any other non-pip line.
+    """
+    if not text:
+        return text
+    stem = os.path.basename(notebook_path).removesuffix(".ipynb").removeprefix("AMD-")
+    for line, amd_lines in _AMD_KERNEL_LINES.get(stem, {}).items():
+        text = re.sub(rf"(?m)^{re.escape(line)}$", lambda _: amd_lines, text)
+    if "\n" + KERNELS_INSTALL + "\n" not in text:
+        return text
+    ssm_block = "trl==0.22.2 unsloth unsloth_zoo\n" + KERNELS_INSTALL in text and "transformers==4.57.6" in text
+    amd = NEMOTRON_KERNELS_AMD if ssm_block else QWEN3_5_CAUSAL_CONV1D_AMD
+    return text.replace("\n" + KERNELS_INSTALL + "\n", "\n" + amd, 1)
+
+
 def _compose_amd_installation(notebook_path, source_install_texts):
     """Build the AMD install cell(s) while preserving notebook-specific packages.
 
@@ -2734,14 +3723,21 @@ def _compose_amd_installation(notebook_path, source_install_texts):
          verbatim above the merged pip lines.
     """
     lowered = notebook_path.lower()
+    source_install_texts = [_amd_kernel_source(text, notebook_path) for text in source_install_texts]
     source_install_blob = "\n".join(text for text in source_install_texts if text).lower()
     if is_path_contains_any(lowered, ["gemma4"]):
         if is_path_contains_any(lowered, ["(12b)"]):
             variant_extras = installation_amd_extras_gemma4_12b
         else:
             variant_extras = installation_amd_extras_gemma4
+    elif _is_qwen3_moe_path(notebook_path):
+        variant_extras = installation_amd_extras_qwen3_moe
+    elif is_path_contains_any(lowered, ["grpo-tool_use"]):
+        variant_extras = installation_amd_extras_grpo_tool_use
     elif _is_amd_grpo_like_path(notebook_path) and "vllm" in source_install_blob:
         variant_extras = installation_amd_extras_grpo
+    elif is_path_contains_any(lowered, ["llasa"]):
+        variant_extras = installation_amd_extras_llasa
     else:
         variant_extras = installation_amd_extras_default
 
@@ -2798,8 +3794,21 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     extra_blocks = []
     if any("{_qat_" in spec for specs in merged_groups.values() for spec in specs):
         extra_blocks.append(_build_qat_version_vars_block())
+        _pin_qat_numpy_beside_fbgemm(merged_groups)
     if setup_lines:
         extra_blocks.append("\n".join(setup_lines))
+    replace_specs = _extract_git_main_unsloth_specs(source_install_texts)
+    if not replace_specs:
+        replace_specs = _extract_forced_unsloth_release_specs(source_install_texts)
+    if replace_specs:
+        # --no-deps keeps the ROCm stack the base cell just installed. That
+        # cell's own "unsloth[amd]" is --no-deps too, so overwriting it loses
+        # nothing.
+        extra_blocks.append(
+            _format_amd_pip_call(
+                ("--upgrade", "--force-reinstall", "--no-deps"), replace_specs
+            )
+        )
     for flags, specs in merged_groups.items():
         if specs:
             extra_blocks.append(_format_amd_pip_call(flags, specs))
@@ -3937,7 +4946,9 @@ def update_notebook_sections(
                                 notebook_content["cells"], i + 1
                             )
                             source_install_texts.extend(
-                                source_text for _idx, source_text in amd_followup_install_cells
+                                source_text
+                                for _idx, source_text in amd_followup_install_cells
+                                if source_text is not None
                             )
                         elif (
                             i + 2 < len(notebook_content["cells"])
@@ -3952,10 +4963,19 @@ def update_notebook_sections(
                         else:
                             installation = installation_steps
 
+                        # Index of the cell holding the vLLM-pinning extra
+                        # install block, once one has been stamped. The family
+                        # branches below overwrite `installation` for cell i+1
+                        # without withdrawing it, so the first cell has to be
+                        # kept torch-free -- see
+                        # `_defer_torch_imports_past_downgrade`.
+                        extra_grpo_install_idx = None
+
                         # GRPO INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"]):
+                            is_tool_use = is_path_contains_any(notebook_path.lower(), ["grpo-tool_use"])
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
-                                installation = installation_grpo_kaggle_content
+                                installation = installation_grpo_tool_use_kaggle_content if is_tool_use else installation_grpo_kaggle_content
                                 # Kaggle will delete the second cell instead -> Need to check
                                 if i + 2 < len(notebook_content["cells"]):
                                     del notebook_content["cells"][i + 2]
@@ -3965,7 +4985,18 @@ def update_notebook_sections(
                                 installation = installation_grpo_content
                                 # TODO: Remove after GRPO numpy bug fixed!
                                 # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                                notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
+                                if _owns_extra_grpo_install_cell(
+                                    notebook_path, notebook_content["cells"], i + 2
+                                ):
+                                    notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_tool_use_content if is_tool_use else installation_extra_grpo_content
+                                    extra_grpo_install_idx = i + 2
+                                elif is_path_contains_any(notebook_path.lower(), ["gemma4"]) and \
+                                    _is_extra_grpo_install_cell(notebook_content["cells"], i + 2):
+                                    # Not writing the block is not enough: the cell already
+                                    # holds it from a previous generation and there is no
+                                    # original_template to regenerate a clean one from. The
+                                    # marker guard keeps a hand-placed cell safe.
+                                    del notebook_content["cells"][i + 2]
 
                         # META INSTALLATION
                         elif is_path_contains_any(notebook_path.lower(), ["Meta"]):
@@ -3982,7 +5013,8 @@ def update_notebook_sections(
                                 # Error : ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
                                 if i + 2 < len(notebook_content["cells"]):
                                     notebook_content["cells"][i + 2]["source"] = installation_extra_grpo_content
-                        
+                                    extra_grpo_install_idx = i + 2
+
                         # ORPHEUS INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["orpheus"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -4032,13 +5064,6 @@ def update_notebook_sections(
                             else:
                                 installation = installation_sesame_csm_content
 
-                        # SGLANG INSTALLATION
-                        if is_path_contains_any(notebook_path.lower(), ["sglang"]):
-                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
-                                installation = installation_sglang_kaggle_content
-                            else:
-                                installation = installation_sglang_content
-
                         # QAT INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qat"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -4067,6 +5092,15 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma3n_content
 
+                        # Keyed off the import: the only sglang notebook is named
+                        # Gemma3N_(2B)-Inference, so a filename match never fired and
+                        # Gemma3N overwrote it. Must stay after the Gemma3N branch.
+                        if _notebook_imports_sglang(notebook_content):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_sglang_kaggle_content
+                            else:
+                                installation = installation_sglang_content
+
                         # Gemma4 INSTALLATION: preserve the custom
                         # transformers==5.5.0 --no-deps + torchcodec block.
                         if is_path_contains_any(notebook_path.lower(), ["gemma4"]):
@@ -4075,7 +5109,14 @@ def update_notebook_sections(
                             else:
                                 installation = installation_gemma4_content
 
-                        # DIFFUSIONGEMMA INSTALLATION: unsloth + unsloth_zoo from main, transformers 5.11.0.
+                        # EMBEDDINGGEMMA 2 INSTALLATION: transformers >= 5.18.0 + sentence-transformers >= 6.1.0.
+                        if is_path_contains_any(notebook_path.lower(), ["embeddinggemma2"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_embeddinggemma2_kaggle_content
+                            else:
+                                installation = installation_embeddinggemma2_content
+
+                        # DIFFUSIONGEMMA INSTALLATION: unsloth + unsloth_zoo from PyPI, transformers 5.11.0.
                         if is_path_contains_any(notebook_path.lower(), ["diffusiongemma"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
                                 installation = installation_diffusiongemma_kaggle_content
@@ -4096,6 +5137,27 @@ def update_notebook_sections(
                             else:
                                 installation = installation_deepseek_ocr_content
                                 
+                        # LFM2.5-VL INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["lfm2.5_vl"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_lfm2_vl_kaggle_content
+                            else:
+                                installation = installation_lfm2_vl_content
+
+                        # LIQUID LFM2 INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["liquid_lfm2"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_liquid_lfm2_kaggle_content
+                            else:
+                                installation = installation_liquid_lfm2_content
+
+                        # MUSE GLIMMER INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["muse_glimmer"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_muse_glimmer_kaggle_content
+                            else:
+                                installation = installation_muse_glimmer_content
+
                         # Qwen3VL INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["qwen3"]) and is_vision:
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -4104,9 +5166,9 @@ def update_notebook_sections(
                                 installation = installation_qwen3_vl_content
                                 
                         # Qwen3.5 / Qwen3.6 INSTALLATION (must come after Qwen3VL).
-                        # Match the inconsistently-named variants too. Qwen3.6 also
-                        # needs flash-linear-attention + causal_conv1d + tilelang so
-                        # we route both families through the same install block.
+                        # Match the inconsistently-named variants too. Qwen3.6 needs
+                        # the same causal_conv1d build as Qwen3.5, so we route both
+                        # families through the same install block.
                         if is_path_contains_any(
                             notebook_path.lower(),
                             ["qwen3_5", "qwen_3_5", "qwen3_6", "qwen_3_6"],
@@ -4115,6 +5177,32 @@ def update_notebook_sections(
                                 installation = installation_qwen3_5_kaggle_content
                             else:
                                 installation = installation_qwen3_5_content
+
+                        # Qwen3.8 INSTALLATION. The escaped dot is load-bearing
+                        # twice over. is_path_contains_any is re.search, not a
+                        # substring test, so an unescaped "qwen3.8" has "." match
+                        # the underscore in "Qwen3_8B_FP8_GRPO" -- an unrelated
+                        # Qwen3 *8B* notebook whose install block builds vLLM,
+                        # which then silently gets this block instead. Spelling it
+                        # "qwen3_8" collides with the same name directly. Every
+                        # Qwen3.5-family upload writes the minor version with a
+                        # dot, so match exactly that, escaped.
+                        if is_path_contains_any(notebook_path.lower(), [r"qwen3\.8"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_qwen3_8_kaggle_content
+                            else:
+                                installation = installation_qwen3_8_content
+
+                        # KNOWLEDGE DISTILLATION INSTALLATION. Must come after
+                        # the Qwen3 rules above: the notebook is named for its
+                        # default student (Qwen3 0.6B) but its other configs are
+                        # Gemma-4, Qwen3.8 and Muse Glimmer, so the name must not
+                        # decide the install block on its own.
+                        if is_path_contains_any(notebook_path.lower(), ["knowledge_distillation"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_knowledge_distillation_kaggle_content
+                            else:
+                                installation = installation_knowledge_distillation_content
 
                         # Nemotron Nano 3 INSTALLATION also Granite has mamba
                         if is_path_contains_any(notebook_path.lower(), ["nemotron-3-nano","nemotron-nano-3", "granite4"]):
@@ -4154,14 +5242,18 @@ def update_notebook_sections(
                                 is_path_contains_any(notebook_path.lower(), ["grpo"])
                                 and not is_path_contains_any(notebook_path.lower(), ["gpt_oss", "gpt-oss"])
                             ):
-                                source_install_texts.append(installation_extra_grpo_content)
-                            if is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
-                                # AMD path: only the FLA + causal_conv1d kernels
-                                # are propagated. tilelang has no ROCm wheel
-                                # (and apache-tvm-ffi is CUDA-only), so they
-                                # stay filtered out via _AMD_INSTALL_PACKAGE_IGNORE.
                                 source_install_texts.append(
-                                    "!uv pip install --no-build-isolation flash-linear-attention causal_conv1d==1.6.0"
+                                    installation_extra_grpo_tool_use_content
+                                    if is_path_contains_any(notebook_path.lower(), ["grpo-tool_use"])
+                                    else installation_extra_grpo_content
+                                )
+                            if is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
+                                # AMD path: causal_conv1d is the only kernel
+                                # package propagated. The gated delta net
+                                # kernels ship inside unsloth_zoo, so nothing
+                                # else has to be built here.
+                                source_install_texts.append(
+                                    "!uv pip install --no-build-isolation causal_conv1d==1.6.0"
                                 )
                             installation, amd_extras_cell_text = _compose_amd_installation(
                                 notebook_path, source_install_texts
@@ -4178,7 +5270,26 @@ def update_notebook_sections(
                         if not is_path_contains_any(notebook_path.lower(), ["qwen3_5"]):
                             new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
                         if not is_amd_notebook:
+                            new_install_text = pin_torchcodec_to_torch(new_install_text)
                             _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
+
+                        # The extra install cell pins vLLM, which pins one exact
+                        # torch and so downgrades the session's torch on disk.
+                        # Whatever family block won cell i+1 above must not have
+                        # loaded libtorch by then, or torchvision's operators
+                        # fail to register: `operator torchvision::nms does not
+                        # exist`. AMD composes everything into one cell, so it
+                        # has no before/after to get wrong.
+                        if extra_grpo_install_idx is not None and not is_amd_notebook:
+                            new_install_text, relocated_torch_lines = (
+                                _defer_torch_imports_past_downgrade(new_install_text)
+                            )
+                            if relocated_torch_lines:
+                                extra_cell = notebook_content["cells"][extra_grpo_install_idx]
+                                extra_text = _cell_source_text(extra_cell).rstrip("\n")
+                                extra_cell["source"] = (
+                                    extra_text + "\n" + "\n".join(relocated_torch_lines)
+                                )
 
                         notebook_content["cells"][i + 1]["source"] = new_install_text
                         if is_amd_notebook:
@@ -4219,7 +5330,7 @@ def update_notebook_sections(
                     if (
                         cell_index > 0
                         and notebook_content["cells"][cell_index - 1].get("cell_type") == "markdown"
-                        and "flash-linear-attention" in _cell_source_text(notebook_content["cells"][cell_index - 1]).lower()
+                        and "causal-conv-1d" in _cell_source_text(notebook_content["cells"][cell_index - 1]).lower()
                     ):
                         remove_indices.add(cell_index - 1)
             if remove_indices:
@@ -4321,7 +5432,8 @@ def update_notebook_sections(
 
                 # Check if notebook has partial footer content but missing LGPL line
                 has_partial_footer = any(marker in existing_text for marker in footer_markers[:2])  # First two markers only
-                has_lgpl = lgpl_marker in existing_text
+                # Unsloth_Studio states its own AGPL-3.0 licence; an LGPL line under it contradicts it.
+                has_lgpl = lgpl_marker in existing_text or "This notebook is licensed" in existing_text
 
                 # Add content if:
                 # 1. No footer markers at all, OR
@@ -4877,6 +5989,7 @@ def update_readme(
         is_grpo_trainer = trainer_class == "GRPOTrainer"
         is_dpo_trainer = trainer_class == "DPOTrainer"
         is_orpo_trainer = trainer_class == "ORPOTrainer"
+        is_ppo_trainer = trainer_class == "PPOTrainer"
         # GRPO / RL notebooks: identified by trainer class, model_type OR
         # filename. The trainer-class check catches notebooks whose type
         # the filename classifier assigned as "Vision GRPO" / "FP8 GRPO"
@@ -4885,6 +5998,7 @@ def update_readme(
             is_grpo_trainer
             or is_dpo_trainer
             or is_orpo_trainer
+            or is_ppo_trainer
             or model_type.startswith("GRPO")
             or "grpo" in basename_lower_for_rl
             or "nemo-gym" in basename_lower_for_rl
@@ -4898,6 +6012,8 @@ def update_readme(
             model_type = "DPO"
         elif is_orpo_trainer:
             model_type = "ORPO"
+        elif is_ppo_trainer:
+            model_type = "PPO"
         elif is_in_grpo_section:
             task = detect_rl_task(path)
             if task:
@@ -5464,6 +6580,17 @@ def copy_and_update_notebooks(
         _preserve_outputs(destination_notebook_path, template_notebook_path)
         print(f"Copied '{colab_notebook_name}' to '{destination_dir}'")
 
+        update_notebook_sections(
+            os.path.join(destination_dir, colab_notebook_name),
+            general_announcement,
+            installation,
+            installation_kaggle,
+            new_announcement,
+        )
+
+        if notebook_name in KAGGLE_SKIP_NOTEBOOKS:
+            continue
+
         kaggle_notebook_name = "Kaggle-" + notebook_name
         destination_notebook_path = os.path.join(destination_dir, kaggle_notebook_name)
 
@@ -5476,14 +6603,6 @@ def copy_and_update_notebooks(
             destination_notebook_path = os.path.join(destination_dir, hf_course_notebook_name)
             _preserve_outputs(destination_notebook_path, template_notebook_path)
             print(f"Copied f'{hf_course_name}-{notebook_name}' to '{destination_notebook_path}'")
-
-        update_notebook_sections(
-            os.path.join(destination_dir, colab_notebook_name),
-            general_announcement,
-            installation,
-            installation_kaggle,
-            new_announcement,
-        )
 
         update_notebook_sections(
             destination_notebook_path,
@@ -5506,6 +6625,58 @@ def copy_and_update_notebooks(
     
     # finally remove the temp_location
     _rmtree_robust(temp_location)
+
+
+def _has_news_section(cells):
+    return any(
+        cell.get("cell_type") == "markdown" and _cell_source_text(cell).strip() == "### News"
+        for cell in cells
+    )
+
+
+def _news_insert_index(cells):
+    """Where the template path keeps News: above Installation, below the intro."""
+    for index, cell in enumerate(cells):
+        if cell.get("cell_type") != "markdown":
+            continue
+        if _is_installation_heading(_cell_source_text(cell), True):
+            return index
+    for index, cell in enumerate(cells):
+        if cell.get("cell_type") == "markdown":
+            return index + 1
+    return len(cells)
+
+
+def _restore_news_section(amd_path, template_path, new_announcement):
+    """Give an nb/-sourced AMD notebook the News section its template carries.
+
+    Only `original_template/` carries News cells, so minting an AMD variant
+    from `nb/` dropped the heading and announcement. News is generator-owned
+    boilerplate, so it still comes from the template.
+    """
+    try:
+        with open(template_path, "r", encoding="utf-8", newline="") as f:
+            template_cells = json.load(f)["cells"]
+        with open(amd_path, "r", encoding="utf-8", newline="") as f:
+            notebook_content = json.load(f)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError):
+        return False
+
+    cells = notebook_content.get("cells", [])
+    if not _has_news_section(template_cells) or _has_news_section(cells):
+        return False
+
+    index = _news_insert_index(cells)
+    cells[index:index] = [
+        {"cell_type": "markdown", "metadata": {}, "source": _source_lines("### News")},
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": _source_lines(new_announcement.strip()),
+        },
+    ]
+    _write_notebook(amd_path, notebook_content)
+    return True
 
 
 def copy_and_update_amd_notebooks(
@@ -5552,6 +6723,19 @@ def copy_and_update_amd_notebooks(
         if basename not in amd_base_names:
             continue
         source_notebooks.setdefault(basename, path)
+    # For DONT_UPDATE_EXCEPTIONS, nb/ is the source of truth and the template
+    # copy is abandoned: `Advanced_Llama3_1_(3B)_GRPO_LoRA` is weight_decay 0.1
+    # under nb/ and 0.001 under original_template/, so sourcing from the
+    # template gave the AMD variant hyperparameters nobody chose.
+    for basename in DONT_UPDATE_EXCEPTIONS:
+        if basename not in amd_base_names:
+            continue
+        nb_path = os.path.join(destination_dir, basename)
+        if os.path.isfile(nb_path):
+            source_notebooks[basename] = nb_path
+    # Last, so it overrides every seeding path above.
+    for basename in AMD_SKIP_NOTEBOOKS:
+        source_notebooks.pop(basename, None)
 
     amd_paths = []
     for notebook_name, template_notebook_path in sorted(source_notebooks.items()):
@@ -5561,6 +6745,15 @@ def copy_and_update_amd_notebooks(
         shutil.copyfile(template_notebook_path, amd_destination_path)
         _set_file_permissions(amd_destination_path)
         _cache_notebook_format(amd_destination_path)
+        sourced_from_template = os.path.normpath(
+            os.path.dirname(template_notebook_path)
+        ) == os.path.normpath(template_dir)
+        if not sourced_from_template:
+            _restore_news_section(
+                amd_destination_path,
+                os.path.join(template_dir, notebook_name),
+                new_announcement,
+            )
         update_notebook_sections(
             amd_destination_path,
             general_announcement,
@@ -5587,12 +6780,25 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
     return sorted(list(only_in_nb))
 
 
-def remove_unwanted_section(script_content):
-    start_marker = "# ### Installation"
-    end_marker = "# ### Unsloth"
+# Any heading depth: a template exports `# ### Installation` but a
+# hand-maintained `nb/` source exports `# # Installation`, and that difference
+# left the install cells live in the .py, where `get_ipython()` is undefined.
+_RE_SCRIPT_INSTALL_HEADING = re.compile(r"^# #+ Installation\b", re.MULTILINE)
+_RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 
-    start_index = script_content.find(start_marker)
-    end_index = script_content.find(end_marker)
+
+def remove_unwanted_section(script_content):
+    start_match = _RE_SCRIPT_INSTALL_HEADING.search(script_content)
+    start_index = -1 if start_match is None else start_match.start()
+    # Search from the Installation heading, never from the top: notebooks like
+    # `Falcon_H1_(0.5B)-Alpaca` open on an intro `# Unsloth` heading, and taking
+    # that as the terminator puts the end before the start, discarding the range
+    # and leaving the install cells live.
+    end_match = (
+        None if start_match is None
+        else _RE_SCRIPT_UNSLOTH_HEADING.search(script_content, start_match.end())
+    )
+    end_index = -1 if end_match is None else end_match.start()
 
     if start_index != -1 and end_index != -1 and start_index < end_index:
         before_section = script_content[:start_index]
@@ -6148,26 +7354,5 @@ if __name__ == "__main__":
             max_workers=args.workers,
             executor_type=args.executor,
         )
-
-    # molab (marimo) notebooks. Generated from the molab manifest's curated
-    # allowlist into molab/*.py — a SEPARATE native-marimo tree, deliberately
-    # NOT routed through convert_folder()/python_scripts/. Two call sites:
-    # (1) regenerate molab/*.py, (2) refresh the README molab section between
-    # the <!-- MOLAB:START --> / <!-- MOLAB:END --> markers.
-    try:
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
-        import molab_generate as _molab_generate
-
-        for _molab_path in _molab_generate.generate_all():
-            print(f"Generated molab notebook {_molab_path}")
-        if _molab_generate.update_readme():
-            print("Updated README molab section.")
-    except Exception as _molab_exc:  # noqa: BLE001 - keep molab failures non-fatal
-        # Preserve the traceback so the operator can debug — mirrors the
-        # pattern used by the convert_folder handler in this same file
-        # (review P1 / PY-01 / C-1).
-        import traceback as _molab_tb
-        print(f"WARNING: molab generation step failed: {_molab_exc}")
-        _molab_tb.print_exc()
 
     _summarize_git_diff()

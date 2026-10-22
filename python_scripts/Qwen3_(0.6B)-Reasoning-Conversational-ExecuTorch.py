@@ -17,7 +17,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.56.2\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -115,6 +115,8 @@ reasoning_conversations[0]
 # Next we take the non reasoning dataset and convert it to conversational format as well.
 # 
 # We have to use Unsloth's `standardize_sharegpt` function to fix up the format of the dataset first.
+# 
+# We also add Qwen3's `/no_think` switch to every user message in the chat examples. The chat template gives these examples an empty `<think></think>` block, so without the switch the model learns to skip thinking even when `enable_thinking = True`.
 
 # In[ ]:
 
@@ -122,8 +124,14 @@ reasoning_conversations[0]
 from unsloth.chat_templates import standardize_sharegpt
 dataset = standardize_sharegpt(non_reasoning_dataset)
 
+def add_no_think(conversation):
+    return [
+        {**message, "content": message["content"] + " /no_think"} if message["role"] == "user" else message
+        for message in conversation
+    ]
+
 non_reasoning_conversations = tokenizer.apply_chat_template(
-    list(dataset["conversations"]),
+    [add_no_think(conversation) for conversation in dataset["conversations"]],
     tokenize = False,
 )
 

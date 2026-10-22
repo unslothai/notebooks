@@ -14,12 +14,11 @@
 
 # ### News
 
-# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 # 
-# <table><tr>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-# </tr></table>
+# <p>
+# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
+# </p>
 # 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
@@ -40,10 +39,10 @@
 # # In[ ]:
 # 
 # 
-# # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
+# # Gemma 4 12B requires transformers >= 5.5.0 / trl >= 0.28.0; 5.16+ needs tokenizers >= 0.23.1, past the pin above
 # 
 # import torch; torch._dynamo.config.recompile_limit = 64;
-# get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "transformers>=5.10.1" "huggingface_hub>=1.5.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" timm')
+# get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "transformers>=5.10.1,<5.16" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0" timm')
 # get_ipython().system('uv pip install --system -qqq torchcodec')
 # 
 # 
@@ -91,7 +90,7 @@ from transformers import TextStreamer
 # Helper function for inference
 def do_gemma_4_inference(messages, max_new_tokens = 128):
     _ = model.generate(
-        **processor.apply_chat_template(
+        **tokenizer.apply_chat_template(
             messages,
             add_generation_prompt = True, # Must add for generation
             tokenize = True,
@@ -101,7 +100,7 @@ def do_gemma_4_inference(messages, max_new_tokens = 128):
         max_new_tokens = max_new_tokens,
         do_sample = False,
         use_cache = False,
-        streamer = TextStreamer(processor, skip_prompt = True),
+        streamer = TextStreamer(tokenizer, skip_prompt = True),
     )
 
 
@@ -177,6 +176,7 @@ model = FastModel.get_peft_model(
     finetune_language_layers   = True,  # False if not finetuning language layers
     finetune_attention_modules = True,  # False if not finetuning attention layers
     finetune_mlp_modules       = True,  # False if not finetuning MLP layers
+    finetune_audio_layers      = True,  # Finetune the audio encoder + audio embedder
 
     r = 8,                              # The larger, the higher the accuracy, but might overfit
     lora_alpha = 16,                    # Recommended alpha == r at least
@@ -185,16 +185,6 @@ model = FastModel.get_peft_model(
     random_state = 3407,
     use_rslora = False,                 # We support rank stabilized LoRA
     loftq_config = None,                # And LoftQ
-    target_modules = [
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
-
-        # Audio layers
-        "post", "linear_start", "linear_end",
-        "embedding_projection",
-        "ffw_layer_1", "ffw_layer_2",
-        "output_proj",
-    ]
 )
 
 
@@ -266,8 +256,8 @@ from trl import SFTTrainer, SFTConfig
 trainer = SFTTrainer(
     model = model,
     train_dataset = dataset,
-    processing_class = processor.tokenizer,
-    data_collator = UnslothVisionDataCollator(model, processor),
+    processing_class = tokenizer.tokenizer,
+    data_collator = UnslothVisionDataCollator(model, tokenizer),
     args = SFTConfig(
         per_device_train_batch_size = 8,
         gradient_accumulation_steps = 1,
@@ -371,9 +361,9 @@ do_gemma_4_inference(messages, max_new_tokens = 256)
 
 
 model.save_pretrained("gemma_4_lora")  # Local saving
-processor.save_pretrained("gemma_4_lora")
+tokenizer.save_pretrained("gemma_4_lora")
 # model.push_to_hub("HF_ACCOUNT/gemma_4_lora", token = "YOUR_HF_TOKEN") # Online saving
-# processor.push_to_hub("HF_ACCOUNT/gemma_4_lora", token = "YOUR_HF_TOKEN") # Online saving
+# tokenizer.push_to_hub("HF_ACCOUNT/gemma_4_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
@@ -383,7 +373,7 @@ processor.save_pretrained("gemma_4_lora")
 
 if False:
     from unsloth import FastModel
-    model, processor = FastModel.from_pretrained(
+    model, tokenizer = FastModel.from_pretrained(
         model_name = "gemma_4_lora", # YOUR MODEL YOU USED FOR TRAINING
         max_seq_length = 2048,
         load_in_4bit = True,
@@ -393,7 +383,7 @@ messages = [{
     "role": "user",
     "content": [{"type" : "text", "text" : "What is Gemma-4?",}]
 }]
-inputs = processor.apply_chat_template(
+inputs = tokenizer.apply_chat_template(
     messages,
     add_generation_prompt = True, # Must add for generation
     return_tensors = "pt",
@@ -407,7 +397,7 @@ _ = model.generate(
     max_new_tokens = 128, # Increase for longer outputs!
     # Recommended Gemma-4 settings!
     temperature = 1.0, top_p = 0.95, top_k = 64,
-    streamer = TextStreamer(processor, skip_prompt = True),
+    streamer = TextStreamer(tokenizer, skip_prompt = True),
 )
 
 
@@ -419,7 +409,7 @@ _ = model.generate(
 
 
 if False: # Change to True to save finetune!
-    model.save_pretrained_merged("gemma-4", processor)
+    model.save_pretrained_merged("gemma-4", tokenizer)
 
 
 # If you want to upload / push to your Hugging Face account, set `if False` to `if True` and add your Hugging Face token and upload location!
@@ -429,7 +419,7 @@ if False: # Change to True to save finetune!
 
 if False: # Change to True to upload finetune
     model.push_to_hub_merged(
-        "HF_ACCOUNT/gemma-4-finetune", processor,
+        "HF_ACCOUNT/gemma-4-finetune", tokenizer,
         token = "YOUR_HF_TOKEN"
     )
 
@@ -443,7 +433,7 @@ if False: # Change to True to upload finetune
 if False: # Change to True to save to GGUF
     model.save_pretrained_gguf(
         "gemma_4_finetune",
-        processor,
+        tokenizer,
         quantization_method = "Q8_0", # For now only Q8_0, BF16, F16 supported
     )
 
@@ -456,7 +446,7 @@ if False: # Change to True to save to GGUF
 if False: # Change to True to upload GGUF
     model.push_to_hub_gguf(
         "HF_ACCOUNT/gemma_4_finetune",
-        processor,
+        tokenizer,
         quantization_method = "Q8_0", # Only Q8_0, BF16, F16 supported
         token = "YOUR_HF_TOKEN",
     )

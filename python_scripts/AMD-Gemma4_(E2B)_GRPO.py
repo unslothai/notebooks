@@ -23,10 +23,10 @@
 # # In[ ]:
 # 
 # 
-# # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0
+# # Gemma 4 requires transformers >= 5.5.0 / trl >= 0.28.0; 5.16+ needs tokenizers >= 0.23.1, past the pin above
 # 
 # import torch; torch._dynamo.config.recompile_limit = 64;
-# get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0" "huggingface_hub>=1.5.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0"')
+# get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "transformers>=5.5.0,<5.16" "huggingface_hub>=1.5.0,<2.0" "datasets==4.3.0" accelerate peft sentencepiece protobuf hf_transfer "trl>=0.28.0"')
 # get_ipython().system('uv pip install --system -qqq torchcodec vllm')
 # 
 # 
@@ -321,12 +321,10 @@ except Exception as e:
 # In[ ]:
 
 
-def create_locked_down_function(function):
-    output_function = {}
-    exec(function, {}, output_function)
-    new_matmul = output_function["matmul"]
-    new_matmul = types.FunctionType(new_matmul.__code__, {})
-    return new_matmul
+# Unsloth's create_locked_down_function executes the generated code with a
+# restricted set of builtins and a restricted importer, so a reward hacking
+# completion cannot reach os, subprocess, sockets or the filesystem.
+from unsloth import create_locked_down_function
 
 
 # # Countering Reward Hacking 3: Stop caching
@@ -674,7 +672,11 @@ def speed_check(completions, **kwargs):
 
 from datasets import Dataset
 dataset = Dataset.from_list([{"prompt" : [{"role": "user", "content": prompt.strip()}], "answer" : 0}]*1000)
-maximum_length = len(tokenizer.apply_chat_template([{"role":"user", "content":prompt.strip()}], add_generation_prompt = True, tokenize = True))
+maximum_length = tokenizer(
+    text = tokenizer.apply_chat_template([{"role":"user", "content":prompt.strip()}], add_generation_prompt = True, tokenize = False),
+    add_special_tokens = False,
+    return_tensors = "pt",
+)["input_ids"].shape[-1]
 print(maximum_length)
 dataset[0]
 
@@ -785,7 +787,7 @@ tokenizer.save_pretrained("gemma_4_lora")
 from safetensors import safe_open
 
 tensors = {}
-with safe_open("grpo_saved_lora/adapter_model.safetensors", framework = "pt") as f:
+with safe_open("gemma_4_lora/adapter_model.safetensors", framework = "pt") as f:
     # Verify both A and B are non zero
     for key in f.keys():
         tensor = f.get_tensor(key)

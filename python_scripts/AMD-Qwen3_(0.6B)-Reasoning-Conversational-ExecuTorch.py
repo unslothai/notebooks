@@ -23,7 +23,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.56.2"')
+# get_ipython().system('uv pip install --system -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6"')
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # 
 # 
@@ -122,6 +122,8 @@ reasoning_conversations[0]
 # Next we take the non reasoning dataset and convert it to conversational format as well.
 # 
 # We have to use Unsloth's `standardize_sharegpt` function to fix up the format of the dataset first.
+# 
+# We also add Qwen3's `/no_think` switch to every user message in the chat examples. The chat template gives these examples an empty `<think></think>` block, so without the switch the model learns to skip thinking even when `enable_thinking = True`.
 
 # In[ ]:
 
@@ -129,8 +131,14 @@ reasoning_conversations[0]
 from unsloth.chat_templates import standardize_sharegpt
 dataset = standardize_sharegpt(non_reasoning_dataset)
 
+def add_no_think(conversation):
+    return [
+        {**message, "content": message["content"] + " /no_think"} if message["role"] == "user" else message
+        for message in conversation
+    ]
+
 non_reasoning_conversations = tokenizer.apply_chat_template(
-    list(dataset["conversations"]),
+    [add_no_think(conversation) for conversation in dataset["conversations"]],
     tokenize = False,
 )
 

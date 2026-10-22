@@ -20,22 +20,22 @@
 # 
 # <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/2048_win.png/500px-2048_win.png" height=300 />
 
-# # Installation
-# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Gemma 4. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    # Gemma 4 requires transformers >= 5.5.0 — do NOT pin to 4.x here\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# Gemma 4 requires transformers >= 5.5.0\n!uv pip install --upgrade --no-deps "transformers>=5.5.0" "tokenizers>=0.22.0,<=0.23.0" "trl>=0.28.0" unsloth unsloth_zoo\n')
-
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('capture', '', '!pip install --no-deps --upgrade timm # For Gemma 4 vision/audio\n')
-
-
-# ### Unsloth
+# # # Installation
+# # We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Gemma 4. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy, PIL; _numpy = f"numpy=={numpy.__version__}"; _pil = f"pillow=={PIL.__version__}"\n    except: _numpy = "numpy"; _pil = "pillow"\n    # Gemma 4 requires transformers >= 5.5.0 — do NOT pin to 4.x here\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} {_pil} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# Gemma 4 requires transformers >= 5.5.0; 5.16+ needs tokenizers >= 0.23.1, past the pin below\n!uv pip install --upgrade --no-deps "transformers>=5.5.0,<5.16" "tokenizers>=0.22.0,<=0.23.0" "trl>=0.28.0" unsloth unsloth_zoo\n# transformers 5.x needs huggingface_hub >= 1.5.0, and the --no-deps above cannot pull it\n!uv pip install -qqq "huggingface_hub>=1.5.0,<2.0"\n')
+# 
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', '!pip install --no-deps --upgrade timm # For Gemma 4 vision/audio\n')
+# 
+# 
+# # ### Unsloth
 
 # In[ ]:
 
@@ -689,7 +689,11 @@ def strategy_succeeds(completions, **kwargs):
 
 from datasets import Dataset
 dataset = Dataset.from_list([{"prompt" : [{"role": "user", "content": prompt.strip()}], "answer" : 0}]*1000)
-maximum_length = len(tokenizer.apply_chat_template([{"role":"user", "content":prompt.strip()}], add_generation_prompt = True, tokenize = True))
+maximum_length = tokenizer(
+    text = tokenizer.apply_chat_template([{"role":"user", "content":prompt.strip()}], add_generation_prompt = True, tokenize = False),
+    add_special_tokens = False,
+    return_tensors = "pt",
+)["input_ids"].shape[-1]
 print(maximum_length)
 dataset[0]
 
@@ -799,7 +803,7 @@ tokenizer.save_pretrained("gemma_4_lora")
 from safetensors import safe_open
 
 tensors = {}
-with safe_open("grpo_saved_lora/adapter_model.safetensors", framework = "pt") as f:
+with safe_open("gemma_4_lora/adapter_model.safetensors", framework = "pt") as f:
     # Verify both A and B are non zero
     for key in f.keys():
         tensor = f.get_tensor(key)

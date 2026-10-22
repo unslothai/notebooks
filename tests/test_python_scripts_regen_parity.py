@@ -23,6 +23,14 @@
      mode where someone edits an .ipynb but forgets to regenerate the
      .py mirror (or vice-versa).
 
+  3. The two trees hold the same set of names, in BOTH directions.
+     Check 2 is parametrized over ``nb/``, so it can only see a
+     notebook that is missing its mirror; a mirror whose notebook was
+     deleted or renamed is invisible to it and keeps shipping to users
+     as a script with no source. Nothing covered that until a
+     hand-uploaded notebook landed in ``nb/`` with no mirror and sat on
+     main for four days, which prompted looking at the other side too.
+
 This is exactly what the generator does at regen time -- we just lift
 it into a pytest gate so per-PR CI fails red if the two trees diverge.
 
@@ -152,4 +160,44 @@ def test_live_conversion_matches_committed_script(nb_path: Path, tmp_path: Path)
         f"`python update_all_notebooks.py --to_main_repo` to refresh "
         f"the .py mirror, or revert the unintended change to the "
         f".ipynb. First diff lines:\n{snippet}"
+    )
+
+
+def test_no_python_script_without_its_notebook() -> None:
+    """A ``python_scripts/*.py`` whose ``nb/*.ipynb`` is gone must fail.
+
+    The parity test above walks ``nb/``, so a mirror left behind by a deleted or
+    renamed notebook is invisible to it: the script keeps shipping, is never
+    regenerated again, and silently drifts from a source that no longer exists.
+    Both trees are generated from the same names, so the sets are equal or
+    something was moved by hand.
+    """
+    notebooks = {p.stem for p in (REPO_ROOT / "nb").glob("*.ipynb")}
+    scripts = {p.stem for p in (REPO_ROOT / "python_scripts").glob("*.py")}
+    assert notebooks, "no nb/*.ipynb found -- the glob or the layout changed"
+
+    stray = sorted(scripts - notebooks)
+    assert not stray, (
+        "DRIFT DETECTED: python_scripts/ holds mirrors whose nb/ notebook does not "
+        "exist. Delete them, or restore the notebook they were generated from: "
+        f"{stray}"
+    )
+
+
+def test_no_notebook_without_its_python_script() -> None:
+    """The forward direction, as one assertion naming every offender at once.
+
+    The parametrized test reports these one notebook per test id, which is the
+    right granularity when a mirror has drifted. When a batch is uploaded by
+    hand it is easier to act on the whole list, and this states the invariant
+    the two trees are supposed to satisfy in one place.
+    """
+    notebooks = {p.stem for p in (REPO_ROOT / "nb").glob("*.ipynb")}
+    scripts = {p.stem for p in (REPO_ROOT / "python_scripts").glob("*.py")}
+
+    missing = sorted(notebooks - scripts)
+    assert not missing, (
+        "DRIFT DETECTED: nb/ notebooks have no python_scripts/ mirror. Regenerate "
+        "via `python update_all_notebooks.py --to_main_repo`: "
+        f"{missing}"
     )

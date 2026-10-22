@@ -14,12 +14,11 @@
 
 # ### News
 
-# Introducing **Unsloth Studio** - a new open source, no-code web UI to train and run LLMs. [Blog](https://unsloth.ai/docs/new/studio) • [Notebook](https://colab.research.google.com/github/unslothai/unsloth/blob/main/studio/Unsloth_Studio_Colab.ipynb)
+# Introducing **[Unsloth Desktop](https://unsloth.ai/docs/desktop)**, the first desktop app to run and train models. Free and open-source for macOS, Windows and Linux. [GitHub](https://github.com/unslothai/unsloth) • [Download](https://unsloth.ai/download)
 # 
-# <table><tr>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FxV1PO5DbF3ksB51nE2Tw%252Fmore%2520cropped%2520ui%2520for%2520homepage.png%3Falt%3Dmedia%26token%3Df75942c9-3d8d-4b59-8ba2-1a4a38de1b86&width=376&dpr=3&quality=100&sign=a663c397&sv=2" width="200" height="120" alt="Unsloth Studio Training UI"></a><br><sub><b>Train models</b> — no code needed</sub></td>
-# <td align="center"><a href="https://unsloth.ai/docs/new/studio"><img src="https://unsloth.ai/docs/~gitbook/image?url=https%3A%2F%2F3215535692-files.gitbook.io%2F~%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FxhOjnexMCB3dmuQFQ2Zq%252Fuploads%252FRCnTAZ6Uh88DIlU3g0Ij%252Fmainpage%2520unsloth.png%3Falt%3Dmedia%26token%3D837c96b6-bd09-4e81-bc76-fa50421e9bfb&width=376&dpr=3&quality=100&sign=c1a39da1&sv=2" width="200" height="120" alt="Unsloth Studio Chat UI"></a><br><sub><b>Run GGUF models</b> on Mac, Windows & Linux</sub></td>
-# </tr></table>
+# <p>
+# <a href="https://unsloth.ai/docs/desktop"><img src="https://raw.githubusercontent.com/unslothai/notebooks/refs/heads/main/assets/unsloth-qwen3-8.png" width="350" alt="Introducing Unsloth Desktop"></a>
+# </p>
 # 
 # Train MoEs - DeepSeek, GLM, Qwen and gpt-oss 12x faster with 35% less VRAM. [Blog](https://unsloth.ai/docs/new/faster-moe)
 # 
@@ -34,7 +33,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    import torch; v = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.10\':\'0.0.34\',\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.34")\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\ntry:\n    import torch; _qat_torch_minor = re.match(r"[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0)\nexcept Exception:\n    _qat_torch_minor = ""\n_qat_torchao_map = {"2.10":"0.16.0","2.8":"0.14.1","2.9":"0.15.0"}\n_qat_torchao = _qat_torchao_map.get(_qat_torch_minor, "0.16.0")\n_qat_fbgemm_map = {"2.10":"1.5.0","2.8":"1.3.0","2.9":"1.4.2"}\n_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "1.5.0")\n!pip install --upgrade --force-reinstall torchao=={_qat_torchao} fbgemm-gpu-genai=={_qat_fbgemm}\n!pip install transformers==4.55.4 && pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth\nelse:\n    # Do this only in Colab notebooks! Otherwise use pip install unsloth\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\ntry:\n    import torch; _qat_torch_version = re.match(r"[0-9]{1,}\\.[0-9]{1,}\\.[0-9]{1,}", str(torch.__version__)).group(0); _qat_torch_minor = _qat_torch_version.rsplit(".", 1)[0]\nexcept Exception:\n    _qat_torch_version = _qat_torch_minor = ""\n# peft 0.19 refuses torchao under 0.16.0, and torchao 0.17.0 and up need torch\n# 2.11 to import at all, so 0.16.0 is the only pin that works below torch 2.11.\n_qat_torchao_exact_map = {"2.10.0":"0.16.0","2.8.0":"0.16.0","2.9.0":"0.16.0","2.9.1":"0.16.0"}\n_qat_torchao_map = {"2.10":"0.16.0","2.11":"0.18.0","2.8":"0.16.0","2.9":"0.16.0"}\n_qat_torchao = _qat_torchao_exact_map.get(_qat_torch_version) or _qat_torchao_map.get(_qat_torch_minor)\nif not _qat_torchao:\n    try:\n        _qat_below = tuple(int(_p) for _p in _qat_torch_minor.split(".")) < tuple(int(_p) for _p in "2.11".split("."))\n    except Exception:\n        _qat_below = False\n    _qat_torchao = "0.16.0" if _qat_below else "0.18.0"\n_qat_fbgemm_map = {"2.10":"1.5.0","2.11":"1.6.0","2.8":"1.3.0","2.9":"1.4.2"}\n_qat_fbgemm = _qat_fbgemm_map.get(_qat_torch_minor, "1.6.0")\n# Each PyPI fbgemm-gpu-genai is built for one CUDA major (1.5.0 links\n# libcudart.so.12, 1.6.0 libcudart.so.13), so take the build from torch\'s own\n# CUDA index, which carries +cuXXX builds of both fbgemm-gpu-genai and torchao.\ntry: _qat_index = "--extra-index-url https://download.pytorch.org/whl/cu" + torch.version.cuda.replace(".", "") if torch.version.cuda else ""\nexcept Exception: _qat_index = ""\n# fbgemm-gpu-genai depends on an unpinned numpy, so --force-reinstall fetches\n# the newest one while `import torch` above has already loaded the old one\n# into this kernel. Hold numpy where it is; otherwise the next import stops\n# with "numpy was upgraded mid-session ... but the kernel still has the old\n# version" and the notebook cannot continue without a restart.\ntry:\n    import numpy; _qat_numpy = "numpy==" + numpy.__version__\nexcept Exception:\n    _qat_numpy = "numpy"\n!pip install --upgrade --force-reinstall torchao=={_qat_torchao} fbgemm-gpu-genai=={_qat_fbgemm} {_qat_numpy} {_qat_index}\n!pip install transformers==4.57.6 && pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -202,17 +201,13 @@ trainer = SFTTrainer(
 )
 
 
-# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes!
+# We also use Unsloth's `train_on_completions` method to only train on the assistant outputs and ignore the loss on the user's inputs. This helps increase accuracy of finetunes! Unsloth now auto-detects the instruction and response parts from the tokenizer's chat template, so we don't need to pass `instruction_part` and `response_part` anymore. You can still pass them explicitly if you use a custom chat template.
 
 # In[12]:
 
 
 from unsloth.chat_templates import train_on_responses_only
-trainer = train_on_responses_only(
-    trainer,
-    instruction_part = "<|im_start|>user\n",
-    response_part = "<|im_start|>assistant\n",
-)
+trainer = train_on_responses_only(trainer)
 
 
 # Let's verify masking the instruction part is done! Let's print the 100th row again.
