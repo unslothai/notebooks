@@ -1,0 +1,132 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright 2026-present the Unsloth AI Inc. team. All rights reserved.
+
+# Notebook-aware lint gate. Adapted from unslothai/unsloth-zoo's
+# lint-ci.yml, scoped to the four Python files notebooks actually ships
+# (update_all_notebooks.py, replace_text.py, update_max_seq_length.py,
+# scripts/*) plus YAML / JSON round-trip on workflows + every .ipynb.
+
+name: Lint CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  source-lint:
+    name: Source lint (Python + YAML + JSON + notebooks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden runner (audit)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - run: pip install 'ruff==0.15.12' 'pyyaml>=6'
+
+      - name: Python AST / syntax check
+        # All committed Python files must compile. continue-on-error
+        # during bootstrap; ratchet to hard once the baseline is clean.
+        continue-on-error: true
+        run: |
+          python -m compileall -q -j 0 \
+            update_all_notebooks.py \
+            replace_text.py \
+            update_max_seq_length.py \
+            scripts tests
+
+      - name: Python ruff check (narrow gate)
+        # E9 / F63 / F7 / F82: syntax, broken comparisons, undefined names.
+        continue-on-error: true
+        run: |
+          ruff check --select E9,F63,F7,F82 \
+            update_all_notebooks.py \
+            replace_text.py \
+            update_max_seq_length.py \
+            scripts tests
+
+      - name: Dynamic-execution gate self-test
+        run: python scripts/lint_exec_literals.py --self-test
+
+      - name: No exec, eval or compile of a value that is not written out
+        run: python scripts/lint_exec_literals.py
+
+      - name: No leftover debugger / pdb / breakpoint calls
+        continue-on-error: true
+        run: |
+          set -e
+          if grep -rnE '(^|[^A-Za-z_])(pdb\.set_trace|breakpoint)\(|^import (pdb|ipdb)$|^from (pdb|ipdb) import' \
+              --include='*.py' scripts tests update_all_notebooks.py \
+              replace_text.py update_max_seq_length.py; then
+            echo "::error::Leftover debugger call found above. Remove it." >&2
+            exit 1
+          fi
+
+      - name: YAML round-trip for every committed YAML
+        run: |
+          python <<'PY'
+          import pathlib, sys, yaml
+          fails = []
+          for ext in ("yml", "yaml"):
+              for p in pathlib.Path(".").rglob(f"*.{ext}"):
+                  if any(
+                      part.startswith(".") and part not in (".github",)
+                      for part in p.parts
+                  ):
+                      continue
+                  try:
+                      yaml.safe_load(p.read_text())
+                  except Exception as exc:
+                      fails.append(f"{p}: {exc}")
+          if fails:
+              for f in fails:
+                  print("::error::", f)
+              sys.exit(1)
+          print("YAML round-trip OK")
+          PY
+
+      - name: JSON round-trip for every committed JSON + notebook
+        # Notebooks ARE JSON. This is a fast sanity gate run before the
+        # per-cell ast.parse test in tests/test_notebook_json_validity.py.
+        run: |
+          python <<'PY'
+          import pathlib, json, sys
+          fails = []
+          targets = (
+              list(pathlib.Path(".").rglob("*.json"))
+              + list(pathlib.Path(".").rglob("*.ipynb"))
+          )
+          for p in targets:
+              if any(
+                  part in (".git", "node_modules", "__pycache__", "build", "dist")
+                  for part in p.parts
+              ):
+                  continue
+              try:
+                  json.loads(p.read_text())
+              except Exception as exc:
+                  fails.append(f"{p}: {exc}")
+          if fails:
+              for f in fails:
+                  print("::error::", f)
+              sys.exit(1)
+          print(f"JSON / notebook round-trip OK ({len(targets)} files)")
+          PY
