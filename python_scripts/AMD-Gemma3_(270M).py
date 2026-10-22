@@ -399,6 +399,12 @@ if False: # Change to True to export to LiteRT-LM (.litertlm) for phones
     get_ipython().system('uv venv -q --allow-existing --python 3.12 litert_env')
     get_ipython().system('uv pip install -q --python litert_env/bin/python --torch-backend cpu litert-torch==0.10.0 litert-lm==0.18.1 tensorflow-cpu==2.21.0 "transformers<5.21"')
     get_ipython().system('litert_env/bin/litert-torch export_hf gemma_3_finetune_16bit gemma_3_finetune_litertlm')
+    # Gemma-3 270M only prints <pad> on LiteRT-LM's GPU backend with its default fp16 activations, so ask for fp32
+    # https://github.com/google-ai-edge/LiteRT-LM/issues/3280
+    get_ipython().system('litert_env/bin/litert-lm unpack gemma_3_finetune_litertlm/model.litertlm --output-dir gemma_3_finetune_litertlm/parts --allow-overwrite')
+    get_ipython().system('grep -q prefer_activation_type gemma_3_finetune_litertlm/parts/model.toml || sed -i \'s/^model_type = "prefill_decode"$/&\\nprefer_activation_type = "fp32"/\' gemma_3_finetune_litertlm/parts/model.toml')
+    get_ipython().system('litert_env/bin/litert-lm pack gemma_3_finetune_litertlm/parts --output gemma_3_finetune_litertlm/model.litertlm --allow-overwrite')
+    get_ipython().system('rm -rf gemma_3_finetune_litertlm/parts')
     # Gemma-3 puts the system prompt at the start of the first user turn
     prompt = messages[0]["content"] + "\n\n" + messages[1]["content"]
     get_ipython().system('litert_env/bin/litert-lm run gemma_3_finetune_litertlm/model.litertlm --backend cpu --cache no --prompt {shlex.quote(prompt)}')
