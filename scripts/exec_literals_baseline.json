@@ -1,0 +1,22 @@
+{
+  "_comment": "Call sites that predate the gate. New ones fail; see scripts/lint_exec_literals.py.",
+  "targets": [
+    "scripts",
+    "original_template",
+    "nb",
+    "kaggle",
+    "Template_Notebook.ipynb",
+    "update_all_notebooks.py",
+    "replace_text.py",
+    "update_max_seq_length.py"
+  ],
+  "entries": [
+    {
+      "file": "original_template/gpt_oss_(20B)_GRPO_BF16.ipynb",
+      "sink": "exec",
+      "digest": "76276d8b8b63d99d",
+      "count": 1,
+      "reason": "Runs a model-generated program; sandboxed by the RL helper added in unsloth-zoo#1105."
+    }
+  ]
+}

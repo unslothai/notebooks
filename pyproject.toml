@@ -1,0 +1,25 @@
+[project]
+name = "notebooks"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ipykernel>=6.30.1",
+    "ipywidgets>=8.1.7",
+    "nbconvert>=7.16.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+# Explicit setuptools package discovery. Without this, the flat layout (with
+# top-level scripts/, tests/ directories) makes setuptools try to
+# auto-discover them all as packages, which fails the `pip install -e .`
+# invocation. This project ships no
+# importable Python package -- generator helpers live as flat modules under
+# scripts/ and are imported via sys.path.insert at runtime by the tests.
+[tool.setuptools]
+packages = []
+py-modules = []

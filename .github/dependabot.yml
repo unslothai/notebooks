@@ -1,0 +1,51 @@
+---
+# Mirrors the shape of unslothai/unsloth's .github/dependabot.yml,
+# scoped to unslothai/notebooks's actual surface:
+#   - github-actions (this very directory once the workflows land)
+#   - pip (root pyproject.toml -- notebooks ships a kernel + nbconvert
+#     stack; same supply-chain attack surface as zoo)
+#
+# Dropped entries that exist on the unsloth repo but are N/A here:
+#   - bun / npm  (no package-lock.json / bun.lock anywhere in notebooks)
+#   - cargo      (no Cargo.toml / Cargo.lock anywhere in notebooks)
+#
+# Add a real entry IF and WHEN one of those manifests lands.
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      # github-actions refs are git tags / SHAs, not semver -- the
+      # `semver-minor-days` / `semver-patch-days` knobs are rejected by
+      # Dependabot's validator for this ecosystem. Only the
+      # `default-days` floor applies. (Pinned via PR #5397 on unsloth
+      # after the validator surfaced the bug on a sibling repo.)
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+      actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  # pip dependencies pinned in pyproject.toml (ipykernel / ipywidgets /
+  # nbconvert) -- the notebook tooling stack. Weekly version-update PRs
+  # are grouped + cooled-down 7 days; security-advisory PRs flow
+  # through the *-security group independently. The 7-day cooldown is
+  # the supply-chain gate, matching the rest of the org.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    groups:
+      python:
+        patterns: ["*"]
+      python-security:
+        applies-to: security-updates
+        patterns: ["*"]

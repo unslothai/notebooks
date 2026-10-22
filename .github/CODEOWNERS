@@ -1,0 +1,26 @@
+# Inspired from https://github.com/vllm-project/vllm/blob/main/.github/CODEOWNERS
+# Mirrors unslothai/unsloth-zoo's CODEOWNERS shape, scoped to notebooks's
+# actual layout (template + generated notebooks + generator script).
+
+# Source-of-truth template notebooks. Generated content under nb/ and
+# python_scripts/ derives from these via update_all_notebooks.py, so
+# any review here governs the full downstream tree.
+/original_template/ @danielhanchen
+/kaggle/ @danielhanchen
+/Template_Notebook.ipynb @danielhanchen
+
+# Generator + bulk-edit scripts (5940 LOC). Changes here regenerate
+# 422 files; treat with the same care as a library refactor.
+/update_all_notebooks.py @danielhanchen
+/update_max_seq_length.py @danielhanchen
+/replace_text.py @danielhanchen
+
+# Per-folder helper scripts (HTML tag fixups, template patchers).
+/scripts/ @danielhanchen
+
+# Security + CI infrastructure ported from unsloth / unsloth-zoo via
+# this PR. Same maintainer scope as the sibling repos.
+/.github/workflows/ @danielhanchen
+/.github/dependabot.yml @danielhanchen
+/.github/CODEOWNERS @danielhanchen
+/tests/ @danielhanchen

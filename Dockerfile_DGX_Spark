@@ -1,0 +1,32 @@
+FROM nvcr.io/nvidia/pytorch:25.11-py3
+
+# Set CUDA environment variables
+ENV CUDA_HOME=/usr/local/cuda-13.0
+ENV CUDA_PATH=$CUDA_HOME
+ENV PATH=$CUDA_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+ENV C_INCLUDE_PATH=$CUDA_HOME/include:$C_INCLUDE_PATH
+ENV CPLUS_INCLUDE_PATH=$CUDA_HOME/include:$CPLUS_INCLUDE_PATH
+
+# Install triton from source for latest blackwell support
+RUN git clone https://github.com/triton-lang/triton.git && \
+    cd triton && \
+    git checkout c5d671f91d90f40900027382f98b17a3e04045f6 && \
+    pip install -r python/requirements.txt && \
+    pip install . && \
+    cd ..
+
+# Install xformers from source for blackwell support
+RUN git clone -b v0.0.33 --depth=1 https://github.com/facebookresearch/xformers --recursive && \
+    cd xformers && \
+    export TORCH_CUDA_ARCH_LIST="12.1" && \
+    python setup.py install && \
+    cd ..
+
+# Pin NGC's torch/torchvision: pip must fail, not swap in PyPI builds that break the source builds above.
+RUN pip list --format=freeze | grep -iE '^(torch|torchvision)==' > /tmp/ngc_torch.txt && \
+    pip install --no-cache-dir -c /tmp/ngc_torch.txt unsloth unsloth_zoo && \
+    rm /tmp/ngc_torch.txt
+
+# Launch the shell
+CMD ["/bin/bash"]
