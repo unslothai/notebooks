@@ -382,6 +382,28 @@ if False: # Change to True to upload GGUF
     )
 
 
+# ### LiteRT-LM (`.litertlm`) for Android, iOS and Web
+# To run the finetune on a phone with Google's [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM) runtime, which replaces MediaPipe's LLM Inference API and its `.task` files, set `if False` to `if True`. This merges the LoRA adapters to 16bit, converts the merged model on the CPU with Google's `litert-torch export_hf` into an int8 `.litertlm` file of about 290MB, then asks it one question on the CPU.
+# 
+# The converter is installed into its own `litert_env` environment, so the training packages above stay as they are. The export takes a few minutes and about 7GB of RAM.
+# 
+# Copy `gemma_3_finetune_litertlm/model.litertlm` to your phone and load it in the [Google AI Edge Gallery](https://github.com/google-ai-edge/gallery) app, or call it from your own app with LiteRT-LM's Kotlin, Swift or JavaScript APIs.
+
+# In[ ]:
+
+
+if False: # Change to True to export to LiteRT-LM (.litertlm) for phones
+    import shlex
+    model.save_pretrained_merged("gemma_3_finetune_16bit", tokenizer, save_method = "merged_16bit")
+    get_ipython().system('pip install -q uv')
+    get_ipython().system('uv venv -q --allow-existing --python 3.12 litert_env')
+    get_ipython().system('uv pip install -q --python litert_env/bin/python --torch-backend cpu litert-torch==0.10.0 litert-lm==0.18.1 tensorflow-cpu==2.21.0 "transformers<5.21"')
+    get_ipython().system('litert_env/bin/litert-torch export_hf gemma_3_finetune_16bit gemma_3_finetune_litertlm')
+    # Gemma-3 puts the system prompt at the start of the first user turn
+    prompt = messages[0]["content"] + "\n\n" + messages[1]["content"]
+    get_ipython().system('litert_env/bin/litert-lm run gemma_3_finetune_litertlm/model.litertlm --backend cpu --cache no --prompt {shlex.quote(prompt)}')
+
+
 # Now, use the `gemma-3-finetune.gguf` file or `gemma-3-finetune-Q4_K_M.gguf` file in llama.cpp.
 # 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!

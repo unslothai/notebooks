@@ -60,7 +60,8 @@ NOTEBOOK_DIRS = ("nb", "kaggle", "original_template")
 # `torchvision==0.24.1`, `torchaudio==2.9.1`). Matched anywhere in the cell:
 # the GRPO extra install block picks its pin into a variable
 # (`_vllm = 'vllm==0.15.1'`) and only interpolates it into the shell line.
-_TORCH_PIN = re.compile(r"\b(?:torch|torchvision|torchaudio|vllm)\s*==\s*\d[\w.+]*")
+# `(?<![\w-])` keeps other distributions ending in `-torch` (`litert-torch==0.10.0`) out.
+_TORCH_PIN = re.compile(r"(?<![\w-])(?:torch|torchvision|torchaudio|vllm)\s*==\s*\d[\w.+]*")
 
 # `import torch` in statement position: at the start of a line, after a `;`, or
 # as the body of a one-line `else:`. Anchoring this way keeps `# import torch`
@@ -175,8 +176,9 @@ def test_the_pins_that_swap_libtorch_are_detected(source):
     "!pip install unsloth vllm",
     "!pip install transformers==5.5.0",
     "!pip install triton==3.2.0",
+    "!uv pip install --python litert_env/bin/python litert-torch==0.10.0",
 ], ids=["unpinned", "torchao-floor", "vllm-unpinned", "transformers",
-        "triton"])
+        "triton", "litert-torch"])
 def test_installs_that_do_not_swap_libtorch_are_not_flagged(source):
     """An unpinned install resolves against the session's torch, and a pin on
     an unrelated distribution never moves it."""
