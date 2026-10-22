@@ -97,6 +97,9 @@ def apply_chat_template(
         # Use re.escape to escape any special characters in the pattern
         return re.sub(f"^{re.escape(pattern)}", "", s)
 
+    def _strip_suffix(s, pattern):
+        return re.sub(rf"{re.escape(pattern)}\s*$", "", s)
+
     if task in ["sft", "generation"]:
         messages = example["messages"]
         # We add an empty system message if there is none
@@ -155,6 +158,9 @@ def apply_chat_template(
             example["text_rejected"] = _strip_prefix(
                 example["text_rejected"], assistant_prefix
             )
+            # DPOTrainer appends its own EOS, so drop the chat template's trailing EOS
+            example["text_chosen"] = _strip_suffix(example["text_chosen"], tokenizer.eos_token)
+            example["text_rejected"] = _strip_suffix(example["text_rejected"], tokenizer.eos_token)
         else:
             raise ValueError(
                 f"Could not format example as dialogue for `dpo` task! Require `[chosen, rejected]` keys but found {list(example.keys())}"

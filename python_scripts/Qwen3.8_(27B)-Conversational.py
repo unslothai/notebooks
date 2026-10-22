@@ -33,7 +33,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.35")\n    if str(torch.version.cuda).startswith("13") and xformers.endswith("0.0.35"): xformers = "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-manylinux_2_28_x86_64.whl"\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.1\n# Unsloth bundles the gated delta net kernels; a leftover pip fla would shadow them\n!pip install --upgrade -qqq uv\n!uv pip uninstall -qqq flash-linear-attention fla-core\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.1\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # ### Unsloth
@@ -63,9 +63,11 @@ MODEL_NAME = "unsloth/Qwen3.8-27B"  # unsloth resolves this to its 4-bit build
 
 import torch
 
-assert torch.cuda.device_count() >= 2, (
-    "Qwen3.8-27B in 4-bit needs more than one 16 GB card. On Kaggle pick the "
-    "T4 x2 accelerator (Settings -> Accelerator -> GPU T4 x2)."
+# Peaks near 22.5 GB in 4-bit: one 40 GB card (A100), or two 16 GB cards (Kaggle GPU T4 x2).
+total_gb = sum(torch.cuda.get_device_properties(i).total_memory for i in range(torch.cuda.device_count())) / 2**30
+assert total_gb >= 28, (
+    f"Qwen3.8-27B in 4-bit needs about 28 GB of GPU memory in total, this machine has {total_gb:.1f} GB. "
+    "On Kaggle pick the T4 x2 accelerator (Settings -> Accelerator -> GPU T4 x2)."
 )
 
 
@@ -82,7 +84,7 @@ model, tokenizer = FastModel.from_pretrained(
     load_in_4bit      = True,
     full_finetuning   = False,
 )
-print(f"placed over {len(set(model.hf_device_map.values()))} devices")
+print(f"placed over {len(set(getattr(model, 'hf_device_map', {'': 0}).values()))} devices")
 
 
 # Do not pass `dtype = torch.float16`, and do not set `fp16 = True` on the trainer below.

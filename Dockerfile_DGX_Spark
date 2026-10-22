@@ -23,9 +23,10 @@ RUN git clone -b v0.0.33 --depth=1 https://github.com/facebookresearch/xformers 
     python setup.py install && \
     cd ..
 
-# Install unsloth and other dependencies
-RUN pip install --no-deps bitsandbytes==0.48.0 transformers==4.56.2 trl==0.22.2
-RUN pip install unsloth unsloth_zoo
+# Pin NGC's torch/torchvision: pip must fail, not swap in PyPI builds that break the source builds above.
+RUN pip list --format=freeze | grep -iE '^(torch|torchvision)==' > /tmp/ngc_torch.txt && \
+    pip install --no-cache-dir -c /tmp/ngc_torch.txt unsloth unsloth_zoo && \
+    rm /tmp/ngc_torch.txt
 
 # Launch the shell
 CMD ["/bin/bash"]

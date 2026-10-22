@@ -36,9 +36,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "notebooks-tests-ci.yml"
 
-# Every notebook root the workflow watches. `molab/` and `python_scripts/` hold
-# no notebook today, but are listed so one appearing there is not exempt.
-ROOTS = ("nb", "original_template", "kaggle", "molab", "python_scripts")
+# Every notebook root the workflow watches. `python_scripts/` holds no notebook
+# today, but is listed so one appearing there is not exempt.
+ROOTS = ("nb", "original_template", "kaggle", "python_scripts")
 
 # Known offenders, keyed by repo-relative path (a template and its copies share
 # a basename) and pinned to the exact command (a name or marker match would hide

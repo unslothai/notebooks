@@ -28,6 +28,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Qwen3-VL (8B)**           | Vision         | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_VL_%288B%29-Vision.ipynb)                |
 | **Qwen3-Embedding (0.6B)**           | Embeddings         | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_Embedding_(0_6B).ipynb)                |
 | **Qwen3: Advanced GRPO**    | GRPO           | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_%284B%29-GRPO.ipynb)                     |
+| **Llama 3.2 (1B)**          | PPO            | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_%281B%29-PPO.ipynb)                    |
 | **Gemma 3 (4B)**     | Vision         | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_%284B%29-Vision.ipynb)                  |
 | **Gemma 3N (4B)**     | Audio          | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3N_%284B%29-Audio.ipynb)                  |
 | **embeddinggemma (300M)**   | Embeddings     | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/EmbeddingGemma_%28300M%29.ipynb)               |
@@ -74,6 +75,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Openenv wordle**  | Wordle + vLLM | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Openenv_wordle_grpo.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen2.5 VL** **(7B)** | Vision Math + vLLM | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_5_7B_VL_GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Zephyr** **(7B)** | DPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Zephyr_(7B)-DPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Llama3.2** **(1B)** | PPO | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.2_(1B)-PPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **(OpenEnv) gpt oss BF16** **(20B)** | 2048 Game | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **gpt oss** **(20B)** | Auto Kernel Creation | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt-oss-(20B)-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **gpt oss** **(20B)** | 2048 Game | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/gpt_oss_(20B)_Reinforcement_Learning_2048_Game.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -94,12 +96,14 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Gemma4** **(E2B)** | Auto Kernel Creation | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma4_(E2B)_GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Gemma4** **(E2B)** | 2048 Game | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma4_(E2B)_Reinforcement_Learning_2048_Game.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3** **(4B)** | DAPO Math + vLLM | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3** **(4B)** | GRPO + vLLM | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-GRPO-Tool_Use.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Ministral3** **(3B)** | Sudoku | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
 ### Tool Calling Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **Qwen2.5 Coder** **(1.5B)** | Tool Calling | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3** **(4B)** | Tool Calling | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-Tool_Calling.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **FunctionGemma** **(270M)** | Tool Calling | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/FunctionGemma_(270M)-Multi-Turn-Tool-Calling.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **FunctionGemma** **(270M)** | Mobile Actions | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/FunctionGemma_(270M)-Mobile-Actions.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **FunctionGemma** **(270M)** | Inference | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/FunctionGemma_(270M)-LMStudio.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -126,6 +130,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Qwen3 VL** **(8B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_VL_(8B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3 VL** **(8B)** | Vision Math (GRPO RL) | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_VL_(8B)-Vision-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3 5** **(4B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_5_(4B)_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3 5** **(4B)** | Decision Model | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_5_(4B)-Decision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3 5** **(4B)** | Vision Math (GRPO RL) | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_5_(4B)_Vision_GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Gemma3** **(4B)** | Vision Math (GRPO RL) | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Gemma3_(4B)-Vision-GRPO.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3 5** **(0 8B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_5_(0_8B)_Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -366,6 +371,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Qwen2.5 VL** **(7B)** | Vision Math + vLLM | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_5_7B_VL_GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Ministral3** **(3B)** | Sudoku | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Zephyr** **(7B)** | DPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Zephyr_(7B)-DPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Llama3.2** **(1B)** | PPO | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Llama3.2_(1B)-PPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **gpt oss** **(20B)** | Auto Kernel Creation | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-gpt-oss-(20B)-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **(A100) gpt oss** **(20B)** | Auto Kernel Creation | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-gpt-oss-(20B)_A100-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen2.5** **(3B)** | GSM8K Math + vLLM | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_(3B)-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
@@ -377,11 +383,13 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Gemma3** **(1B)** | GSM8K Math | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Gemma3_(1B)-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **DeepSeek R1 0528 Qwen3** **(8B)** | DAPO Math + vLLM | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-DeepSeek_R1_0528_Qwen3_(8B)_GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3** **(4B)** | DAPO Math + vLLM | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(4B)-GRPO.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3** **(4B)** | GRPO + vLLM | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(4B)-GRPO-Tool_Use.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### Tool Calling Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
 | **Qwen2.5 Coder** **(1.5B)** | Tool Calling | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2.5_Coder_(1.5B)-Tool_Calling.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3** **(4B)** | Tool Calling | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(4B)-Tool_Calling.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### Text-to-Speech (TTS) Notebooks
 | Model | Type | Notebook Link |
@@ -418,6 +426,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **ModernBert**  | Classification | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-ModernBert.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3 Embedding** **(4B)** | Embeddings | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_Embedding_(4B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3 Embedding** **(0 6B)** | Embeddings | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_Embedding_(0_6B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3 5** **(4B)** | Decision Model | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_5_(4B)-Decision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **EmbeddingGemma** **(300M)** | Embeddings | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-EmbeddingGemma_(300M).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **ModernBERT** **(Large)** | Classification | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-bert_classification.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **BGE M3**  | Embeddings | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-BGE_M3.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
@@ -580,7 +589,6 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Muse Glimmer** **(30B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Muse_Glimmer_(30B)-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Muse Glimmer** **(30B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Muse_Glimmer_(30B)-Multimodal.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **CodeForces CoT Reasoning**  |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
-| **Unsloth**  | Studio | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Unsloth_Studio.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 </details>
 
@@ -589,7 +597,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 
 | Model | Type | Notebook |
 | --- | --- | --- |
-| **Unsloth Studio** | Chat UI | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Unsloth_Studio.ipynb) |
 | **Gemma4** **(E2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma4_(E2B)-Vision.ipynb) |
 | **Qwen3 5** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(4B)_Vision.ipynb) |
 | **Qwen3 5** **(2B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_5_(2B)_Vision.ipynb) |
@@ -739,6 +746,7 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **Mistral** **(7B)** | Text Completion | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_(7B)-Text_Completion.ipynb) |
 | **Qwen2** **(7B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen2_(7B)-Alpaca.ipynb) |
 | **Zephyr** **(7B)** | DPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Zephyr_(7B)-DPO.ipynb) |
+| **Llama3.2** **(1B)** | PPO | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Llama3.2_(1B)-PPO.ipynb) |
 | **ModernBERT** **(Large)** | Classification | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-bert_classification.ipynb) |
 | **Mistral Nemo** **(12B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Mistral_Nemo_(12B)-Alpaca.ipynb) |
 | **CodeGemma** **(7B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-CodeGemma_(7B)-Conversational.ipynb) |
@@ -750,166 +758,6 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 
 
 <!-- End of Notebook Links -->
-
-<!-- MOLAB:START -->
-# 🍃 Molab Notebooks
-
-Run any of these on [molab](https://molab.marimo.io), Marimo's hosted GPU notebooks. They're reactive: change a value in one cell, the cells below recompute on their own.
-
-| Model | Type | Notebook |
-| --- | --- | --- |
-| **Gemma4** **(E2B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Vision.py) |
-| **Qwen3 5** **(4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(4B)_Vision.py) |
-| **Qwen3 5** **(2B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(2B)_Vision.py) |
-| **gpt oss** **(20B)** | Fine Tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)-Fine-tuning.py) |
-| **gpt oss** **(20B)** | Auto Kernel Creation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)-GRPO.py) |
-| **Qwen3** **(14B)** | Reasoning Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B)-Reasoning-Conversational.py) |
-
-<details>
-  <summary>
-    Click for all our molab notebooks:
-  </summary>
-
-| Model | Type | Notebook |
-| --- | --- | --- |
-| **All MiniLM L6 v2** | Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/All_MiniLM_L6_v2.py) |
-| **BGE M3** | Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/BGE_M3.py) |
-| **CodeForces CoT Reasoning** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.py) |
-| **CodeGemma** **(7B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/CodeGemma_(7B)-Conversational.py) |
-| **Deepseek OCR** **(3B)** | Fine Tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B).py) |
-| **Deepseek OCR** **(3B)** | Eval | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B)-Eval.py) |
-| **Deepseek OCR** **(3B)** | Evaluation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_(3B)-Evaluation.py) |
-| **Deepseek OCR 2** **(3B)** | Fine Tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Deepseek_OCR_2_(3B).py) |
-| **DiffusionGemma** **(26B A4B)** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/DiffusionGemma_(26B-A4B)-Sudoku.py) |
-| **ERNIE 4 5 21B A3B PT** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ERNIE_4_5_21B_A3B_PT-Conversational.py) |
-| **ERNIE 4 5 VL 28B A3B PT** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ERNIE_4_5_VL_28B_A3B_PT_Vision.py) |
-| **EmbeddingGemma** **(300M)** | Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/EmbeddingGemma_(300M).py) |
-| **Falcon H1** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Falcon_H1-Alpaca.py) |
-| **Falcon H1** **(0.5B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Falcon_H1_(0.5B)-Alpaca.py) |
-| **FunctionGemma** **(270M)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/FunctionGemma_(270M).py) |
-| **FunctionGemma** **(270M)** | Inference | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/FunctionGemma_(270M)-LMStudio.py) |
-| **FunctionGemma** **(270M)** | Mobile Actions | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/FunctionGemma_(270M)-Mobile-Actions.py) |
-| **FunctionGemma** **(270M)** | Tool Calling | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/FunctionGemma_(270M)-Multi-Turn-Tool-Calling.py) |
-| **GLM Flash(80GB)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/GLM_Flash_A100(80GB).py) |
-| **gpt oss BNB** **(20B)** | Inference | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/GPT_OSS_BNB_(20B)-Inference.py) |
-| **gpt oss MXFP4** **(20B)** | Inference | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/GPT_OSS_MXFP4_(20B)-Inference.py) |
-| **Gemma2** **(2B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma2_(2B)-Alpaca.py) |
-| **Gemma2** **(9B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma2_(9B)-Alpaca.py) |
-| **Gemma3N** **(2B)** | Inference | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3N_(2B)-Inference.py) |
-| **Gemma3N** **(4B)** | Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3N_(4B)-Audio.py) |
-| **Gemma3N** **(4B)** | Multimodal | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3N_(4B)-Conversational.py) |
-| **Gemma3N** **(4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3N_(4B)-Vision.py) |
-| **Gemma3** **(270M)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(270M).py) |
-| **Gemma3** **(270M)** | Phone Deployment | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(270M)_Phone_Deployment.py) |
-| **Gemma3** **(27B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(27B)_A100-Conversational.py) |
-| **Gemma3** **(4B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(4B).py) |
-| **Gemma3** **(4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma3_(4B)-Vision.py) |
-| **Gemma4** **(12B)** | Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(12B)_Audio.py) |
-| **Gemma4** **(12B)** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(12B)_Text.py) |
-| **Gemma4** **(12B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(12B)_Vision.py) |
-| **Gemma4** **(26B A4B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(26B_A4B)-Text.py) |
-| **Gemma4** **(26B A4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(26B_A4B)-Vision.py) |
-| **Gemma4** **(31B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(31B)-Text.py) |
-| **Gemma4** **(31B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(31B)-Vision.py) |
-| **Gemma4** **(E2B)** | Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Audio.py) |
-| **Gemma4** **(E2B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)-Text.py) |
-| **Gemma4** **(E2B)** | GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_GRPO.py) |
-| **Gemma4** **(E2B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_Reinforcement_Learning_2048_Game.py) |
-| **Gemma4** **(E2B)** | Sudoku | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.py) |
-| **Gemma4** **(E4B)** | Audio | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E4B)-Audio.py) |
-| **Gemma4** **(E4B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E4B)-Text.py) |
-| **Gemma4** **(E4B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Gemma4_(E4B)-Vision.py) |
-| **Granite4.0** **(3B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Granite4.0.py) |
-| **Granite4.0** **(350M)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Granite4.0_350M.py) |
-| **LFM2.5** **(1.2B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_(1.2B)-Conversational.py) |
-| **LFM2.5** **(1.2B)** | Text Completion | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_(1.2B)-Text_Completion.py) |
-| **LFM2.5** **(1.2B)** | Translation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_(1.2B)-Translation.py) |
-| **LFM2.5 VL** **(1.6B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/LFM2.5_VL_(1.6B)-Vision.py) |
-| **Liquid LFM2** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Liquid_LFM2-Conversational.py) |
-| **Liquid LFM2** **(1.2B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Liquid_LFM2_(1.2B)-Conversational.py) |
-| **Llama3.1** **(8B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.1_(8B)-Alpaca.py) |
-| **Llama3.1** **(8B)** | Inference | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.1_(8B)-Inference.py) |
-| **Llama3.2** **(11B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.2_(11B)-Vision.py) |
-| **Llama3.2** **(1B)** | RAFT | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.2_(1B)-RAFT.py) |
-| **Llama3.2** **(1B and 3B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.2_(1B_and_3B)-Conversational.py) |
-| **Llama3.3** **(70B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3.3_(70B)_A100-Conversational.py) |
-| **Llama3** **(8B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3_(8B)-Alpaca.py) |
-| **Llama3** **(8B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3_(8B)-Conversational.py) |
-| **Llama3** **(8B)** | ORPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3_(8B)-ORPO.py) |
-| **Llama3** **(8B)** | Ollama | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llama3_(8B)-Ollama.py) |
-| **Llasa TTS** **(1B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llasa_TTS_(1B).py) |
-| **Llasa TTS** **(3B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Llasa_TTS_(3B).py) |
-| **Magistral** **(24B)** | Reasoning Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Magistral_(24B)-Reasoning-Conversational.py) |
-| **Ministral3** **(3B)** | Sudoku | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Ministral_3_(3B)_Reinforcement_Learning_Sudoku_Game.py) |
-| **Ministral3 VL** **(3B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Ministral_3_VL_(3B)_Vision.py) |
-| **Mistral** **(7B)** | Text Completion | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_(7B)-Text_Completion.py) |
-| **Mistral Nemo** **(12B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_Nemo_(12B)-Alpaca.py) |
-| **Mistral Small** **(22B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_Small_(22B)-Alpaca.py) |
-| **Mistral v0.3** **(7B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_v0.3_(7B)-Alpaca.py) |
-| **Mistral v0.3** **(7B)** | CPT | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_v0.3_(7B)-CPT.py) |
-| **Mistral v0.3** **(7B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Mistral_v0.3_(7B)-Conversational.py) |
-| **ModernBert** | Classification | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/ModernBert.py) |
-| **Muse Glimmer** **(30B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Muse_Glimmer_(30B)-Conversational.py) |
-| **Muse Glimmer** **(30B)** | GRPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Muse_Glimmer_(30B)-GRPO.py) |
-| **Muse Glimmer** **(30B)** |  | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Muse_Glimmer_(30B)-Multimodal.py) |
-| **Muse Glimmer** **(30B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Muse_Glimmer_(30B)-Vision.py) |
-| **NeMo Gym Multi Environment** | Multi Environment | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/NeMo-Gym-Multi-Environment.py) |
-| **NeMo Gym Sudoku** | Sudoku | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/NeMo-Gym-Sudoku.py) |
-| **Nemotron 3 Nano 30B A3B** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Nemotron-3-Nano-30B-A3B_A100.py) |
-| **Nemotron Nano 3 30B A3B** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Nemotron-Nano-3-30B-A3B_A100.py) |
-| **(OpenEnv) gpt oss** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py) |
-| **(OpenEnv) gpt oss BF16** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py) |
-| **Orpheus** **(3B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Orpheus_(3B)-TTS.py) |
-| **Oute TTS** **(1B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Oute_TTS_(1B).py) |
-| **Paddle OCR** **(1B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Paddle_OCR_(1B)_Vision.py) |
-| **Phi 3.5 Mini** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Phi_3.5_Mini-Conversational.py) |
-| **Phi 3 Medium** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Phi_3_Medium-Conversational.py) |
-| **Phi 4** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Phi_4-Conversational.py) |
-| **Pixtral** **(12B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Pixtral_(12B)-Vision.py) |
-| **Qwen2.5** **(7B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_(7B)-Alpaca.py) |
-| **Qwen2.5 Coder** **(1.5B)** | Tool Calling | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_Coder_(1.5B)-Tool_Calling.py) |
-| **Qwen2.5 Coder** **(14B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_Coder_(14B)-Conversational.py) |
-| **Qwen2.5 VL** **(7B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2.5_VL_(7B)-Vision.py) |
-| **Qwen2** **(7B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2_(7B)-Alpaca.py) |
-| **Qwen2 VL** **(7B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen2_VL_(7B)-Vision.py) |
-| **Qwen3.8** **(27B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3.8_(27B)-Conversational.py) |
-| **Qwen3** **(0.6B)** | Knowledge Distillation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(0.6B)-Knowledge_Distillation.py) |
-| **Qwen3** **(0.6B)** | Reasoning Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch.py) |
-| **Qwen3** **(0 6B)** | Phone Deployment | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(0_6B)-Phone_Deployment.py) |
-| **Qwen3** **(14B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B).py) |
-| **Qwen3** **(14B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(14B)-Alpaca.py) |
-| **Qwen3** **(32B)** | Reasoning Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(32B)_A100-Reasoning-Conversational.py) |
-| **Qwen3** **(4B)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)-Instruct.py) |
-| **Qwen3** **(4B)** | Thinking | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)-Thinking.py) |
-| **Qwen3** **(4B)** | QAT | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_(4B)_Instruct-QAT.py) |
-| **Qwen3 5** **(0 8B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(0_8B)_Vision.py) |
-| **Qwen3 5** **(4B)** | Vision Math (GRPO RL) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_(4B)_Vision_GRPO.py) |
-| **Qwen3 5 MoE** | MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_5_MoE.py) |
-| **Qwen3 6 MoE** | MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_6_MoE.py) |
-| **Qwen3 Embedding** **(0 6B)** | Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_Embedding_(0_6B).py) |
-| **Qwen3 Embedding** **(4B)** | Embeddings | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_Embedding_(4B).py) |
-| **Qwen3 MoE** | MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_MoE.py) |
-| **Qwen3 VL** **(8B)** | Vision | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_VL_(8B)-Vision.py) |
-| **Qwen3 VL** **(8B)** | Vision Math (GRPO RL) | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen3_VL_(8B)-Vision-GRPO.py) |
-| **Qwen 3 5 27B(80GB)** | Conversational | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Qwen_3_5_27B_A100(80GB).py) |
-| **Sesame CSM** **(1B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Sesame_CSM_(1B)-TTS.py) |
-| **Spark TTS** **(0.5B)** | TTS | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Spark_TTS_(0_5B).py) |
-| **Synthetic Data Hackathon** | Synthetic Data | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Synthetic_Data_Hackathon.py) |
-| **TinyLlama** **(1.1B)** | Alpaca | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/TinyLlama_(1.1B)-Alpaca.py) |
-| **TinyQwen3 MoE** | MoE | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/TinyQwen3_MoE.py) |
-| **Whisper** **(Large)** | Fine Tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Whisper.py) |
-| **Zephyr** **(7B)** | DPO | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/Zephyr_(7B)-DPO.py) |
-| **ModernBERT** **(Large)** | Classification | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/bert_classification.py) |
-| **gpt oss** **(120B)** | Fine Tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(120B)_A100-Fine-tuning.py) |
-| **(A100) gpt oss** **(20B)** | Auto Kernel Creation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt-oss-(20B)_A100-GRPO.py) |
-| **gpt oss** **(20B)** | Fine Tuning | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_500K_Context_Fine_tuning.py) |
-| **gpt oss** **(20B)** | Auto Kernel Creation | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_GRPO_BF16.py) |
-| **gpt oss** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py) |
-| **gpt oss BF16** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py) |
-| **(DGX Spark) gpt oss** **(20B)** | 2048 Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_Reinforcement_Learning_2048_Game_DGX_Spark.py) |
-| **gpt oss** **(20B)** | Minesweeper Game | [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/unslothai/notebooks/blob/main/molab/gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py) |
-</details>
-<!-- MOLAB:END -->
 
 # ✨ Contributing to Notebooks
 

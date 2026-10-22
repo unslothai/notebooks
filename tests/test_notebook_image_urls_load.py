@@ -46,7 +46,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SEARCH_DIRS = ("original_template", "nb", "kaggle", "python_scripts", "molab")
+SEARCH_DIRS = ("original_template", "nb", "kaggle", "python_scripts")
 
 _LOAD_CALL = re.compile(r"""load_image_from_url\(\s*["']([^"']+)["']""")
 _HELPER = "load_image_from_url"

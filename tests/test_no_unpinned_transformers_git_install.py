@@ -19,9 +19,7 @@
 """Installing transformers from git means naming the commit.
 
 `git+https://github.com/huggingface/transformers` with no `@ref` is whatever
-upstream's default branch holds the minute a reader runs the notebook. Beyond
-the reproducibility cost, in molab that dependency is not a cell at all: the
-PEP 723 header has uv *build* it before the notebook's first line, so an
+upstream's default branch holds the minute a reader runs the notebook, and an
 unreviewed revision's build backend runs in a runtime holding the reader's
 Hugging Face token.
 
@@ -38,7 +36,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # `scripts/notebook_inventory.py`'s roots plus the generated trees. `kaggle/`
 # is hand-committed rather than generated, so nothing else would catch it.
-SEARCH_ROOTS = ("nb", "original_template", "kaggle", "python_scripts", "molab")
+SEARCH_ROOTS = ("nb", "original_template", "kaggle", "python_scripts")
 
 # Transport and boundary follow `test_force_reinstall_does_not_replace_numpy.py`:
 # pip takes `git+ssh://git@`, and without the lookahead `transformers-neuronx`
@@ -107,8 +105,7 @@ def test_transformers_git_installs_name_a_commit(name, text):
     for ref in _TRANSFORMERS_GIT.findall(text):
         assert ref, (
             f"{name} installs transformers from git with no @ref, so it builds "
-            "whatever upstream's default branch holds at run time. In molab that "
-            "happens in the PEP 723 header, before the notebook body runs. Pin a "
+            "whatever upstream's default branch holds at run time. Pin a "
             "release with == or name a commit with @<sha>"
         )
         assert _IMMUTABLE.fullmatch(ref.lstrip("@")), (

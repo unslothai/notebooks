@@ -33,17 +33,7 @@
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    import torch; v = re.match(r\'[\\d]{1,}\\.[\\d]{1,}\', str(torch.__version__)).group(0)\n    xformers = \'xformers==\' + {\'2.9\':\'0.0.33.post1\',\'2.8\':\'0.0.32.post2\'}.get(v, "0.0.35")\n    if str(torch.version.cuda).startswith("13") and xformers.endswith("0.0.35"): xformers = "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-manylinux_2_28_x86_64.whl"\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate {xformers} peft trl triton unsloth\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.1\n!pip install --no-deps trl==0.25.1\n')
-
-
-# GKD needs unslothai/unsloth#11440 and unslothai/unsloth-zoo#1310, on main but
-# not yet released. Without them `GKDConfig` is downcast to `SFTConfig` and
-# distillation silently becomes plain SFT. Delete the next cell once released.
-
-# In[ ]:
-
-
-get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git+https://github.com/unslothai/unsloth-zoo git+https://github.com/unslothai/unsloth')
+get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.1\n!pip install --no-deps trl==0.25.1\n!pip install --no-deps --upgrade "unsloth>=2026.10.5" "unsloth_zoo>=2026.10.5"\n')
 
 
 # ### Knowledge distillation with Unsloth
@@ -58,15 +48,20 @@ get_ipython().system('pip install --no-deps --upgrade --force-reinstall      git
 
 # ### Pick a configuration
 # 
-# GKD holds full `(batch, seq, vocab)` logits for **both** models, so peak memory
-# follows the vocabulary, not the weights.
+# Unsloth projects hidden states through each `lm_head` in chunks, so the full
+# `(batch, seq, vocab)` logits never exist for either model: 3.0 GB peak below
+# against 9.9 GB for TRL's dense loss (`UNSLOTH_GKD_CHUNKED=0`), same loss to 2e-5,
+# about 30% slower at batch 1 and not at larger batches.
 # 
-# | config | weights | measured on a Kaggle 2x T4 |
+# | config | weights | measured |
 # | --- | --- | --- |
-# | `qwen3` | 1.2 + 3.4 GB | PASS, loss 0.413, 392/392 adapters, 10.9 GB |
-# | `gemma-4` | 8.1 + 10.9 GB | PASS, loss 0.079, 410/410 adapters, 14.3 GB |
+# | `qwen3` | 1.2 + 3.4 GB | PASS on one free T4: loss 0.367, 392/392 adapters, 3.36 GB |
+# | `gemma-4` | 8.1 + 10.9 GB | PASS on a Kaggle 2x T4: loss 0.079, 410/410 adapters, 14.3 GB |
 # | `muse-glimmer` | 22.2 GB | self-distillation, OOM by 208 MiB at seq 384 |
 # | `qwen3.8` | 22.3 GB | self-distillation, blocked on a dtype mismatch |
+# 
+# Only `qwen3` has been re-measured since the chunked loss landed, which is why it
+# now fits one card. The others predate it and are pessimistic.
 # 
 # `unsloth/gemma-4-26B-A4B-it` needs an A100 or better, so add it yourself.
 
@@ -122,6 +117,29 @@ print(f"student: {student_name}")
 # backslash before Python 3.12, and the apostrophe needs one.
 teacher_label = teacher_name or "(self-distillation: the student's own frozen base)"
 print(f"teacher: {teacher_label}")
+
+
+# Older releases downcast `GKDConfig` to `SFTConfig` and have no chunked loss, so
+# distillation would quietly run as plain SFT. A runtime that already had unsloth
+# keeps its own copy, so check the capability is really there. Restart the runtime
+# if this fails.
+
+# In[ ]:
+
+
+# Probing the capability, not a version string: the notebook generator
+# rewrites every version literal in a cell, which silently defangs a pin.
+# unsloth first: unsloth_zoo refuses to import until it sets UNSLOTH_IS_PRESENT.
+import unsloth
+from unsloth.models.rl_replacements import RL_FUNCTIONS
+from unsloth_zoo.rl_replacements import distillation_chunked_jsd
+
+_patches = [getattr(f, "__name__", "") for f in RL_FUNCTIONS.get("gkd_trainer", [])]
+assert any("compute_loss" in n for n in _patches), (
+    "this unsloth does not route GKD through the chunked loss; restart the "
+    f"runtime so the install upgrade applies (gkd patches: {_patches})"
+)
+print(f"GKD chunked loss wired: {_patches}")
 
 
 # ### Load the student

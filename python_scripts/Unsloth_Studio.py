@@ -19,7 +19,7 @@
 # 
 # We are actively working on making Unsloth Studio install on Colab T4 GPUs faster.
 # 
-# [Features](https://unsloth.ai/docs/new/unsloth-studio#features) • [Quickstart](https://unsloth.ai/docs/new/unsloth-studio/start) • [Data Recipes](https://unsloth.ai/docs/new/unsloth-studio/data-recipe) • [Studio Chat](https://unsloth.ai/docs/new/unsloth-studio/chat) • [Export](https://unsloth.ai/docs/new/unsloth-studio/export)
+# [Features](https://unsloth.ai/docs/new/unsloth-studio#features) • [Quickstart](https://unsloth.ai/docs/new/unsloth-studio/start) • [Data Recipes](https://unsloth.ai/docs/new/unsloth-studio/data-recipe) • [Unsloth Chat](https://unsloth.ai/docs/new/unsloth-studio/chat) • [Export](https://unsloth.ai/docs/new/unsloth-studio/export)
 
 # <p align="left"><img src="https://github.com/unslothai/unsloth/raw/main/studio/frontend/public/studio%20github%20landscape%20colab%20display.png" width="600"></p>
 
@@ -41,7 +41,13 @@ get_ipython().system('chmod +x studio/setup.sh && ./studio/setup.sh --local')
 import sys
 sys.path.insert(0, "/content/unsloth/studio/backend")
 from colab import start
+
+# On Colab, start() auto-opens a Cloudflare link and prints admin login credentials.
+# Use the Cloudflare link above the ready card to open Unsloth (in-cell iframes often stay blank).
 start()
+
+# To skip the Cloudflare tunnel and try the in-notebook proxy iframe only:
+# start(cloudflare = False)
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
