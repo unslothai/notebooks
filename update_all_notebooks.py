@@ -590,6 +590,25 @@ installation_spark_content = installation_content + f"""\n!git clone https://git
 installation_spark_kaggle_content = installation_kaggle_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
+# OmniVoice needs transformers >= 5.3 (Higgs audio tokenizer); --no-deps skips its demo/trainer deps (gradio, tensorboardX).
+# `pip install unsloth` does not pull torchaudio, whose releases stop at 2.11: newest <= torch, from torch's own
+# index when torch has a local tag (+cu128, +cpu), since a mismatched build fails to load.
+OMNIVOICE_INSTALL = """
+!pip install --no-deps omnivoice==0.2.1
+!pip install pydub webdataset soundfile librosa torchcodec \"datasets>=3.4.1,<4.0.0\"
+import importlib.util, importlib.metadata
+if importlib.util.find_spec("torchaudio") is None:
+    _torch = importlib.metadata.version("torch")
+    _torchaudio = "torchaudio<=" + _torch.split("+")[0]
+    _index = "--index-url https://download.pytorch.org/whl/" + _torch.split("+")[1] if "+" in _torch else ""
+    !pip install "{_torchaudio}" {_index}"""
+installation_omnivoice_content = update_or_append_pip_install(
+    installation_content, "transformers", "!pip install transformers==5.15.0"
+) + OMNIVOICE_INSTALL
+installation_omnivoice_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content, "transformers", "!pip install transformers==5.15.0"
+) + OMNIVOICE_INSTALL
+
 installation_gpt_oss_content = r"""%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
@@ -1500,6 +1519,7 @@ ARCHITECTURE_MAPPING = {
     "spark": "Text-to-Speech (TTS)",
     "orpheus": "Text-to-Speech (TTS)",
     "sesame": "Text-to-Speech (TTS)",
+    "omnivoice": "Text-to-Speech (TTS)",
 
     # gpt oss
     "gpt oss": "GPT-OSS",
@@ -5036,6 +5056,13 @@ def update_notebook_sections(
                                 installation = installation_spark_kaggle_content
                             else:
                                 installation = installation_spark_content
+
+                        # OMNIVOICE INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["omnivoice"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_omnivoice_kaggle_content
+                            else:
+                                installation = installation_omnivoice_content
 
                         # OUTE INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["oute"]):
