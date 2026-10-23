@@ -191,7 +191,7 @@ data_collator = PaddingDataCollator(processor, batch_tokens = None)
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's use Huggingface `Trainer`! More docs here: [Transformers docs](https://huggingface.co/docs/transformers/main_classes/trainer). We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`.
+# Now let's use Huggingface `Trainer`! More docs here: [Transformers docs](https://huggingface.co/docs/transformers/main_classes/trainer). We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and remove `max_steps` (or set it to `-1`).
 
 # In[ ]:
 
