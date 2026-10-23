@@ -594,14 +594,17 @@ installation_spark_kaggle_content = installation_kaggle_content + f"""\n!git clo
 # --no-deps: its requirements also pull gradio and tensorboardX for its demo and trainer, which the
 # notebook does not use; the second line is what the model, processor and collator import.
 # OmniVoice imports torchaudio, which `pip install unsloth` does not pull. torchaudio releases stop at
-# 2.11 while torch moves on, so take the newest one not newer than torch (the pairing unsloth's extras use).
+# 2.11 while torch moves on, so take the newest one not newer than torch (the pairing unsloth's extras use),
+# from torch's own index when torch carries a local tag (+cu128, +cpu): a mismatched build fails to load.
 OMNIVOICE_INSTALL = """
 !pip install --no-deps omnivoice==0.2.1
 !pip install pydub webdataset soundfile librosa torchcodec \"datasets>=3.4.1,<4.0.0\"
 import importlib.util, importlib.metadata
 if importlib.util.find_spec("torchaudio") is None:
-    _torchaudio = "torchaudio<=" + importlib.metadata.version("torch").split("+")[0]
-    !pip install "{_torchaudio}\""""
+    _torch = importlib.metadata.version("torch")
+    _torchaudio = "torchaudio<=" + _torch.split("+")[0]
+    _index = "--index-url https://download.pytorch.org/whl/" + _torch.split("+")[1] if "+" in _torch else ""
+    !pip install "{_torchaudio}" {_index}"""
 installation_omnivoice_content = update_or_append_pip_install(
     installation_content, "transformers", "!pip install transformers==5.15.0"
 ) + OMNIVOICE_INSTALL
