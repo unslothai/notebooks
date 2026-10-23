@@ -590,6 +590,19 @@ installation_spark_content = installation_content + f"""\n!git clone https://git
 installation_spark_kaggle_content = installation_kaggle_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
+# OmniVoice ships as its own package and needs transformers >= 5.3 for the Higgs audio tokenizer.
+# --no-deps: its requirements also pull gradio and tensorboardX for its demo and trainer, which the
+# notebook does not use; the second line is what the model, processor and collator import.
+OMNIVOICE_INSTALL = """
+!pip install --no-deps omnivoice==0.2.1
+!pip install pydub webdataset soundfile librosa torchcodec \"datasets>=3.4.1,<4.0.0\""""
+installation_omnivoice_content = update_or_append_pip_install(
+    installation_content, "transformers", "!pip install transformers==5.15.0"
+) + OMNIVOICE_INSTALL
+installation_omnivoice_kaggle_content = update_or_append_pip_install(
+    installation_kaggle_content, "transformers", "!pip install transformers==5.15.0"
+) + OMNIVOICE_INSTALL
+
 installation_gpt_oss_content = r"""%%capture
 import os, importlib.util
 !pip install --upgrade -qqq uv
@@ -1500,6 +1513,7 @@ ARCHITECTURE_MAPPING = {
     "spark": "Text-to-Speech (TTS)",
     "orpheus": "Text-to-Speech (TTS)",
     "sesame": "Text-to-Speech (TTS)",
+    "omnivoice": "Text-to-Speech (TTS)",
 
     # gpt oss
     "gpt oss": "GPT-OSS",
@@ -5036,6 +5050,13 @@ def update_notebook_sections(
                                 installation = installation_spark_kaggle_content
                             else:
                                 installation = installation_spark_content
+
+                        # OMNIVOICE INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["omnivoice"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_omnivoice_kaggle_content
+                            else:
+                                installation = installation_omnivoice_content
 
                         # OUTE INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["oute"]):
