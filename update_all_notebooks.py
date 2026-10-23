@@ -590,12 +590,9 @@ installation_spark_content = installation_content + f"""\n!git clone https://git
 installation_spark_kaggle_content = installation_kaggle_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
-# OmniVoice ships as its own package and needs transformers >= 5.3 for the Higgs audio tokenizer.
-# --no-deps: its requirements also pull gradio and tensorboardX for its demo and trainer, which the
-# notebook does not use; the second line is what the model, processor and collator import.
-# OmniVoice imports torchaudio, which `pip install unsloth` does not pull. torchaudio releases stop at
-# 2.11 while torch moves on, so take the newest one not newer than torch (the pairing unsloth's extras use),
-# from torch's own index when torch carries a local tag (+cu128, +cpu): a mismatched build fails to load.
+# OmniVoice needs transformers >= 5.3 (Higgs audio tokenizer); --no-deps skips its demo/trainer deps (gradio, tensorboardX).
+# `pip install unsloth` does not pull torchaudio, whose releases stop at 2.11: newest <= torch, from torch's own
+# index when torch has a local tag (+cu128, +cpu), since a mismatched build fails to load.
 OMNIVOICE_INSTALL = """
 !pip install --no-deps omnivoice==0.2.1
 !pip install pydub webdataset soundfile librosa torchcodec \"datasets>=3.4.1,<4.0.0\"
