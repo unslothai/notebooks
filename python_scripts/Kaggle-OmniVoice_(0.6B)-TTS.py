@@ -33,7 +33,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.0\n!pip install --no-deps trl==0.22.2\n!pip install --no-deps omnivoice==0.2.1\nimport importlib.metadata as _md\ntry: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])\nexcept Exception: _tv = (2, 11)\n_torchcodec = {(2, 11): "torchcodec>=0.11.0", (2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 12) else "torchcodec")\n!pip install pydub webdataset soundfile librosa "{_torchcodec}" "datasets>=3.4.1,<4.0.0"\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.0\n!pip install --no-deps trl==0.22.2\n!pip install --no-deps omnivoice==0.2.1\nimport importlib.metadata as _md\ntry: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])\nexcept Exception: _tv = (2, 11)\n_torchcodec = {(2, 11): "torchcodec>=0.11.0", (2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 12) else "torchcodec")\n!pip install pydub webdataset soundfile librosa "{_torchcodec}" "datasets>=3.4.1,<4.0.0"\nimport importlib.util, importlib.metadata\nif importlib.util.find_spec("torchaudio") is None:\n    _torchaudio = "torchaudio<=" + importlib.metadata.version("torch").split("+")[0]\n    !pip install "{_torchaudio}"\n')
 # 
 # 
 # # ### Unsloth
@@ -307,12 +307,14 @@ model.save_pretrained("omnivoice_lora")  # Local saving of the backbone LoRA ada
 text_tokenizer.save_pretrained("omnivoice_lora")
 audio_layers = {k: v for k, v in omnivoice.state_dict().items() if k.startswith(("audio_embeddings", "audio_heads"))}
 torch.save(audio_layers, "omnivoice_lora/audio_layers.pt")
-# model.push_to_hub("your_name/omnivoice_lora", token = "...") # Online saving
+# from huggingface_hub import create_repo, upload_folder # Online saving: the whole folder, audio_layers.pt included
+# create_repo("your_name/omnivoice_lora", exist_ok = True, token = "...")
+# upload_folder(repo_id = "your_name/omnivoice_lora", folder_path = "omnivoice_lora", token = "...")
 
 
 # ### Saving a full OmniVoice checkpoint
 # 
-# We merge the LoRA adapters into the backbone and save a complete OmniVoice checkpoint, with the text tokenizer and the audio tokenizer, in 16bit. It loads with `OmniVoice.from_pretrained` like the original model. Use `push_to_hub` to upload it to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# We merge the LoRA adapters into the backbone and save a complete OmniVoice checkpoint, with the text tokenizer and the audio tokenizer, in 16bit. It loads with `OmniVoice.from_pretrained` like the original model. Use `upload_folder` to upload it to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
 # In[ ]:
 
@@ -332,8 +334,9 @@ shutil.copytree(
     os.path.join(save_directory, "audio_tokenizer"),
     dirs_exist_ok = True,
 )
-# omnivoice.push_to_hub("your_name/omnivoice_finetuned", token = "...") # Then upload the folder's
-# tokenizer files and audio_tokenizer/ too, e.g. with huggingface_hub's upload_folder.
+# from huggingface_hub import create_repo, upload_folder # Online saving: weights, tokenizer and audio_tokenizer/
+# create_repo("your_name/omnivoice_finetuned", exist_ok = True, token = "...")
+# upload_folder(repo_id = "your_name/omnivoice_finetuned", folder_path = save_directory, token = "...")
 
 
 # Now load the saved checkpoint like any OmniVoice model and generate:
