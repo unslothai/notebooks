@@ -296,25 +296,8 @@ display(Audio(auto_voice, rate = omnivoice.sampling_rate))
 
 # <a name="Save"></a>
 # ### Saving, loading finetuned models
-# To save the final model as LoRA adapters, use `save_pretrained` for a local save. The audio embeddings and audio heads were trained fully, so we save them next to the adapters.
 # 
-# **[NOTE]** This ONLY saves the LoRA adapters and the audio layers, and not the full model. To save a full OmniVoice checkpoint, scroll down!
-
-# In[ ]:
-
-
-model.save_pretrained("omnivoice_lora")  # Local saving of the backbone LoRA adapters
-text_tokenizer.save_pretrained("omnivoice_lora")
-audio_layers = {k: v for k, v in omnivoice.state_dict().items() if k.startswith(("audio_embeddings", "audio_heads"))}
-torch.save(audio_layers, "omnivoice_lora/audio_layers.pt")
-# from huggingface_hub import create_repo, upload_folder # Online saving: the whole folder, audio_layers.pt included
-# create_repo("your_name/omnivoice_lora", exist_ok = True, token = "...")
-# upload_folder(repo_id = "your_name/omnivoice_lora", folder_path = "omnivoice_lora", token = "...")
-
-
-# ### Saving a full OmniVoice checkpoint
-# 
-# We merge the LoRA adapters into the backbone and save a complete OmniVoice checkpoint, with the text tokenizer and the audio tokenizer, in 16bit. It loads with `OmniVoice.from_pretrained` like the original model. Use `upload_folder` to upload it to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
+# The audio embeddings and audio heads were trained fully, not as LoRA adapters, so we save the whole model: we merge the LoRA adapters into the backbone and save a complete OmniVoice checkpoint, with the text tokenizer and the audio tokenizer, in 16bit. It loads with `OmniVoice.from_pretrained` like the original model. Use `upload_folder` to upload it to your Hugging Face account! You can go to https://huggingface.co/settings/tokens for your personal tokens.
 
 # In[ ]:
 
