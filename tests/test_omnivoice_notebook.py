@@ -48,3 +48,18 @@ def test_installs_omnivoice_and_transformers_5_3_or_newer():
         assert re.search(r"pip install --no-deps omnivoice==", install), path.name
         seen += 1
     assert seen >= 2
+
+
+def test_installs_audioop_backport_for_python_3_13():
+    # omnivoice -> pydub -> `import audioop`, removed from the stdlib in Python 3.13; pydub does not
+    # declare the `audioop-lts` backport, so without it `from omnivoice import OmniVoice` fails there.
+    seen = 0
+    for path, code in _omnivoice_notebooks():
+        if path.parent.name != "nb":
+            continue
+        install = "\n".join(code)
+        for line in install.splitlines():
+            if re.match(r"\s*!(?:uv )?pip install\b.*\bpydub\b", line):
+                assert re.search(r"""["']audioop-lts\s*;\s*python_version\s*>=\s*'3\.13'["']""", line), (path.name, line)
+                seen += 1
+    assert seen >= 2
