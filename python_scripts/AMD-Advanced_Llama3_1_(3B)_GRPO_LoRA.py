@@ -45,6 +45,11 @@
 # get_ipython().system('uv pip install --system -qqq --no-deps "trl==0.22.2"')
 # 
 # 
+# Kept from the installation cell above, which is commented out in scripts.
+import os
+os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
+
+
 # # ### Unsloth
 
 # Load up `Llama 3.1 8B Instruct`, and set parameters

@@ -6836,9 +6836,60 @@ def remove_unwanted_section(script_content):
         lines = section_to_comment.split('\n')
         commented_lines = [f"# {line}" for line in lines]
         commented_section = '\n'.join(commented_lines)
+        # Not a key the script already sets at top level after the install cells.
+        set_later = {key for key, _ in _kept_install_env_lines(after_section.split('\n'))}
+        kept = [line for key, line in _kept_install_env_lines(lines) if key not in set_later]
+        if kept:
+            # The install cell is commented out, but these must still run before
+            # unsloth is imported: without UNSLOTH_VLLM_STANDBY the vLLM GRPO
+            # scripts OOM on a 15 GB T4 where the notebook fits.
+            # Before the last line, which runs on into the next heading unchanged.
+            commented_section = (
+                '\n'.join(commented_lines[:-1])
+                + "\n# Kept from the installation cell above, which is commented out in scripts.\n"
+                + "import os\n" + "\n".join(kept) + "\n\n\n"
+                + commented_lines[-1]
+            )
         return before_section + commented_section + after_section
     else:
         return script_content
+
+
+# Environment variables an install cell sets that the rest of the script relies on.
+_SCRIPT_KEPT_INSTALL_ENV = ("UNSLOTH_VLLM_STANDBY",)
+_RE_KEPT_INSTALL_ENV = re.compile(
+    r"""^(?:import os\s*;\s*)?(os\.environ\[\s*["'](%s)["']\s*\]\s*=\s*["'][^"']*["'])"""
+    % "|".join(map(re.escape, _SCRIPT_KEPT_INSTALL_ENV))
+)
+
+
+def _kept_install_env_lines(lines):
+    """(key, line) for each top-level `os.environ["X"] = "..."` of the exported cells, first per key.
+
+    nbconvert turns a `%%capture` cell into one
+    `get_ipython().run_cell_magic('capture', '', '<cell source>')` line, so the
+    cell source is read back out of that call's third argument.
+    """
+    sources = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("get_ipython().run_cell_magic("):
+            try:
+                call = ast.parse(stripped, mode="eval").body
+                args = [ast.literal_eval(a) for a in call.args]
+            except (SyntaxError, ValueError):
+                continue
+            if len(args) >= 3 and isinstance(args[2], str):
+                sources.extend(args[2].split("\n"))
+        else:
+            sources.append(line)
+    kept, seen = [], set()
+    for line in sources:
+        m = _RE_KEPT_INSTALL_ENV.match(line)  # unindented only: not one set inside an if
+        if m and m.group(2) not in seen:
+            seen.add(m.group(2))
+            kept.append((m.group(2), m.group(1)))
+    return kept
 
 def convert_notebook_to_script(notebook_path: str, output_path: str):
     exporter = PythonExporter()

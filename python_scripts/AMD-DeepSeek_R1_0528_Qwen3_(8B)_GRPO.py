@@ -51,6 +51,11 @@
 # # Placeholder
 # 
 # 
+# Kept from the installation cell above, which is commented out in scripts.
+import os
+os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
+
+
 # # ### Unsloth
 
 # Goal: To convert `DeepSeek-R1-0528-Qwen3-8B` into a reasoning model via GRPO by using OpenR1's Math dataset.
