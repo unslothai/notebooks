@@ -591,11 +591,13 @@ installation_spark_kaggle_content = installation_kaggle_content + f"""\n!git clo
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 # OmniVoice needs transformers >= 5.3 (Higgs audio tokenizer); --no-deps skips its demo/trainer deps (gradio, tensorboardX).
+# OmniVoice imports pydub, which imports the stdlib `audioop` that Python 3.13 removed; pydub 0.25.1 does not
+# declare the `audioop-lts` backport, and gradio (which does) is one of the skipped deps, so add it here.
 # `pip install unsloth` does not pull torchaudio, whose releases stop at 2.11: newest <= torch, from torch's own
 # index when torch has a local tag (+cu128, +cpu), since a mismatched build fails to load.
 OMNIVOICE_INSTALL = """
 !pip install --no-deps omnivoice==0.2.1
-!pip install pydub webdataset soundfile librosa torchcodec \"datasets>=3.4.1,<4.0.0\"
+!pip install pydub \"audioop-lts; python_version >= '3.13'\" webdataset soundfile librosa torchcodec \"datasets>=3.4.1,<4.0.0\"
 import importlib.util, importlib.metadata
 if importlib.util.find_spec("torchaudio") is None:
     _torch = importlib.metadata.version("torch")
