@@ -51,6 +51,11 @@
 # # Placeholder
 # 
 # 
+# Kept from the installation cell above, which is commented out in scripts.
+import os
+os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
+
+
 # # ### Unsloth
 
 # Goal: To convert `Qwen3-4B-Base` into a reasoning model via GRPO by using OpenR1's Math dataset.

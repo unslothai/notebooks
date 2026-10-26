@@ -67,6 +67,11 @@
 # get_ipython().system('uv pip install --no-deps trl==0.22.2')
 # 
 # 
+# Kept from the installation cell above, which is commented out in scripts.
+import os
+os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
+
+
 # # ### Unsloth
 
 # Load up `unsloth/mistral-7b-instruct-v0.3-bnb-4bit`, and set parameters

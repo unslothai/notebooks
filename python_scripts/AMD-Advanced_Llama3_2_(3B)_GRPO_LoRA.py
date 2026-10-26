@@ -45,6 +45,11 @@
 # get_ipython().system('uv pip install --system -qqq --no-deps accelerate peft "trl==0.22.2"')
 # 
 # 
+# Kept from the installation cell above, which is commented out in scripts.
+import os
+os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
+
+
 # # ### Unsloth
 
 # Load up `Llama 3.2 3B Instruct`, and set parameters. To finetune a base model from scratch, check out our `Qwen 3 4B Base GRPO` notebook [here](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(4B)-GRPO.ipynb)

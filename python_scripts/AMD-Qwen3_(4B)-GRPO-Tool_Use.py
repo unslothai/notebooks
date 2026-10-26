@@ -52,6 +52,11 @@
 # # Placeholder
 # 
 # 
+# Kept from the installation cell above, which is commented out in scripts.
+import os
+os.environ["UNSLOTH_VLLM_STANDBY"] = "1"
+
+
 # # ### Unsloth
 
 # Goal: teach `Qwen3-4B-Instruct-2507` to solve arithmetic problems by **calling calculator tools** with GRPO.
