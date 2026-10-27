@@ -19,7 +19,7 @@
 # <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/2048_win.png/500px-2048_win.png" height=300 />
 
 # # Installation
-# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on GPT-OSS 20B, and [OpenEnv](https://github.com/meta-pytorch/OpenEnv) for the environment interactions. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
+# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on GPT-OSS 20B, and [OpenEnv](https://github.com/openenv/OpenEnv) for the environment interactions. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
 
 # In[1]:
 
@@ -35,12 +35,12 @@ get_ipython().system('uv pip install --system -qqq "transformers==4.57.6" tracki
 get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "trl==0.22.2"')
 
 
-# We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) from source:
+# We will then install [OpenEnv](https://github.com/openenv/OpenEnv) from source:
 
 # In[3]:
 
 
-get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel\n!pip install fastapi uvicorn requests\n!pip install open_spiel --prefer-binary\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\n!git checkout 83dda10\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'.\')  # Add OpenEnv root for envs module\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().parent.absolute() / "OpenEnv")\n')
+get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel\n!pip install fastapi uvicorn requests\n!pip install open_spiel --prefer-binary\n!git clone https://github.com/openenv/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\n!git checkout 83dda10\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'.\')  # Add OpenEnv root for envs module\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().parent.absolute() / "OpenEnv")\n')
 
 
 # We'll load GPT-OSS 20B and set some parameters:

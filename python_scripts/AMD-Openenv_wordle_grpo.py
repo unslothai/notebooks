@@ -19,7 +19,7 @@
 # <img width="270" height="265" alt="image" src="https://github.com/user-attachments/assets/1a51a172-ff1a-40a2-8bee-2746f5017aa0" />
 
 # # Installation
-# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Qwen3-4B, and [OpenEnv](https://github.com/meta-pytorch/OpenEnv) for the environment interactions. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
+# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Qwen3-4B, and [OpenEnv](https://github.com/openenv/OpenEnv) for the environment interactions. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
 
 # In[ ]:
 
@@ -37,12 +37,12 @@ get_ipython().system('uv pip install --system -qqq vllm "transformers==4.57.6" t
 get_ipython().system('uv pip install --system -qqq --upgrade --no-deps "huggingface_hub>=0.34.0,<1.0" "trl==0.29.1"')
 
 
-# We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) from source:
+# We will then install [OpenEnv](https://github.com/openenv/OpenEnv) from source:
 
 # In[ ]:
 
 
-get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel --prefer-binary\n# openenv-core[core] pulls gradio>=4.0.0, and gradio 6.x wants\n# huggingface_hub>=1.16.0, which would take the hub past the <1.0 wall\n# transformers 4.57.6 checks on import. Carrying the bound keeps pip on a\n# gradio that is happy with hub 0.36.\n!pip install "openenv-core[core]>=0.2.1" "huggingface_hub>=0.34.0,<1.0"\n!git clone https://github.com/meta-pytorch/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./envs\')  # Add OpenEnv envs for textarena_env module\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().absolute())\n')
+get_ipython().run_cell_magic('capture', '', '!pip install -qqq fastapi uvicorn requests open_spiel --prefer-binary\n# openenv-core[core] pulls gradio>=4.0.0, and gradio 6.x wants\n# huggingface_hub>=1.16.0, which would take the hub past the <1.0 wall\n# transformers 4.57.6 checks on import. Carrying the bound keeps pip on a\n# gradio that is happy with hub 0.36.\n!pip install "openenv-core[core]>=0.2.1" "huggingface_hub>=0.34.0,<1.0"\n!git clone https://github.com/openenv/OpenEnv.git > /dev/null 2>&1\n%cd OpenEnv\nimport subprocess, sys, os\nfrom pathlib import Path\nsys.path.insert(0, \'./envs\')  # Add OpenEnv envs for textarena_env module\nsys.path.insert(0, \'./src\')\nworking_directory = str(Path.cwd().absolute())\n')
 
 
 # We'll load Qwen3-4B and set some parameters:
