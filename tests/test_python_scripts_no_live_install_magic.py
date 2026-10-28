@@ -113,7 +113,6 @@ def test_allowlist_has_no_stale_entries():
     assert not stale, f"_ALLOWED_LIVE entries that no longer match: {stale}"
 
 
-# Unit checks on the generator's terminator, on synthetic scripts.
 
 @pytest.fixture(scope = "module")
 def gen():

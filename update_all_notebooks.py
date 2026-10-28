@@ -6832,8 +6832,6 @@ def remove_unwanted_section(script_content):
     end_index = -1 if end_match is None else end_match.start()
 
     if start_index != -1 and end_index == -1:
-        # No `# Unsloth` heading closes the section (Whisper, the OpenEnv and
-        # gpt-oss RL notebooks, NeMo-Gym, ...): find the end from the cells.
         return _comment_unterminated_install_section(script_content, start_match)
 
     if start_index != -1 and end_index != -1 and start_index < end_index:
@@ -6900,25 +6898,10 @@ def _kept_install_env_lines(lines):
     return kept
 
 
-# Terminating an installation section that no `# Unsloth` heading closes.
-#
-# The section runs from the Installation heading over each following code cell
-# that is an install cell, and stops at whichever comes first: the next markdown
-# heading of any level, or the first code cell that is not an install cell.
-#
-# An install cell is one whose every top-level statement is a `get_ipython()`
-# call (`%%capture` / `%%bash` cells, `!pip` lines), unless it is a `%%capture`
-# cell that also does setup the script relies on: it changes directory or
-# `sys.path`, deletes, writes or copies files, or binds a name that live code
-# later in the script reads (OpenEnv's clone cell binds `working_directory`).
-# Such a cell is left live and ends the section: commenting it would silently
-# drop that setup, while leaving it live fails loudly at `get_ipython`, and the
-# scripts carrying one are listed in tests/test_python_scripts_no_live_install_magic.py.
-#
-# The first code cell after the section may mix an install line into real code
-# (Muse Glimmer pins transformers, then asserts the version and loads the
-# config). Only its top-level `get_ipython().system("pip install ...")` lines
-# are commented; the rest of the cell stays live.
+# Section end without a `# Unsloth` heading: install cells (all top-level statements are get_ipython()
+# calls) run until the next markdown heading or first non-install cell. A %%capture cell that also does
+# setup (cd, sys.path, file ops, names read later) stays live and ends the section; such scripts are
+# allowlisted in tests/test_python_scripts_no_live_install_magic.py. In the next cell only top-level pip lines are commented.
 _RE_SCRIPT_CELL_MARKER = re.compile(r"^# In\[[^\]]*\]:$")
 _RE_SCRIPT_MD_HEADING = re.compile(r"^# #+ \S")
 _RE_INSTALL_CELL_SETUP = re.compile(
@@ -7003,8 +6986,7 @@ def _comment_unterminated_install_section(script_content, start_match):
     while i < len(lines):
         line = lines[i]
         if _RE_SCRIPT_CELL_MARKER.match(line):
-            # The body runs to the next cell, or to a markdown cell, which
-            # nbconvert sets off from the code above by two blank lines.
+            # nbconvert sets a markdown cell off from code by two blank lines.
             end, seen_code = i + 1, False
             while end < len(lines):
                 cur = lines[end]
@@ -7037,7 +7019,6 @@ def _comment_unterminated_install_section(script_content, start_match):
     set_later = {key for key, _ in _kept_install_env_lines(after)}
     kept = [line for key, line in _kept_install_env_lines(section) if key not in set_later]
     if kept:
-        # Same lift as the `# Unsloth`-terminated path in remove_unwanted_section.
         out += ["", "", "# Kept from the installation cell above, which is commented out in scripts.", "import os"] + kept
     if mixed is not None:
         first, end = mixed[0] - section_end, mixed[1] - section_end
