@@ -66,11 +66,17 @@ the ollama installer, ``unsloth install-kernels``) are handled per command:
                                        PATH), else run it once per node. Only local
                                        rank 0 decides; the others follow it. Installs into
                                        another environment (``--python``, ``--target``,
-                                       ``--prefix``, ``--root``, ``uv venv``) always run.
+                                       ``--prefix``, ``--root``, ``uv venv``, and
+                                       ``--system`` from a virtual environment) always run.
     UNSLOTH_FSDP2_RUN_INSTALLS=1       always run, once per node
     UNSLOTH_FSDP2_RUN_INSTALLS=0       always skip
 
 Every skipped install prints one line. The single-process path uses the same rules.
+
+Shell steps use the interpreter running this launcher, the environment the install
+check reads: ``python`` / ``python3`` are that interpreter and ``pip`` / ``pip3`` its
+``-m pip``, whatever ``PATH`` holds, and from a virtual environment ``VIRTUAL_ENV`` names
+it, so ``uv pip`` installs there too.
 
 Only the standard library is imported here, so the parent process never loads torch.
 """
@@ -165,6 +171,10 @@ _PIP_UNCHECKABLE_FLAGS = frozenset({"-r", "--requirement", "-e", "--editable"})
 
 def _normalize(name):
     return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _in_venv():
+    return sys.prefix != getattr(sys, "base_prefix", sys.prefix)
 
 
 def _installed_versions():
@@ -277,6 +287,8 @@ def _pip_decision(args, versions):
         flag = arg.split("=", 1)[0]
         if flag in _PIP_OTHER_ENV_FLAGS:
             return (False, f"installs into another environment ({flag})")
+        if flag == "--system" and _in_venv():
+            return (False, "installs into the system Python (--system), not this virtual environment")
         if flag in _PIP_UNCHECKABLE_FLAGS:
             return (False, f"cannot check {flag} without running it")
         if arg.startswith("-"):
@@ -409,6 +421,26 @@ def install_decision(command):
     if not details:
         return (False, "cannot tell what it installs")
     return (True, "; ".join(details))
+
+
+# install_decision() reads this interpreter's packages, so a shell step's pip must install
+# into it rather than into whichever pip PATH finds first. On the command's first line so
+# bash's line numbers in error messages still match the cell.
+_SHELL_PREAMBLE = (
+    'python() { "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
+    'python3() { "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
+    'pip() { "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
+    'pip3() { "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
+    "export -f python python3 pip pip3; "
+)
+
+
+def _shell_env():
+    env = dict(os.environ)
+    env["UNSLOTH_FSDP2_PYTHON"] = sys.executable
+    if _in_venv():
+        env["VIRTUAL_ENV"] = sys.prefix
+    return env
 
 
 def _log(message):
@@ -881,16 +913,17 @@ class FSDP2Shell:
         """Run ``command`` here. ``capture`` returns its output lines (``x = !cmd``)."""
         sys.stdout.flush()
         sys.stderr.flush()
-        argv = [self._bash(), "-c", command]
+        argv = [self._bash(), "-c", _SHELL_PREAMBLE + command]
+        env = _shell_env()
         if capture:
-            result = subprocess.run(argv, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            result = subprocess.run(argv, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, env = env)
             lines = result.stdout.decode("utf-8", "replace").splitlines()
             return {"code": result.returncode, "output": lines, "skipped": False}
         if self._capture_depth:
-            result = subprocess.run(argv, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            result = subprocess.run(argv, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, env = env)
             sys.stdout.write(result.stdout.decode("utf-8", "replace"))
             return {"code": result.returncode, "output": None, "skipped": False}
-        return {"code": subprocess.run(argv).returncode, "output": None, "skipped": False}
+        return {"code": subprocess.run(argv, env = env).returncode, "output": None, "skipped": False}
 
     def _shell(self, command):
         return self._run(command)["code"]

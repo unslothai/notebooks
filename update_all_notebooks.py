@@ -7267,7 +7267,11 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   installed at a version that matches its pin (a `git+` URL counts by its package name),
   or the `apt-get` / ollama program already on `PATH`. Otherwise it runs on one process
   per node while the others wait. Installs into another environment (`--python`,
-  `--target`, `--prefix`, `--root`, or after `uv venv`) always run. Flags such as
+  `--target`, `--prefix`, `--root`, after `uv venv`, or `--system` from a virtual
+  environment) always run. Shell steps use the Python that runs the launcher: `python`
+  and `python3` are that Python and `pip` / `pip3` its `-m pip`, whatever is on `PATH`,
+  and from a virtual environment `VIRTUAL_ENV` names it for `uv pip`, so an install goes
+  where the check looked. Flags such as
   `--upgrade` or `--force-reinstall` do not force a run: set
   `UNSLOTH_FSDP2_RUN_INSTALLS=1` for that, or `0` to skip every install. Other shell
   lines (`git clone`, `wget`, `mkdir`) run once per node.
