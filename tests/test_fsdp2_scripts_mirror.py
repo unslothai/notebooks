@@ -202,7 +202,8 @@ def test_render_survives_awkward_names(name):
     # The name only ever appears in comments or in the repr'd constant: every
     # line that is not code must stay a comment, whatever the name holds.
     code = {
-        "import os, sys",
+        "import os",
+        "import sys",
         "sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))",
         "from unsloth_fsdp2_launch import main",
         'if __name__ == "__main__":',
@@ -458,3 +459,89 @@ def test_launcher_helper_tests_run_in_their_own_ci_job():
     assert "strategy" not in job, "the launcher tests need one CPU torch, not a matrix"
     runs = "\n".join(step.get("run", "") for step in job["steps"])
     assert "https://download.pytorch.org/whl/cpu" in runs and "pytest" in runs
+
+
+# ---------------------------------------------------------------------------
+# Scripts that must run single process
+# ---------------------------------------------------------------------------
+
+import re  # noqa: E402
+
+# Python-side process launches and servers the adapter cannot coordinate: get_ipython
+# shell steps run once per node, these run on every rank.
+_UNSAFE = re.compile(r"subprocess\.Popen|os\.system\(|vllm serve|[\"']--port[\"']|--port\b")
+
+
+def _unsafe_lines(path):
+    hits = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if line.lstrip().startswith("#") or "get_ipython()" in line:
+            continue
+        if _UNSAFE.search(line):
+            hits.append(f"{number}: {line.strip()[:100]}")
+    return hits
+
+
+def test_scripts_that_start_servers_or_processes_are_single_process():
+    missing = {}
+    for path in sorted(SCRIPTS.glob("*.py")):
+        hits = _unsafe_lines(path)
+        if hits and _GEN.fsdp2_single_process_reason(path.name) is None:
+            missing[path.name] = hits[:3]
+    assert not missing, (
+        "These python_scripts start servers or processes from Python on every rank. Add "
+        "their base name to FSDP2_SINGLE_PROCESS in update_all_notebooks.py with a reason "
+        f"(or make them multi-rank safe): {missing}"
+    )
+
+
+def test_single_process_list_names_real_scripts():
+    bases = {_GEN._fsdp2_base_name(name) for name in _script_names()}
+    stale = sorted(set(_GEN.FSDP2_SINGLE_PROCESS) - bases)
+    assert not stale, f"FSDP2_SINGLE_PROCESS names scripts that no longer exist: {stale}"
+    readme = (LAUNCHERS / "README.md").read_text(encoding="utf-8")
+    for base in _GEN.FSDP2_SINGLE_PROCESS:
+        assert base[:-3] in readme, f"{base} is single process but not listed in the README"
+
+
+@pytest.mark.parametrize("name", [
+    "Meta-Synthetic-Data-Llama3.1_(8B).py",
+    "AMD-Meta-Synthetic-Data-Llama3.1_(8B).py",
+    "Kaggle-Meta-Synthetic-Data-Llama3.1_(8B).py",
+    "NeMo-Gym-Sudoku.py",
+    "AMD-NeMo-Gym-Multi-Environment.py",
+    "Synthetic_Data_Hackathon.py",
+    "Deepseek_OCR_(3B)-Evaluation.py",
+])
+def test_single_process_launchers_say_so(name):
+    assert (SCRIPTS / name).is_file()
+    tree = ast.parse((LAUNCHERS / name).read_text(encoding="utf-8"))
+    call = next(node for node in ast.walk(tree)
+                if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "main")
+    keywords = {k.arg: ast.literal_eval(k.value) for k in call.keywords}
+    assert keywords["single_process"] is True
+    assert keywords["reason"] == _GEN.fsdp2_single_process_reason(name)
+
+
+def test_ordinary_launchers_pass_no_single_process_flag():
+    tree = ast.parse(_GEN.render_fsdp2_launcher("Qwen3_(4B)-GRPO.py"))
+    call = next(node for node in ast.walk(tree)
+                if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "main")
+    assert call.keywords == []
+
+
+def test_launchers_import_one_module_per_line():
+    text = _GEN.render_fsdp2_launcher("A.py")
+    assert "import os\nimport sys\n" in text and "import os, sys" not in text
+
+
+def test_assert_mirror_requires_readme_and_helper(tmp_path):
+    scripts, out = _tree(tmp_path, ["A.py"])
+    _gen(scripts, out)
+    (out / "README.md").unlink()
+    with pytest.raises(RuntimeError, match="README.md is missing"):
+        _GEN._assert_fsdp2_mirror(str(scripts), str(out))
+    _gen(scripts, out)
+    (out / HELPER_NAME).unlink()
+    with pytest.raises(RuntimeError, match=HELPER_NAME):
+        _GEN._assert_fsdp2_mirror(str(scripts), str(out))

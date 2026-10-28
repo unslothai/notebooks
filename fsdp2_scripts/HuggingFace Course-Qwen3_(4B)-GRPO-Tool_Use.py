@@ -5,7 +5,8 @@
 #   CUDA_VISIBLE_DEVICES=0,1 python "fsdp2_scripts/HuggingFace Course-Qwen3_(4B)-GRPO-Tool_Use.py"   (pick GPUs)
 #   python "fsdp2_scripts/HuggingFace Course-Qwen3_(4B)-GRPO-Tool_Use.py" --nproc-per-node 4
 #   UNSLOTH_TP_SIZE=2 python "fsdp2_scripts/HuggingFace Course-Qwen3_(4B)-GRPO-Tool_Use.py"   (tensor parallel x FSDP2; Unsloth validates the layout)
-import os, sys
+import os
+import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from unsloth_fsdp2_launch import main
 if __name__ == "__main__":
