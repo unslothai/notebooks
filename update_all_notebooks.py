@@ -6813,7 +6813,8 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
 # Any heading depth: a template exports `# ### Installation` but a
 # hand-maintained `nb/` source exports `# # Installation`, and that difference
 # left the install cells live in the .py, where `get_ipython()` is undefined.
-_RE_SCRIPT_INSTALL_HEADING = re.compile(r"^# #+ Installation\b", re.MULTILINE)
+# `Install Unsloth and other dependencies` is the FunctionGemma LM Studio title.
+_RE_SCRIPT_INSTALL_HEADING = re.compile(r"^# #+ Install(?:ation\b| Unsloth\b)", re.MULTILINE)
 _RE_SCRIPT_UNSLOTH_HEADING = re.compile(r"^# #+ Unsloth\b", re.MULTILINE)
 
 
@@ -6829,6 +6830,9 @@ def remove_unwanted_section(script_content):
         else _RE_SCRIPT_UNSLOTH_HEADING.search(script_content, start_match.end())
     )
     end_index = -1 if end_match is None else end_match.start()
+
+    if start_index != -1 and end_index == -1:
+        return _comment_unterminated_install_section(script_content, start_match)
 
     if start_index != -1 and end_index != -1 and start_index < end_index:
         before_section = script_content[:start_index]
@@ -6892,6 +6896,136 @@ def _kept_install_env_lines(lines):
             seen.add(m.group(2))
             kept.append((m.group(2), m.group(1)))
     return kept
+
+
+# Section end without a `# Unsloth` heading: install cells (all top-level statements are get_ipython()
+# calls) run until the next markdown heading or first non-install cell. A %%capture cell that also does
+# setup (cd, sys.path, file ops, names read later) stays live and ends the section; such scripts are
+# allowlisted in tests/test_python_scripts_no_live_install_magic.py. In the next cell only top-level pip lines are commented.
+_RE_SCRIPT_CELL_MARKER = re.compile(r"^# In\[[^\]]*\]:$")
+_RE_SCRIPT_MD_HEADING = re.compile(r"^# #+ \S")
+_RE_INSTALL_CELL_SETUP = re.compile(
+    r"^\s*(?:%cd\b|os\.chdir\(|sys\.path\b|os\.(?:remove|unlink|rename|replace)\(|shutil\.)|\bopen\("
+)
+_RE_SCRIPT_PIP_LINE = re.compile(r"""^get_ipython\(\)\.system\(['"]\s*(?:uv\s+)?pip3?\s+(?:install|uninstall)\b""")
+
+
+def _top_level_ipython_calls(source):
+    """The calls, if every top-level statement of `source` is `get_ipython().<x>(...)`, else None."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    calls = []
+    for stmt in tree.body:
+        call = stmt.value if isinstance(stmt, ast.Expr) else None
+        if not (
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and isinstance(call.func.value, ast.Call)
+            and isinstance(call.func.value.func, ast.Name)
+            and call.func.value.func.id == "get_ipython"
+        ):
+            return None
+        calls.append(call)
+    return calls or None
+
+
+def _capture_cell_python(call):
+    """Python lines of a `%%capture` cell, with each shell / magic line as `pass`; else None."""
+    if call.func.attr != "run_cell_magic" or len(call.args) < 3:
+        return None
+    try:
+        magic, body = ast.literal_eval(call.args[0]), ast.literal_eval(call.args[2])
+    except ValueError:
+        return None
+    if magic != "capture" or not isinstance(body, str):
+        return None
+    lines, continued = [], False
+    for line in body.split("\n"):
+        stripped = line.lstrip()
+        if continued:
+            lines.append("")
+        elif stripped.startswith(("!", "%")) and not stripped.startswith("%cd"):
+            lines.append(line[: len(line) - len(stripped)] + "pass")
+        else:
+            lines.append(line)
+        continued = (continued or stripped.startswith(("!", "%"))) and line.rstrip().endswith("\\")
+    return lines
+
+
+def _install_cell_does_setup(call, live_after):
+    """True for a `%%capture` cell that also does setup the rest of the script needs."""
+    lines = _capture_cell_python(call)
+    if lines is None:
+        return False
+    code = [line for line in lines if not line.lstrip().startswith("#")]
+    if any(_RE_INSTALL_CELL_SETUP.search(line) for line in code):
+        return True
+    try:
+        tree = ast.parse("\n".join(line.replace("%cd", "pass  #", 1) for line in lines))
+    except SyntaxError:
+        return False
+    bound, todo = set(), list(tree.body)
+    while todo:  # names the cell binds for later cells: not comprehension or function locals
+        node = todo.pop()
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp, ast.Lambda, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            bound.add(node.id)
+        todo.extend(ast.iter_child_nodes(node))
+    return any(re.search(r"\b%s\b" % re.escape(name), live_after) for name in bound)
+
+
+def _comment_unterminated_install_section(script_content, start_match):
+    lines = script_content.split("\n")
+    start = script_content.count("\n", 0, start_match.start())
+    section_end = None  # one past the last non-blank line of the last install cell
+    mixed = None        # (first, end) body lines of the cell that ends the section
+    i = start + 1
+    while i < len(lines):
+        line = lines[i]
+        if _RE_SCRIPT_CELL_MARKER.match(line):
+            # nbconvert sets a markdown cell off from code by two blank lines.
+            end, seen_code = i + 1, False
+            while end < len(lines):
+                cur = lines[end]
+                if _RE_SCRIPT_CELL_MARKER.match(cur):
+                    break
+                if seen_code and cur.startswith("#") and lines[end - 1] == "" and lines[end - 2] == "":
+                    break
+                seen_code = seen_code or (cur.strip() != "" and not cur.startswith("#"))
+                end += 1
+            calls = _top_level_ipython_calls("\n".join(lines[i + 1:end]))
+            live_after = "\n".join(l for l in lines[end:] if not l.lstrip().startswith("#"))
+            if calls is None or any(_install_cell_does_setup(c, live_after) for c in calls):
+                if calls is None:
+                    mixed = (i + 1, end)
+                break
+            section_end = end
+            while lines[section_end - 1].strip() == "":
+                section_end -= 1
+            i = end
+            continue
+        if _RE_SCRIPT_MD_HEADING.match(line):
+            break
+        i += 1
+
+    if section_end is None:
+        return script_content
+    section = lines[start:section_end]
+    out = lines[:start] + [f"# {line}" for line in section]
+    after = lines[section_end:]
+    set_later = {key for key, _ in _kept_install_env_lines(after)}
+    kept = [line for key, line in _kept_install_env_lines(section) if key not in set_later]
+    if kept:
+        out += ["", "", "# Kept from the installation cell above, which is commented out in scripts.", "import os"] + kept
+    if mixed is not None:
+        first, end = mixed[0] - section_end, mixed[1] - section_end
+        after = after[:first] + [
+            f"# {line}" if _RE_SCRIPT_PIP_LINE.match(line) else line for line in after[first:end]
+        ] + after[end:]
+    return "\n".join(out + after)
 
 def convert_notebook_to_script(notebook_path: str, output_path: str):
     exporter = PythonExporter()

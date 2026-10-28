@@ -71,17 +71,17 @@
 # Ministral Sudoku and gpt-oss 2048 RL notebooks do. It works, it is just slower per step. Keep
 # `num_generations` small and be patient.
 
-# # Installation
+# # # Installation
+# # 
+# # Muse Glimmer support ships in transformers 5.15.0, so we install that release. Everything else is a normal Unsloth install.
 # 
-# Muse Glimmer support ships in transformers 5.15.0, so we install that release. Everything else is a normal Unsloth install.
-
-# First we pick up the token. Never paste a token into a cell. Read it from the environment, from
-# Kaggle Secrets or from Colab secrets.
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; _numpy = f"numpy=={numpy.__version__}"\n    except: _numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# Track main: the device map planner and the GRPO log-softmax fix are newer than the release\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==1.9.2 \\\n    "unsloth @ git+https://github.com/unslothai/unsloth" \\\n    "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
+# # First we pick up the token. Never paste a token into a cell. Read it from the environment, from
+# # Kaggle Secrets or from Colab secrets.
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; _numpy = f"numpy=={numpy.__version__}"\n    except: _numpy = "numpy"\n    !uv pip install -qqq \\\n        "torch>=2.8.0" "triton>=3.4.0" {_numpy} torchvision bitsandbytes \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth"\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth\n# Track main: the device map planner and the GRPO log-softmax fix are newer than the release\n!uv pip install --upgrade --no-deps "tokenizers>=0.22.0,<=0.23.0" trl==1.9.2 \\\n    "unsloth @ git+https://github.com/unslothai/unsloth" \\\n    "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"\n!uv pip install --no-deps --upgrade "torchao>=0.16.0"\n')
 
 
 # Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.
@@ -90,7 +90,7 @@ get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip ins
 
 
 # Muse Glimmer needs transformers 5.15.0. Run before anything imports transformers
-get_ipython().system('pip install -q "transformers==5.15.0"')
+# get_ipython().system('pip install -q "transformers==5.15.0"')
 
 import transformers
 print("transformers:", transformers.__version__)
