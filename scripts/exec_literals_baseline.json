@@ -5,6 +5,7 @@
     "original_template",
     "nb",
     "kaggle",
+    "fsdp2_scripts",
     "Template_Notebook.ipynb",
     "update_all_notebooks.py",
     "replace_text.py",

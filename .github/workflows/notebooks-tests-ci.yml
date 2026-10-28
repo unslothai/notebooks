@@ -12,6 +12,7 @@
 #      tests/test_notebook_vllm_pin.py
 #      tests/test_python_scripts_regen_parity.py  (live nbconvert)
 #      tests/test_python_scripts_keep_standby_env.py
+#      tests/test_fsdp2_scripts_mirror.py  (fsdp2_scripts/ launcher mirror)
 #
 #   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
 #      tests/test_notebook_api_drift.py against three (transformers, trl)
@@ -32,6 +33,7 @@ on:
       - 'nb/**'
       - 'kaggle/**'
       - 'python_scripts/**'
+      - 'fsdp2_scripts/**'
       - 'update_all_notebooks.py'
       - 'replace_text.py'
       - 'update_max_seq_length.py'
@@ -279,6 +281,14 @@ jobs:
         # The scripts' commented install cell must not drop UNSLOTH_VLLM_STANDBY.
         run: |
           python -m pytest tests/test_python_scripts_keep_standby_env.py -q --tb=short
+
+      - name: tests/test_fsdp2_scripts_mirror.py
+        # fsdp2_scripts/ holds one generated multi-GPU launcher per
+        # python_scripts/*.py plus a copy of scripts/fsdp2_launch.py. Names
+        # must match in both directions and every file must equal what
+        # update_all_notebooks.py renders today.
+        run: |
+          python -m pytest tests/test_fsdp2_scripts_mirror.py -q --tb=short
 
       - name: tests/test_amd_templated_kernel_pins.py
         run: |
