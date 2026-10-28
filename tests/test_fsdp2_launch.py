@@ -26,9 +26,14 @@ Two layers:
      fake notebook mirror that uses every ``get_ipython()`` form the adapter
      supports. It proves shell steps run once per node while the other rank
      waits, that both ranks see the files / env / cwd afterwards, that return
-     codes reach every rank, that installs are skipped unless
-     ``UNSLOTH_FSDP2_RUN_INSTALLS=1``, and that a failing rank fails the
-     launch. Skipped when torch is not importable.
+     codes reach every rank, that an install runs once when its package is
+     missing and is skipped when it is installed (``UNSLOTH_FSDP2_RUN_INSTALLS``
+     forces either way), and that a failing rank fails the launch. Skipped when
+     torch is not importable.
+
+  3. Subprocess checks of the launch environment: marker folders that are
+     never reused across launches, a ``LOCAL_RANK`` left in the shell,
+     multiprocessing spawn / forkserver children of the script.
 
 No GPU is used: the subprocesses run with ``CUDA_VISIBLE_DEVICES`` empty.
 """
@@ -50,6 +55,21 @@ LAUNCH_PATH = REPO_ROOT / "scripts" / "fsdp2_launch.py"
 
 _HAS_TORCH = importlib.util.find_spec("torch") is not None
 
+# Every variable the helper reads to decide what kind of process it is in.
+_LAUNCH_ENV = (
+    "LOCAL_RANK", "TORCHELASTIC_RUN_ID", "UNSLOTH_FSDP2", "UNSLOTH_NPROC_PER_NODE",
+    "UNSLOTH_FSDP2_RUN_INSTALLS", "UNSLOTH_FSDP2_RUN_ID", "UNSLOTH_FSDP2_MP_TARGET",
+    "UNSLOTH_FSDP2_WAIT_TIMEOUT", "WORLD_SIZE", "LOCAL_WORLD_SIZE", "RANK", "MASTER_PORT",
+    "SLURM_STEP_NUM_TASKS", "OMPI_COMM_WORLD_SIZE", "PMI_SIZE",
+)
+
+
+def _clean_env(**extra):
+    env = {k: v for k, v in os.environ.items() if k not in _LAUNCH_ENV}
+    env.update(CUDA_VISIBLE_DEVICES = "", OMP_NUM_THREADS = "1")
+    env.update(extra)
+    return env
+
 
 def _load_launch():
     spec = importlib.util.spec_from_file_location("_fsdp2_launch_under_test", str(LAUNCH_PATH))
@@ -60,8 +80,7 @@ def _load_launch():
 
 @pytest.fixture
 def fl(monkeypatch):
-    for name in ("LOCAL_RANK", "TORCHELASTIC_RUN_ID", "UNSLOTH_FSDP2", "UNSLOTH_NPROC_PER_NODE",
-                 "UNSLOTH_FSDP2_RUN_INSTALLS"):
+    for name in _LAUNCH_ENV:
         monkeypatch.delenv(name, raising = False)
     mod = _load_launch()
     monkeypatch.setattr(sys, "argv", list(sys.argv))
@@ -219,7 +238,12 @@ def test_zero_or_one_gpu_runs_in_process(fl, layout, monkeypatch, visible):
     assert seen["has_ipython"] is True
 
 
-@pytest.mark.parametrize("env", [{"LOCAL_RANK": "0"}, {"TORCHELASTIC_RUN_ID": "abc"}])
+@pytest.mark.parametrize("env", [
+    {"LOCAL_RANK": "0", "WORLD_SIZE": "2"},
+    {"LOCAL_RANK": "1", "LOCAL_WORLD_SIZE": "4"},
+    {"LOCAL_RANK": "0", "WORLD_SIZE": "1"},
+    {"TORCHELASTIC_RUN_ID": "abc"},
+])
 def test_worker_mode_never_relaunches(fl, layout, monkeypatch, env):
     tmp, launcher, target = layout
     calls = _stub(fl, monkeypatch, visible = 8)
@@ -251,10 +275,7 @@ def test_generic_cli_dry_run(tmp_path):
     target = tmp_path / "some dir" / "x (y).py"
     target.parent.mkdir()
     target.write_text("print('hi')\n")
-    env = dict(os.environ, CUDA_VISIBLE_DEVICES = "", UNSLOTH_NPROC_PER_NODE = "2")
-    env.pop("LOCAL_RANK", None)
-    env.pop("TORCHELASTIC_RUN_ID", None)
-    env.pop("UNSLOTH_FSDP2", None)
+    env = _clean_env(UNSLOTH_NPROC_PER_NODE = "2")
     result = subprocess.run(
         [sys.executable, str(LAUNCH_PATH), "--dry-run", str(target), "--epochs", "1"],
         env = env, capture_output = True, text = True, timeout = 300,
@@ -366,6 +387,7 @@ _FAKE_MIRROR = textwrap.dedent('''\
     except subprocess.CalledProcessError as error:
         bash_code = error.returncode
     get_ipython().system("pip install fake-pkg-xyz")
+    get_ipython().system("pip install -q --upgrade pytest")
     get_ipython().run_cell_magic("capture", "", "!uv pip install --system fake-pkg-abc\\n!echo after-install >> " + log + "\\n")
     try:
         get_ipython().run_line_magic("matplotlib", "inline")
@@ -413,12 +435,10 @@ def _torchrun_case(tmp_path, extra_env):
         d.mkdir()
     log = tmp_path / "shell.log"
     log.touch()
-    env = {k: v for k, v in os.environ.items()
-           if k not in ("LOCAL_RANK", "TORCHELASTIC_RUN_ID", "UNSLOTH_FSDP2",
-                        "UNSLOTH_NPROC_PER_NODE", "UNSLOTH_FSDP2_RUN_INSTALLS")}
+    env = _clean_env()
     env.update(
-        CUDA_VISIBLE_DEVICES = "", PATH = f"{shim}{os.pathsep}{env.get('PATH', '')}",
-        FAKE_LOG = str(log), FAKE_OUT = str(out), TMPDIR = str(tmpdir), OMP_NUM_THREADS = "1",
+        PATH = f"{shim}{os.pathsep}{env.get('PATH', '')}",
+        FAKE_LOG = str(log), FAKE_OUT = str(out), TMPDIR = str(tmpdir),
     )
     env.update(extra_env)
     result = subprocess.run(
@@ -426,12 +446,13 @@ def _torchrun_case(tmp_path, extra_env):
         cwd = work, env = env, capture_output = True, text = True, timeout = 600,
     )
     ranks = {p.stem: json.loads(p.read_text()) for p in out.glob("rank*.json")}
-    return result, log.read_text().splitlines(), ranks, work, root
+    leftover = sorted(p.name for p in tmpdir.glob("unsloth_fsdp2_*"))
+    return result, log.read_text().splitlines(), ranks, work, root, leftover
 
 
 @pytest.mark.skipif(not _HAS_TORCH, reason = "torch is not importable")
 def test_real_torchrun_two_ranks_on_cpu(tmp_path):
-    result, log, ranks, work, root = _torchrun_case(tmp_path, {})
+    result, log, ranks, work, root, leftover = _torchrun_case(tmp_path, {})
     assert result.returncode == 0, result.stdout + result.stderr
     assert sorted(ranks) == ["rank0", "rank1"], result.stdout + result.stderr
     # Shell steps ran once for the node, not once per rank.
@@ -439,10 +460,15 @@ def test_real_torchrun_two_ranks_on_cpu(tmp_path):
     assert log.count("bash-cell") == 1
     assert log.count("capture-bang") == 1
     assert log.count("after-install") == 1
-    # Installs are skipped by default, with a note naming the command.
-    assert not any(line.startswith(("pip-ran", "uv-ran")) for line in log)
-    assert "skipped install step: pip install fake-pkg-xyz" in result.stderr
+    # By default an install of a missing package runs once per node, and one whose
+    # package is already installed is skipped with a note naming the command.
+    assert log.count("pip-ran install fake-pkg-xyz") == 1
+    assert log.count("uv-ran pip install --system fake-pkg-abc") == 1
+    assert not any("pytest" in line for line in log)
+    assert "skipped install step (already installed: pytest): pip install -q --upgrade pytest" in result.stderr
     assert "UNSLOTH_FSDP2_RUN_INSTALLS=1" in result.stderr
+    # The marker folder is removed once both ranks are done with it.
+    assert leftover == []
     assert "hidden-output" not in result.stdout + result.stderr
     assert (work / "written.txt").read_text() == "hello\n"
     target = str(root / "python_scripts" / SCRIPT_NAME)
@@ -462,12 +488,387 @@ def test_real_torchrun_two_ranks_on_cpu(tmp_path):
 
 @pytest.mark.skipif(not _HAS_TORCH, reason = "torch is not importable")
 def test_real_torchrun_installs_opt_in_and_failing_rank(tmp_path):
-    result, log, ranks, _, _ = _torchrun_case(
+    result, log, ranks, _, _, _ = _torchrun_case(
         tmp_path, {"UNSLOTH_FSDP2_RUN_INSTALLS": "1", "FAKE_FAIL_RANK": "1"},
     )
     assert result.returncode != 0, result.stdout + result.stderr
     assert log.count("pip-ran install fake-pkg-xyz") == 1
+    assert log.count("pip-ran install -q --upgrade pytest") == 1
     assert log.count("uv-ran pip install --system fake-pkg-abc") == 1
     assert log.count("system-sys") == 1
     assert "skipped install step" not in result.stderr
     assert "rank1" in ranks
+
+
+@pytest.mark.skipif(not _HAS_TORCH, reason = "torch is not importable")
+def test_real_torchrun_installs_opt_out(tmp_path):
+    result, log, ranks, _, _, _ = _torchrun_case(tmp_path, {"UNSLOTH_FSDP2_RUN_INSTALLS": "0"})
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not any(line.startswith(("pip-ran", "uv-ran")) for line in log)
+    assert "skipped install step (UNSLOTH_FSDP2_RUN_INSTALLS=0): pip install fake-pkg-xyz" in result.stderr
+    assert log.count("after-install") == 1
+    assert sorted(ranks) == ["rank0", "rank1"]
+
+
+# ---------------------------------------------------------------------------------------
+# Install decisions.
+# ---------------------------------------------------------------------------------------
+def _fake_dist(site, name, version):
+    info = site / f"{name}-{version}.dist-info"
+    info.mkdir(parents = True)
+    (info / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n")
+
+
+@pytest.fixture
+def installed(fl, tmp_path, monkeypatch):
+    """A site folder on sys.path holding fake installed distributions, and a PATH with
+    only the programs a test puts there."""
+    site = tmp_path / "site"
+    site.mkdir()
+    monkeypatch.syspath_prepend(str(site))
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    monkeypatch.setenv("PATH", str(bin_dir))
+    monkeypatch.setattr(fl, "_dpkg_installed", lambda package: False)
+
+    def add_dist(name, version = "1.0"):
+        _fake_dist(site, name, version)
+
+    def add_program(name):
+        (bin_dir / name).write_text("#!/bin/sh\n")
+        (bin_dir / name).chmod(0o755)
+
+    return add_dist, add_program
+
+
+def _skip(fl, command):
+    decision = fl.install_decision(command)
+    assert decision is not None, command
+    return decision[0]
+
+
+# Lines exactly as they appear in python_scripts/, so the decision is tested on the real
+# install steps rather than on a paraphrase of them.
+_REAL_LINES = {
+    "DeepSeek_R1_0528_Qwen3_(8B)_GRPO.py": "pip install langid -qq",
+    "Gemma3_(270M).py": 'uv pip install -q --python litert_env/bin/python --torch-backend cpu '
+                        'litert-torch==0.10.0 litert-lm==0.18.1 tensorflow-cpu==2.21.0 "transformers<5.21"',
+    "Llama3_(8B)-Ollama.py": "command -v zstd >/dev/null 2>&1 || (apt-get -qq update && "
+                             "apt-get -qq install -y zstd) >/dev/null 2>&1",
+}
+_OLLAMA_LINE = "curl -fsSL https://ollama.com/install.sh | sh"
+
+
+def test_real_install_lines_are_still_in_the_scripts():
+    for name, line in _REAL_LINES.items():
+        assert repr(line)[1:-1] in (REPO_ROOT / "python_scripts" / name).read_text(), name
+    assert _OLLAMA_LINE in (REPO_ROOT / "python_scripts" / "Llama3_(8B)-Ollama.py").read_text()
+
+
+def test_install_runs_only_when_the_package_is_missing(fl, installed):
+    add_dist, _ = installed
+    line = _REAL_LINES["DeepSeek_R1_0528_Qwen3_(8B)_GRPO.py"]
+    assert _skip(fl, line) is False
+    add_dist("langid", "1.1.6")
+    assert _skip(fl, line) is True
+    assert "already installed: langid" in fl.install_decision(line)[1]
+
+
+def test_install_into_another_environment_always_runs(fl, installed):
+    add_dist, _ = installed
+    for name in ("litert-torch", "litert-lm", "tensorflow-cpu", "transformers"):
+        add_dist(name, "0.10.0")
+    assert _skip(fl, _REAL_LINES["Gemma3_(270M).py"]) is False
+    add_dist("langid")
+    assert _skip(fl, "pip install --target vendored langid") is False
+    assert _skip(fl, "pip install --prefix=/opt/x langid") is False
+    assert _skip(fl, "uv venv -q env && uv pip install langid") is False
+
+
+def test_apt_and_ollama_run_only_when_the_program_is_missing(fl, installed):
+    _, add_program = installed
+    apt = _REAL_LINES["Llama3_(8B)-Ollama.py"]
+    assert _skip(fl, apt) is False
+    assert _skip(fl, _OLLAMA_LINE) is False
+    add_program("zstd")
+    add_program("ollama")
+    assert _skip(fl, apt) is True
+    assert _skip(fl, _OLLAMA_LINE) is True
+
+
+@pytest.mark.parametrize("command, skip", [
+    ("pip install --upgrade -qqq langid", True),
+    ("python -m pip install -qU langid --root-user-action=ignore", True),
+    ("uv pip install --system -qqq 'langid==1.1.6'", True),
+    ("uv pip install --system -qqq 'langid>=2'", False),
+    ("pip install --no-deps --force-reinstall langid unsloth_zoo", True),
+    ("pip install langid other-missing-pkg", False),
+    ("pip install --no-deps git+https://github.com/unslothai/unsloth-zoo.git", True),
+    ('pip install "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo.git@main"', True),
+    ("pip install git+https://github.com/x/whatever.git#egg=langid", True),
+    ("pip install git+https://github.com/x/missing-repo.git", False),
+    ("pip install unsloth  # Do this in local & cloud setups", True),
+    ("pip install \"langid; python_version < '3'\" ", True),
+    ("pip install -r requirements.txt", False),
+    ("pip install -e .", False),
+    ("pip install {_vllm}", False),
+    ("pip uninstall -y langid", False),
+    ("pip uninstall -y never-installed-pkg", True),
+    ("unsloth install-kernels", False),
+])
+def test_install_decision_forms(fl, installed, command, skip):
+    add_dist, _ = installed
+    add_dist("langid", "1.1.6")
+    add_dist("unsloth_zoo", "2026.10.1")
+    add_dist("unsloth", "2026.10.1")
+    assert _skip(fl, command) is skip
+
+
+def test_non_install_commands_have_no_decision(fl):
+    assert fl.install_decision("git clone https://github.com/x/y.git") is None
+    assert fl.install_decision("uv venv -q --allow-existing --python 3.12 litert_env") is None
+
+
+def _shim_pip(tmp_path, monkeypatch):
+    shim = tmp_path / "shim"
+    shim.mkdir()
+    log = tmp_path / "pip.log"
+    (shim / "pip").write_text(f'#!/bin/bash\necho "pip-ran $*" >> {shlex.quote(str(log))}\n')
+    (shim / "pip").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{shim}{os.pathsep}{os.environ['PATH']}")
+    return log
+
+
+@pytest.mark.parametrize("setting, ran_missing, ran_present", [
+    (None, True, False), ("1", True, True), ("0", False, False),
+])
+def test_single_process_install_rules_match_the_multi_gpu_ones(
+        fl, tmp_path, monkeypatch, capfd, setting, ran_missing, ran_present):
+    log = _shim_pip(tmp_path, monkeypatch)
+    if setting is not None:
+        monkeypatch.setenv("UNSLOTH_FSDP2_RUN_INSTALLS", setting)
+    shell = fl.FSDP2Shell()
+    assert shell.distributed is False
+    shell._system("pip install never-installed-pkg-xyz")
+    shell._system("pip install pytest")
+    ran = log.read_text() if log.exists() else ""
+    assert ("never-installed-pkg-xyz" in ran) is ran_missing
+    assert ("install pytest" in ran) is ran_present
+    err = capfd.readouterr().err
+    if not ran_present:
+        assert "skipped install step" in err and "pip install pytest" in err
+
+
+# ---------------------------------------------------------------------------------------
+# Launch environment.
+# ---------------------------------------------------------------------------------------
+def test_each_launch_gets_a_fresh_run_id(fl, layout, monkeypatch):
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    seen = []
+    for _ in range(2):
+        with pytest.raises(_Exec):
+            fl.main(str(launcher), SCRIPT_NAME, [])
+        seen.append(os.environ["UNSLOTH_FSDP2_RUN_ID"])
+    assert len(calls) == 2 and seen[0] != seen[1] and all(seen)
+
+
+def test_marker_folder_is_named_by_run_id_or_parent(fl, monkeypatch):
+    monkeypatch.setenv("LOCAL_RANK", "1")
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    monkeypatch.setenv("MASTER_PORT", "29500")
+    without = os.path.basename(fl.FSDP2Shell()._markers())
+    assert f"p{os.getppid()}" in without
+    monkeypatch.setenv("UNSLOTH_FSDP2_RUN_ID", "abc123")
+    assert os.path.basename(fl.FSDP2Shell()._markers()).startswith("unsloth_fsdp2_abc123_")
+
+
+_FAKE_LAUNCHER = textwrap.dedent('''\
+    # Starts two local ranks the way deepspeed / a hand-rolled launcher does: LOCAL_RANK,
+    # WORLD_SIZE and a fixed MASTER_PORT, no TORCHELASTIC_RUN_ID.
+    import os, subprocess, sys
+    procs = [subprocess.Popen([sys.executable] + sys.argv[1:],
+                              env = {**os.environ, "LOCAL_RANK": str(r), "RANK": str(r),
+                                     "WORLD_SIZE": "2", "MASTER_PORT": "29500"})
+             for r in (0, 1)]
+    sys.exit(max(p.wait() for p in procs))
+''')
+
+_STALE_TARGET = textwrap.dedent('''\
+    import os, time
+    if os.environ["LOCAL_RANK"] == "0":
+        time.sleep(2)
+    get_ipython().run_cell_magic("file", "shared.txt", os.environ["PAYLOAD"])
+    with open(os.environ["OUT"] + "." + os.environ["LOCAL_RANK"], "w") as f:
+        f.write(open("shared.txt").read())
+''')
+
+
+def test_markers_are_never_reused_by_a_later_launch(tmp_path):
+    (tmp_path / "fake_launcher.py").write_text(_FAKE_LAUNCHER)
+    (tmp_path / "target.py").write_text(_STALE_TARGET)
+    tmpdir = tmp_path / "tmp"
+    tmpdir.mkdir()
+    for payload in ("first", "second"):
+        env = _clean_env(TMPDIR = str(tmpdir), PAYLOAD = payload, OUT = str(tmp_path / payload))
+        result = subprocess.run(
+            [sys.executable, str(tmp_path / "fake_launcher.py"), str(LAUNCH_PATH), str(tmp_path / "target.py")],
+            cwd = tmp_path, env = env, capture_output = True, text = True, timeout = 300,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        # Rank 1 must have waited for this launch's write, not an earlier launch's marker.
+        assert (tmp_path / f"{payload}.1").read_text() == payload
+        assert (tmp_path / f"{payload}.0").read_text() == payload
+
+
+_HANG_TARGET = 'get_ipython().system("echo ran > " + __import__("os").environ["OUT"])\n'
+
+
+@pytest.mark.parametrize("leftover", ["0", "1"])
+def test_a_local_rank_left_in_the_shell_does_not_hang(tmp_path, leftover):
+    (tmp_path / "target.py").write_text(_HANG_TARGET)
+    out = tmp_path / "out.txt"
+    env = _clean_env(LOCAL_RANK = leftover, OUT = str(out), TMPDIR = str(tmp_path),
+                     UNSLOTH_NPROC_PER_NODE = "1")
+    result = subprocess.run(
+        [sys.executable, str(LAUNCH_PATH), str(tmp_path / "target.py")],
+        env = env, capture_output = True, text = True, timeout = 120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert out.read_text() == "ran\n"
+    assert "left over in the shell" in result.stderr
+
+
+def test_local_rank_without_a_world_is_not_distributed(fl, monkeypatch):
+    monkeypatch.setenv("LOCAL_RANK", "1")
+    assert fl.FSDP2Shell().distributed is False
+    monkeypatch.setenv("WORLD_SIZE", "1")
+    assert fl.FSDP2Shell().distributed is False
+    monkeypatch.setenv("LOCAL_WORLD_SIZE", "2")
+    assert fl.FSDP2Shell().distributed is True
+
+
+def test_marker_wait_times_out_with_a_clear_error(fl, tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCAL_RANK", "1")
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    monkeypatch.setenv("UNSLOTH_FSDP2_RUN_ID", "timeout-test")
+    monkeypatch.setenv("UNSLOTH_FSDP2_WAIT_TIMEOUT", "0.5")
+    monkeypatch.setattr(fl.tempfile, "gettempdir", lambda: str(tmp_path))
+    shell = fl.FSDP2Shell()
+    with pytest.raises(TimeoutError, match = "UNSLOTH_FSDP2_WAIT_TIMEOUT"):
+        shell._system("echo never")
+
+
+@pytest.mark.parametrize("env", [
+    {"SLURM_STEP_NUM_TASKS": "2"}, {"OMPI_COMM_WORLD_SIZE": "4"}, {"PMI_SIZE": "2"}, {"WORLD_SIZE": "2"},
+])
+def test_refuses_to_launch_from_each_slurm_or_mpi_task(fl, layout, monkeypatch, capsys, env):
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    with pytest.raises(SystemExit) as raised:
+        fl.main(str(launcher), SCRIPT_NAME, [])
+    assert raised.value.code == 2 and calls == []
+    err = capsys.readouterr().err
+    assert "SLURM / MPI" in err and "torchrun" in err and "LOCAL_RANK" in err
+
+
+def test_a_single_slurm_task_still_launches(fl, layout, monkeypatch):
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setenv("SLURM_STEP_NUM_TASKS", "1")
+    with pytest.raises(_Exec):
+        fl.main(str(launcher), SCRIPT_NAME, [])
+    assert calls[0][1] == _expected(launcher, 2)
+
+
+def test_ipython_run_uses_a_child_process(fl, layout, monkeypatch):
+    import types
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    fake = types.ModuleType("IPython")
+    fake.get_ipython = lambda: object()
+    monkeypatch.setitem(sys.modules, "IPython", fake)
+    ran = []
+
+    def fake_run(command, env = None, **kwargs):
+        ran.append((command, env))
+        return subprocess.CompletedProcess(command, 3)
+
+    monkeypatch.setattr(fl.subprocess, "run", fake_run)
+    with pytest.raises(SystemExit) as raised:
+        fl.main(str(launcher), SCRIPT_NAME, [])
+    assert raised.value.code == 3 and calls == []
+    command, env = ran[0]
+    assert command == _expected(launcher, 2)
+    assert env["UNSLOTH_FSDP2"] == "1" and env["UNSLOTH_FSDP2_RUN_ID"]
+    # The kernel's own environment is left alone.
+    assert "UNSLOTH_FSDP2" not in os.environ and "UNSLOTH_FSDP2_RUN_ID" not in os.environ
+
+
+_MP_TARGET = textwrap.dedent('''\
+    import json, multiprocessing as mp, os
+    def square(x):
+        return x * x
+    get_ipython().system("echo top-level >> " + os.environ["FAKE_LOG"])
+    get_ipython().run_line_magic("cd", "sub")
+    if __name__ == "__main__":
+        results = {}
+        for method in ("spawn", "forkserver"):
+            with mp.get_context(method).Pool(2) as pool:
+                results[method] = pool.map(square, [1, 2, 3])
+        with open(os.environ["OUT"], "w") as f:
+            json.dump(results, f)
+''')
+
+
+def test_spawn_and_forkserver_children_see_get_ipython(tmp_path):
+    (tmp_path / "work" / "sub").mkdir(parents = True)
+    (tmp_path / "target.py").write_text(_MP_TARGET)
+    log, out = tmp_path / "shell.log", tmp_path / "out.json"
+    env = _clean_env(FAKE_LOG = str(log), OUT = str(out), UNSLOTH_NPROC_PER_NODE = "1")
+    result = subprocess.run(
+        [sys.executable, str(LAUNCH_PATH), str(tmp_path / "target.py")],
+        cwd = tmp_path / "work", env = env, capture_output = True, text = True, timeout = 180,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(out.read_text()) == {"spawn": [1, 4, 9], "forkserver": [1, 4, 9]}
+    # The children re-import the script but do not repeat its shell steps.
+    assert log.read_text().splitlines() == ["top-level"]
+    assert "NameError" not in result.stderr
+
+
+def test_cd_matches_ipython(fl, tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "sub").mkdir()
+    shell = fl.FSDP2Shell()
+    assert shell.run_line_magic("cd", "missing-folder") is None
+    assert os.getcwd() == str(tmp_path)
+    assert "missing-folder" in capsys.readouterr().out
+    assert shell.run_line_magic("cd", "sub") is None
+    assert os.getcwd() == str(tmp_path / "sub")
+    assert capsys.readouterr().out.strip() == str(tmp_path / "sub")
+
+
+@pytest.mark.parametrize("args, visible, expected", [
+    (["--nproc-per-node", "1"], 4, "--nproc-per-node=1 (4 GPU(s) visible): running single-process"),
+    (["--nproc-per-node", "0"], 2, "--nproc-per-node=0 (2 GPU(s) visible): running single-process"),
+    ([], 1, "1 GPU visible: running single-process"),
+    ([], 0, "no GPU visible: running single-process"),
+])
+def test_single_process_note_names_what_was_asked(fl, layout, monkeypatch, capsys, args, visible, expected):
+    _, launcher, _ = layout
+    _stub(fl, monkeypatch, visible = visible)
+    assert fl.main(str(launcher), SCRIPT_NAME, ["--dry-run", *args]) == 0
+    assert expected in capsys.readouterr().out
+
+
+def test_gpu_count_failure_prints_the_childs_error(fl, monkeypatch, capfd):
+    def fake_run(*args, **kwargs):
+        return subprocess.CompletedProcess(args, 1, stdout = b"", stderr = b"Traceback\nImportError: boom\n")
+
+    monkeypatch.setattr(fl.subprocess, "run", fake_run)
+    assert fl._count_visible_gpus() == 0
+    err = capfd.readouterr().err
+    assert err.count("ImportError: boom") == 1 and "assuming none is visible" in err
