@@ -66,17 +66,20 @@ the ollama installer, ``unsloth install-kernels``) are handled per command:
                                        PATH), else run it once per node. Only local
                                        rank 0 decides; the others follow it. Installs into
                                        another environment (``--python``, ``--target``,
-                                       ``--prefix``, ``--root``, ``uv venv``, and
-                                       ``--system`` from a virtual environment) always run.
+                                       ``--prefix``, ``--root``, ``uv venv``,
+                                       ``--system`` from a virtual environment, or the
+                                       same through ``PIP_TARGET`` / ``PIP_PREFIX`` /
+                                       ``PIP_ROOT`` / ``PIP_PYTHON`` / ``UV_PYTHON`` /
+                                       ``UV_SYSTEM_PYTHON``) always run.
     UNSLOTH_FSDP2_RUN_INSTALLS=1       always run, once per node
     UNSLOTH_FSDP2_RUN_INSTALLS=0       always skip
 
 Every skipped install prints one line. The single-process path uses the same rules.
 
 Shell steps use the interpreter running this launcher, the environment the install
-check reads: ``python`` / ``python3`` are that interpreter and ``pip`` / ``pip3`` its
-``-m pip``, whatever ``PATH`` holds, and from a virtual environment ``VIRTUAL_ENV`` names
-it, so ``uv pip`` installs there too.
+check reads: ``python`` / ``python3`` are that interpreter, ``pip`` / ``pip3`` its
+``-m pip`` and ``unsloth`` its ``unsloth`` command, whatever ``PATH`` holds, and from a
+virtual environment ``VIRTUAL_ENV`` names it, so ``uv pip`` installs there too.
 
 Only the standard library is imported here, so the parent process never loads torch.
 """
@@ -175,6 +178,28 @@ def _normalize(name):
 
 def _in_venv():
     return sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+
+
+# Inherited variables that send pip / uv pip somewhere other than this interpreter, the
+# same as the matching flags in _PIP_OTHER_ENV_FLAGS (pip reads any option as PIP_<NAME>).
+_PIP_ENV_REDIRECTS = ("PIP_TARGET", "PIP_PREFIX", "PIP_ROOT", "PIP_PYTHON")
+
+
+def _env_redirect(tool):
+    """Why the environment sends this ``pip`` (``tool="pip"``) or ``uv pip`` somewhere the
+    install check does not read, or None."""
+    if tool == "uv":
+        target = os.environ.get("UV_PYTHON", "").strip()
+        here = (os.path.abspath(sys.executable), os.path.abspath(sys.prefix))
+        if target and os.path.abspath(os.path.expanduser(target)) not in here:
+            return f"UV_PYTHON={target} sends uv pip to another interpreter"
+        if _in_venv() and os.environ.get("UV_SYSTEM_PYTHON", "").strip().lower() in ("1", "true", "yes", "on"):
+            return "UV_SYSTEM_PYTHON installs into the system Python, not this virtual environment"
+        return None
+    for name in _PIP_ENV_REDIRECTS:
+        if os.environ.get(name, "").strip():
+            return f"{name} sends pip to another environment"
+    return None
 
 
 def _installed_versions():
@@ -406,6 +431,10 @@ def install_decision(command):
             missing = [k for k in kernels if _normalize(k) not in versions]
             if missing:
                 return (False, f"{', '.join(missing)} not installed")
+            # It installs with this interpreter's pip, which reads PIP_* too.
+            redirect = _env_redirect("pip")
+            if redirect:
+                return (False, redirect)
             details.append("already installed: " + ", ".join(kernels))
             continue
         args = _pip_args(tokens)
@@ -415,6 +444,9 @@ def install_decision(command):
         decision = _pip_decision(args, versions)
         if decision is None:
             continue
+        redirect = _env_redirect("uv" if head == "uv" else "pip")
+        if redirect:
+            return (False, redirect)
         if not decision[0]:
             return decision
         details.append(decision[1])
@@ -431,13 +463,22 @@ _SHELL_PREAMBLE = (
     'python3() { "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
     'pip() { "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
     'pip3() { "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
-    "export -f python python3 pip pip3; "
+    # The `unsloth` console script of this interpreter, run the way the script runs it.
+    'unsloth() { "$UNSLOTH_FSDP2_PYTHON" -c "$_UNSLOTH_FSDP2_CLI" "$@"; }; '
+    "export -f python python3 pip pip3 unsloth; "
+)
+_UNSLOTH_CLI = (
+    "import sys; from importlib.metadata import entry_points; "
+    "ep = next(iter(entry_points(group='console_scripts', name='unsloth')), None); "
+    "ep is None and sys.exit('unsloth is not installed for ' + sys.executable); "
+    "sys.argv[0] = 'unsloth'; sys.exit(ep.load()())"
 )
 
 
 def _shell_env():
     env = dict(os.environ)
     env["UNSLOTH_FSDP2_PYTHON"] = sys.executable
+    env["_UNSLOTH_FSDP2_CLI"] = _UNSLOTH_CLI
     if _in_venv():
         env["VIRTUAL_ENV"] = sys.prefix
     return env
