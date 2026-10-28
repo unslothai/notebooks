@@ -18,6 +18,20 @@
       "digest": "76276d8b8b63d99d",
       "count": 1,
       "reason": "Runs a model-generated program; sandboxed by the RL helper added in unsloth-zoo#1105."
+    },
+    {
+      "file": "scripts/fsdp2_launch.py",
+      "sink": "eval",
+      "digest": "6d79d97bec3e1d4e",
+      "count": 1,
+      "reason": "IPython-style {expr} expansion of a !cmd line from the script being run, same as IPython's DollarFormatter."
+    },
+    {
+      "file": "scripts/fsdp2_launch.py",
+      "sink": "exec",
+      "digest": "4b6b3a49b588c0a6",
+      "count": 1,
+      "reason": "Runs the script's own %%capture cell body after the IPython transform, as IPython does in the notebook."
     }
   ]
 }
