@@ -33,7 +33,12 @@ of ``scripts/fsdp2_launch.py``. All of it comes from
 
   4. The generator itself: a second run is a no-op, a deleted or renamed
      script loses its launcher, the AMD-only pass touches only ``AMD-*``
-     launchers, and a render failure leaves the folder as it was.
+     launchers, a render failure leaves the folder as it was, read-only files
+     are replaced and removed, unchanged launchers get their permissions back.
+
+  5. Repository wiring: the staging folder is git-ignored, the git diff
+     summary counts only the root README as a README change, and the launcher
+     helper tests run in their own CI job rather than in every api-drift cell.
 
 No torch, no network: only the generator module and the files on disk.
 """
@@ -41,7 +46,10 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import os
 import shutil
+import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -368,3 +376,85 @@ def test_the_main_pass_calls_the_generator_after_both_conversions():
         assert prefixed == ("include_prefix='AMD-'" in gen[0]) == ("include_prefix='AMD-'" in check[0])
         found.append(prefixed)
     assert sorted(found) == [False, True], f"expected the full and the AMD-only pass, got {found}"
+
+
+def test_unchanged_launchers_get_their_permissions_reset(tmp_path):
+    if os.name == "nt":
+        pytest.skip("_set_file_permissions is a no-op on Windows")
+    scripts, out = _tree(tmp_path, ["A.py"])
+    _gen(scripts, out)
+    (out / "A.py").chmod(0o600)
+    assert _gen(scripts, out) == {"written": [], "removed": []}
+    assert stat.S_IMODE((out / "A.py").stat().st_mode) == 0o644
+
+
+def _read_only_refusal(monkeypatch, name):
+    """Make ``os.<name>`` refuse a read-only path the way Windows does."""
+    real = getattr(_GEN.os, name)
+    refused = []
+
+    def guarded(*paths):
+        for path in paths:
+            if os.path.exists(path) and not os.stat(path).st_mode & stat.S_IWRITE:
+                refused.append(path)
+                raise PermissionError(13, "Access is denied", path)
+        return real(*paths)
+
+    monkeypatch.setattr(_GEN.os, name, guarded)
+    return refused
+
+
+def test_read_only_launchers_are_replaced(tmp_path, monkeypatch):
+    scripts, out = _tree(tmp_path, ["A.py"])
+    _gen(scripts, out)
+    (out / "A.py").write_text("stale\n", encoding="utf-8")
+    (out / "A.py").chmod(stat.S_IREAD)
+    refused = _read_only_refusal(monkeypatch, "replace")
+    assert _gen(scripts, out)["written"] == ["A.py"]
+    assert refused and (out / "A.py").read_text(encoding="utf-8") == _GEN.render_fsdp2_launcher("A.py")
+
+
+def test_read_only_orphans_are_removed(tmp_path, monkeypatch):
+    scripts, out = _tree(tmp_path, ["A.py", "B.py"])
+    _gen(scripts, out)
+    (scripts / "B.py").unlink()
+    (out / "B.py").chmod(stat.S_IREAD)
+    refused = _read_only_refusal(monkeypatch, "remove")
+    assert _gen(scripts, out)["removed"] == ["B.py"]
+    assert refused and not (out / "B.py").exists()
+
+
+def test_staging_folder_is_git_ignored():
+    lines = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert "/.fsdp2_scripts.staging-*" in lines
+
+
+def test_git_diff_summary_counts_only_the_root_readme(monkeypatch, capsys):
+    changed = ["README.md", "fsdp2_scripts/README.md", "nb/README.md"]
+
+    def fake_run(argv, **kwargs):
+        if argv[:3] == ["git", "diff", "--name-only"]:
+            return subprocess.CompletedProcess(argv, 0, stdout="\n".join(changed) + "\n", stderr="")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(_GEN.subprocess, "run", fake_run)
+    _GEN._summarize_git_diff()
+    out = capsys.readouterr().out
+    assert "README changes: 1" in out
+    assert "Other changes: 2" in out
+
+
+def test_launcher_helper_tests_run_in_their_own_ci_job():
+    import yaml
+
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "notebooks-tests-ci.yml").read_text(encoding="utf-8"))
+    jobs = {
+        name: job for name, job in workflow["jobs"].items()
+        if any("tests/test_fsdp2_launch.py" in step.get("run", "") for step in job.get("steps", []))
+    }
+    assert list(jobs) == ["fsdp2-launch"], f"tests/test_fsdp2_launch.py runs in {sorted(jobs)}"
+    job = jobs["fsdp2-launch"]
+    assert "strategy" not in job, "the launcher tests need one CPU torch, not a matrix"
+    runs = "\n".join(step.get("run", "") for step in job["steps"])
+    assert "https://download.pytorch.org/whl/cpu" in runs and "pytest" in runs

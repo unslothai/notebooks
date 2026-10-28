@@ -22,7 +22,13 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
 - Asking for more processes than there are visible GPUs is refused.
 - Arguments other than the launcher flags are passed through to the script.
 - A launcher started under your own `torchrun` (for example multi-node) detects the
-  torchrun environment and does not launch a second time.
+  torchrun environment and does not launch a second time. So does one started with
+  `LOCAL_RANK` plus `WORLD_SIZE` or `LOCAL_WORLD_SIZE` set by another launcher. A lone
+  `LOCAL_RANK` left over in the shell is ignored.
+- Started as one of several SLURM / MPI tasks (`srun`, `mpirun`) without those variables,
+  the launcher stops with an error instead of starting one `torchrun` per task.
+- From IPython or Jupyter (`%run "fsdp2_scripts/<name>"`), `torchrun` runs as a child
+  process so the kernel survives.
 - The working directory is not changed, so outputs such as `outputs/` and `lora_model/`
   land where they would for `python_scripts/<name>`.
 
@@ -32,7 +38,8 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
 | --- | --- | --- |
 | `UNSLOTH_NPROC_PER_NODE` | number of visible GPUs | Processes per node when `--nproc-per-node` is not given. |
 | `UNSLOTH_FSDP2` | `1` | Set by the launcher only when unset. `UNSLOTH_FSDP2=0` launches plain data parallel instead. |
-| `UNSLOTH_FSDP2_RUN_INSTALLS` | unset | Set to `1` to run the script's install commands (once per node). |
+| `UNSLOTH_FSDP2_RUN_INSTALLS` | unset | Unset: skip an install command only when everything it asks for is already installed, else run it once per node. `1`: always run them (once per node). `0`: always skip them. |
+| `UNSLOTH_FSDP2_WAIT_TIMEOUT` | `21600` (6 hours) | Seconds the other processes on a node wait for a shell step on the first one before failing with an error. |
 | `UNSLOTH_TP_SIZE` | unset | Tensor parallel size, combined with FSDP2 over the remaining ranks. |
 
 ## Things to know
@@ -42,12 +49,17 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   the global batch is that product times the number of data parallel ranks (GPUs divided
   by `UNSLOTH_TP_SIZE`). Lower `gradient_accumulation_steps` to match a single-GPU run
   step for step.
-- **Package installs are skipped by default.** Shell lines in the script that install
-  packages (`pip install`, `uv pip install`, `apt-get install`, the ollama installer) are
-  skipped with one message each, because installing from every training process at once
-  is unsafe. Prepare the environment once before launching, or set
-  `UNSLOTH_FSDP2_RUN_INSTALLS=1` to run them on one process per node while the others wait.
-  Other shell lines (`git clone`, `wget`, `mkdir`) run once per node.
+- **Package installs run only when something is missing.** A shell line in the script
+  that installs packages (`pip install`, `uv pip install`, `python -m pip install`,
+  `apt-get install`, the ollama installer, `unsloth install-kernels`) is skipped, with
+  one message, when everything it asks for is already there: every requested package
+  installed at a version that matches its pin (a `git+` URL counts by its package name),
+  or the `apt-get` / ollama program already on `PATH`. Otherwise it runs on one process
+  per node while the others wait. Installs into another environment (`--python`,
+  `--target`, `--prefix`, `--root`, or after `uv venv`) always run. Flags such as
+  `--upgrade` or `--force-reinstall` do not force a run: set
+  `UNSLOTH_FSDP2_RUN_INSTALLS=1` for that, or `0` to skip every install. Other shell
+  lines (`git clone`, `wget`, `mkdir`) run once per node.
 - **Unsloth decides what is supported.** The launcher does not check models, trainers or
   parallel layouts. Unsloth itself refuses layouts it cannot run (for example an invalid
   `UNSLOTH_TP_SIZE`) with an error that names the problem. Nothing in this folder claims

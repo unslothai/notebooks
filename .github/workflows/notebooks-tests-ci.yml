@@ -18,7 +18,9 @@
 #   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
 #      tests/test_notebook_api_drift.py against three (transformers, trl)
 #      combos: HF=4.57.6 + TRL<1, HF=default + TRL=default, HF=latest +
-#      TRL=latest. The same CPU torch install also runs
+#      TRL=latest.
+#
+#   3. fsdp2-launch (HARD GATE, ~2 min, CPU torch only)
 #      tests/test_fsdp2_launch.py (fsdp2_scripts/ launcher helper).
 #
 # Mirrors the policy on unslothai/unsloth-zoo PR #637 and
@@ -433,9 +435,36 @@ jobs:
         run: |
           python -m pytest tests/test_notebook_api_drift.py -v --tb=short
 
+  fsdp2-launch:
+    # The fsdp2_scripts/ launcher helper, including a real 2-process
+    # torch.distributed.run on CPU (gloo). Only needs CPU torch, so it runs
+    # once here instead of once per api-drift matrix cell.
+    name: tests/test_fsdp2_launch.py (HARD GATE)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner (audit)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install pytest + CPU torch
+        run: |
+          set -euxo pipefail
+          python -m pip install --upgrade pip
+          pip install pytest packaging
+          pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.4,<2.11'
+
       - name: tests/test_fsdp2_launch.py
-        # The fsdp2_scripts/ launcher helper, including a real 2-process
-        # torch.distributed.run on CPU (gloo). Needs the CPU torch above.
         run: |
           python -m pytest tests/test_fsdp2_launch.py -q --tb=short
 
