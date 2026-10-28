@@ -14,6 +14,7 @@
 #      tests/test_python_scripts_keep_standby_env.py
 #      tests/test_fsdp2_scripts_mirror.py  (fsdp2_scripts/ launcher mirror)
 #      tests/test_fsdp2_adapter_covers_scripts.py
+#      tests/test_python_scripts_no_live_install_magic.py
 #
 #   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
 #      tests/test_notebook_api_drift.py against three (transformers, trl)
@@ -299,6 +300,11 @@ jobs:
         # is one the fsdp2 launcher's adapter handles.
         run: |
           python -m pytest tests/test_fsdp2_adapter_covers_scripts.py -q --tb=short
+      - name: tests/test_python_scripts_no_live_install_magic.py
+        # No mirror may leave its install cells executable: get_ipython is
+        # undefined under plain python. Exceptions are listed in the test.
+        run: |
+          python -m pytest tests/test_python_scripts_no_live_install_magic.py -q --tb=short
 
       - name: tests/test_amd_templated_kernel_pins.py
         run: |

@@ -21,13 +21,13 @@
 # 
 # <img width="270" height="265" alt="image" src="https://github.com/user-attachments/assets/1a51a172-ff1a-40a2-8bee-2746f5017aa0" />
 
-# # Installation
-# We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Qwen3-4B, and [OpenEnv](https://github.com/meta-pytorch/OpenEnv) for the environment interactions. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\n# vllm is not optional here: the model below is loaded with\n# fast_inference = True and every rollout generates through the trainer\'s\n# colocated vllm engine. It is pinned in the same resolve as torch because\n# vllm==0.15.1 pins torch==2.9.1 and its torchvision/torchaudio companions.\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"\n    except: get_numpy = "numpy"\n    !uv pip install -qqq \\\n        "vllm==0.15.1" "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers==4.57.6" trackio \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth vllm trackio\n# transformers 4.57.6 refuses to import on huggingface_hub 1.x, and the Colab\n# base image now ships hub 1.23. --no-deps means nothing here pulls the hub\n# back under 1.0, so the bound is spelled out. The 4.57.6 pin itself stays:\n# vllm==0.15.1 requires transformers<5.\n!uv pip install --upgrade --no-deps transformers==4.57.6 "tokenizers>=0.22.0,<=0.23.0" "huggingface_hub>=0.34.0,<1.0" trl==0.29.1 unsloth unsloth_zoo\n')
+# # # Installation
+# # We'll be using [Unsloth](https://github.com/unslothai/unsloth) to do RL on Qwen3-4B, and [OpenEnv](https://github.com/meta-pytorch/OpenEnv) for the environment interactions. Unsloth saves 70% VRAM usage and makes reinforcement learning 2 to 6x faster!
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', 'import os, importlib.util\n!pip install --upgrade -qqq uv\n# vllm is not optional here: the model below is loaded with\n# fast_inference = True and every rollout generates through the trainer\'s\n# colocated vllm engine. It is pinned in the same resolve as torch because\n# vllm==0.15.1 pins torch==2.9.1 and its torchvision/torchaudio companions.\nif importlib.util.find_spec("torch") is None or "COLAB_" in "".join(os.environ.keys()):\n    try: import numpy; get_numpy = f"numpy=={numpy.__version__}"\n    except: get_numpy = "numpy"\n    !uv pip install -qqq \\\n        "vllm==0.15.1" "torch>=2.8.0" "triton>=3.4.0" {get_numpy} torchvision bitsandbytes "transformers==4.57.6" trackio \\\n        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \\\n        "unsloth[base] @ git+https://github.com/unslothai/unsloth" \\\n        git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356#subdirectory=python/triton_kernels\nelif importlib.util.find_spec("unsloth") is None:\n    !uv pip install -qqq unsloth vllm trackio\n# transformers 4.57.6 refuses to import on huggingface_hub 1.x, and the Colab\n# base image now ships hub 1.23. --no-deps means nothing here pulls the hub\n# back under 1.0, so the bound is spelled out. The 4.57.6 pin itself stays:\n# vllm==0.15.1 requires transformers<5.\n!uv pip install --upgrade --no-deps transformers==4.57.6 "tokenizers>=0.22.0,<=0.23.0" "huggingface_hub>=0.34.0,<1.0" trl==0.29.1 unsloth unsloth_zoo\n')
 
 
 # We will then install [OpenEnv](https://github.com/meta-pytorch/OpenEnv) from source:
