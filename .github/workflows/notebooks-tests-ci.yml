@@ -13,11 +13,13 @@
 #      tests/test_python_scripts_regen_parity.py  (live nbconvert)
 #      tests/test_python_scripts_keep_standby_env.py
 #      tests/test_fsdp2_scripts_mirror.py  (fsdp2_scripts/ launcher mirror)
+#      tests/test_fsdp2_adapter_covers_scripts.py
 #
 #   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
 #      tests/test_notebook_api_drift.py against three (transformers, trl)
 #      combos: HF=4.57.6 + TRL<1, HF=default + TRL=default, HF=latest +
-#      TRL=latest.
+#      TRL=latest. The same CPU torch install also runs
+#      tests/test_fsdp2_launch.py (fsdp2_scripts/ launcher helper).
 #
 # Mirrors the policy on unslothai/unsloth-zoo PR #637 and
 # unslothai/unsloth PR #5414: drift detector failures fire pytest.fail
@@ -290,6 +292,12 @@ jobs:
         run: |
           python -m pytest tests/test_fsdp2_scripts_mirror.py -q --tb=short
 
+      - name: tests/test_fsdp2_adapter_covers_scripts.py
+        # Every shell line and magic python_scripts/ hands to get_ipython()
+        # is one the fsdp2 launcher's adapter handles.
+        run: |
+          python -m pytest tests/test_fsdp2_adapter_covers_scripts.py -q --tb=short
+
       - name: tests/test_amd_templated_kernel_pins.py
         run: |
           python -m pytest tests/test_amd_templated_kernel_pins.py -q --tb=short
@@ -424,6 +432,12 @@ jobs:
       - name: tests/test_notebook_api_drift.py
         run: |
           python -m pytest tests/test_notebook_api_drift.py -v --tb=short
+
+      - name: tests/test_fsdp2_launch.py
+        # The fsdp2_scripts/ launcher helper, including a real 2-process
+        # torch.distributed.run on CPU (gloo). Needs the CPU torch above.
+        run: |
+          python -m pytest tests/test_fsdp2_launch.py -q --tb=short
 
   security-tests:
     name: tests/security (HARD GATE)
