@@ -12,6 +12,7 @@
 #      tests/test_notebook_vllm_pin.py
 #      tests/test_python_scripts_regen_parity.py  (live nbconvert)
 #      tests/test_python_scripts_keep_standby_env.py
+#      tests/test_python_scripts_no_live_install_magic.py
 #
 #   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
 #      tests/test_notebook_api_drift.py against three (transformers, trl)
@@ -279,6 +280,12 @@ jobs:
         # The scripts' commented install cell must not drop UNSLOTH_VLLM_STANDBY.
         run: |
           python -m pytest tests/test_python_scripts_keep_standby_env.py -q --tb=short
+
+      - name: tests/test_python_scripts_no_live_install_magic.py
+        # No mirror may leave its install cells executable: get_ipython is
+        # undefined under plain python. Exceptions are listed in the test.
+        run: |
+          python -m pytest tests/test_python_scripts_no_live_install_magic.py -q --tb=short
 
       - name: tests/test_amd_templated_kernel_pins.py
         run: |
