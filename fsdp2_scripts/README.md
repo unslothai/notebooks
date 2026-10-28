@@ -59,7 +59,11 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   per node while the others wait. Installs into another environment (`--python`,
   `--target`, `--prefix`, `--root`, after `uv venv`, `--system` from a virtual
   environment, or the same set through `PIP_TARGET`, `PIP_PREFIX`, `PIP_ROOT`,
-  `PIP_PYTHON`, `UV_PYTHON` or `UV_SYSTEM_PYTHON`) always run. Shell steps use the Python
+  `PIP_PYTHON`, `UV_PYTHON` or `UV_SYSTEM_PYTHON`) always run, and so does any install that
+  may land elsewhere: `uv pip` from a Python outside a virtual environment (uv then picks
+  `VIRTUAL_ENV`, `CONDA_PREFIX` or a `.venv`), a command line that sets variables or runs
+  `export`, `cd`, `source`, `sudo`, `env` or `conda`, and a pip or python named by version
+  or another path. Shell steps use the Python
   that runs the launcher: `python` and `python3` are that Python, `pip` / `pip3` its
   `-m pip` and `unsloth` its `unsloth` command, whatever is on `PATH`, and from a virtual
   environment `VIRTUAL_ENV` names it for `uv pip`, so an install goes where the check

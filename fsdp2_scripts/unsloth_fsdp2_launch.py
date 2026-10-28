@@ -70,7 +70,12 @@ the ollama installer, ``unsloth install-kernels``) are handled per command:
                                        ``--system`` from a virtual environment, or the
                                        same through ``PIP_TARGET`` / ``PIP_PREFIX`` /
                                        ``PIP_ROOT`` / ``PIP_PYTHON`` / ``UV_PYTHON`` /
-                                       ``UV_SYSTEM_PYTHON``) always run.
+                                       ``UV_SYSTEM_PYTHON``) always run. So does an install
+                                       that may land elsewhere: ``uv pip`` from a Python
+                                       outside a virtual environment, a command line that
+                                       sets variables or runs ``export`` / ``cd`` /
+                                       ``source`` / ``sudo`` / ``env`` / ``conda``, and a
+                                       pip or python named by version or other path.
     UNSLOTH_FSDP2_RUN_INSTALLS=1       always run, once per node
     UNSLOTH_FSDP2_RUN_INSTALLS=0       always skip
 
@@ -189,6 +194,11 @@ def _env_redirect(tool):
     """Why the environment sends this ``pip`` (``tool="pip"``) or ``uv pip`` somewhere the
     install check does not read, or None."""
     if tool == "uv":
+        if not _in_venv():
+            # Outside a virtual environment nothing names this interpreter for uv: it takes
+            # VIRTUAL_ENV, CONDA_PREFIX or a .venv above the working directory, or for
+            # --system its own pick of system interpreter.
+            return "uv pip from a Python outside a virtual environment installs where uv finds one"
         target = os.environ.get("UV_PYTHON", "").strip()
         here = (os.path.abspath(sys.executable), os.path.abspath(sys.prefix))
         if target and os.path.abspath(os.path.expanduser(target)) not in here:
@@ -391,6 +401,34 @@ def _command_segments(command):
     return [segment for segment in segments if segment]
 
 
+_ASSIGNMENT = re.compile(r"^[A-Za-z_]\w*=")
+# Commands that change the variables, directory or user a later command runs with.
+_STATE_COMMANDS = frozenset({
+    "export", "unset", "set", "source", ".", "cd", "pushd", "popd", "eval", "sudo", "env",
+    "exec", "conda", "mamba", "micromamba", "activate", "deactivate",
+})
+# The commands _SHELL_PREAMBLE pins to this interpreter.
+_PINNED_COMMANDS = frozenset({"pip", "pip3", "python", "python3", "unsloth"})
+
+
+def _target_doubt(segments, tokens):
+    """Why the Python package install ``tokens`` (one of ``segments``) may not land in this
+    interpreter, or None. Only a plain command is trusted: no variable assignments or
+    environment / directory changes anywhere in the command line, a pinned command name or
+    this interpreter's own path, and no pip / uv variable pointing elsewhere."""
+    for segment in segments:
+        if _ASSIGNMENT.match(segment[0]):
+            return f"the command sets {segment[0].split('=', 1)[0]}, which can change where it installs"
+        if segment[0] in _STATE_COMMANDS:
+            return f"`{segment[0]}` in the command can change where it installs"
+    if os.path.basename(tokens[0]) == "uv":
+        return _env_redirect("uv")
+    if tokens[0] not in _PINNED_COMMANDS and \
+            os.path.abspath(os.path.expanduser(tokens[0])) != os.path.abspath(sys.executable):
+        return f"{tokens[0]} is not this interpreter's command"
+    return _env_redirect("pip")
+
+
 def install_decision(command):
     """Whether an install command can be skipped because what it asks for is already here.
 
@@ -410,8 +448,9 @@ def install_decision(command):
     segments = _command_segments(command)
     if segments is None:
         return (False, "cannot parse the command")
-    for tokens in segments:
-        while tokens and (re.match(r"^[A-Za-z_]\w*=", tokens[0]) or tokens[0] in ("sudo", "env", "exec")):
+    for segment in segments:
+        tokens = segment
+        while tokens and (_ASSIGNMENT.match(tokens[0]) or tokens[0] in ("sudo", "env", "exec")):
             tokens = tokens[1:]
         if not tokens:
             continue
@@ -431,10 +470,10 @@ def install_decision(command):
             missing = [k for k in kernels if _normalize(k) not in versions]
             if missing:
                 return (False, f"{', '.join(missing)} not installed")
-            # It installs with this interpreter's pip, which reads PIP_* too.
-            redirect = _env_redirect("pip")
-            if redirect:
-                return (False, redirect)
+            # It installs with the pip of the interpreter it runs on, which reads PIP_* too.
+            doubt = _target_doubt(segments, segment)
+            if doubt:
+                return (False, doubt)
             details.append("already installed: " + ", ".join(kernels))
             continue
         args = _pip_args(tokens)
@@ -444,9 +483,9 @@ def install_decision(command):
         decision = _pip_decision(args, versions)
         if decision is None:
             continue
-        redirect = _env_redirect("uv" if head == "uv" else "pip")
-        if redirect:
-            return (False, redirect)
+        doubt = _target_doubt(segments, segment)
+        if doubt:
+            return (False, doubt)
         if not decision[0]:
             return decision
         details.append(decision[1])

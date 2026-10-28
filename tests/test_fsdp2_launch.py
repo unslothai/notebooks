@@ -575,9 +575,9 @@ def installed(fl, tmp_path, monkeypatch):
     bin_dir.mkdir()
     monkeypatch.setenv("PATH", str(bin_dir))
     monkeypatch.setattr(fl, "_dpkg_installed", lambda package: False)
-    # Only the fake site counts, and the test interpreter counts as no virtual environment,
-    # whatever the interpreter running the tests is.
-    monkeypatch.setattr(fl, "_in_venv", lambda: False)
+    # Only the fake site counts, and the test interpreter counts as a virtual environment
+    # (which the shell steps name to uv through VIRTUAL_ENV), whatever runs the tests.
+    monkeypatch.setattr(fl, "_in_venv", lambda: True)
     for name in ("UV_PYTHON", "UV_SYSTEM_PYTHON", *fl._PIP_ENV_REDIRECTS):
         monkeypatch.delenv(name, raising = False)
     import importlib.metadata
@@ -654,8 +654,8 @@ def test_apt_and_ollama_run_only_when_the_program_is_missing(fl, installed):
 @pytest.mark.parametrize("command, skip", [
     ("pip install --upgrade -qqq langid", True),
     ("python -m pip install -qU langid --root-user-action=ignore", True),
-    ("uv pip install --system -qqq 'langid==1.1.6'", True),
-    ("uv pip install --system -qqq 'langid>=2'", False),
+    ("uv pip install -qqq 'langid==1.1.6'", True),
+    ("uv pip install -qqq 'langid>=2'", False),
     ("pip install --no-deps --force-reinstall langid unsloth_zoo", True),
     ("pip install langid other-missing-pkg", False),
     ("pip install --no-deps git+https://github.com/unslothai/unsloth-zoo.git", True),
@@ -745,6 +745,42 @@ def test_inherited_redirection_always_runs(fl, installed, monkeypatch, command, 
     assert skip is False and variable in reason
 
 
+@pytest.mark.parametrize("command", [
+    "PIP_TARGET=/other/site pip install langid",
+    "UV_PYTHON=/other/env/bin/python uv pip install langid",
+    "PIP_NO_CACHE_DIR=1 pip install langid",
+    "env PIP_TARGET=/other/site pip install langid",
+    "export PIP_PREFIX=/other; pip install langid",
+    "cd /elsewhere && uv pip install langid",
+    "source /other/env/bin/activate && pip install langid",
+    "conda activate other && pip install langid",
+    "sudo pip install langid",
+    "exec pip install langid",
+    "pip3.12 install langid",
+    "/other/env/bin/pip install langid",
+    "/other/env/bin/python -m pip install langid",
+    "PIP_TARGET=/other/site unsloth install-kernels langid",
+])
+def test_installs_that_may_land_elsewhere_always_run(fl, installed, command):
+    """Only a plain command is trusted to install into this interpreter: inline variables,
+    environment or directory changes, sudo / env / exec, and pip / python by version or
+    another path all run instead of being skipped."""
+    add_dist, _ = installed
+    add_dist("langid")
+    skip, reason = fl.install_decision(command)
+    assert skip is False, reason
+
+
+def test_plain_commands_for_this_interpreter_still_skip(fl, installed):
+    add_dist, _ = installed
+    add_dist("langid")
+    for command in ("pip install langid", "pip3 install langid", "python -m pip install langid",
+                    "python3 -m pip install langid", f"{sys.executable} -m pip install langid",
+                    "uv pip install langid", "mkdir -p out && pip install langid",
+                    "unsloth install-kernels langid"):
+        assert _skip(fl, command) is True, command
+
+
 def test_redirection_variables_that_name_this_environment_still_skip(fl, installed, monkeypatch):
     add_dist, _ = installed
     add_dist("langid")
@@ -758,21 +794,35 @@ def test_redirection_variables_that_name_this_environment_still_skip(fl, install
     assert _skip(fl, "uv pip install langid") is True  # nor PIP_* by uv
 
 
-@pytest.mark.parametrize("in_venv, skip", [(True, False), (False, True)])
-def test_uv_system_python_from_a_venv_always_runs(fl, installed, monkeypatch, in_venv, skip):
+@pytest.mark.parametrize("in_venv, command, system_env, skip", [
+    (True, "uv pip install langid", None, True),
+    (True, "uv pip install --system -qqq langid", None, False),
+    (True, "uv pip install langid", "true", False),
+    # Outside a virtual environment uv takes VIRTUAL_ENV, CONDA_PREFIX or a .venv above
+    # the working directory, or its own system interpreter: never provably this one.
+    (False, "uv pip install langid", None, False),
+    (False, "uv pip install --system -qqq langid", None, False),
+    (False, "uv pip install langid", "true", False),
+])
+def test_uv_installs_skip_only_inside_this_virtual_environment(
+        fl, installed, monkeypatch, in_venv, command, system_env, skip):
     add_dist, _ = installed
     add_dist("langid")
-    monkeypatch.setenv("UV_SYSTEM_PYTHON", "true")
+    if system_env:
+        monkeypatch.setenv("UV_SYSTEM_PYTHON", system_env)
     monkeypatch.setattr(fl, "_in_venv", lambda: in_venv)
-    assert _skip(fl, "uv pip install langid") is skip
+    assert _skip(fl, command) is skip
 
 
-@pytest.mark.parametrize("in_venv, skip", [(True, False), (False, True)])
-def test_system_install_from_a_venv_always_runs(fl, installed, monkeypatch, in_venv, skip):
+def test_pip_from_outside_a_virtual_environment_still_skips(fl, installed, monkeypatch):
+    """pip is this interpreter's -m pip whatever uv would discover, so VIRTUAL_ENV,
+    CONDA_PREFIX and a .venv do not matter to it."""
     add_dist, _ = installed
     add_dist("langid")
-    monkeypatch.setattr(fl, "_in_venv", lambda: in_venv)
-    assert _skip(fl, "uv pip install --system -qqq langid") is skip
+    monkeypatch.setattr(fl, "_in_venv", lambda: False)
+    monkeypatch.setenv("VIRTUAL_ENV", "/other/venv")
+    monkeypatch.setenv("CONDA_PREFIX", "/other/conda")
+    assert _skip(fl, "pip install langid") is True
 
 
 @pytest.mark.parametrize("setting, ran_missing, ran_present", [
