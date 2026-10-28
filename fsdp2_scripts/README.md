@@ -72,9 +72,9 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   the reason. Their launchers say so in a comment, run the script in one process with a
   note naming the reason, and refuse `--nproc-per-node` above 1 unless
   `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
-  Meta-Synthetic-Data-Llama3.1_(8B), Synthetic_Data_Hackathon,
-  Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama, Gemma3N_(2B)-Inference and
-  Oute_TTS_(1B), with their AMD- / Kaggle- variants.
+  Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
+  Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
+  Gemma3N_(2B)-Inference and Oute_TTS_(1B), with their AMD- / Kaggle- variants.
 - **Unsloth decides what is supported.** The launcher does not check models, trainers or
   parallel layouts. Unsloth itself refuses layouts it cannot run (for example an invalid
   `UNSLOTH_TP_SIZE`) with an error that names the problem. Nothing in this folder claims

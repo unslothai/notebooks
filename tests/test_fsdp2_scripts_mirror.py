@@ -471,6 +471,8 @@ import re  # noqa: E402
 # coordinate: get_ipython shell steps run once per node, these run on every rank.
 _UNSAFE = re.compile(
     r"subprocess\.Popen|os\.system\(|vllm serve|[\"']--port[\"']|--port\b"
+    # Library calls that start a server themselves (unsloth/dataprep/synthetic.py).
+    r"|SyntheticDataKit\.from_pretrained\("
     r"|os\.remove\(|os\.unlink\(|shutil\.rmtree\(|shutil\.move\(|os\.rename\("
 )
 
@@ -551,6 +553,9 @@ def test_single_process_list_names_real_scripts():
     "Meta-Synthetic-Data-Llama3.1_(8B).py",
     "AMD-Meta-Synthetic-Data-Llama3.1_(8B).py",
     "Kaggle-Meta-Synthetic-Data-Llama3.1_(8B).py",
+    "Meta_Synthetic_Data_Llama3_2_(3B).py",
+    "AMD-Meta_Synthetic_Data_Llama3_2_(3B).py",
+    "Kaggle-Meta_Synthetic_Data_Llama3_2_(3B).py",
     "NeMo-Gym-Sudoku.py",
     "AMD-NeMo-Gym-Multi-Environment.py",
     "Synthetic_Data_Hackathon.py",
