@@ -184,29 +184,41 @@ def _installed_versions():
     return versions
 
 
+# Repositories whose distribution name is known without running pip. Only these exact
+# repos, and only without a #subdirectory=, map from the URL to a name.
+_KNOWN_REPOS = {
+    "github.com/unslothai/unsloth": "unsloth",
+    "github.com/unslothai/unsloth-zoo": "unsloth_zoo",
+    "github.com/unslothai/unsloth_zoo": "unsloth_zoo",
+}
+
+
 def _name_from_location(spec):
-    """Distribution name for a URL / VCS / archive requirement, or None."""
+    """Distribution name for a URL / VCS / archive requirement, or None when only pip
+    could tell (then the install runs). Explicit names (``#egg=``) and wheel file names
+    count; a ``#subdirectory=`` or any other repository URL does not."""
     egg = re.search(r"[#&]egg=([A-Za-z0-9][A-Za-z0-9._-]*)", spec)
     if egg:
         return egg.group(1)
+    if re.search(r"[#&]subdirectory=", spec):
+        return None
     path = re.split(r"[?#]", spec, 1)[0].rstrip("/")
     last = path.rsplit("/", 1)[-1]
     if last.endswith(".whl"):
         return last.split("-", 1)[0]
     if "://" not in spec:
         return None  # a local path: its name is in its own metadata
-    if path.startswith("git+") or last.endswith(".git") or "@" in last:
-        last = last.split("@", 1)[0]
-        if last.endswith(".git"):
-            last = last[:-4]
-        return last if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", last) else None
-    return None
+    repo = re.sub(r"^(?:git\+)?[a-z]+://(?:[^/@]+@)?", "", path)
+    repo = re.sub(r"@[^/]*$", "", repo)
+    repo = re.sub(r"\.git$", "", repo).lower()
+    return _KNOWN_REPOS.get(repo)
 
 
 def _parse_requirement(spec):
     """(name, specifier or None, applies) for one requirement argument, or None when the
     name cannot be known without running pip."""
     if " @ " in spec or re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*(\[[^\]]*\])?\s*@", spec):
+        # `name @ url`: the name is explicit, whatever the URL holds.
         return (re.split(r"[\[\s@]", spec, 1)[0], None, True)
     if "://" in spec or spec.startswith(("git+", ".", "/", "~")) or spec.endswith((".whl", ".tar.gz", ".zip")):
         name = _name_from_location(spec)

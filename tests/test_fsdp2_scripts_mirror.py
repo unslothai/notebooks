@@ -467,19 +467,62 @@ def test_launcher_helper_tests_run_in_their_own_ci_job():
 
 import re  # noqa: E402
 
-# Python-side process launches and servers the adapter cannot coordinate: get_ipython
-# shell steps run once per node, these run on every rank.
-_UNSAFE = re.compile(r"subprocess\.Popen|os\.system\(|vllm serve|[\"']--port[\"']|--port\b")
+# Python-side process launches, servers and file removes / moves the adapter cannot
+# coordinate: get_ipython shell steps run once per node, these run on every rank.
+_UNSAFE = re.compile(
+    r"subprocess\.Popen|os\.system\(|vllm serve|[\"']--port[\"']|--port\b"
+    r"|os\.remove\(|os\.unlink\(|shutil\.rmtree\(|shutil\.move\(|os\.rename\("
+)
+
+
+def _capture_bodies(text):
+    """(line, body) of every live get_ipython().run_cell_magic('capture', ..., body)."""
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        tree = ast.parse(text)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "run_cell_magic" and len(node.args) == 3
+                and all(isinstance(a, ast.Constant) for a in node.args)
+                and node.args[0].value == "capture"):
+            yield node.lineno, node.args[2].value
 
 
 def _unsafe_lines(path):
+    text = path.read_text(encoding="utf-8")
     hits = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for number, line in enumerate(text.splitlines(), 1):
+        # Comments are not run; get_ipython() lines are shell steps the adapter
+        # coordinates (a %%capture body is checked separately below).
         if line.lstrip().startswith("#") or "get_ipython()" in line:
             continue
         if _UNSAFE.search(line):
             hits.append(f"{number}: {line.strip()[:100]}")
+    for number, body in _capture_bodies(text):
+        for line in body.splitlines():
+            if line.lstrip().startswith(("!", "%", "#")):
+                continue
+            if _UNSAFE.search(line):
+                hits.append(f"{number} (%%capture): {line.strip()[:100]}")
     return hits
+
+
+def test_scan_reads_live_capture_bodies_and_skips_comments(tmp_path):
+    live = tmp_path / "live.py"
+    live.write_text(
+        "import os\n"
+        "get_ipython().run_cell_magic('capture', '', "
+        "'!git clone https://example.com/x X\\nos.remove(\"X/a.py\")\\n')\n",
+        encoding="utf-8",
+    )
+    assert any("%%capture" in hit and "os.remove" in hit for hit in _unsafe_lines(live))
+    commented = tmp_path / "commented.py"
+    commented.write_text("# os.remove('X/a.py')\n# shutil.rmtree('X')\nprint(1)\n", encoding="utf-8")
+    assert _unsafe_lines(commented) == []
+    top = tmp_path / "top.py"
+    top.write_text("import shutil\nshutil.rmtree('outputs')\n", encoding="utf-8")
+    assert _unsafe_lines(top)
 
 
 def test_scripts_that_start_servers_or_processes_are_single_process():
@@ -512,6 +555,9 @@ def test_single_process_list_names_real_scripts():
     "AMD-NeMo-Gym-Multi-Environment.py",
     "Synthetic_Data_Hackathon.py",
     "Deepseek_OCR_(3B)-Evaluation.py",
+    "Oute_TTS_(1B).py",
+    "AMD-Oute_TTS_(1B).py",
+    "Kaggle-Oute_TTS_(1B).py",
 ])
 def test_single_process_launchers_say_so(name):
     assert (SCRIPTS / name).is_file()

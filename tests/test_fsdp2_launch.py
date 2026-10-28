@@ -1149,3 +1149,32 @@ def test_single_process_script_refuses_a_multi_rank_worker(fl, layout, monkeypat
     with pytest.raises(SystemExit):
         fl.main(str(launcher), SCRIPT_NAME, [], single_process = True, reason = "shared temp files")
     assert "shared temp files" in capsys.readouterr().err
+
+
+_TRITON_KERNELS = ("git+https://github.com/triton-lang/triton.git@0add68262ab0a2e33b84524346cb27cbb2787356"
+                   "#subdirectory=python/triton_kernels")
+
+
+@pytest.mark.parametrize("command, skip", [
+    # The repository is triton, but the subdirectory is another distribution: an
+    # installed triton says nothing about it.
+    (f"uv pip install -qqq {_TRITON_KERNELS}", False),
+    ("pip install git+https://github.com/unslothai/unsloth.git@main#subdirectory=sub", False),
+    # A repository URL with no explicit name is only checked for the known repos.
+    ("pip install git+https://github.com/someone/triton.git", False),
+    ("pip install --no-deps git+https://github.com/unslothai/unsloth-zoo.git", True),
+    ("pip install --no-deps git+https://github.com/unslothai/unsloth.git@main", True),
+    # Explicit names still count.
+    ('pip install "triton @ git+https://github.com/someone/fork.git"', True),
+    ("pip install git+https://github.com/someone/fork.git#egg=triton", True),
+])
+def test_url_requirements_need_an_explicit_name(fl, installed, command, skip):
+    add_dist, _ = installed
+    for name in ("triton", "unsloth", "unsloth_zoo"):
+        add_dist(name, "3.4.0")
+    assert _skip(fl, command) is skip
+
+
+def test_triton_kernels_line_is_still_in_the_script():
+    text = (REPO_ROOT / "python_scripts" / "gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py").read_text()
+    assert _TRITON_KERNELS in text
