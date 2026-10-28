@@ -13,21 +13,10 @@
 
 """Every live ``get_ipython()`` call in ``python_scripts/`` is one the fsdp2 adapter implements.
 
-``fsdp2_scripts/<name>.py`` runs ``python_scripts/<name>.py`` under torchrun with a
-narrow ``get_ipython`` stand-in (``scripts/fsdp2_launch.py``). It raises
-``NotImplementedError`` for a magic it does not know, which is the right call at run
-time but is found late: on a multi-GPU box, after the model has loaded. This gate
-finds it at PR time instead.
-
-  1. AST-walk every ``python_scripts/*.py`` and collect each live call (comments are
-     not AST nodes, so commented-out cells do not count) as (method, magic name).
-     ``%%capture`` bodies are transformed the way the adapter transforms them and
-     walked too, since their ``!cmd`` / ``%cd`` lines become calls at run time.
-  2. Assert each one is in the adapter's ``SUPPORTED_CALLS`` and that the shell
-     class really has the method.
-  3. When IPython is installed, the adapter's fallback transform (used when IPython
-     is missing) must give the same AST as IPython's own transform on every
-     ``%%capture`` body in the tree.
+The adapter raises ``NotImplementedError`` for an unknown magic only at run time,
+after the model loads; this gate catches it at PR time. ``%%capture`` bodies are
+transformed and walked too. With IPython installed, the fallback transform must match
+IPython's AST on every ``%%capture`` body.
 
 No torch; stdlib only (plus IPython when present).
 """

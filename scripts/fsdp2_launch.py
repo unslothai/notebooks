@@ -111,10 +111,8 @@ _RUN_ID_ENV = "UNSLOTH_FSDP2_RUN_ID"
 _MP_TARGET_ENV = "UNSLOTH_FSDP2_MP_TARGET"
 _IS_WINDOWS = os.name == "nt"
 
-# Every get_ipython() call form the adapter implements, as (method, magic name).
-# tests/test_fsdp2_adapter_covers_scripts.py checks every live call in
-# python_scripts/ against this table, so a notebook that starts using another magic
-# fails CI here instead of failing on a multi-GPU box.
+# Every get_ipython() call form the adapter implements, as (method, magic name);
+# tests/test_fsdp2_adapter_covers_scripts.py checks python_scripts/ against it.
 SUPPORTED_CALLS = frozenset({
     ("system", None),
     ("getoutput", None),
@@ -440,11 +438,8 @@ def _short(command, limit = 160):
     return command if len(command) <= limit else command[: limit - 3] + "..."
 
 
-# ---------------------------------------------------------------------------------------
-# IPython-style expansion: {expr} and $name, from the calling frame. Same rules as
-# IPython's DollarFormatter: $$ is a literal $, $name inside single quotes is left
-# alone, and any failure leaves the whole string untouched.
-# ---------------------------------------------------------------------------------------
+# IPython-style expansion ({expr}, $name) with DollarFormatter's rules: $$ is a literal
+# $, $name inside single quotes is left alone, any failure leaves the string untouched.
 class _DollarFormatter(string.Formatter):
     _dollar = re.compile(r"(.*?)\$(\$?[\w\.]+)(?=([^']*'[^']*')*[^']*$)")
 
@@ -489,9 +484,6 @@ def _expand(command, frame):
         return command
 
 
-# ---------------------------------------------------------------------------------------
-# Cell transform for %%capture bodies.
-# ---------------------------------------------------------------------------------------
 _ASSIGN_BANG = re.compile(r"^(\s*)([A-Za-z_][\w\.\[\]'\", ]*?)\s*=\s*!(.*)$")
 
 
@@ -544,9 +536,6 @@ def _transform_cell(body):
     return TransformerManager().transform_cell(body)
 
 
-# ---------------------------------------------------------------------------------------
-# The get_ipython() stand-in.
-# ---------------------------------------------------------------------------------------
 class _Captured:
     def __init__(self, stdout, stderr):
         self.stdout = stdout
@@ -584,11 +573,9 @@ def _pid_alive(pid):
     return True
 
 
-# ---------------------------------------------------------------------------------------
 # Marker files. The folder lives in a possibly shared temp dir, so it must be ours: a
 # private folder (0700, owned by this uid, not a symlink), files created exclusively
 # without following symlinks, and content that is checked before it is believed.
-# ---------------------------------------------------------------------------------------
 _O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
 
@@ -1076,9 +1063,6 @@ def get_ipython():
     return _SHELL
 
 
-# ---------------------------------------------------------------------------------------
-# Launcher.
-# ---------------------------------------------------------------------------------------
 def _usage(launcher, script_name):
     shown = launcher if script_name else f"{launcher} <script.py>"
     return f"usage: python {shown} [--nproc-per-node N] [--dry-run] [--help] [script args]\n\n{__doc__}"

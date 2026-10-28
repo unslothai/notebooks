@@ -6970,24 +6970,15 @@ def _assert_amd_script_count(notebook_folder="nb", script_folder="python_scripts
 
 
 
-# ---------------------------------------------------------------------------
-# fsdp2_scripts/: one thin multi-GPU launcher per python_scripts/*.py
-# ---------------------------------------------------------------------------
-# Each launcher hands its python_scripts/ twin, unchanged, to the shared
-# helper copied from scripts/fsdp2_launch.py, which starts torchrun with
-# Unsloth's native FSDP2 on every visible GPU. Everything here is a pure text
-# step over the already generated python_scripts/ folder.
+# fsdp2_scripts/: one launcher per python_scripts/*.py, run under torchrun via
+# the helper copied from scripts/fsdp2_launch.py.
 
 FSDP2_HELPER_SOURCE = os.path.join("scripts", "fsdp2_launch.py")
 FSDP2_HELPER_NAME = "unsloth_fsdp2_launch.py"
 FSDP2_README_NAME = "README.md"
-# Scripts that are not safe on several ranks, by base name (AMD-, Kaggle- and
-# HuggingFace Course- variants share the entry). Their launchers render with
-# single_process=True: they run in one process with a note giving the reason, and more
-# processes are refused unless UNSLOTH_FSDP2_FORCE=1. The reason is shown to the user.
-# tests/test_fsdp2_scripts_mirror.py scans python_scripts/ (top-level code and live
-# %%capture bodies) for servers, Python-side process launches and file removes / moves
-# so a new script of that kind cannot slip past this list.
+# Scripts unsafe on several ranks, by base name (AMD-/Kaggle-/Course- variants share
+# the entry): they run single process unless UNSLOTH_FSDP2_FORCE=1.
+# tests/test_fsdp2_scripts_mirror.py guards this list against new unsafe scripts.
 FSDP2_SINGLE_PROCESS = {
     # Clones NeMo-Gym and runs uv / pip through subprocess.run, outside the adapter.
     "NeMo-Gym-Sudoku.py": "clones and installs NeMo-Gym through Python subprocess calls",
