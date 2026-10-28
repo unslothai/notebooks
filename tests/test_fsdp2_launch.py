@@ -35,6 +35,12 @@ Two layers:
      never reused across launches, a ``LOCAL_RANK`` left in the shell,
      multiprocessing spawn / forkserver children of the script.
 
+  4. The marker protocol played one rank at a time in-process: a private
+     folder, writes that do not follow planted symlinks, rejected malformed
+     markers, the arrival + command-hash handshake, and local rank 0's
+     install decision, output and errors reaching the other rank. Plus log
+     redaction, bash on Windows, and single-process scripts.
+
 No GPU is used: the subprocesses run with ``CUDA_VISIBLE_DEVICES`` empty.
 """
 from __future__ import annotations
@@ -43,6 +49,7 @@ import importlib.util
 import json
 import os
 import shlex
+import stat
 import subprocess
 import sys
 import textwrap
@@ -395,11 +402,12 @@ _FAKE_MIRROR = textwrap.dedent('''\
     except NotImplementedError as error:
         unknown = str(error)
     lines = get_ipython().getoutput("echo a; echo b")
+    once_lines = get_ipython().getoutput("echo getoutput-ran >> " + log + "; echo $RANK")
     with open(os.path.join(os.environ["FAKE_OUT"], f"rank{rank}.json"), "w") as f:
         json.dump({
             "written": written, "a_var": os.environ.get("A_VAR"), "cwd": cwd, "x": x,
             "false_code": false_code, "bash_code": bash_code, "unknown": unknown,
-            "lines": lines, "fsdp2": os.environ.get("UNSLOTH_FSDP2"), "argv": sys.argv,
+            "lines": lines, "once_lines": once_lines, "fsdp2": os.environ.get("UNSLOTH_FSDP2"), "argv": sys.argv,
             "file": __file__,
         }, f)
     if os.environ.get("FAKE_FAIL_RANK") == rank:
@@ -460,6 +468,7 @@ def test_real_torchrun_two_ranks_on_cpu(tmp_path):
     assert log.count("bash-cell") == 1
     assert log.count("capture-bang") == 1
     assert log.count("after-install") == 1
+    assert log.count("getoutput-ran") == 1
     # By default an install of a missing package runs once per node, and one whose
     # package is already installed is skipped with a note naming the command.
     assert log.count("pip-ran install fake-pkg-xyz") == 1
@@ -481,6 +490,8 @@ def test_real_torchrun_two_ranks_on_cpu(tmp_path):
         assert seen["bash_code"] == 3
         assert "matplotlib" in seen["unknown"]
         assert seen["lines"] == ["a", "b"]
+        # x = !cmd runs once per node and every rank gets local rank 0's output.
+        assert seen["once_lines"] == ["0"]
         assert seen["fsdp2"] == "1"
         assert seen["argv"] == [target, "arg one", "--lr=1"]
         assert seen["file"] == target
@@ -872,3 +883,269 @@ def test_gpu_count_failure_prints_the_childs_error(fl, monkeypatch, capfd):
     assert fl._count_visible_gpus() == 0
     err = capfd.readouterr().err
     assert err.count("ImportError: boom") == 1 and "assuming none is visible" in err
+
+
+# ---------------------------------------------------------------------------------------
+# Marker protocol: private folder, safe writes, validated content, arrival + hash
+# handshake, rank 0's decision / output / error reaching every rank.
+# ---------------------------------------------------------------------------------------
+@pytest.fixture
+def ranked(fl, tmp_path, monkeypatch):
+    """An in-process FSDP2Shell playing one local rank of two, markers under tmp_path."""
+    monkeypatch.setattr(fl.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setenv("UNSLOTH_FSDP2_RUN_ID", "unit")
+    monkeypatch.setenv("LOCAL_WORLD_SIZE", "2")
+    monkeypatch.setenv("UNSLOTH_FSDP2_WAIT_TIMEOUT", "5")
+
+    def make(rank):
+        monkeypatch.setenv("LOCAL_RANK", str(rank))
+        shell = fl.FSDP2Shell()
+        assert shell.distributed
+        return shell
+
+    def folder():
+        return tmp_path / f"unsloth_fsdp2_unit_r0_{fl.socket.gethostname()}"
+
+    return make, folder
+
+
+def _done(fl, folder, step, template, kind = "system", **fields):
+    payload = {"hash": fl._step_hash(kind, template), "code": 0, "output": None,
+               "skipped": False, "error": None}
+    payload.update(fields)
+    folder.mkdir(mode = 0o700, exist_ok = True)
+    (folder / f"{step}.done").write_text(json.dumps(payload))
+
+
+def _arrive(fl, folder, step, template, kind = "system"):
+    folder.mkdir(mode = 0o700, exist_ok = True)
+    (folder / f"{step}.arrived.1").write_text(json.dumps({"hash": fl._step_hash(kind, template)}))
+
+
+@pytest.mark.skipif(os.name == "nt", reason = "POSIX permissions")
+def test_marker_folder_is_private(fl, ranked):
+    make, folder = ranked
+    shell = make(1)
+    path = shell._markers()
+    assert stat.S_IMODE(os.lstat(path).st_mode) == 0o700
+
+
+@pytest.mark.skipif(os.name == "nt", reason = "POSIX symlinks and permissions")
+def test_marker_folder_planted_by_someone_else_is_refused(fl, ranked, tmp_path):
+    make, folder = ranked
+    elsewhere = tmp_path / "attacker"
+    elsewhere.mkdir()
+    folder().symlink_to(elsewhere)
+    with pytest.raises(RuntimeError, match = "symlink"):
+        make(1)._markers()
+    folder().unlink()
+    folder().mkdir()
+    folder().chmod(0o777)
+    with pytest.raises(RuntimeError, match = "world-writable"):
+        make(1)._markers()
+
+
+@pytest.mark.skipif(os.name == "nt", reason = "POSIX symlinks")
+def test_marker_writes_do_not_follow_planted_symlinks(fl, ranked, tmp_path):
+    make, folder = ranked
+    victim = tmp_path / "victim.txt"
+    victim.write_text("precious\n")
+    folder().mkdir(mode = 0o700)
+    os.symlink(victim, folder() / "1.done")
+    os.symlink(victim, folder() / f"1.done.{os.getpid()}.tmp")
+    _arrive(fl, folder(), 1, "true")
+    make(0)._system("true")
+    assert victim.read_text() == "precious\n"
+    assert not (folder() / "1.done").is_symlink()
+
+
+def test_forged_or_malformed_markers_are_rejected(fl, ranked):
+    make, folder = ranked
+    folder().mkdir(mode = 0o700)
+    (folder() / "1.done").write_text("0")
+    with pytest.raises(RuntimeError, match = "malformed"):
+        make(1)._system("true")
+
+
+def test_peer_announces_arrival_and_rank0_waits_for_it(fl, ranked):
+    make, folder = ranked
+    os.environ["UNSLOTH_FSDP2_WAIT_TIMEOUT"] = "0.5"
+    with pytest.raises(TimeoutError, match = "local rank 1 to arrive"):
+        make(0)._system("echo hi")
+    with pytest.raises(TimeoutError):
+        make(1)._system("echo hi")
+    arrived = json.loads((folder() / "1.arrived.1").read_text())
+    assert arrived["hash"] == fl._step_hash("system", "echo hi")
+
+
+def test_ranks_at_different_steps_fail_instead_of_pairing(fl, ranked):
+    make, folder = ranked
+    _done(fl, folder(), 1, "echo other")
+    with pytest.raises(RuntimeError, match = "diverged"):
+        make(1)._system("echo mine")
+    _arrive(fl, folder(), 2, "echo other")
+    shell = make(0)
+    shell.counter = 1
+    with pytest.raises(RuntimeError, match = "diverged"):
+        shell._system("echo mine")
+    recorded = json.loads((folder() / "2.done").read_text())
+    assert "diverged" in recorded["error"]["message"]
+
+
+def test_peers_follow_rank0_install_decision(fl, ranked, tmp_path, monkeypatch):
+    make, folder = ranked
+    log = _shim_pip(tmp_path, monkeypatch)
+    command = "pip install never-installed-pkg-xyz"
+    # Rank 0 recorded a skip (say it saw the package installed); rank 1 must not decide
+    # again from its own view of the environment, where the package is missing.
+    _done(fl, folder(), 1, command, skipped = True)
+    assert make(1)._system(command) == 0
+    assert not log.exists()
+
+
+def test_getoutput_runs_once_and_shares_rank0_output(fl, ranked, tmp_path):
+    make, folder = ranked
+    flag = tmp_path / "ran"
+    command = f"touch {flag}; echo mine"
+    _done(fl, folder(), 1, command, kind = "getoutput", output = ["from rank 0"])
+    assert make(1).getoutput(command) == ["from rank 0"]
+    assert not flag.exists()
+
+
+def test_getoutput_follows_the_install_rules(fl, ranked, tmp_path, monkeypatch):
+    make, folder = ranked
+    log = _shim_pip(tmp_path, monkeypatch)
+    monkeypatch.setenv("UNSLOTH_FSDP2_RUN_INSTALLS", "0")
+    _arrive(fl, folder(), 1, "pip install anything", kind = "getoutput")
+    assert make(0).getoutput("pip install anything") == []
+    assert not log.exists()
+    assert json.loads((folder() / "1.done").read_text())["skipped"] is True
+
+
+def test_file_write_errors_reach_every_rank(fl, ranked, tmp_path):
+    make, folder = ranked
+    target = tmp_path / "a_directory"
+    target.mkdir()
+    _arrive(fl, folder(), 1, f"%%file {target}\nhello\n", kind = "file")
+    with pytest.raises(IsADirectoryError):
+        make(0).run_cell_magic("file", str(target), "hello\n")
+    recorded = json.loads((folder() / "1.done").read_text())
+    assert recorded["error"]["type"] == "IsADirectoryError"
+    with pytest.raises(IsADirectoryError, match = "raised on local rank 0"):
+        make(1).run_cell_magic("file", str(target), "hello\n")
+
+
+@pytest.mark.skipif(not _HAS_TORCH, reason = "torch is not importable")
+def test_real_torchrun_divergent_ranks_fail_clearly(tmp_path):
+    target = tmp_path / "diverge.py"
+    target.write_text('import os\nget_ipython().system("echo rank-" + os.environ["RANK"])\n')
+    result = subprocess.run(
+        [sys.executable, str(LAUNCH_PATH), "--nproc-per-node", "2", str(target)],
+        cwd = tmp_path, env = _clean_env(TMPDIR = str(tmp_path)),
+        capture_output = True, text = True, timeout = 300,
+    )
+    assert result.returncode != 0
+    assert "diverged at step 1" in result.stdout + result.stderr
+
+
+# ---------------------------------------------------------------------------------------
+# Adapter injection, credentials in logs, bash on Windows.
+# ---------------------------------------------------------------------------------------
+def test_worker_uses_the_adapter_even_inside_ipython(fl, layout, monkeypatch):
+    import builtins
+    tmp, launcher, _ = layout
+    _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setattr(builtins, "get_ipython", lambda: None, raising = False)
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setenv("WORLD_SIZE", "1")
+    ran = tmp / "ran.json"
+    monkeypatch.setenv("FAKE_RAN", str(ran))
+    assert fl.main(str(launcher), SCRIPT_NAME, []) == 0
+    assert json.loads(ran.read_text())["has_ipython"] is True
+
+
+def test_redaction(fl):
+    token = "hf_" + "Q" * 30
+    text = fl._redact(
+        f"pip install --index-url https://u:{token}@pypi.example/simple --extra-index-url=https://x/y "
+        f"-i https://z/w pkg; curl -H 'Authorization: Bearer abc' https://user:pw@host/a; "
+        f"HF_TOKEN={token} echo {token}"
+    )
+    for secret in (token, "u:", "user:pw", "Bearer abc", "https://x/y", "https://z/w"):
+        assert secret not in text, (secret, text)
+    assert "pip install" in text and "pkg" in text
+
+
+def test_logs_name_the_unexpanded_step_with_secrets_masked(fl, tmp_path, monkeypatch, capfd):
+    monkeypatch.setenv("UNSLOTH_FSDP2_RUN_INSTALLS", "0")
+    token = "hf_" + "Z" * 30  # a local the command expands, as {token} would in a notebook
+    shell = fl.FSDP2Shell()
+    shell.system("pip install --index-url https://me:{token}@pypi.example/simple somepkg")
+    err = capfd.readouterr().err
+    assert "skipped install step" in err and "somepkg" in err
+    assert token not in err
+
+
+def test_windows_needs_a_real_bash(fl, monkeypatch):
+    monkeypatch.setattr(fl, "_IS_WINDOWS", True)
+    monkeypatch.setattr(fl.shutil, "which", lambda name: r"C:\Windows\System32\bash.exe")
+    with pytest.raises(RuntimeError, match = "Git Bash"):
+        fl.FSDP2Shell._bash()
+    monkeypatch.setattr(fl.shutil, "which", lambda name: None)
+    with pytest.raises(RuntimeError, match = "no bash"):
+        fl.FSDP2Shell._bash()
+    monkeypatch.setattr(fl.shutil, "which", lambda name: r"C:\Program Files\Git\bin\bash.exe")
+    assert fl.FSDP2Shell._bash().endswith("bash.exe")
+
+
+# ---------------------------------------------------------------------------------------
+# Launch argv corners and single-process scripts.
+# ---------------------------------------------------------------------------------------
+def test_double_separator_keeps_a_literal_separator(fl, layout, monkeypatch):
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    assert fl._parse(["--", "--"]) == ({"nproc": None, "dry_run": False, "help": False}, ["--"])
+    with pytest.raises(_Exec):
+        fl.main(str(launcher), SCRIPT_NAME, ["--", "--"])
+    assert calls[0][1] == _expected(launcher, 2, "--", "--")
+
+
+def test_dry_run_names_the_adapter(fl, layout, monkeypatch, capsys):
+    _, launcher, _ = layout
+    _stub(fl, monkeypatch, visible = 2)
+    fl.main(str(launcher), SCRIPT_NAME, ["--dry-run"])
+    assert f"get_ipython adapter: {LAUNCH_PATH}" in capsys.readouterr().out
+
+
+def test_single_process_script_runs_alone(fl, layout, monkeypatch, capfd):
+    tmp, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 4)
+    ran = tmp / "ran.json"
+    monkeypatch.setenv("FAKE_RAN", str(ran))
+    assert fl.main(str(launcher), SCRIPT_NAME, [], single_process = True, reason = "starts a server") == 0
+    assert calls == [] and ran.exists()
+    assert "starts a server" in capfd.readouterr().err
+
+
+def test_single_process_script_refuses_more_processes_unless_forced(fl, layout, monkeypatch, capsys):
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 4)
+    with pytest.raises(SystemExit) as raised:
+        fl.main(str(launcher), SCRIPT_NAME, ["--nproc-per-node", "2"], single_process = True, reason = "port 8000")
+    assert raised.value.code == 2 and calls == []
+    err = capsys.readouterr().err
+    assert "port 8000" in err and "UNSLOTH_FSDP2_FORCE=1" in err
+    monkeypatch.setenv("UNSLOTH_FSDP2_FORCE", "1")
+    with pytest.raises(_Exec):
+        fl.main(str(launcher), SCRIPT_NAME, ["--nproc-per-node", "2"], single_process = True, reason = "port 8000")
+    assert calls[0][1] == _expected(launcher, 2)
+
+
+def test_single_process_script_refuses_a_multi_rank_worker(fl, layout, monkeypatch, capsys):
+    _, launcher, _ = layout
+    _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    with pytest.raises(SystemExit):
+        fl.main(str(launcher), SCRIPT_NAME, [], single_process = True, reason = "shared temp files")
+    assert "shared temp files" in capsys.readouterr().err

@@ -43,9 +43,19 @@ A process is a worker (it runs the script and never launches again) under torchr
 
 Inside a worker the target script runs through ``runpy`` with a small ``get_ipython``
 stand-in, because the notebook mirrors still carry ``!cmd`` / ``%%bash`` / ``%%file`` /
-``%%capture`` / ``%env`` / ``%cd`` calls. With 2+ local ranks, shell commands and file
-writes happen once per node (local rank 0) while the other local ranks wait for its
-return code (at most ``UNSLOTH_FSDP2_WAIT_TIMEOUT`` seconds, default 6 hours).
+``%%capture`` / ``%env`` / ``%cd`` calls. With 2+ local ranks, shell commands (``!cmd``,
+``x = !cmd``, ``%%bash``) and ``%%file`` writes happen once per node (local rank 0) while
+the other local ranks wait for its return code, output and any error (at most
+``UNSLOTH_FSDP2_WAIT_TIMEOUT`` seconds, default 6 hours). Ranks that reach different
+steps fail with an error instead of pairing them up. The handshake files live in a
+private (0700) folder under the temp dir. Shell steps need bash; on Windows that means
+Git Bash, not WSL's ``bash.exe``. Log lines name a step by its unexpanded text with
+credentials (URL user info, index URLs, header values, tokens) masked.
+
+A launcher generated with ``single_process=True`` belongs to a script that is not safe
+on several ranks (it starts a server on a fixed port, installs or clones from Python,
+or shares temp files); it runs single process with a note saying why, and more than
+one process is refused unless ``UNSLOTH_FSDP2_FORCE=1``.
 
 Package installs (``pip`` / ``uv pip`` / ``python -m pip`` install, ``apt-get install``,
 the ollama installer, ``unsloth install-kernels``) are handled per command:
@@ -53,7 +63,8 @@ the ollama installer, ``unsloth install-kernels``) are handled per command:
     UNSLOTH_FSDP2_RUN_INSTALLS unset   skip it when everything it asks for is already
                                        there (every requested distribution installed at
                                        a matching version, or the apt / ollama binary on
-                                       PATH), else run it once per node. Installs into
+                                       PATH), else run it once per node. Only local
+                                       rank 0 decides; the others follow it. Installs into
                                        another environment (``--python``, ``--target``,
                                        ``--prefix``, ``--root``, ``uv venv``) always run.
     UNSLOTH_FSDP2_RUN_INSTALLS=1       always run, once per node
@@ -66,13 +77,16 @@ Only the standard library is imported here, so the parent process never loads to
 
 import atexit
 import contextlib
+import hashlib
 import io
+import json
 import os
 import re
 import runpy
 import shlex
 import shutil
 import socket
+import stat
 import string
 import subprocess
 import sys
@@ -95,6 +109,7 @@ _PREFIX = "[unsloth fsdp2]"
 _RUN_ID_ENV = "UNSLOTH_FSDP2_RUN_ID"
 # Set in a worker for multiprocessing spawn / forkserver children (see _patch_spawn).
 _MP_TARGET_ENV = "UNSLOTH_FSDP2_MP_TARGET"
+_IS_WINDOWS = os.name == "nt"
 
 # Every get_ipython() call form the adapter implements, as (method, magic name).
 # tests/test_fsdp2_adapter_covers_scripts.py checks every live call in
@@ -390,8 +405,26 @@ def _log(message):
     print(f"{_PREFIX} {message}", file = sys.__stderr__, flush = True)
 
 
+# Secrets that must not reach a log line: URL userinfo, index URLs, header values and
+# token-shaped strings. Messages name the unexpanded step and pass through this too.
+_REDACTIONS = (
+    (re.compile(r"(?i)(\b[a-z][a-z0-9+.-]*://)[^/\s@'\"]+@"), r"\1***@"),
+    (re.compile(r"(?i)((?:--(?:extra-)?index-url|--find-links|-[if])(?:\s+|=))(\S+)"), r"\1***"),
+    (re.compile(r"(?i)((?:-H|--header)(?:\s+|=))('[^']*'|\"[^\"]*\"|\S+)"), r"\1***"),
+    (re.compile(r"(?i)(authorization:\s*(?:bearer|token|basic)?\s*)\S+"), r"\1***"),
+    (re.compile(r"(?i)(\b[\w-]*(?:token|secret|password|passwd|api_?key)[\w-]*\s*[=:]\s*)('[^']*'|\"[^\"]*\"|\S+)"), r"\1***"),
+    (re.compile(r"\b(?:hf_[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abpr]-[A-Za-z0-9-]{10,})"), "***"),
+)
+
+
+def _redact(text):
+    for pattern, replacement in _REDACTIONS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 def _short(command, limit = 160):
-    command = " ".join(command.split())
+    command = " ".join(_redact(command).split())
     return command if len(command) <= limit else command[: limit - 3] + "..."
 
 
@@ -539,16 +572,115 @@ def _pid_alive(pid):
     return True
 
 
+# ---------------------------------------------------------------------------------------
+# Marker files. The folder lives in a possibly shared temp dir, so it must be ours: a
+# private folder (0700, owned by this uid, not a symlink), files created exclusively
+# without following symlinks, and content that is checked before it is believed.
+# ---------------------------------------------------------------------------------------
+_O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+
+
+def _private_dir(path):
+    try:
+        os.mkdir(path, 0o700)
+    except FileExistsError:
+        pass
+    info = os.lstat(path)
+    problem = None
+    if stat.S_ISLNK(info.st_mode):
+        problem = "is a symlink"
+    elif not stat.S_ISDIR(info.st_mode):
+        problem = "is not a directory"
+    elif hasattr(os, "getuid") and info.st_uid != os.getuid():
+        problem = f"is owned by uid {info.st_uid}, not {os.getuid()}"
+    elif not _IS_WINDOWS and info.st_mode & 0o022:
+        problem = f"is group- or world-writable (mode {stat.S_IMODE(info.st_mode):o})"
+    if problem:
+        raise RuntimeError(
+            f"{_PREFIX} refusing marker folder {path}: it {problem}. Remove it, or point "
+            f"TMPDIR at a private folder."
+        )
+    return path
+
+
+def _write_private(path, payload):
+    """Write JSON ``payload`` to ``path`` atomically: an exclusive, no-follow temp file
+    in the same private folder, then os.replace."""
+    partial = f"{path}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL | _O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding = "utf-8") as handle:
+        json.dump(payload, handle)
+    os.replace(partial, path)
+
+
+def _read_private(path, kind):
+    fd = os.open(path, os.O_RDONLY | _O_NOFOLLOW)
+    with os.fdopen(fd, encoding = "utf-8") as handle:
+        text = handle.read()
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        payload = None
+    if not _valid_payload(payload, kind):
+        raise RuntimeError(f"{_PREFIX} malformed {kind} marker {path}: {text[:200]!r}")
+    return payload
+
+
+def _valid_payload(payload, kind):
+    if not isinstance(payload, dict) or not isinstance(payload.get("hash"), str):
+        return False
+    if kind == "arrival":
+        return True
+    if not isinstance(payload.get("code"), int) or isinstance(payload.get("code"), bool):
+        return False
+    if not isinstance(payload.get("skipped"), bool):
+        return False
+    output = payload.get("output")
+    if output is not None and not (isinstance(output, list) and all(isinstance(x, str) for x in output)):
+        return False
+    error = payload.get("error")
+    if error is not None and not (isinstance(error, dict) and isinstance(error.get("type"), str)
+                                  and isinstance(error.get("message"), str)):
+        return False
+    return True
+
+
+def _step_hash(kind, template):
+    return hashlib.sha256(f"{kind}\0{template}".encode("utf-8", "replace")).hexdigest()[:16]
+
+
+def _rebuild_error(error):
+    """The exception local rank 0 recorded, re-raised on a peer."""
+    import builtins
+    cls = getattr(builtins, error["type"], None)
+    message = f"{error['message']} (raised on local rank 0)"
+    if isinstance(cls, type) and issubclass(cls, Exception):
+        try:
+            return cls(message)
+        except Exception:
+            pass
+    return RuntimeError(f"{error['type']}: {message}")
+
+
+class _Divergence(RuntimeError):
+    pass
+
+
 class FSDP2Shell:
     """The few ``get_ipython()`` operations the notebook mirrors use, made safe for N ranks.
 
-    With 2+ local ranks, shell commands and file writes run on local rank 0. The other
-    local ranks wait for ``<tmp>/unsloth_fsdp2_<launch>/<n>.done`` (a file, since there
-    may be no process group yet), which holds rank 0's return code. ``n`` counts every
-    system / bash / file call, skipped installs included, so it agrees across ranks that
-    follow the same control flow. ``%env`` / ``%cd`` / ``getoutput`` run on every rank.
-    In a multiprocessing spawn / forkserver child, which re-imports the script, shell
-    steps, file writes and ``%cd`` are skipped: the parent already ran them.
+    With 2+ local ranks, shell commands (``!cmd``, ``x = !cmd``, ``%%bash``) and file
+    writes run on local rank 0 only. Step ``n`` (counted per call on every rank) goes:
+    each other local rank writes ``n.arrived.<rank>`` with a hash of the step's
+    unexpanded text; rank 0 waits for all of them, checks the hashes agree, runs or
+    skips the step, and writes ``n.done`` with its return code, output lines, whether
+    it skipped an install, and any error. The others take all of that from the marker,
+    so every rank sees rank 0's decision, output and failure. A hash mismatch means the
+    ranks reached different steps and raises. Markers live in a private folder under the
+    temp dir (``<tmp>/unsloth_fsdp2_<launch>``) because there may be no process group
+    yet. ``%env`` / ``%cd`` run on every rank. In a multiprocessing spawn / forkserver
+    child, which re-imports the script, shell steps, file writes and ``%cd`` are
+    skipped: the parent already ran them.
     """
 
     def __init__(self, mp_child = False):
@@ -587,20 +719,17 @@ class FSDP2Shell:
             parts.append("r" + os.environ.get("TORCHELASTIC_RESTART_COUNT", "0"))
             parts.append(socket.gethostname())
             name = "_".join(re.sub(r"[^\w.-]", "_", part) for part in parts)
-            self._marker_dir = os.path.join(tempfile.gettempdir(), f"unsloth_fsdp2_{name}")
-            os.makedirs(self._marker_dir, exist_ok = True)
+            folder = _private_dir(os.path.join(tempfile.gettempdir(), f"unsloth_fsdp2_{name}"))
+            self._marker_dir = folder
             if self.local_rank == 0:
                 atexit.register(self._cleanup_markers)
         return self._marker_dir
 
     def _ack(self, step):
         """A non-zero local rank records that it has read marker ``step``."""
-        path = os.path.join(self._markers(), f"seen.{self.local_rank}")
-        partial = f"{path}.{os.getpid()}.tmp"
         try:
-            with open(partial, "w", encoding = "utf-8") as handle:
-                handle.write(f"{os.getpid()} {step}")
-            os.replace(partial, path)
+            _write_private(os.path.join(self._markers(), f"seen.{self.local_rank}"),
+                           {"hash": "", "pid": os.getpid(), "step": step})
         except OSError:
             pass
 
@@ -608,7 +737,7 @@ class FSDP2Shell:
         """Local rank 0 at exit: remove the marker folder once every other local rank has
         read the last marker or exited. Gives up (leaving the folder) after a while."""
         folder = self._marker_dir
-        if folder is None or not os.path.isdir(folder):
+        if folder is None or not os.path.isdir(folder) or os.path.islink(folder):
             return
         wait_seconds = _CLEANUP_WAIT_SECONDS if wait_seconds is None else wait_seconds
         deadline = time.monotonic() + wait_seconds
@@ -616,9 +745,9 @@ class FSDP2Shell:
         while pending:
             for rank in sorted(pending):
                 try:
-                    with open(os.path.join(folder, f"seen.{rank}"), encoding = "utf-8") as handle:
-                        pid, step = (int(x) for x in handle.read().split())
-                except (OSError, ValueError):
+                    seen = _read_private(os.path.join(folder, f"seen.{rank}"), "arrival")
+                    pid, step = int(seen["pid"]), int(seen["step"])
+                except (OSError, RuntimeError, KeyError, TypeError, ValueError):
                     continue
                 if step >= self.counter or not _pid_alive(pid):
                     pending.discard(rank)
@@ -629,62 +758,94 @@ class FSDP2Shell:
             time.sleep(_POLL_SECONDS)
         shutil.rmtree(folder, ignore_errors = True)
 
-    def _once(self, what, action):
-        """Run ``action()`` (returns an int code) on local rank 0; other local ranks wait
-        for its marker and return the same code."""
-        self.counter += 1
-        if not self.distributed:
-            return action()
-        marker = os.path.join(self._markers(), f"{self.counter}.done")
-        if self.local_rank == 0:
-            code = 1
-            try:
-                code = action()
-            finally:
-                partial = f"{marker}.{os.getpid()}.tmp"
-                with open(partial, "w", encoding = "utf-8") as handle:
-                    handle.write(str(code))
-                os.replace(partial, marker)
-            return code
+    def _wait_for(self, path, waiting_for, template):
         started = time.monotonic()
         timeout = self._wait_timeout()
         next_note = started + _WAIT_NOTE_SECONDS
-        while not os.path.exists(marker):
+        while not os.path.exists(path):
             time.sleep(_POLL_SECONDS)
             now = time.monotonic()
             if now - started >= timeout:
                 raise TimeoutError(
-                    f"{_PREFIX} local rank {self.local_rank} waited {int(now - started)}s for local "
-                    f"rank 0 to finish step {self.counter} ({_short(what)}) and gave up. Local rank 0 "
+                    f"{_PREFIX} local rank {self.local_rank} waited {int(now - started)}s for "
+                    f"{waiting_for} at step {self.counter} ({_short(template)}) and gave up. A rank "
                     f"may have failed, taken another branch, or not be running; raise "
                     f"UNSLOTH_FSDP2_WAIT_TIMEOUT (seconds) if the step is just slow."
                 )
             if now >= next_note:
-                _log(f"local rank {self.local_rank} still waiting ({int(now - started)}s) for local rank 0 "
-                     f"to finish step {self.counter}: {_short(what)}")
+                _log(f"local rank {self.local_rank} still waiting ({int(now - started)}s) for "
+                     f"{waiting_for} at step {self.counter}: {_short(template)}")
                 next_note += _WAIT_NOTE_SECONDS
-        with open(marker, encoding = "utf-8") as handle:
-            code = int(handle.read().strip() or 1)
-        self._ack(self.counter)
-        return code
 
-    def _install_action(self, command):
-        """Run or skip one install command, on the process that runs shell steps."""
+    def _divergence(self, rank, theirs, ours, template):
+        return _Divergence(
+            f"{_PREFIX} local ranks diverged at step {self.counter}: local rank {rank} reached a "
+            f"different shell / file step (hash {theirs}) than local rank {self.local_rank} "
+            f"(hash {ours}, {_short(template)}). Every rank must run the same get_ipython() "
+            f"calls in the same order."
+        )
+
+    def _once(self, kind, template, action):
+        """Run ``action()`` on local rank 0 and give every local rank its result.
+
+        ``action`` returns ``{"code": int, "output": list or None, "skipped": bool}``.
+        ``template`` is the step's unexpanded text: it names the step in messages and its
+        hash must match across ranks.
+        """
+        self.counter += 1
+        if not self.distributed:
+            return action()
+        folder = self._markers()
+        digest = _step_hash(kind, template)
+        marker = os.path.join(folder, f"{self.counter}.done")
+        if self.local_rank != 0:
+            _write_private(os.path.join(folder, f"{self.counter}.arrived.{self.local_rank}"), {"hash": digest})
+            self._wait_for(marker, "local rank 0", template)
+            done = _read_private(marker, "done")
+            self._ack(self.counter)
+            if done["hash"] != digest:
+                raise self._divergence(0, done["hash"], digest, template)
+            if done["error"] is not None:
+                raise _rebuild_error(done["error"])
+            return {"code": done["code"], "output": done["output"], "skipped": done["skipped"]}
+
+        result = {"code": 1, "output": None, "skipped": False}
+        error = None
+        try:
+            for rank in range(1, self.local_world_size):
+                arrival = os.path.join(folder, f"{self.counter}.arrived.{rank}")
+                self._wait_for(arrival, f"local rank {rank} to arrive", template)
+                theirs = _read_private(arrival, "arrival")["hash"]
+                if theirs != digest:
+                    raise self._divergence(rank, theirs, digest, template)
+            result = action()
+        except BaseException as exc:
+            error = {"type": type(exc).__name__, "message": _redact(str(exc))}
+            raise
+        finally:
+            _write_private(marker, {"hash": digest, "code": int(result["code"]),
+                                    "output": result["output"], "skipped": bool(result["skipped"]),
+                                    "error": error})
+        return result
+
+    def _install_action(self, command, template, capture = False):
+        """Run or skip one install command, on the process that runs shell steps. Only
+        this process decides; the other local ranks follow its recorded result."""
         setting = os.environ.get("UNSLOTH_FSDP2_RUN_INSTALLS", "").strip()
         if setting == "1":
-            return self._shell(command)
+            return self._run(command, capture)
         if setting == "0":
-            self._note_skip(command, "UNSLOTH_FSDP2_RUN_INSTALLS=0")
-            return 0
-        skip, reason = install_decision(command)
-        if skip:
-            self._note_skip(command, reason)
-            return 0
-        _log(f"running install step ({reason}): {_short(command)}")
-        return self._shell(command)
+            reason = "UNSLOTH_FSDP2_RUN_INSTALLS=0"
+        else:
+            skip, reason = install_decision(command)
+            if not skip:
+                _log(f"running install step ({_redact(reason)}): {_short(template)}")
+                return self._run(command, capture)
+        self._note_skip(template, reason)
+        return {"code": 0, "output": [] if capture else None, "skipped": True}
 
-    def _note_skip(self, command, reason):
-        _log(f"skipped install step ({reason}): {_short(command)}")
+    def _note_skip(self, template, reason):
+        _log(f"skipped install step ({_redact(reason)}): {_short(template)}")
         if not self._skip_noted:
             _log("UNSLOTH_FSDP2_RUN_INSTALLS=1 runs every install step (once per node), "
                  "UNSLOTH_FSDP2_RUN_INSTALLS=0 skips them all")
@@ -700,39 +861,70 @@ class FSDP2Shell:
     # -- shell -----------------------------------------------------------------------
     @staticmethod
     def _bash():
-        return "/bin/bash" if os.path.exists("/bin/bash") else "bash"
+        if _IS_WINDOWS:
+            path = shutil.which("bash")
+            if not path or "system32" in path.lower():
+                raise RuntimeError(
+                    f"{_PREFIX} shell steps need bash, and only "
+                    f"{'WSL bash (' + path + ')' if path else 'no bash'} was found on PATH. "
+                    f"Install Git for Windows (Git Bash) and put its bash first on PATH, or run "
+                    f"the script under WSL / Linux."
+                )
+            return path
+        if os.path.exists("/bin/bash"):
+            return "/bin/bash"
+        path = shutil.which("bash")
+        if not path:
+            raise RuntimeError(f"{_PREFIX} shell steps need bash, and none was found on PATH.")
+        return path
 
-    def _shell(self, command):
+    def _run(self, command, capture = False):
+        """Run ``command`` here. ``capture`` returns its output lines (``x = !cmd``)."""
         sys.stdout.flush()
         sys.stderr.flush()
         argv = [self._bash(), "-c", command]
+        if capture:
+            result = subprocess.run(argv, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            lines = result.stdout.decode("utf-8", "replace").splitlines()
+            return {"code": result.returncode, "output": lines, "skipped": False}
         if self._capture_depth:
             result = subprocess.run(argv, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             sys.stdout.write(result.stdout.decode("utf-8", "replace"))
-            return result.returncode
-        return subprocess.run(argv).returncode
+            return {"code": result.returncode, "output": None, "skipped": False}
+        return {"code": subprocess.run(argv).returncode, "output": None, "skipped": False}
 
-    def _system(self, command):
+    def _shell(self, command):
+        return self._run(command)["code"]
+
+    def _system(self, command, template = None):
+        template = command if template is None else template
         if self.mp_child:
             return self._child_skip()
         if is_install_command(command):
-            return self._once(command, lambda: self._install_action(command))
-        return self._once(command, lambda: self._shell(command))
+            return self._once("system", template, lambda: self._install_action(command, template))["code"]
+        return self._once("system", template, lambda: self._run(command))["code"]
 
     def system(self, cmd):
         """``!cmd``: like IPython, a failing command does not raise; ``_exit_code`` holds it."""
         frame = sys._getframe(1)
-        code = self._system(_expand(cmd, frame))
+        code = self._system(_expand(cmd, frame), cmd)
         frame.f_globals["_exit_code"] = code
         return None
 
     def getoutput(self, cmd):
-        """``x = !cmd``: runs on every rank, returns the output lines."""
+        """``x = !cmd``: runs once per node like ``!cmd`` (installs follow the same rules);
+        every local rank gets local rank 0's output lines."""
         command = _expand(cmd, sys._getframe(1))
-        result = subprocess.run(
-            [self._bash(), "-c", command], stdout = subprocess.PIPE, stderr = subprocess.STDOUT,
-        )
-        return result.stdout.decode("utf-8", "replace").splitlines()
+        if self.mp_child:
+            if is_install_command(command):
+                self._child_skip()
+                return []
+            return self._run(command, capture = True)["output"]
+        if is_install_command(command):
+            action = lambda: self._install_action(command, cmd, capture = True)
+        else:
+            action = lambda: self._run(command, capture = True)
+        return list(self._once("getoutput", cmd, action)["output"] or [])
 
     # -- magics ----------------------------------------------------------------------
     def _unsupported(self, kind, name, frame):
@@ -791,23 +983,24 @@ class FSDP2Shell:
 
     def run_cell_magic(self, magic_name, line, cell):
         frame = sys._getframe(1)
+        template = line
         line = _expand(line, frame)
         if magic_name == "bash":
             return self._bash_cell(cell)
         if magic_name in ("file", "writefile"):
-            return self._write_file(line, cell)
+            return self._write_file(line, cell, template)
         if magic_name == "capture":
             return self._capture(line, cell, frame)
         self._unsupported("run_cell_magic", magic_name, frame)
 
     def _bash_cell(self, cell):
         # %%bash is not expanded by IPython; it raises on a non-zero exit, on every rank.
-        code = self._system(cell)
+        code = self._system(cell, cell)
         if code:
             raise subprocess.CalledProcessError(code, cell)
         return None
 
-    def _write_file(self, line, cell):
+    def _write_file(self, line, cell, template = None):
         args = shlex.split(line)
         append = any(a in ("-a", "--append") for a in args)
         paths = [a for a in args if a not in ("-a", "--append")]
@@ -823,12 +1016,14 @@ class FSDP2Shell:
                 print(f"{'Overwriting' if exists else 'Writing'} {path}")
             with open(path, "a" if append else "w", encoding = "utf-8") as handle:
                 handle.write(cell)
-            return 0
+            return {"code": 0, "output": None, "skipped": False}
 
         if self.mp_child:
             self._child_skip()
             return None
-        self._once(f"write {path}", write)
+        # A failed write raises here on local rank 0 and, from its marker, on every peer.
+        template = line if template is None else template
+        self._once("file", f"%%file {template}\n{cell}", write)
         return None
 
     def _capture(self, line, cell, frame):
@@ -1002,10 +1197,14 @@ def _run_worker(launcher, target, rest, set_fsdp2):
     sys.path.insert(0, os.path.dirname(target))
     init_globals = {}
     import builtins
-    if not hasattr(builtins, "get_ipython"):
-        # A real IPython session keeps its own get_ipython (and its own __main__, which
-        # spawn children never re-import).
+    real_ipython = hasattr(builtins, "get_ipython")
+    if set_fsdp2 or not real_ipython:
+        # A worker always uses the adapter, even where an IPython get_ipython exists:
+        # only the adapter runs shell steps once per node. A single process inside a real
+        # IPython session keeps IPython's own.
         init_globals["get_ipython"] = get_ipython
+    if not real_ipython:
+        # IPython has its own __main__, which spawn children never re-import.
         _patch_spawn(target)
     runpy.run_path(target, init_globals = init_globals, run_name = "__main__")
 
@@ -1030,10 +1229,13 @@ def _worker_mode():
     return None
 
 
-def main(launcher_path, script_name, argv = None):
+def main(launcher_path, script_name, argv = None, single_process = False, reason = None):
     """Launch ``python_scripts/<script_name>`` next to ``launcher_path`` with FSDP2.
 
     ``script_name=None`` is the generic form: the first script argument is the target.
+    ``single_process=True`` marks a script that is not safe to run on several ranks
+    (``reason`` says why): it runs single process, and asking for more processes is
+    refused unless ``UNSLOTH_FSDP2_FORCE=1``.
     """
     launcher = os.path.abspath(launcher_path)
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -1045,6 +1247,9 @@ def main(launcher_path, script_name, argv = None):
         print(_usage(launcher, script_name))
         return 0
     target, rest = _resolve_target(launcher, script_name, rest)
+    adapter = f"get_ipython adapter: {os.path.abspath(__file__)}"
+    pinned = single_process and os.environ.get("UNSLOTH_FSDP2_FORCE", "").strip() != "1"
+    why = f"{os.path.basename(target)} is not safe to run on several ranks: {reason or 'see its launcher'}"
 
     mode = _worker_mode()
     if mode == "stale":
@@ -1055,10 +1260,14 @@ def main(launcher_path, script_name, argv = None):
     elif mode == "worker":
         # Already a launcher's worker (ours, the user's torchrun, deepspeed, ...): never
         # launch again. With one local process the shell steps simply run here.
+        if pinned and _env_int("WORLD_SIZE", "LOCAL_WORLD_SIZE", default = 1) > 1:
+            _fail(f"{why}. Run it with one process, or set UNSLOTH_FSDP2_FORCE=1 to run it on "
+                  f"every rank anyway.")
         if options["nproc"] is not None and os.environ.get("LOCAL_RANK", "0") == "0":
             _log("--nproc-per-node is ignored inside torchrun")
         if options["dry_run"]:
             print(f"would run {target} {shlex.join(rest)} in this torchrun worker".rstrip())
+            print(adapter)
             return 0
         _run_worker(launcher, target, rest, set_fsdp2 = True)
         return 0
@@ -1074,6 +1283,19 @@ def main(launcher_path, script_name, argv = None):
             _fail(f"{source} must be an integer, got {requested!r}")
         if requested < 0:
             _fail(f"{source} must be >= 0, got {requested}")
+    if pinned:
+        if requested is not None and requested > 1:
+            _fail(f"{source}={requested} refused: {why}. Set UNSLOTH_FSDP2_FORCE=1 to launch it "
+                  f"on {requested} processes anyway.")
+        note = f"running single-process: {why} (UNSLOTH_FSDP2_FORCE=1 overrides)"
+        if options["dry_run"]:
+            print(note)
+            print(shlex.join([sys.executable, target, *rest]))
+            print(adapter)
+            return 0
+        _log(note)
+        _run_worker(launcher, target, rest, set_fsdp2 = False)
+        return 0
     visible = _count_visible_gpus()
     if requested is None:
         nproc = visible
@@ -1101,6 +1323,7 @@ def main(launcher_path, script_name, argv = None):
             _log("UNSLOTH_FSDP2=0: launching plain DDP torchrun without FSDP2")
         if options["dry_run"]:
             print(f"UNSLOTH_FSDP2={fsdp2}")
+            print(adapter)
             print(shlex.join(command))
             return 0
         sys.stdout.flush()
@@ -1132,6 +1355,7 @@ def main(launcher_path, script_name, argv = None):
     if options["dry_run"]:
         print(note)
         print(shlex.join([sys.executable, target, *rest]))
+        print(adapter)
         return 0
     _log(note)
     _run_worker(launcher, target, rest, set_fsdp2 = False)
