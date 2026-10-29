@@ -33,7 +33,7 @@
 # # In[ ]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.0\n!pip install --no-deps trl==0.22.2\n')
+# get_ipython().run_cell_magic('capture', '', 'import os\n\n!pip install pip3-autoremove\n!pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128\n!pip install unsloth "huggingface_hub>=0.34.0" "datasets==4.3.0"\n!pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==5.15.0\n!pip install --no-deps trl==0.22.2\n')
 # 
 # 
 # # Muse Glimmer is a brand new architecture, so it needs a `transformers` release that knows about it. Support shipped in [transformers 5.15.0](https://github.com/huggingface/transformers/releases/tag/v5.15.0), so we pin that exact version. Everything used below is public - no Hugging Face token is required.

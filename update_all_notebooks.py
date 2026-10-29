@@ -353,10 +353,13 @@ import os
 
 !pip install pip3-autoremove
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
-!pip install unsloth
+!pip install unsloth "huggingface_hub>=0.34.0" "datasets==4.3.0"
 !pip install --no-deps --upgrade "torchao>=0.16.0"
-!pip install --upgrade transformers "huggingface_hub>=0.34.0" "datasets==4.3.0"
+!pip install --upgrade transformers
 """
+# The hub and datasets pins ride on the unsloth line, not the transformers one:
+# update_or_append_pip_install below swaps the whole transformers line for
+# PIN_TRANSFORMERS, which used to drop "datasets==4.3.0" from every Kaggle cell.
 
 installation_kaggle_content = update_or_append_pip_install(
     installation_kaggle_content,
