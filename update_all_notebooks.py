@@ -1374,10 +1374,17 @@ installation_phone_kaggle_content += """\n!pip install torchao==0.15.0 optimum==
 
 # Every install cell above, Colab and Kaggle: put the final trl and datasets
 # versions on the Colab branch's own install lines (see pin_colab_no_deps_trl).
+# The AMD composer keeps the first spec it meets per package, so it would read
+# the moved datasets spec as a new pin; _AMD_INSTALL_SOURCE hands it the text
+# from before the move so the AMD cells stay as they were.
+_AMD_INSTALL_SOURCE = {}
 for _name, _value in list(globals().items()):
     if _name.startswith("installation_") and _name.endswith("_content") and isinstance(_value, str):
-        globals()[_name] = pin_colab_datasets_to_final(pin_colab_no_deps_trl(_value))
-del _name, _value
+        _single = pin_colab_datasets_to_final(pin_colab_no_deps_trl(_value))
+        if _single != _value:
+            _AMD_INSTALL_SOURCE.setdefault(_single, _value)
+        globals()[_name] = _single
+del _name, _value, _single
 
 OTHER_RESOURCES = """Some other resources:
 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
@@ -5344,6 +5351,7 @@ def update_notebook_sections(
                         amd_extras_cell_text = None
                         if is_amd_notebook:
                             selected_install_text = "".join(installation) if isinstance(installation, list) else installation
+                            selected_install_text = _AMD_INSTALL_SOURCE.get(selected_install_text, selected_install_text)
                             source_install_texts.insert(0, selected_install_text)
                             if (
                                 is_path_contains_any(notebook_path.lower(), ["grpo"])
@@ -5453,9 +5461,12 @@ def update_notebook_sections(
             )
             if "from unsloth import" in notebook_code or "import unsloth" in notebook_code:
                 source_install_texts = [
-                    installation_synthetic_data_content
-                    if is_path_contains_any(notebook_path.lower(), ["synthetic_data"])
-                    else installation_content
+                    _AMD_INSTALL_SOURCE.get(_text, _text)
+                    for _text in [
+                        installation_synthetic_data_content
+                        if is_path_contains_any(notebook_path.lower(), ["synthetic_data"])
+                        else installation_content
+                    ]
                 ]
                 installation, amd_extras_cell_text = _compose_amd_installation(
                     notebook_path, source_install_texts
