@@ -297,7 +297,7 @@ except Exception: _qat_index = ""
 # branch too) and becomes "already satisfied" on Colab. Both installs are
 # --no-deps, so the environment the cell leaves is unchanged.
 _RE_TAIL_NO_DEPS_TRL_PIN = re.compile(
-    r"^!(?:uv )?pip install(?: -qqq)? --no-deps \"?trl==([0-9][0-9A-Za-z.]*)\"?\s*$", re.MULTILINE
+    r"^!(?:.*&& )?(?:uv )?pip install(?: -qqq)? --no-deps \"?trl==([0-9][0-9A-Za-z.]*)\"?\s*$", re.MULTILINE
 )
 _RE_BARE_TRL = re.compile(r"(?<=\s)trl(?=\s|$)")
 
