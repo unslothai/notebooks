@@ -325,6 +325,41 @@ def pin_colab_no_deps_trl(install_text):
     return "\n".join(out)
 
 
+# Same shape for datasets in the audio notebooks: the Colab line installs
+# "datasets==4.3.0" and a later top-level line (with dependencies) brings it back
+# down to "datasets>=3.4.1,<4.0.0", so every Colab run installs datasets 4.3.0
+# and its dill / fsspec only to replace all three. Give the Colab line the spec
+# the cell ends on; the later line stays and is already satisfied there.
+_RE_QUOTED_DATASETS = re.compile(r'"datasets[=<>!~][^"]*"')
+
+
+def pin_colab_datasets_to_final(install_text):
+    """Use the cell's last top-level datasets spec on the indented Colab install line."""
+    lines = install_text.split("\n")
+    final = None
+    for line in lines:
+        if line.startswith("!") and "pip install" in line and "--no-deps" not in line.split():
+            found = _RE_QUOTED_DATASETS.findall(line)
+            if found:
+                final = found[-1]
+    if final is None:
+        return install_text
+    out = []
+    for line in lines:
+        body = line.lstrip()
+        if (
+            line != body
+            and body.startswith("!")
+            and "pip install" in body
+            and "--no-deps" not in body.split()
+            and "--upgrade" not in body.split()
+            and len(_RE_QUOTED_DATASETS.findall(body)) == 1
+        ):
+            line = line[: len(line) - len(body)] + _RE_QUOTED_DATASETS.sub(lambda m: final, body)
+        out.append(line)
+    return "\n".join(out)
+
+
 def update_or_append_pip_install(base_content, package_name, new_install_line):
     pattern = re.compile(rf"^!(uv )?pip install .*?{package_name}.*$", re.MULTILINE)
 
@@ -5299,9 +5334,11 @@ def update_notebook_sections(
 
                         if not is_amd_notebook:
                             if isinstance(installation, list):
-                                installation = pin_colab_no_deps_trl("".join(installation)).splitlines(keepends=True)
+                                installation = pin_colab_datasets_to_final(
+                                    pin_colab_no_deps_trl("".join(installation))
+                                ).splitlines(keepends=True)
                             else:
-                                installation = pin_colab_no_deps_trl(installation)
+                                installation = pin_colab_datasets_to_final(pin_colab_no_deps_trl(installation))
 
                         # AMD INSTALLATION: final override for all AMD-prefixed notebooks.
                         # Must come last, but compose notebook-specific deps from the selected source install.
