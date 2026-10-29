@@ -290,6 +290,41 @@ except Exception: _qat_index = ""
 !pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}} {{_qat_index}}"""
 
 
+# The Colab branch installs `trl` unpinned with --no-deps, and the shared tail
+# then reinstalls the pinned one with --no-deps, so every Colab run downloads the
+# newest trl only to uninstall it a few lines later. Write the tail's pin into
+# the Colab line instead: the tail line stays (it is the pin for the non-Colab
+# branch too) and becomes "already satisfied" on Colab. Both installs are
+# --no-deps, so the environment the cell leaves is unchanged.
+_RE_TAIL_NO_DEPS_TRL_PIN = re.compile(
+    r"^!(?:uv )?pip install(?: -qqq)? --no-deps \"?trl==([0-9][0-9A-Za-z.]*)\"?\s*$", re.MULTILINE
+)
+_RE_BARE_TRL = re.compile(r"(?<=\s)trl(?=\s|$)")
+
+
+def pin_colab_no_deps_trl(install_text):
+    """Pin a bare `trl` on an indented `--no-deps` install line to the cell's final top-level trl pin."""
+    pins = _RE_TAIL_NO_DEPS_TRL_PIN.findall(install_text)
+    if not pins:
+        return install_text
+    final = pins[-1]
+    out = []
+    for line in install_text.split("\n"):
+        body = line.lstrip()
+        if (
+            line != body
+            and body.startswith("!")
+            and "pip install" in body
+            and "--no-deps" in body.split()
+            and "--upgrade" not in body.split()
+            and "--force-reinstall" not in body.split()
+            and len(_RE_BARE_TRL.findall(body)) == 1
+        ):
+            line = line[: len(line) - len(body)] + _RE_BARE_TRL.sub("trl==" + final, body)
+        out.append(line)
+    return "\n".join(out)
+
+
 def update_or_append_pip_install(base_content, package_name, new_install_line):
     pattern = re.compile(rf"^!(uv )?pip install .*?{package_name}.*$", re.MULTILINE)
 
@@ -5261,6 +5296,12 @@ def update_notebook_sections(
                                 installation = installation_phone_kaggle_content
                             else:
                                 installation = installation_phone_content
+
+                        if not is_amd_notebook:
+                            if isinstance(installation, list):
+                                installation = pin_colab_no_deps_trl("".join(installation)).splitlines(keepends=True)
+                            else:
+                                installation = pin_colab_no_deps_trl(installation)
 
                         # AMD INSTALLATION: final override for all AMD-prefixed notebooks.
                         # Must come last, but compose notebook-specific deps from the selected source install.
