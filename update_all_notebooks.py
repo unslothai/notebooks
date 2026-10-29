@@ -1372,6 +1372,13 @@ installation_phone_kaggle_content = update_or_append_pip_install(
 installation_phone_kaggle_content += """\n!pip install torchao==0.15.0 optimum==1.24.0 pytorch-tokenizers executorch==1.1.0
 !pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
 
+# Every install cell above, Colab and Kaggle: put the final trl and datasets
+# versions on the Colab branch's own install lines (see pin_colab_no_deps_trl).
+for _name, _value in list(globals().items()):
+    if _name.startswith("installation_") and _name.endswith("_content") and isinstance(_value, str):
+        globals()[_name] = pin_colab_datasets_to_final(pin_colab_no_deps_trl(_value))
+del _name, _value
+
 OTHER_RESOURCES = """Some other resources:
 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
 2. Learn how to do Reinforcement Learning with our [RL Guide and notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide).
@@ -5331,14 +5338,6 @@ def update_notebook_sections(
                                 installation = installation_phone_kaggle_content
                             else:
                                 installation = installation_phone_content
-
-                        if not is_amd_notebook:
-                            if isinstance(installation, list):
-                                installation = pin_colab_datasets_to_final(
-                                    pin_colab_no_deps_trl("".join(installation))
-                                ).splitlines(keepends=True)
-                            else:
-                                installation = pin_colab_datasets_to_final(pin_colab_no_deps_trl(installation))
 
                         # AMD INSTALLATION: final override for all AMD-prefixed notebooks.
                         # Must come last, but compose notebook-specific deps from the selected source install.
