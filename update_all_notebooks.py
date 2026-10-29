@@ -7252,6 +7252,7 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
 | `UNSLOTH_FSDP2_FORCE` | unset | Set to `1` to run a single-process script (see below) on several processes anyway. |
 | `UNSLOTH_FSDP2_WAIT_TIMEOUT` | `21600` (6 hours) | Seconds the other processes on a node wait for a shell step on the first one before failing with an error. |
 | `UNSLOTH_TP_SIZE` | unset | Tensor parallel size, combined with FSDP2 over the remaining ranks. |
+| `UNSLOTH_FSDP2_SHARDED_LOAD` | unset | Read by Unsloth, not set by the launchers. `1`: under native FSDP2 each process reads only its own slice of the `nn.Linear` weights while `from_pretrained` loads the model (the output head and other weights are read whole), instead of every process loading the full model first. Use it for a 16-bit model larger than the smallest GPU. Unsloth refuses 4-bit / 8-bit loads with it, so a script with `load_in_4bit = True` needs that changed, and it cannot be combined with `UNSLOTH_TP_SIZE`. |
 
 ## Things to know
 
@@ -7295,6 +7296,12 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
   Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
   Gemma3N_(2B)-Inference and Oute_TTS_(1B), with their AMD- / Kaggle- variants.
+- **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
+  runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
+  every sharded unit onto every process until `generate` returns (every process
+  generates). A model that only fits when sharded, for example one loaded with
+  `UNSLOTH_FSDP2_SHARDED_LOAD=1`, can train and save its adapter and still run out of
+  memory on a smaller GPU in the generation cells that follow training.
 - **Unsloth decides what is supported.** The launcher does not check models, trainers or
   parallel layouts. Unsloth itself refuses layouts it cannot run (for example an invalid
   `UNSLOTH_TP_SIZE`) with an error that names the problem. Nothing in this folder claims

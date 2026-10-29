@@ -714,6 +714,33 @@ def test_shell_steps_use_this_interpreter_not_path(fl, tmp_path, monkeypatch):
     assert shell.getoutput("bash -c 'type -t pip python'") == ["function", "function"]
 
 
+def test_wrapper_interpreter_does_not_recurse(fl, tmp_path, monkeypatch):
+    """$UNSLOTH_FSDP2_PYTHON may be a bash wrapper (sys.executable is the wrapper under
+    `exec -a`). One that runs `python3` / `pip` by name imports the exported functions and
+    must reach PATH's command, not call itself again."""
+    bindir = tmp_path / "dir (with) spaces"
+    bindir.mkdir()
+    wrapper = bindir / "py wrapper"
+    wrapper.write_text(textwrap.dedent(f"""\
+        #!/bin/bash
+        export WRAP_DEPTH=$((${{WRAP_DEPTH:-0}} + 1))
+        [ "$WRAP_DEPTH" -gt 3 ] && {{ echo recursed >&2; exit 97; }}
+        if [ "$1" = -m ] && [ "$2" = pip ]; then shift 2; pip "$@"; else python3 "$@"; fi
+    """))
+    wrapper.chmod(0o755)
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "python3").symlink_to(sys.executable)
+    (real / "pip").write_text("#!/bin/sh\necho real-pip \"$@\" depth=$WRAP_DEPTH\n")
+    (real / "pip").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{real}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setattr(sys, "executable", str(wrapper))
+    monkeypatch.setenv("_UNSLOTH_FSDP2_PINNED", "1")  # inherited from an outer launcher
+    shell = fl.FSDP2Shell()
+    assert shell.getoutput("python3 -c 'print(6 * 7)'; echo rc=$?") == ["42", "rc=0"]
+    assert shell.getoutput("pip --version; echo rc=$?") == ["real-pip --version depth=1", "rc=0"]
+
+
 @pytest.mark.parametrize("in_venv", [True, False])
 def test_virtual_env_names_this_interpreter_for_uv(fl, monkeypatch, in_venv):
     monkeypatch.setenv("VIRTUAL_ENV", "/some/other/venv")

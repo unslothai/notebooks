@@ -497,13 +497,18 @@ def install_decision(command):
 # install_decision() reads this interpreter's packages, so a shell step's pip must install
 # into it rather than into whichever pip PATH finds first. On the command's first line so
 # bash's line numbers in error messages still match the cell.
+# Below the pinned interpreter (_UNSLOTH_FSDP2_PINNED set) the names fall back to PATH:
+# if $UNSLOTH_FSDP2_PYTHON is a bash wrapper that runs `python3` by name, the exported
+# function would otherwise call the wrapper again without end.
+_PIN_GUARD = '[ -n "$_UNSLOTH_FSDP2_PINNED" ] && { command %s "$@"; return; }; '
 _SHELL_PREAMBLE = (
-    'python() { "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
-    'python3() { "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
-    'pip() { "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
-    'pip3() { "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
+    'python() { ' + _PIN_GUARD % "python" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
+    'python3() { ' + _PIN_GUARD % "python3" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
+    'pip() { ' + _PIN_GUARD % "pip" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
+    'pip3() { ' + _PIN_GUARD % "pip3" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
     # The `unsloth` console script of this interpreter, run the way the script runs it.
-    'unsloth() { "$UNSLOTH_FSDP2_PYTHON" -c "$_UNSLOTH_FSDP2_CLI" "$@"; }; '
+    'unsloth() { ' + _PIN_GUARD % "unsloth"
+    + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" -c "$_UNSLOTH_FSDP2_CLI" "$@"; }; '
     "export -f python python3 pip pip3 unsloth; "
 )
 _UNSLOTH_CLI = (
@@ -518,6 +523,8 @@ def _shell_env():
     env = dict(os.environ)
     env["UNSLOTH_FSDP2_PYTHON"] = sys.executable
     env["_UNSLOTH_FSDP2_CLI"] = _UNSLOTH_CLI
+    # A launcher started from another launcher's shell step pins its own interpreter again.
+    env.pop("_UNSLOTH_FSDP2_PINNED", None)
     if _in_venv():
         env["VIRTUAL_ENV"] = sys.prefix
     return env
