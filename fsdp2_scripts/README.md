@@ -85,7 +85,8 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
   Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
   Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
-  Gemma3N_(2B)-Inference and Oute_TTS_(1B), with their AMD- / Kaggle- variants.
+  Gemma3N_(2B)-Inference, Oute_TTS_(1B) and OmniVoice_(0.6B)-TTS, with their AMD- /
+  Kaggle- variants.
 - **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
   runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
   every sharded unit onto every process until `generate` returns (every process

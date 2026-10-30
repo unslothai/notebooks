@@ -473,6 +473,8 @@ _UNSAFE = re.compile(
     r"subprocess\.Popen|os\.system\(|vllm serve|[\"']--port[\"']|--port\b"
     # Library calls that start a server themselves (unsloth/dataprep/synthetic.py).
     r"|SyntheticDataKit\.from_pretrained\("
+    # Outer models built outside Unsloth: their merge / save skip the collective export.
+    r"|OmniVoice\.from_pretrained\("
     r"|os\.remove\(|os\.unlink\(|shutil\.rmtree\(|shutil\.move\(|os\.rename\("
 )
 
@@ -563,6 +565,8 @@ def test_single_process_list_names_real_scripts():
     "Oute_TTS_(1B).py",
     "AMD-Oute_TTS_(1B).py",
     "Kaggle-Oute_TTS_(1B).py",
+    "OmniVoice_(0.6B)-TTS.py",
+    "Kaggle-OmniVoice_(0.6B)-TTS.py",
 ])
 def test_single_process_launchers_say_so(name):
     assert (SCRIPTS / name).is_file()
