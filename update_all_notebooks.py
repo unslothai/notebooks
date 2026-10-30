@@ -517,6 +517,7 @@ def _tool_use_installation(content, indent):
     )
     assert old in content, "GRPO install layout moved; update _tool_use_installation"
     content = content.replace(old, new)
+    content = content.replace('"datasets==4.3.0"', '"datasets>=4.7.0,<5.0.0"')
     content = update_or_append_pip_install(content, "transformers", TOOL_USE_PIN_TRANSFORMERS)
     content = update_or_append_pip_install(content, "trl", TOOL_USE_PIN_TRL)
     return content.rstrip("\n") + "\n" + TOOL_USE_UNSLOTH_MAIN + "\n"
@@ -581,16 +582,21 @@ installation_grpo_synthetic_data_content = update_or_append_pip_install(
     UV_PIN_TRL,
 )
 
+# Audio notebooks need datasets 3.x: pin it on the shared line, or pip installs 4.3.0 there and then swaps it out.
+assert installation_kaggle_content.count('"datasets==4.3.0"') == 1
+installation_kaggle_audio_content = installation_kaggle_content.replace(
+    '"datasets==4.3.0"', '"datasets>=3.4.1,<4.0.0"')
+
 # Add install snac under install unsloth
 installation_orpheus_content = installation_content + """\n!pip install snac torchcodec \"datasets>=3.4.1,<4.0.0\""""
-installation_orpheus_kaggle_content = installation_kaggle_content + """\n!pip install snac torchcodec \"datasets>=3.4.1,<4.0.0\""""
+installation_orpheus_kaggle_content = installation_kaggle_audio_content + """\n!pip install snac torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 installation_whisper_content = installation_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
-installation_whisper_kaggle_content = installation_kaggle_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
+installation_whisper_kaggle_content = installation_kaggle_audio_content + """\n!pip install librosa soundfile evaluate jiwer torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 installation_spark_content = installation_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
-installation_spark_kaggle_content = installation_kaggle_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
+installation_spark_kaggle_content = installation_kaggle_audio_content + f"""\n!git clone https://github.com/SparkAudio/Spark-TTS && git -C Spark-TTS checkout --quiet {PIN_SPARK_TTS_REF}
 !pip install omegaconf einx torchcodec \"datasets>=3.4.1,<4.0.0\""""
 
 # OmniVoice needs transformers >= 5.3 (Higgs audio tokenizer); --no-deps skips its demo/trainer deps (gradio, tensorboardX).
@@ -611,7 +617,7 @@ installation_omnivoice_content = update_or_append_pip_install(
     installation_content, "transformers", "!pip install transformers==5.15.0"
 ) + OMNIVOICE_INSTALL
 installation_omnivoice_kaggle_content = update_or_append_pip_install(
-    installation_kaggle_content, "transformers", "!pip install transformers==5.15.0"
+    installation_kaggle_audio_content, "transformers", "!pip install transformers==5.15.0"
 ) + OMNIVOICE_INSTALL
 
 installation_gpt_oss_content = r"""%%capture
@@ -653,7 +659,7 @@ os.remove("OuteTTS/outetts/__init__.py")
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
-installation_oute_kaggle_content = installation_kaggle_content + f"""\n!pip install omegaconf einx
+installation_oute_kaggle_content = installation_kaggle_audio_content + f"""\n!pip install omegaconf einx
 !rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS && git -C OuteTTS checkout --quiet {PIN_OUTETTS_REF}
 import os
 os.remove("OuteTTS/outetts/models/gguf_model.py")
@@ -688,7 +694,7 @@ installation_llasa_content = update_or_append_pip_install(
     "!pip install transformers==4.57.6",
 )
 
-installation_llasa_kaggle_content = installation_kaggle_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch==1.17.8 torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
+installation_llasa_kaggle_content = installation_kaggle_audio_content + """\n!pip install torchtune \"torchao<0.18.0\" vector_quantize_pytorch==1.17.8 torch_einops_utils einx loguru tiktoken xcodec2==0.1.5 --no-deps
 !pip install omegaconf torchcodec \"datasets>=3.4.1,<4.0.0\"
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 installation_llasa_kaggle_content = update_or_append_pip_install(
@@ -734,7 +740,7 @@ installation_sesame_csm_content = update_or_append_pip_install(
     PIN_TRL
 )
 
-installation_sesame_csm_kaggle_content = installation_kaggle_content + """\n!pip install torchcodec \"datasets>=3.4.1,<4.0.0\""""
+installation_sesame_csm_kaggle_content = installation_kaggle_audio_content + """\n!pip install torchcodec \"datasets>=3.4.1,<4.0.0\""""
 installation_sesame_csm_kaggle_content = update_or_append_pip_install(
     installation_sesame_csm_kaggle_content,
     "transformers",
