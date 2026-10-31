@@ -1444,8 +1444,10 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
             return 0
         sys.stdout.flush()
         sys.stderr.flush()
-        if _real_ipython_active():
+        if _IS_WINDOWS or _real_ipython_active():
             # %run from IPython / Jupyter: replacing the kernel process would kill it.
+            # Windows: os.execv starts a detached process with unquoted arguments (paths
+            # with spaces split) and exits at once with code 0, so wait on a child instead.
             env = dict(os.environ)
             env.setdefault("UNSLOTH_FSDP2", "1")
             env[_RUN_ID_ENV] = uuid.uuid4().hex

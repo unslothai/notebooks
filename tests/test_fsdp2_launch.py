@@ -1020,6 +1020,27 @@ def test_ipython_run_uses_a_child_process(fl, layout, monkeypatch):
     assert "UNSLOTH_FSDP2" not in os.environ and "UNSLOTH_FSDP2_RUN_ID" not in os.environ
 
 
+def test_windows_waits_on_a_child_instead_of_execv(fl, layout, monkeypatch):
+    # os.execv on Windows detaches the new process, drops argument quoting and exits 0
+    # at once (bpo-19124, bpo-20451), so the launcher must wait on torchrun itself.
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setattr(fl, "_IS_WINDOWS", True)
+    ran = []
+
+    def fake_run(command, env = None, **kwargs):
+        ran.append((command, env))
+        return subprocess.CompletedProcess(command, 5)
+
+    monkeypatch.setattr(fl.subprocess, "run", fake_run)
+    with pytest.raises(SystemExit) as raised:
+        fl.main(str(launcher), SCRIPT_NAME, ["a b (c)"])
+    assert raised.value.code == 5 and calls == []
+    command, env = ran[0]
+    assert command == _expected(launcher, 2, "a b (c)")
+    assert env["UNSLOTH_FSDP2"] == "1" and env["UNSLOTH_FSDP2_RUN_ID"]
+
+
 _MP_TARGET = textwrap.dedent('''\
     import json, multiprocessing as mp, os
     def square(x):
