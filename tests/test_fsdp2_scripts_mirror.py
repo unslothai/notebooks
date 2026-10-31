@@ -646,6 +646,214 @@ def test_scripts_that_write_then_read_a_shared_path_are_single_process():
     )
 
 
+# Generated audio / images written from Python to a fixed path. Every rank generates its
+# own sample, so ranks write different bytes to one file and the result can interleave
+# them, whether or not the run reads the file back. In-memory buffers do not count.
+_MEDIA_SUFFIXES = (
+    ".wav", ".flac", ".mp3", ".ogg", ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif",
+    ".tif", ".tiff", ".mp4",
+)
+
+
+def _parse(text):
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        return ast.parse(text)
+
+
+def _literal_path(node, strings):
+    """The path ``node`` names when it is a literal, an f-string or a name bound to one."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr):
+        return "".join(v.value for v in node.values if isinstance(v, ast.Constant)) or None
+    if isinstance(node, ast.Name):
+        return strings.get(node.id)
+    return None
+
+
+def _media_writes(text):
+    """(line, path) of each live audio / image write to a path the script spells out."""
+    tree = _parse(text)
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    strings = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            path = _literal_path(node.value, {})
+            if path:
+                strings[node.targets[0].id] = path
+    hits = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.args and not _dead(node, parents)):
+            continue
+        func = node.func
+        path = _literal_path(node.args[0], strings)
+        if not path:
+            continue
+        module = func.value.id if isinstance(func.value, ast.Name) else None
+        if ((module in _PATH_WRITE_MODULES and func.attr in ("write", "save", "imwrite"))
+                or (func.attr == "save" and path.lower().endswith(_MEDIA_SUFFIXES))):
+            hits.append((node.lineno, path))
+    return hits
+
+
+def test_media_write_scan():
+    assert _media_writes('sf.write("o.wav", a, 24000)\n') == [(1, "o.wav")]
+    assert _media_writes('name = "s.wav"\nsf.write(name, a, 16000)\n') == [(2, "s.wav")]
+    assert _media_writes('torchaudio.save(f"out_{i}.wav", a, 16000)\n') == [(1, "out_.wav")]
+    assert _media_writes('img.save("a.png")\n') == [(1, "a.png")]
+    # In-memory buffers, Unsloth / transformers saves, behind if False.
+    assert _media_writes('buf = io.BytesIO()\nsf.write(buf, a, 16000, format = "WAV")\n') == []
+    assert _media_writes('model.save_pretrained("lora")\nprocessor.save("dir")\n') == []
+    assert _media_writes('if False:\n    sf.write("o.wav", a, 16000)\n') == []
+
+
+def test_scripts_that_write_generated_media_to_a_fixed_path_are_single_process():
+    missing = {}
+    for path in sorted(SCRIPTS.glob("*.py")):
+        hits = _media_writes(path.read_text(encoding="utf-8"))
+        if hits and _GEN.fsdp2_single_process_reason(path.name) is None:
+            missing[path.name] = hits[:3]
+    assert not missing, (
+        "These python_scripts write audio or images from Python to a fixed path. Every rank "
+        "writes its own sample there, so the file can mix several ranks' bytes. Add their "
+        "base name to FSDP2_SINGLE_PROCESS in update_all_notebooks.py with a reason (or write "
+        f"from one rank only): {missing}"
+    )
+
+
+# model.generate is collective under native FSDP2 (native_fsdp2_unsharded all-gathers on
+# every rank), so every rank must make the same number of calls. A generate inside a loop
+# that can stop early (while, break / continue / return in the loop) or inside a try whose
+# handler generates again runs a count that follows each rank's own output: sampled text,
+# parse results, game or environment state. One rank then waits in an all-gather another
+# rank never enters. Helpers are followed: a script function that generates counts as a
+# generate call wherever it is called. A for loop over a fixed list without an early exit
+# is fine.
+_COLLECTIVE_CALLS = {"generate", "fast_generate", "infer", "generate_rollout_completions"}
+_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+
+def _call_name(call):
+    func = call.func
+    return func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+
+
+def _scope_walk(node):
+    """Nodes under ``node`` without entering nested functions or classes."""
+    stack = list(ast.iter_child_nodes(node))
+    while stack:
+        child = stack.pop()
+        yield child
+        if not isinstance(child, _SCOPES):
+            stack.extend(ast.iter_child_nodes(child))
+
+
+def _exits_early(loop):
+    """``loop`` can end after a number of passes its body decides."""
+    if isinstance(loop, ast.While):
+        return True
+    stack = list(loop.body)
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.Break, ast.Continue, ast.Return)):
+            return True
+        # A nested loop's own break / continue ends that loop only; its return still counts.
+        if isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
+            stack.extend(n for n in ast.walk(node) if isinstance(n, ast.Return))
+            continue
+        if not isinstance(node, _SCOPES):
+            stack.extend(ast.iter_child_nodes(node))
+    return False
+
+
+def _divergent_generates(text):
+    """(line, name) of each collective generate whose call count can differ between ranks."""
+    tree = _parse(text)
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    functions = [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    collective = set(_COLLECTIVE_CALLS)
+    grew = True
+    while grew:
+        grew = False
+        for fn in functions:
+            if fn.name not in collective and any(
+                    isinstance(n, ast.Call) and _call_name(n) in collective for n in ast.walk(fn)):
+                collective.add(fn.name)
+                grew = True
+
+    def calls(node):
+        return [n for n in _scope_walk(node) if isinstance(n, ast.Call) and _call_name(n) in collective]
+
+    hits = set()
+    for node in ast.walk(tree):
+        if _dead(node, parents):
+            continue
+        if isinstance(node, (ast.For, ast.AsyncFor, ast.While)) and _exits_early(node):
+            hits.update((c.lineno, _call_name(c)) for c in calls(node))
+        if isinstance(node, ast.Try) and any(calls(h) for h in node.handlers):
+            parts = [*node.body, *node.handlers]
+            hits.update((c.lineno, _call_name(c)) for part in parts if not isinstance(part, _SCOPES)
+                        for c in [part, *calls(part)]
+                        if isinstance(c, ast.Call) and _call_name(c) in collective)
+    return sorted(hits)
+
+
+def test_divergent_generate_scan():
+    sampled = 'out = model.generate(**x, do_sample = True)\n'
+    # A while loop on game state, a for loop that breaks / returns / retries on the output.
+    assert _divergent_generates('while game.ongoing():\n    ' + sampled) == [(2, "generate")]
+    assert _divergent_generates(
+        'for _ in range(5):\n    ' + sampled + '    if parse(out) is None:\n        break\n'
+    ) == [(2, "generate")]
+    assert _divergent_generates(
+        'def run(generate):\n    for _ in range(5):\n        reply = generate(t)\n'
+        '        if not calls(reply):\n            return reply\n'
+    ) == [(3, "generate")]
+    assert _divergent_generates(
+        'for attempt in range(5):\n    ' + sampled + '    try:\n        decode(out)\n'
+        '    except RuntimeError:\n        continue\n    break\n'
+    ) == [(2, "generate")]
+    # Followed through a helper, and a fallback generation in an except handler.
+    assert _divergent_generates(
+        'def play():\n    return model.generate(**x)\n'
+        'while not done:\n    done = play()\n'
+    ) == [(4, "play")]
+    assert _divergent_generates(
+        'try:\n    model.generate(**x)\nexcept ValueError:\n    model.generate(**y)\n'
+    ) == [(2, "generate"), (4, "generate")]
+    # Fixed counts: one call, a for loop over a fixed list, an early exit in a nested loop
+    # that does not hold the call, a helper's own return, behind if False.
+    assert _divergent_generates(sampled) == []
+    assert _divergent_generates('for s in samples:\n    ' + sampled + '    n += ok(out)\n') == []
+    assert _divergent_generates(
+        'for s in samples:\n    ' + sampled + '    for w in words(out):\n        if w:\n            break\n'
+    ) == []
+    assert _divergent_generates(
+        'def solve(p):\n    out = model.generate(**p)\n    return parse(out)\n'
+        'for r in rows:\n    solve(r)\n'
+    ) == []
+    assert _divergent_generates('if False:\n    while True:\n        ' + sampled) == []
+    assert _divergent_generates('while i < n:\n    board = _generate_complete_board()\n') == []
+
+
+def test_scripts_whose_generate_count_can_differ_between_ranks_are_single_process():
+    missing = {}
+    for path in sorted(SCRIPTS.glob("*.py")):
+        hits = _divergent_generates(path.read_text(encoding="utf-8"))
+        if hits and _GEN.fsdp2_single_process_reason(path.name) is None:
+            missing[path.name] = hits[:3]
+    assert not missing, (
+        "These python_scripts call generate (collective under native FSDP2) inside a loop that "
+        "can stop early or a try that generates again, so ranks can make different numbers of "
+        "calls and one waits forever. Add their base name to FSDP2_SINGLE_PROCESS in "
+        "update_all_notebooks.py with a reason (or make every rank take the same decisions): "
+        f"{missing}"
+    )
+
+
 def test_single_process_list_names_real_scripts():
     bases = {_GEN._fsdp2_base_name(name) for name in _script_names()}
     stale = sorted(set(_GEN.FSDP2_SINGLE_PROCESS) - bases)
@@ -690,7 +898,25 @@ def test_single_process_list_names_real_scripts():
     "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py",
     "AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py",
     "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py",
-    "AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py",
+    "AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py",    "Sesame_CSM_(1B)-TTS.py",
+    "AMD-Sesame_CSM_(1B)-TTS.py",
+    "Kaggle-Sesame_CSM_(1B)-TTS.py",
+    "Spark_TTS_(0_5B).py",
+    "AMD-Spark_TTS_(0_5B).py",
+    "Kaggle-Spark_TTS_(0_5B).py",
+    "gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py",
+    "AMD-gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py",
+    "Kaggle-gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py",
+    "HuggingFace Course-gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py",
+    "Openenv_wordle_grpo.py",
+    "AMD-Openenv_wordle_grpo.py",
+    "Qwen3_(4B)-Tool_Calling.py",
+    "AMD-Qwen3_(4B)-Tool_Calling.py",
+    "Kaggle-Qwen3_(4B)-Tool_Calling.py",
+    "Qwen3_(4B)-GRPO-Tool_Use.py",
+    "AMD-Qwen3_(4B)-GRPO-Tool_Use.py",
+    "Kaggle-Qwen3_(4B)-GRPO-Tool_Use.py",
+    "HuggingFace Course-Qwen3_(4B)-GRPO-Tool_Use.py",
 ])
 def test_single_process_launchers_say_so(name):
     assert (SCRIPTS / name).is_file()

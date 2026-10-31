@@ -7158,6 +7158,18 @@ FSDP2_SINGLE_PROCESS = {
     # Each process generates its own dataset through the OpenAI API, then all of them write
     # raft_train.jsonl; interleaved writes of different lengths can leave invalid JSONL.
     "Llama3.2_(1B)-RAFT.py": "every process would write its own generated dataset to the same raft_train.jsonl",
+    # Each process writes its own sampled speech to example_without_context.wav (twice) and
+    # example_with_context.wav with sf.write; concurrent writes can mix their samples.
+    "Sesame_CSM_(1B)-TTS.py": "every process would write its own generated audio to the same WAV files",
+    # model.generate is collective under native FSDP2: every process must make the same
+    # number of calls. These scripts generate in loops that stop on each process's own
+    # sampled output, so one process can wait in a generate the others never start.
+    # Spark also writes generated_speech_controllable.wav from every process.
+    "Spark_TTS_(0_5B).py": "samples speech again after a codec shape error on one process only, and every process would write the same WAV file",
+    "gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py": "its sampled Minesweeper games end on each process's own moves, so processes would make different numbers of collective generate calls",
+    "Openenv_wordle_grpo.py": "its Wordle turns end when each process's own game does, so processes would make different numbers of collective generate calls",
+    "Qwen3_(4B)-Tool_Calling.py": "its sampled tool-calling loop ends when one process's reply has no tool call, so processes would make different numbers of collective generate calls",
+    "Qwen3_(4B)-GRPO-Tool_Use.py": "its sampled tool-calling loop ends when one process's reply has no tool call, so processes would make different numbers of collective generate calls",
 }
 _FSDP2_VARIANT_PREFIXES = ("AMD-", "Kaggle-", "HuggingFace Course-")
 
@@ -7316,8 +7328,11 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   bash (on Windows, Git Bash; WSL's `bash.exe` is refused). Messages name a step by its
   text before `{...}` expansion, with credentials masked.
 - **Some scripts run single process.** Scripts that start a server on a fixed or seeded
-  port, clone or install through Python `subprocess` calls, or have every process write,
-  remove or move the same files (or write a file and read it back) are listed in `FSDP2_SINGLE_PROCESS` in `update_all_notebooks.py`, with
+  port, clone or install through Python `subprocess` calls, have every process write,
+  remove or move the same files (or write a file and read it back, or write generated audio
+  or images to a fixed path), or call `generate` in a loop that stops on each process's own
+  output (so processes would make different numbers of collective `generate` calls) are
+  listed in `FSDP2_SINGLE_PROCESS` in `update_all_notebooks.py`, with
   the reason. Their launchers say so in a comment, run the script in one process with a
   note naming the reason, and refuse `--nproc-per-node` above 1 unless
   `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
@@ -7327,8 +7342,11 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
   EmbeddingGemma2_(300M)-Multimodal_Search, Deepseek_OCR_(3B), Deepseek_OCR_(3B)-Eval,
   Deepseek_OCR_2_(3B), OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game,
-  OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16 and Llama3.2_(1B)-RAFT, with
-  their AMD- / Kaggle- variants.
+  OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16, Llama3.2_(1B)-RAFT,
+  Sesame_CSM_(1B)-TTS, Spark_TTS_(0_5B),
+  gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16, Openenv_wordle_grpo,
+  Qwen3_(4B)-Tool_Calling and Qwen3_(4B)-GRPO-Tool_Use, with their AMD- / Kaggle- /
+  HuggingFace Course- variants.
 - **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
   runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
   every sharded unit onto every process until `generate` returns (every process
