@@ -1005,6 +1005,42 @@ def test_a_single_slurm_task_still_launches(fl, layout, monkeypatch):
     assert calls[0][1] == _expected(launcher, 2)
 
 
+@pytest.mark.parametrize("visible, argv, single_process", [
+    (1, [], False),                         # one GPU per task
+    (0, [], False),                         # no GPU visible
+    (4, ["--nproc-per-node", "1"], False),  # one process asked for
+    (4, [], True),                          # a single-process script
+])
+@pytest.mark.parametrize("env", [{"SLURM_STEP_NUM_TASKS": "2"}, {"WORLD_SIZE": "2"}])
+def test_slurm_or_mpi_tasks_are_refused_before_any_single_process_run(
+        fl, layout, monkeypatch, capsys, visible, argv, single_process, env):
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = visible)
+    ran = []
+    monkeypatch.setattr(fl, "_run_worker", lambda *args, **kwargs: ran.append(kwargs))
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    with pytest.raises(SystemExit) as raised:
+        fl.main(str(launcher), SCRIPT_NAME, argv, single_process = single_process, reason = "port 8000")
+    assert raised.value.code == 2 and calls == [] and ran == []
+    err = capsys.readouterr().err
+    assert "SLURM / MPI" in err and "one copy of the script per task" in err and "LOCAL_RANK" in err
+
+
+@pytest.mark.parametrize("single_process", [False, True])
+def test_ranked_workers_in_a_slurm_step_still_run(fl, layout, monkeypatch, single_process):
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 1)
+    ran = []
+    monkeypatch.setattr(fl, "_run_worker", lambda *args, **kwargs: ran.append(kwargs))
+    monkeypatch.setenv("SLURM_STEP_NUM_TASKS", "2")
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    monkeypatch.setenv("WORLD_SIZE", "1" if single_process else "2")
+    monkeypatch.setenv("LOCAL_WORLD_SIZE", "1")
+    assert fl.main(str(launcher), SCRIPT_NAME, [], single_process = single_process, reason = "port 8000") == 0
+    assert calls == [] and ran == [{"set_fsdp2": True}]
+
+
 def test_ipython_run_uses_a_child_process(fl, layout, monkeypatch):
     import types
     _, launcher, _ = layout

@@ -35,7 +35,8 @@ with ``UNSLOTH_FSDP2=1`` unless the caller already set it (``UNSLOTH_FSDP2=0`` g
 DDP). Under IPython / Jupyter (``%run``) torchrun runs as a child process instead. With
 0 or 1 the script runs here, single process. Started as one of several SLURM / MPI tasks
 without ``LOCAL_RANK`` / ``WORLD_SIZE``, it refuses instead of starting one torchrun per
-task.
+task, whatever the GPU count and also for a single-process script (each task would
+otherwise run its own copy).
 
 A process is a worker (it runs the script and never launches again) under torchrun
 (``TORCHELASTIC_RUN_ID``) or when ``LOCAL_RANK`` comes with ``WORLD_SIZE`` /
@@ -1389,6 +1390,16 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
         _run_worker(launcher, target, rest, set_fsdp2 = True)
         return 0
 
+    # Not a worker. Checked before any launch choice: with one GPU per task, or for a
+    # single-process script, every task would otherwise run its own copy of the script.
+    problem = _launcher_env_problem()
+    if problem:
+        _fail(f"this looks like one of several SLURM / MPI tasks ({problem}); running here would "
+              f"start one torchrun or one copy of the script per task. Run one task per node with "
+              f"torchrun (torchrun --nnodes ... --nproc-per-node N {shlex.quote(launcher)}), run a "
+              f"single task, or set LOCAL_RANK, WORLD_SIZE and LOCAL_WORLD_SIZE for each task so "
+              f"it runs as a worker.")
+
     requested = options["nproc"]
     source = "--nproc-per-node"
     if requested is None and os.environ.get("UNSLOTH_NPROC_PER_NODE", "").strip():
@@ -1423,12 +1434,6 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
                   f"(check CUDA_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES)")
 
     if nproc >= 2:
-        problem = _launcher_env_problem()
-        if problem:
-            _fail(f"this looks like one of several SLURM / MPI tasks ({problem}); starting torchrun "
-                  f"here would start one torchrun per task. Run one task per node with torchrun "
-                  f"(torchrun --nnodes ... --nproc-per-node N {shlex.quote(launcher)}), or set "
-                  f"LOCAL_RANK, WORLD_SIZE and LOCAL_WORLD_SIZE for each task so it runs as a worker.")
         fsdp2 = os.environ.get("UNSLOTH_FSDP2", "1")
         command = [
             sys.executable, "-m", "torch.distributed.run", "--standalone",

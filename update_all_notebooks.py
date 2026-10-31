@@ -7248,7 +7248,9 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   `LOCAL_RANK` plus `WORLD_SIZE` or `LOCAL_WORLD_SIZE` set by another launcher. A lone
   `LOCAL_RANK` left over in the shell is ignored.
 - Started as one of several SLURM / MPI tasks (`srun`, `mpirun`) without those variables,
-  the launcher stops with an error instead of starting one `torchrun` per task.
+  the launcher stops with an error instead of starting one `torchrun` per task. It does
+  so with one GPU per task and for single-process scripts too, where every task would
+  otherwise run its own copy of the script.
 - From IPython or Jupyter (`%run "fsdp2_scripts/<name>"`), `torchrun` runs as a child
   process so the kernel survives.
 - The working directory is not changed, so outputs such as `outputs/` and `lora_model/`
