@@ -258,20 +258,26 @@ def _name_from_location(spec):
     return _KNOWN_REPOS.get(repo)
 
 
+def _spec_extras(spec):
+    match = re.match(r"^\s*[A-Za-z0-9][A-Za-z0-9._-]*\s*\[([^\]]*)\]", spec)
+    return {e.strip() for e in match.group(1).split(",") if e.strip()} if match else set()
+
+
 def _parse_requirement(spec):
-    """(name, specifier or None, applies) for one requirement argument, or None when the
-    name cannot be known without running pip."""
+    """(name, specifier or None, applies, extras) for one requirement argument, or None
+    when the name cannot be known without running pip."""
+    extras = _spec_extras(spec)
     if " @ " in spec or re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*(\[[^\]]*\])?\s*@", spec):
         # `name @ url`: the name is explicit, whatever the URL holds.
-        return (re.split(r"[\[\s@]", spec, 1)[0], None, True)
+        return (re.split(r"[\[\s@]", spec, 1)[0], None, True, extras)
     if "://" in spec or spec.startswith(("git+", ".", "/", "~")) or spec.endswith((".whl", ".tar.gz", ".zip")):
         name = _name_from_location(spec)
-        return (name, None, True) if name else None
+        return (name, None, True, set()) if name else None
     try:
         from packaging.requirements import Requirement
     except Exception:
         match = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(\[[^\]]*\])?\s*(?:[<>=!~;]|$)", spec)
-        return (match.group(1), None, True) if match else None
+        return (match.group(1), None, True, extras) if match else None
     try:
         requirement = Requirement(spec)
     except Exception:
@@ -282,7 +288,43 @@ def _parse_requirement(spec):
             applies = requirement.marker.evaluate()
         except Exception:
             applies = True
-    return (requirement.name, requirement.specifier or None, applies)
+    return (requirement.name, requirement.specifier or None, applies, set(requirement.extras))
+
+
+def _extras_problem(name, extras, versions):
+    """Why ``name[extras]`` may still be missing something, or None once every dependency an
+    extra adds is installed at a matching version (read from the installed metadata)."""
+    if not extras:
+        return None
+    try:
+        import importlib.metadata
+        from packaging.requirements import Requirement
+        requires = importlib.metadata.distribution(name).requires or []
+    except Exception:
+        return f"cannot check the extras {sorted(extras)} of {name}"
+    declared = set()
+    for line in requires:
+        try:
+            requirement = Requirement(line)
+        except Exception:
+            return f"cannot read a dependency of {name}"
+        if requirement.marker is None:
+            continue
+        for extra in extras:
+            try:
+                wanted = requirement.marker.evaluate({"extra": extra})
+                base = requirement.marker.evaluate({"extra": ""})
+            except Exception:
+                return f"cannot read a dependency of {name}"
+            if wanted and not base:
+                declared.add(extra)
+                installed = versions.get(_normalize(requirement.name))
+                if installed is None or not _version_ok(installed, requirement.specifier or None):
+                    return f"{name}[{extra}] needs {requirement.name}{requirement.specifier}"
+    unknown = sorted(extras - declared)
+    if unknown:
+        return f"{name} declares no extra {', '.join(unknown)}"
+    return None
 
 
 def _version_ok(installed, specifier):
@@ -340,7 +382,7 @@ def _pip_decision(args, versions):
         parsed = _parse_requirement(spec)
         if parsed is None:
             return (False, f"cannot tell what {spec!r} installs")
-        name, specifier, applies = parsed
+        name, specifier, applies, extras = parsed
         if not applies:
             continue
         installed = versions.get(_normalize(name))
@@ -351,6 +393,10 @@ def _pip_decision(args, versions):
             return (False, f"{name} is not installed")
         elif not _version_ok(installed, specifier):
             return (False, f"{name} {installed} does not match {specifier}")
+        else:
+            problem = _extras_problem(name, extras, versions)
+            if problem:
+                return (False, problem)
         names.append(name)
     verb = "already removed" if action == "uninstall" else "already installed"
     return (True, f"{verb}: {', '.join(names) if names else 'nothing applies here'}")

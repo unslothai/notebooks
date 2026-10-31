@@ -559,10 +559,11 @@ def test_real_torchrun_installs_opt_out(tmp_path):
 # ---------------------------------------------------------------------------------------
 # Install decisions.
 # ---------------------------------------------------------------------------------------
-def _fake_dist(site, name, version):
+def _fake_dist(site, name, version, requires = ()):
     info = site / f"{name}-{version}.dist-info"
     info.mkdir(parents = True)
-    (info / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n")
+    lines = "".join(f"Requires-Dist: {r}\n" for r in requires)
+    (info / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n{lines}")
 
 
 @pytest.fixture
@@ -587,8 +588,8 @@ def installed(fl, tmp_path, monkeypatch):
         for dist in importlib.metadata.distributions(path = [str(site)])
     })
 
-    def add_dist(name, version = "1.0"):
-        _fake_dist(site, name, version)
+    def add_dist(name, version = "1.0", requires = ()):
+        _fake_dist(site, name, version, requires)
 
     def add_program(name):
         (bin_dir / name).write_text("#!/bin/sh\n")
@@ -694,6 +695,20 @@ def test_a_mixed_command_runs_when_it_does_more_than_install(fl, installed, comm
     add_dist, _ = installed
     add_dist("langid", "1.1.6")
     assert _skip(fl, command) is skip
+
+
+def test_extras_skip_only_when_their_dependencies_are_installed(fl, installed):
+    # `pip install "pkg[extra]"` with pkg present but the extra's dependencies missing must run.
+    add_dist, _ = installed
+    add_dist("requestsfake", "2.0", requires = ["idnafake", 'pysocksfake>=1.5; extra == "socks"'])
+    add_dist("idnafake", "1.0")
+    assert _skip(fl, 'pip install "requestsfake[socks]"') is False
+    assert _skip(fl, 'pip install "requestsfake[socks] @ git+https://github.com/x/requestsfake.git"') is False
+    assert _skip(fl, "pip install requestsfake") is True
+    assert _skip(fl, 'pip install "requestsfake[nosuchextra]"') is False
+    add_dist("pysocksfake", "1.7")
+    assert _skip(fl, 'pip install "requestsfake[socks]"') is True
+    assert _skip(fl, 'pip install "requestsfake[socks]>=2"') is True
 
 
 def test_non_install_commands_have_no_decision(fl):
