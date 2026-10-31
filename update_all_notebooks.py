@@ -291,6 +291,76 @@ except Exception: _qat_index = ""
 !pip install --upgrade --force-reinstall torchao=={{_qat_torchao}} fbgemm-gpu-genai=={{_qat_fbgemm}} {{_qat_numpy}} {{_qat_index}}"""
 
 
+# The Colab branch installs `trl` unpinned with --no-deps, and the shared tail
+# then reinstalls the pinned one with --no-deps, so every Colab run downloads the
+# newest trl only to uninstall it a few lines later. Write the tail's pin into
+# the Colab line instead: the tail line stays (it is the pin for the non-Colab
+# branch too) and becomes "already satisfied" on Colab. Both installs are
+# --no-deps, so the environment the cell leaves is unchanged.
+_RE_TAIL_NO_DEPS_TRL_PIN = re.compile(
+    r"^!(?:.*&& )?(?:uv )?pip install(?: -qqq)? --no-deps \"?trl==([0-9][0-9A-Za-z.]*)\"?\s*$", re.MULTILINE
+)
+_RE_BARE_TRL = re.compile(r"(?<=\s)trl(?=\s|$)")
+
+
+def pin_colab_no_deps_trl(install_text):
+    """Pin a bare `trl` on an indented `--no-deps` install line to the cell's final top-level trl pin."""
+    pins = _RE_TAIL_NO_DEPS_TRL_PIN.findall(install_text)
+    if not pins:
+        return install_text
+    final = pins[-1]
+    out = []
+    for line in install_text.split("\n"):
+        body = line.lstrip()
+        if (
+            line != body
+            and body.startswith("!")
+            and "pip install" in body
+            and "--no-deps" in body.split()
+            and "--upgrade" not in body.split()
+            and "--force-reinstall" not in body.split()
+            and len(_RE_BARE_TRL.findall(body)) == 1
+        ):
+            line = line[: len(line) - len(body)] + _RE_BARE_TRL.sub("trl==" + final, body)
+        out.append(line)
+    return "\n".join(out)
+
+
+# Same shape for datasets in the audio notebooks: the Colab line installs
+# "datasets==4.3.0" and a later top-level line (with dependencies) brings it back
+# down to "datasets>=3.4.1,<4.0.0", so every Colab run installs datasets 4.3.0
+# and its dill / fsspec only to replace all three. Give the Colab line the spec
+# the cell ends on; the later line stays and is already satisfied there.
+_RE_QUOTED_DATASETS = re.compile(r'"datasets[=<>!~][^"]*"')
+
+
+def pin_colab_datasets_to_final(install_text):
+    """Use the cell's last top-level datasets spec on the indented Colab install line."""
+    lines = install_text.split("\n")
+    final = None
+    for line in lines:
+        if line.startswith("!") and "pip install" in line and "--no-deps" not in line.split():
+            found = _RE_QUOTED_DATASETS.findall(line)
+            if found:
+                final = found[-1]
+    if final is None:
+        return install_text
+    out = []
+    for line in lines:
+        body = line.lstrip()
+        if (
+            line != body
+            and body.startswith("!")
+            and "pip install" in body
+            and "--no-deps" not in body.split()
+            and "--upgrade" not in body.split()
+            and len(_RE_QUOTED_DATASETS.findall(body)) == 1
+        ):
+            line = line[: len(line) - len(body)] + _RE_QUOTED_DATASETS.sub(lambda m: final, body)
+        out.append(line)
+    return "\n".join(out)
+
+
 def update_or_append_pip_install(base_content, package_name, new_install_line):
     pattern = re.compile(rf"^!(uv )?pip install .*?{package_name}.*$", re.MULTILINE)
 
@@ -1302,6 +1372,20 @@ installation_phone_kaggle_content = update_or_append_pip_install(
 )
 installation_phone_kaggle_content += """\n!pip install torchao==0.15.0 optimum==1.24.0 pytorch-tokenizers executorch==1.1.0
 !pip install git+https://github.com/huggingface/optimum-executorch.git@v0.1.0 --no-deps"""
+
+# Every install cell above, Colab and Kaggle: put the final trl and datasets
+# versions on the Colab branch's own install lines (see pin_colab_no_deps_trl).
+# The AMD composer keeps the first spec it meets per package, so it would read
+# the moved datasets spec as a new pin; _AMD_INSTALL_SOURCE hands it the text
+# from before the move so the AMD cells stay as they were.
+_AMD_INSTALL_SOURCE = {}
+for _name, _value in list(globals().items()):
+    if _name.startswith("installation_") and _name.endswith("_content") and isinstance(_value, str):
+        _single = pin_colab_datasets_to_final(pin_colab_no_deps_trl(_value))
+        if _single != _value:
+            _AMD_INSTALL_SOURCE.setdefault(_single, _value)
+        globals()[_name] = _single
+del _name, _value, _single
 
 OTHER_RESOURCES = """Some other resources:
 1. Looking to use Unsloth locally? Read our [Installation Guide](https://unsloth.ai/docs/get-started/install-and-update) for details on installing Unsloth on Windows, Docker, AMD, Intel GPUs.
@@ -5268,6 +5352,7 @@ def update_notebook_sections(
                         amd_extras_cell_text = None
                         if is_amd_notebook:
                             selected_install_text = "".join(installation) if isinstance(installation, list) else installation
+                            selected_install_text = _AMD_INSTALL_SOURCE.get(selected_install_text, selected_install_text)
                             source_install_texts.insert(0, selected_install_text)
                             if (
                                 is_path_contains_any(notebook_path.lower(), ["grpo"])
@@ -5377,9 +5462,12 @@ def update_notebook_sections(
             )
             if "from unsloth import" in notebook_code or "import unsloth" in notebook_code:
                 source_install_texts = [
-                    installation_synthetic_data_content
-                    if is_path_contains_any(notebook_path.lower(), ["synthetic_data"])
-                    else installation_content
+                    _AMD_INSTALL_SOURCE.get(_text, _text)
+                    for _text in [
+                        installation_synthetic_data_content
+                        if is_path_contains_any(notebook_path.lower(), ["synthetic_data"])
+                        else installation_content
+                    ]
                 ]
                 installation, amd_extras_cell_text = _compose_amd_installation(
                     notebook_path, source_install_texts
