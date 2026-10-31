@@ -430,6 +430,9 @@ def _target_doubt(segments, tokens):
     return _env_redirect("pip")
 
 
+_READ_ONLY_HEADS = {"true", ":", "tail", "head", "grep"}
+
+
 def install_decision(command):
     """Whether an install command can be skipped because what it asks for is already here.
 
@@ -442,10 +445,12 @@ def install_decision(command):
         return (False, "builds another environment")
     versions = None
     details = []
+    ollama_checked = False
     if re.search(r"ollama\.com/install\.sh", command):
         if not shutil.which("ollama"):
             return (False, "ollama is not on PATH")
         details.append("ollama on PATH")
+        ollama_checked = True  # its curl | sh pipeline is the install itself
     segments = _command_segments(command)
     if segments is None:
         return (False, "cannot parse the command")
@@ -479,11 +484,20 @@ def install_decision(command):
             continue
         args = _pip_args(tokens)
         if args is None:
-            continue
+            # Skipping the step skips every command in it, so it only goes when the rest is
+            # read-only: apt's index refresh or a filter on the install's output.
+            if head in _READ_ONLY_HEADS or (head in ("apt", "apt-get") and [t for t in tokens[1:] if not t.startswith("-")] == ["update"]) \
+                    or (head == "command" and tokens[1:2] == ["-v"]) \
+                    or (ollama_checked and head in ("curl", "sh", "bash")):
+                continue
+            return (False, f"also runs `{head}`")
         versions = _installed_versions() if versions is None else versions
         decision = _pip_decision(args, versions)
         if decision is None:
-            continue
+            words = [a for a in args if not a.startswith("-")]
+            if words[:1] in ([], ["list"], ["show"], ["freeze"], ["check"]):
+                continue
+            return (False, f"also runs `{head} {words[0]}`")
         doubt = _target_doubt(segments, segment)
         if doubt:
             return (False, doubt)

@@ -679,6 +679,22 @@ def test_install_decision_forms(fl, installed, command, skip):
     assert _skip(fl, command) is skip
 
 
+@pytest.mark.parametrize("command, skip", [
+    ("pip install langid\nprintf ready > setup.txt\n", False),
+    ("pip install langid && git clone https://github.com/x/y.git", False),
+    ("pip install langid; wget -q https://example.com/data.zip", False),
+    ("pip install langid && python -c 'open(\"cfg\", \"w\").write(\"x\")'", False),
+    ("pip install -q langid 2>&1 | tail -n 1", True),
+    ("pip install -q langid && pip download -d wheels langid", False),
+    ("mkdir -p out && pip install langid", False),
+])
+def test_a_mixed_command_runs_when_it_does_more_than_install(fl, installed, command, skip):
+    # Skipping the step skips every command in it, so anything besides installs keeps it running.
+    add_dist, _ = installed
+    add_dist("langid", "1.1.6")
+    assert _skip(fl, command) is skip
+
+
 def test_non_install_commands_have_no_decision(fl):
     assert fl.install_decision("git clone https://github.com/x/y.git") is None
     assert fl.install_decision("uv venv -q --allow-existing --python 3.12 litert_env") is None
@@ -812,7 +828,7 @@ def test_plain_commands_for_this_interpreter_still_skip(fl, installed):
     add_dist("langid")
     for command in ("pip install langid", "pip3 install langid", "python -m pip install langid",
                     "python3 -m pip install langid", f"{sys.executable} -m pip install langid",
-                    "uv pip install langid", "mkdir -p out && pip install langid",
+                    "uv pip install langid",
                     "unsloth install-kernels langid"):
         assert _skip(fl, command) is True, command
 
