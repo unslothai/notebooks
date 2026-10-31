@@ -475,6 +475,8 @@ _UNSAFE = re.compile(
     r"|SyntheticDataKit\.from_pretrained\("
     # Outer models built outside Unsloth: their merge / save skip the collective export.
     r"|OmniVoice\.from_pretrained\("
+    # A memmap every process opens for writing at the same path.
+    r"|np\.memmap\([^)]*['\"]w\+"
     r"|os\.remove\(|os\.unlink\(|shutil\.rmtree\(|shutil\.move\(|os\.rename\("
 )
 
@@ -567,6 +569,9 @@ def test_single_process_list_names_real_scripts():
     "Kaggle-Oute_TTS_(1B).py",
     "OmniVoice_(0.6B)-TTS.py",
     "Kaggle-OmniVoice_(0.6B)-TTS.py",
+    "Llasa_TTS_(1B).py",
+    "AMD-Llasa_TTS_(3B).py",
+    "Kaggle-Llasa_TTS_(1B).py",
 ])
 def test_single_process_launchers_say_so(name):
     assert (SCRIPTS / name).is_file()
