@@ -7104,67 +7104,38 @@ def _assert_amd_script_count(notebook_folder="nb", script_folder="python_scripts
 
 
 
-# fsdp2_scripts/: one launcher per python_scripts/*.py, run under torchrun via
-# the helper copied from scripts/fsdp2_launch.py.
-
 FSDP2_HELPER_SOURCE = os.path.join("scripts", "fsdp2_launch.py")
 FSDP2_HELPER_NAME = "unsloth_fsdp2_launch.py"
 FSDP2_README_NAME = "README.md"
-# Scripts unsafe on several ranks, by base name (AMD-/Kaggle-/Course- variants share
-# the entry): they run single process unless UNSLOTH_FSDP2_FORCE=1.
-# tests/test_fsdp2_scripts_mirror.py guards this list against new unsafe scripts.
+# Unsafe on several ranks, keyed by base name (variants share the entry); guarded by
+# tests/test_fsdp2_scripts_mirror.py.
 FSDP2_SINGLE_PROCESS = {
-    # Clones NeMo-Gym and runs uv / pip through subprocess.run, outside the adapter.
     "NeMo-Gym-Sudoku.py": "clones and installs NeMo-Gym through Python subprocess calls",
     "NeMo-Gym-Multi-Environment.py": "clones and installs NeMo-Gym through Python subprocess calls",
-    # subprocess.Popen(vllm serve ... --port 8000): every rank would bind the same port.
     "Meta-Synthetic-Data-Llama3.1_(8B).py": "starts a vLLM server on fixed port 8000 from Python",
-    # SyntheticDataKit.from_pretrained runs `vllm serve` on port 8000 itself.
     "Meta_Synthetic_Data_Llama3_2_(3B).py": "starts a vLLM server on fixed port 8000 through SyntheticDataKit",
-    # Every rank writes the same <shard>.json.tmp and the second os.replace fails.
     "Synthetic_Data_Hackathon.py": "ranks would write the same temporary shard files",
-    # temp_eval_image_{idx}.jpg / temp_output are shared paths that ranks delete.
     "Deepseek_OCR_(3B)-Evaluation.py": "ranks would share and delete the same temporary image files",
-    # subprocess.Popen(["ollama", "serve"]) binds Ollama's fixed port on every rank.
     "Llama3_(8B)-Ollama.py": "starts an Ollama server on its fixed port from Python",
-    # subprocess.Popen(... "--port", "8000"): every rank would bind the same port.
     "Gemma3N_(2B)-Inference.py": "starts a server on fixed port 8000 from Python",
-    # Its install cell clones OuteTTS, then deletes files from that one checkout with
-    # os.remove; on several ranks the second remove of the same path fails.
     "Oute_TTS_(1B).py": "patches one shared OuteTTS checkout with os.remove calls",
-    # OmniVoice.from_pretrained builds the outer model, so its merge_and_unload and
-    # save_pretrained skip Unsloth's collective export and fail on FSDP2 DTensors.
+    # OmniVoice.from_pretrained builds the outer model, so export fails on DTensors.
     "OmniVoice_(0.6B)-TTS.py": "merges and saves an OmniVoice model outside Unsloth's collective FSDP2 export",
-    # preprocess_and_save opens processed_data_memmap/input_ids.memmap with mode w+ and
-    # rewrites input_ids_shape.npy per example; ranks would truncate each other's files.
     "Llasa_TTS_(1B).py": "every process would rewrite the same preprocessed memmap and shape files",
     "Llasa_TTS_(3B).py": "every process would rewrite the same preprocessed memmap and shape files",
-    # Each process writes the same media files with open(path, "wb").write(...) and later
-    # reads them back, so one process can read a file another is still truncating or writing.
     "EmbeddingGemma2_(300M)-Audio.py": "every process would rewrite the same audio files it then reads",
     "EmbeddingGemma2_(300M)-Image_Text.py": "every process would rewrite the same image files it then reads",
     "EmbeddingGemma2_(300M)-Multimodal_Search.py": "every process would write the same audio and video files it then reads",
-    # Each process saves a dataset image to your_image.jpg, then model.infer opens that path
-    # (and writes its results to one output_path); a process can open a JPEG another one is
-    # still truncating, and DeepSeek-OCR's loader then fails with AttributeError.
+    # A half-written JPEG makes DeepSeek-OCR's loader fail with AttributeError.
     "Deepseek_OCR_(3B).py": "every process would rewrite your_image.jpg while another reads it for model.infer",
     "Deepseek_OCR_(3B)-Eval.py": "every process would rewrite your_image.jpg while another reads it for model.infer",
     "Deepseek_OCR_2_(3B).py": "every process would rewrite your_image.jpg while another reads it for model.infer",
-    # launch_openenv (unsloth_zoo) Popens a uvicorn OpenEnv server on a random port. The seed
-    # is the same on every rank, so all ranks pick the same port; the later ones fail to bind,
-    # pass the health check against the first rank's server and play its one 2048 game.
+    # Later ranks fail to bind but pass the health check against rank 0's server.
     "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py": "every process would start an OpenEnv server on the same seeded port and share one game",
     "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py": "every process would start an OpenEnv server on the same seeded port and share one game",
-    # Each process generates its own dataset through the OpenAI API, then all of them write
-    # raft_train.jsonl; interleaved writes of different lengths can leave invalid JSONL.
     "Llama3.2_(1B)-RAFT.py": "every process would write its own generated dataset to the same raft_train.jsonl",
-    # Each process writes its own sampled speech to example_without_context.wav (twice) and
-    # example_with_context.wav with sf.write; concurrent writes can mix their samples.
     "Sesame_CSM_(1B)-TTS.py": "every process would write its own generated audio to the same WAV files",
-    # model.generate is collective under native FSDP2: every process must make the same
-    # number of calls. These scripts generate in loops that stop on each process's own
-    # sampled output, so one process can wait in a generate the others never start.
-    # Spark also writes generated_speech_controllable.wav from every process.
+    # generate is collective under native FSDP2: every process must call it equally often.
     "Spark_TTS_(0_5B).py": "samples speech again after a codec shape error on one process only, and every process would write the same WAV file",
     "gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py": "its sampled Minesweeper games end on each process's own moves, so processes would make different numbers of collective generate calls",
     "Openenv_wordle_grpo.py": "its Wordle turns end when each process's own game does, so processes would make different numbers of collective generate calls",
@@ -7191,7 +7162,6 @@ def fsdp2_single_process_reason(script_name):
     return FSDP2_SINGLE_PROCESS.get(_fsdp2_base_name(script_name))
 
 
-# Characters that would end a comment line or turn the target name into a path.
 _FSDP2_FORBIDDEN_NAME_CHARS = frozenset("/\\\n\r\x00")
 
 
@@ -7391,8 +7361,7 @@ def _fsdp2_script_names(script_folder, include_prefix=None):
 
 
 def _fsdp2_robust(func, *paths):
-    """``func(*paths)``, retrying once after clearing a read-only bit (Windows refuses
-    to replace or delete a read-only file), like ``_rmtree_robust``."""
+    """``func(*paths)``, retrying once after clearing a Windows read-only bit."""
     try:
         return func(*paths)
     except PermissionError:
@@ -7408,19 +7377,11 @@ def generate_fsdp2_scripts(
     include_prefix=None,
     helper_path=None,
 ):
-    """Mirror ``script_folder`` into ``output_folder`` as FSDP2 launchers.
+    """Mirror ``script_folder`` into ``output_folder`` as FSDP2 launchers + README + helper copy.
 
-    Renders one launcher per ``script_folder/*.py``, the README, and a byte
-    copy of the helper (``scripts/fsdp2_launch.py`` beside ``script_folder``
-    unless ``helper_path`` is given). Everything is rendered and staged in a
-    temporary directory first, so a render or staging failure (a bad script
-    name, a missing helper) leaves ``output_folder`` as it was. Files are then
-    replaced one at a time, so a failure while replacing or removing can leave
-    some files already updated; the next run finishes the job. Only files whose
-    bytes changed are replaced (unchanged ones still get their permissions
-    reset), and launchers with no ``script_folder`` twin are removed. With ``include_prefix`` (the AMD-only
-    pass) both the launchers written and the stale ones removed are limited
-    to names with that prefix. Returns ``{"written": [...], "removed": [...]}``.
+    Staged in a temp dir first so a render failure leaves ``output_folder`` untouched; only
+    changed files are replaced, orphans removed, both scoped to ``include_prefix``.
+    Returns ``{"written": [...], "removed": [...]}``.
     """
     if helper_path is None:
         repo_root = os.path.dirname(os.path.abspath(script_folder))
@@ -7575,8 +7536,7 @@ def _summarize_git_diff():
         other_changes = []
 
         for filepath in changed_files:
-            # Only the repository README; generated folder READMEs (fsdp2_scripts/
-            # and the like) are ordinary changes.
+            # Root README only; generated folder READMEs are ordinary changes.
             if filepath == "README.md":
                 readme_changes.append(filepath)
                 continue

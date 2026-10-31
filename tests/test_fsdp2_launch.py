@@ -370,9 +370,7 @@ def test_unknown_magic_raises(fl):
         shell.run_cell_magic("html", "", "<b>x</b>")
 
 
-# ---------------------------------------------------------------------------------------
 # Real two-rank torchrun on CPU.
-# ---------------------------------------------------------------------------------------
 _FAKE_MIRROR = textwrap.dedent('''\
     import json, os, subprocess, sys
     rank = os.environ["RANK"]
@@ -464,8 +462,7 @@ def _torchrun_case(tmp_path, extra_env):
     (root / "fsdp2_scripts" / "unsloth_fsdp2_launch.py").write_text(LAUNCH_PATH.read_text())
     launcher = root / "fsdp2_scripts" / SCRIPT_NAME
     launcher.write_text(_LAUNCHER_STUB.format(name = SCRIPT_NAME))
-    # "Installs" are observable without installing anything: `pip` reaches a fake pip
-    # module through this interpreter, and `uv` on PATH only records it was called.
+    # Fake pip module and a recording `uv` on PATH: nothing really installs.
     shim = tmp_path / "shim"
     shim.mkdir()
     (shim / "uv").write_text('#!/bin/bash\necho "uv-ran $*" >> "$FAKE_LOG"\n')
@@ -503,8 +500,6 @@ def test_real_torchrun_two_ranks_on_cpu(tmp_path):
     assert log.count("capture-bang") == 1
     assert log.count("after-install") == 1
     assert log.count("getoutput-ran") == 1
-    # By default an install of a missing package runs once per node, and one whose
-    # package is already installed is skipped with a note naming the command.
     assert log.count("pip-ran install fake-pkg-xyz") == 1
     assert log.count("uv-ran pip install --system fake-pkg-abc") == 1
     assert not any(line.startswith("path-") for line in log)
@@ -556,9 +551,7 @@ def test_real_torchrun_installs_opt_out(tmp_path):
     assert sorted(ranks) == ["rank0", "rank1"]
 
 
-# ---------------------------------------------------------------------------------------
 # Install decisions.
-# ---------------------------------------------------------------------------------------
 def _fake_dist(site, name, version, requires = ()):
     info = site / f"{name}-{version}.dist-info"
     info.mkdir(parents = True)
@@ -577,8 +570,7 @@ def installed(fl, tmp_path, monkeypatch):
     bin_dir.mkdir()
     monkeypatch.setenv("PATH", str(bin_dir))
     monkeypatch.setattr(fl, "_dpkg_installed", lambda package: False)
-    # Only the fake site counts, and the test interpreter counts as a virtual environment
-    # (which the shell steps name to uv through VIRTUAL_ENV), whatever runs the tests.
+    # Pretend to be in a venv whatever runs the tests.
     monkeypatch.setattr(fl, "_in_venv", lambda: True)
     for name in ("UV_PYTHON", "UV_SYSTEM_PYTHON", *fl._PIP_ENV_REDIRECTS):
         monkeypatch.delenv(name, raising = False)
@@ -604,8 +596,7 @@ def _skip(fl, command):
     return decision[0]
 
 
-# Lines exactly as they appear in python_scripts/, so the decision is tested on the real
-# install steps rather than on a paraphrase of them.
+# Verbatim install lines from python_scripts/.
 _REAL_LINES = {
     "DeepSeek_R1_0528_Qwen3_(8B)_GRPO.py": "pip install langid -qq",
     "Gemma3_(270M).py": 'uv pip install -q --python litert_env/bin/python --torch-backend cpu '
@@ -884,8 +875,7 @@ def test_redirection_variables_that_name_this_environment_still_skip(fl, install
     (True, "uv pip install langid", None, True),
     (True, "uv pip install --system -qqq langid", None, False),
     (True, "uv pip install langid", "true", False),
-    # Outside a virtual environment uv takes VIRTUAL_ENV, CONDA_PREFIX or a .venv above
-    # the working directory, or its own system interpreter: never provably this one.
+    # Outside a venv uv may pick another interpreter.
     (False, "uv pip install langid", None, False),
     (False, "uv pip install --system -qqq langid", None, False),
     (False, "uv pip install langid", "true", False),
@@ -931,9 +921,7 @@ def test_single_process_install_rules_match_the_multi_gpu_ones(
         assert "skipped install step" in err and "pip install pytest" in err
 
 
-# ---------------------------------------------------------------------------------------
 # Launch environment.
-# ---------------------------------------------------------------------------------------
 def test_each_launch_gets_a_fresh_run_id(fl, layout, monkeypatch):
     _, launcher, _ = layout
     calls = _stub(fl, monkeypatch, visible = 2)
@@ -1247,10 +1235,8 @@ def test_gpu_count_failure_prints_the_childs_error(fl, monkeypatch, capfd):
     assert err.count("ImportError: boom") == 1 and "assuming none is visible" in err
 
 
-# ---------------------------------------------------------------------------------------
 # Marker protocol: private folder, safe writes, validated content, arrival + hash
 # handshake, rank 0's decision / output / error reaching every rank.
-# ---------------------------------------------------------------------------------------
 @pytest.fixture
 def ranked(fl, tmp_path, monkeypatch):
     """An in-process FSDP2Shell playing one local rank of two, markers under tmp_path."""
@@ -1358,8 +1344,7 @@ def test_peers_follow_rank0_install_decision(fl, ranked, tmp_path, monkeypatch):
     make, folder = ranked
     log = _shim_pip(tmp_path, monkeypatch)
     command = "pip install never-installed-pkg-xyz"
-    # Rank 0 recorded a skip (say it saw the package installed); rank 1 must not decide
-    # again from its own view of the environment, where the package is missing.
+    # Rank 1 must follow rank 0's skip, not re-decide from its own view.
     _done(fl, folder(), 1, command, skipped = True)
     assert make(1)._system(command) == 0
     assert not log.exists()
@@ -1410,9 +1395,7 @@ def test_real_torchrun_divergent_ranks_fail_clearly(tmp_path):
     assert "diverged at step 1" in result.stdout + result.stderr
 
 
-# ---------------------------------------------------------------------------------------
 # Adapter injection, credentials in logs, bash on Windows.
-# ---------------------------------------------------------------------------------------
 def test_worker_uses_the_adapter_even_inside_ipython(fl, layout, monkeypatch):
     import builtins
     tmp, launcher, _ = layout
@@ -1460,9 +1443,7 @@ def test_windows_needs_a_real_bash(fl, monkeypatch):
     assert fl.FSDP2Shell._bash().endswith("bash.exe")
 
 
-# ---------------------------------------------------------------------------------------
 # Launch argv corners and single-process scripts.
-# ---------------------------------------------------------------------------------------
 def test_double_separator_keeps_a_literal_separator(fl, layout, monkeypatch):
     _, launcher, _ = layout
     calls = _stub(fl, monkeypatch, visible = 2)

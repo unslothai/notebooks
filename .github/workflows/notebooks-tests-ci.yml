@@ -288,16 +288,11 @@ jobs:
           python -m pytest tests/test_python_scripts_keep_standby_env.py -q --tb=short
 
       - name: tests/test_fsdp2_scripts_mirror.py
-        # fsdp2_scripts/ holds one generated multi-GPU launcher per
-        # python_scripts/*.py plus a copy of scripts/fsdp2_launch.py. Names
-        # must match in both directions and every file must equal what
-        # update_all_notebooks.py renders today.
+        # fsdp2_scripts/ must equal what update_all_notebooks.py renders today.
         run: |
           python -m pytest tests/test_fsdp2_scripts_mirror.py -q --tb=short
 
       - name: tests/test_fsdp2_adapter_covers_scripts.py
-        # Every shell line and magic python_scripts/ hands to get_ipython()
-        # is one the fsdp2 launcher's adapter handles.
         run: |
           python -m pytest tests/test_fsdp2_adapter_covers_scripts.py -q --tb=short
       - name: tests/test_python_scripts_no_live_install_magic.py
@@ -442,9 +437,7 @@ jobs:
           python -m pytest tests/test_notebook_api_drift.py -v --tb=short
 
   fsdp2-launch:
-    # The fsdp2_scripts/ launcher helper, including a real 2-process
-    # torch.distributed.run on CPU (gloo). Only needs CPU torch, so it runs
-    # once here instead of once per api-drift matrix cell.
+    # CPU torch only (real 2-rank gloo run), so once here, not per api-drift cell.
     name: tests/test_fsdp2_launch.py (HARD GATE)
     runs-on: ubuntu-latest
     timeout-minutes: 15

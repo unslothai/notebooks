@@ -88,9 +88,7 @@ def _snapshot(folder):
     return {p.name: p.read_bytes() for p in sorted(Path(folder).iterdir()) if p.is_file()}
 
 
-# ---------------------------------------------------------------------------
 # The committed tree
-# ---------------------------------------------------------------------------
 
 def test_there_are_scripts_to_mirror():
     assert len(_script_names()) > 100, "python_scripts/ looks empty; the mirror check would be vacuous"
@@ -182,9 +180,7 @@ def test_every_launcher_parses_and_names_its_own_existing_script():
     assert not problems, "\n".join(problems[:20])
 
 
-# ---------------------------------------------------------------------------
 # The renderer
-# ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("name", [
     "Qwen3_(4B)-GRPO.py",
@@ -233,9 +229,7 @@ def test_readme_has_no_em_dash_or_emoji():
     assert all(ord(ch) < 0x2000 for ch in text), "non-ASCII symbol in README"
 
 
-# ---------------------------------------------------------------------------
 # The generator, in throwaway trees
-# ---------------------------------------------------------------------------
 
 def _tree(tmp_path, names, helper=b"def main(launcher_path, script_name, argv=None):\n    pass\n"):
     scripts = tmp_path / "python_scripts"
@@ -461,9 +455,7 @@ def test_launcher_helper_tests_run_in_their_own_ci_job():
     assert "https://download.pytorch.org/whl/cpu" in runs and "pytest" in runs
 
 
-# ---------------------------------------------------------------------------
 # Scripts that must run single process
-# ---------------------------------------------------------------------------
 
 import re  # noqa: E402
 
@@ -552,14 +544,8 @@ def test_scripts_that_start_servers_or_processes_are_single_process():
     )
 
 
-# Plain-Python writes to a literal path that the same run reads back (the literal shows up
-# again later, e.g. image_file = "your_image.jpg"). Every rank runs them, so one rank can
-# read a file another rank is still truncating or writing. Unsloth's own saves are left
-# out: save_pretrained / save_pretrained_merged / save_lora are collective under FSDP2
-# (rank 0 writes) and the GGUF / torchao exports refuse an FSDP2 model on every rank.
-# tokenizer / processor .save_pretrained (plain transformers) do run on every rank, but
-# write the same bytes and no script reloads them in the same run; this check would flag
-# one that did only through a literal path, which is how the notebooks write them.
+# Literal-path writes the run reads back: a rank can read a file another is still writing.
+# Unsloth saves are excluded (collective under FSDP2, or refused on FSDP2 models).
 _PATH_WRITERS = {
     "save", "to_json", "to_csv", "to_parquet", "save_to_disk", "imwrite", "savez", "tofile",
     "write_text", "write_bytes", "extractall", "copy", "copy2", "copyfile", "copytree", "move",
@@ -646,9 +632,7 @@ def test_scripts_that_write_then_read_a_shared_path_are_single_process():
     )
 
 
-# Generated audio / images written from Python to a fixed path. Every rank generates its
-# own sample, so ranks write different bytes to one file and the result can interleave
-# them, whether or not the run reads the file back. In-memory buffers do not count.
+# Generated media to a fixed path: ranks write different samples into one file.
 _MEDIA_SUFFIXES = (
     ".wav", ".flac", ".mp3", ".ogg", ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif",
     ".tif", ".tiff", ".mp4",
@@ -724,14 +708,8 @@ def test_scripts_that_write_generated_media_to_a_fixed_path_are_single_process()
     )
 
 
-# model.generate is collective under native FSDP2 (native_fsdp2_unsharded all-gathers on
-# every rank), so every rank must make the same number of calls. A generate inside a loop
-# that can stop early (while, break / continue / return in the loop) or inside a try whose
-# handler generates again runs a count that follows each rank's own output: sampled text,
-# parse results, game or environment state. One rank then waits in an all-gather another
-# rank never enters. Helpers are followed: a script function that generates counts as a
-# generate call wherever it is called. A for loop over a fixed list without an early exit
-# is fine.
+# generate is collective under native FSDP2: a call count driven by each rank's own output
+# (early-exit loops, retry in except) deadlocks. Helpers that generate are followed.
 _COLLECTIVE_CALLS = {"generate", "fast_generate", "infer", "generate_rollout_completions"}
 _SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 

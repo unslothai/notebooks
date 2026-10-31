@@ -115,19 +115,14 @@ _LAUNCHER_FLAGS = ("--nproc-per-node", "--nproc_per_node", "--dry-run", "--help"
 _WAIT_NOTE_SECONDS = 60
 _POLL_SECONDS = 0.2
 _DEFAULT_WAIT_TIMEOUT = 6 * 3600
-# How long local rank 0 waits at exit for the other local ranks to read the last marker
-# before it removes the marker folder. Past this the folder is left behind; its name is
-# unique to the launch, so it is never reused.
+# Rank 0's exit wait for peers to read the last marker; past it the (unique) folder is left.
 _CLEANUP_WAIT_SECONDS = 120
 _PREFIX = "[unsloth fsdp2]"
-# Set by the parent before it starts torchrun, so the marker folder is unique per launch.
 _RUN_ID_ENV = "UNSLOTH_FSDP2_RUN_ID"
-# Set in a worker for multiprocessing spawn / forkserver children (see _patch_spawn).
 _MP_TARGET_ENV = "UNSLOTH_FSDP2_MP_TARGET"
 _IS_WINDOWS = os.name == "nt"
 
-# Every get_ipython() call form the adapter implements, as (method, magic name);
-# tests/test_fsdp2_adapter_covers_scripts.py checks python_scripts/ against it.
+# (method, magic name) pairs; tests/test_fsdp2_adapter_covers_scripts.py checks against it.
 SUPPORTED_CALLS = frozenset({
     ("system", None),
     ("getoutput", None),
@@ -140,8 +135,6 @@ SUPPORTED_CALLS = frozenset({
     ("run_line_magic", "capture"),
 })
 
-# Shell commands that change the Python / system environment. install_decision() says
-# whether one can be skipped; when it runs, it runs on local rank 0 only.
 _INSTALL_PATTERNS = (
     re.compile(r"(?<![\w.-])(?:pip3?|uv\s+pip|python[\d.]*\s+-m\s+pip)\b[^\n;&|]*?\b(?:install|uninstall)\b"),
     re.compile(r"(?<![\w.-])apt(?:-get)?\b[^\n;&|]*?\binstall\b"),
@@ -155,13 +148,11 @@ def is_install_command(command):
     return any(pattern.search(command) for pattern in _INSTALL_PATTERNS)
 
 
-# A command that builds another environment: whatever it installs is not for this one.
 _OTHER_ENV = re.compile(r"(?<![\w.-])(?:uv\s+venv|virtualenv|python[\d.]*\s+-m\s+(?:venv|virtualenv))\b")
 # A shell comment starts at a word boundary, so `...#egg=name` in a URL stays.
 _COMMENT = re.compile(r"(?<!\S)#.*$")
 _PIP_EXE = re.compile(r"^pip[\d.]*$")
 _PYTHON_EXE = re.compile(r"^python[\d.]*$")
-# pip / uv pip options that take a value as the next argument.
 _PIP_VALUE_FLAGS = frozenset({
     "-c", "--constraint", "-i", "--index-url", "--extra-index-url", "--index",
     "--default-index", "-f", "--find-links", "--torch-backend", "-C", "--config-settings",
@@ -172,9 +163,9 @@ _PIP_VALUE_FLAGS = frozenset({
     "--exclude-newer", "--link-mode", "--overrides", "--build-constraint", "--report",
     "--global-option", "--root-user-action", "--group", "--extra", "-P", "--upgrade-package",
 })
-# Options that send the install to another interpreter or folder: never skipped.
+# Never skipped: installs elsewhere.
 _PIP_OTHER_ENV_FLAGS = frozenset({"--python", "-p", "--target", "-t", "--prefix", "--root"})
-# Options whose effect cannot be checked from the argument list: never skipped.
+# Never skipped: effect not checkable from argv.
 _PIP_UNCHECKABLE_FLAGS = frozenset({"-r", "--requirement", "-e", "--editable"})
 
 
@@ -186,8 +177,7 @@ def _in_venv():
     return sys.prefix != getattr(sys, "base_prefix", sys.prefix)
 
 
-# Inherited variables that send pip / uv pip somewhere other than this interpreter, the
-# same as the matching flags in _PIP_OTHER_ENV_FLAGS (pip reads any option as PIP_<NAME>).
+# Env forms of _PIP_OTHER_ENV_FLAGS (pip reads any option as PIP_<NAME>).
 _PIP_ENV_REDIRECTS = ("PIP_TARGET", "PIP_PREFIX", "PIP_ROOT", "PIP_PYTHON")
 
 
@@ -196,9 +186,6 @@ def _env_redirect(tool):
     install check does not read, or None."""
     if tool == "uv":
         if not _in_venv():
-            # Outside a virtual environment nothing names this interpreter for uv: it takes
-            # VIRTUAL_ENV, CONDA_PREFIX or a .venv above the working directory, or for
-            # --system its own pick of system interpreter.
             return "uv pip from a Python outside a virtual environment installs where uv finds one"
         target = os.environ.get("UV_PYTHON", "").strip()
         here = (os.path.abspath(sys.executable), os.path.abspath(sys.prefix))
@@ -228,8 +215,7 @@ def _installed_versions():
     return versions
 
 
-# Repositories whose distribution name is known without running pip. Only these exact
-# repos, and only without a #subdirectory=, map from the URL to a name.
+# Exact repos (no #subdirectory=) whose distribution name is known without running pip.
 _KNOWN_REPOS = {
     "github.com/unslothai/unsloth": "unsloth",
     "github.com/unslothai/unsloth-zoo": "unsloth_zoo",
@@ -555,15 +541,10 @@ def install_decision(command):
     return (True, "; ".join(details))
 
 
-# install_decision() reads this interpreter's packages, so a shell step's pip must install
-# into it rather than into whichever pip PATH finds first. On the command's first line so
-# bash's line numbers in error messages still match the cell.
-# Below the pinned interpreter (_UNSLOTH_FSDP2_PINNED set) the names fall back to PATH:
-# if $UNSLOTH_FSDP2_PYTHON is a bash wrapper that runs `python3` by name, the exported
-# function would otherwise call the wrapper again without end.
-# ${...:-} so a step running under `set -u` (nounset) does not stop on the unset guard.
-# A step that activates another environment (VIRTUAL_ENV or CONDA_PREFIX no longer the
-# launcher's) means that environment's commands, so the names fall back to PATH there too.
+# Pin python/pip/unsloth to this interpreter (what install_decision() reads); kept on the
+# first line so bash line numbers match the cell. Falls back to PATH when already pinned
+# (a wrapper calling python3 would recurse) or another venv/conda env is active.
+# ${...:-} survives `set -u`.
 _PIN_GUARD = (
     '{ [ -n "${_UNSLOTH_FSDP2_PINNED:-}" ] || [ "${VIRTUAL_ENV:-}" != "${_UNSLOTH_FSDP2_VENV:-}" ] '
     '|| [ "${CONDA_PREFIX:-}" != "${_UNSLOTH_FSDP2_CONDA:-}" ]; } && { command %s "$@"; return; }; '
@@ -573,7 +554,6 @@ _SHELL_PREAMBLE = (
     'python3() { ' + _PIN_GUARD % "python3" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
     'pip() { ' + _PIN_GUARD % "pip" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
     'pip3() { ' + _PIN_GUARD % "pip3" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" -m pip "$@"; }; '
-    # The `unsloth` console script of this interpreter, run the way the script runs it.
     'unsloth() { ' + _PIN_GUARD % "unsloth"
     + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" -c "$_UNSLOTH_FSDP2_CLI" "$@"; }; '
     "export -f python python3 pip pip3 unsloth; "
@@ -603,8 +583,7 @@ def _log(message):
     print(f"{_PREFIX} {message}", file = sys.__stderr__, flush = True)
 
 
-# Secrets that must not reach a log line: URL userinfo, index URLs, header values and
-# token-shaped strings. Messages name the unexpanded step and pass through this too.
+# Masks URL userinfo, index URLs, header values and token-shaped strings in log lines.
 _REDACTIONS = (
     (re.compile(r"(?i)(\b[a-z][a-z0-9+.-]*://)[^/\s@'\"]+@"), r"\1***@"),
     (re.compile(r"(?i)((?:--(?:extra-)?index-url|--find-links|-[if])(?:\s+|=))(\S+)"), r"\1***"),
@@ -626,8 +605,7 @@ def _short(command, limit = 160):
     return command if len(command) <= limit else command[: limit - 3] + "..."
 
 
-# IPython-style expansion ({expr}, $name) with DollarFormatter's rules: $$ is a literal
-# $, $name inside single quotes is left alone, any failure leaves the string untouched.
+# IPython DollarFormatter rules: $$ is literal, $name in single quotes kept, failure = unchanged.
 class _DollarFormatter(string.Formatter):
     _dollar = re.compile(r"(.*?)\$(\$?[\w\.]+)(?=([^']*'[^']*')*[^']*$)")
 
@@ -653,8 +631,7 @@ class _DollarFormatter(string.Formatter):
             if field is not None:
                 if spec:
                     field = ":".join([field, spec])
-                # The expression comes from the script being run, exactly as IPython
-                # evaluates it for `!cmd {expr}` in the notebook.
+                # Same eval IPython does for `!cmd {expr}`; the expression is the script's own.
                 value = eval(field, dict(kwargs))
                 pieces.append(self.format_field(self.convert_field(value, conversion), ""))
         return "".join(pieces)
@@ -690,8 +667,7 @@ def _minimal_transform(body):
         line = lines[index]
         stripped = line.lstrip()
         if stripped.startswith(("!", "%")) or _ASSIGN_BANG.match(line):
-            # IPython joins backslash-continued escaped lines the same way
-            # (inputtransformer2.assemble_continued_line).
+            # As IPython's inputtransformer2.assemble_continued_line.
             parts = [line]
             while parts[-1].rstrip().endswith("\\") and index + 1 < len(lines):
                 index += 1
@@ -748,8 +724,6 @@ def _env_int(*names, default):
 
 
 def _local_world_size():
-    # Processes on this node: torchrun's LOCAL_WORLD_SIZE, DeepSpeed's LOCAL_SIZE, Open MPI's
-    # and MPICH's local counts; the global WORLD_SIZE only when none of them is set.
     return _env_int("LOCAL_WORLD_SIZE", "LOCAL_SIZE", "OMPI_COMM_WORLD_LOCAL_SIZE", "MPI_LOCALNRANKS",
                     "WORLD_SIZE", default = 1)
 
@@ -764,9 +738,7 @@ def _pid_alive(pid):
     return True
 
 
-# Marker files. The folder lives in a possibly shared temp dir, so it must be ours: a
-# private folder (0700, owned by this uid, not a symlink), files created exclusively
-# without following symlinks, and content that is checked before it is believed.
+# Markers live in a shared temp dir: private 0700 folder we own, O_EXCL|O_NOFOLLOW files, validated content.
 _O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
 
@@ -857,20 +829,13 @@ class _Divergence(RuntimeError):
 
 
 class FSDP2Shell:
-    """The few ``get_ipython()`` operations the notebook mirrors use, made safe for N ranks.
+    """The ``get_ipython()`` subset the mirrors use, made safe for N ranks.
 
-    With 2+ local ranks, shell commands (``!cmd``, ``x = !cmd``, ``%%bash``) and file
-    writes run on local rank 0 only. Step ``n`` (counted per call on every rank) goes:
-    each other local rank writes ``n.arrived.<rank>`` with a hash of the step's
-    unexpanded text; rank 0 waits for all of them, checks the hashes agree, runs or
-    skips the step, and writes ``n.done`` with its return code, output lines, whether
-    it skipped an install, and any error. The others take all of that from the marker,
-    so every rank sees rank 0's decision, output and failure. A hash mismatch means the
-    ranks reached different steps and raises. Markers live in a private folder under the
-    temp dir (``<tmp>/unsloth_fsdp2_<launch>``) because there may be no process group
-    yet. ``%env`` / ``%cd`` run on every rank. In a multiprocessing spawn / forkserver
-    child, which re-imports the script, shell steps, file writes and ``%cd`` are
-    skipped: the parent already ran them.
+    Shell steps and file writes run on local rank 0. For step ``n`` peers write
+    ``n.arrived.<rank>`` with a hash of the unexpanded text; rank 0 checks the hashes
+    agree (mismatch raises), runs or skips, and writes ``n.done`` (code, output, skipped,
+    error) for peers to adopt. Files, not a process group, since none may exist yet.
+    ``%env`` / ``%cd`` run on every rank; spawn children skip steps the parent ran.
     """
 
     def __init__(self, mp_child = False):
@@ -885,7 +850,6 @@ class FSDP2Shell:
         self._skip_noted = False
         self._child_noted = False
 
-    # -- synchronisation -------------------------------------------------------------
     @staticmethod
     def _wait_timeout():
         value = os.environ.get("UNSLOTH_FSDP2_WAIT_TIMEOUT", "").strip()
@@ -896,10 +860,7 @@ class FSDP2Shell:
 
     def _markers(self):
         if self._marker_dir is None:
-            # One folder per launch. The parent launcher sets UNSLOTH_FSDP2_RUN_ID; under
-            # another launcher (the user's torchrun, deepspeed, ...) every local rank of
-            # one launch shares its parent process, and torchrun's default rendezvous id
-            # is the literal "none", so the parent pid is always part of the name.
+            # Parent pid always in the name: torchrun's default rendezvous id is the literal "none".
             run_id = os.environ.get(_RUN_ID_ENV, "").strip()
             if run_id:
                 parts = [run_id]
@@ -1137,7 +1098,6 @@ class FSDP2Shell:
         self._unsupported("run_line_magic", magic_name, frame)
 
     def _cd(self, line):
-        # Like IPython's %cd: a missing folder prints the error and the script goes on.
         if self.mp_child:
             return self._child_skip()
         target = os.path.expanduser(line.strip().strip("'\"") or "~")
@@ -1151,8 +1111,7 @@ class FSDP2Shell:
 
     @staticmethod
     def _env(line):
-        # Mirrors IPython's %env / %set_env, including keeping a trailing comment in the
-        # value, so the variable a script sees is the one it sees in the notebook.
+        # Mirrors IPython's %env, trailing comment kept in the value.
         if not line.strip():
             return {
                 key: "<hidden>" if any(s in key.lower() for s in ("key", "token", "secret")) else value
@@ -1240,8 +1199,6 @@ class FSDP2Shell:
 
 
 def _exec_cell(code, namespace):
-    # The cell body is the script's own %%capture cell, already part of the program
-    # being run; this is the same exec IPython performs for it in the notebook.
     exec(code, namespace)
 
 
@@ -1331,30 +1288,22 @@ def _resolve_target(launcher, script_name, rest):
 
 def _relaunch_args(launcher, script_name, target, rest):
     payload = list(rest) if script_name else [target, *rest]
-    # A script argument that looks like a launcher flag would be eaten by the worker's
-    # own parse, so keep everything behind a separator in that case.
+    # Else the worker's own parse would eat a script arg that looks like a launcher flag.
     if any(a == "--" or a.split("=", 1)[0] in _LAUNCHER_FLAGS for a in rest):
         payload = ["--", *payload]
     return [launcher, *payload]
 
 
 def _patch_spawn(target):
-    """Let multiprocessing spawn / forkserver children re-import the script with
-    ``get_ipython`` defined.
-
-    Such a child normally re-runs ``target`` as ``__mp_main__`` through a plain
-    ``runpy.run_path``, where ``get_ipython`` does not exist. Point it at this helper
-    instead; run as ``__mp_main__`` (bottom of this file) it re-runs ``target`` with the
-    stand-in in a child-mode shell and exposes the script's names as ``__mp_main__``'s.
-    """
+    """Point spawn / forkserver children at this helper so their ``__mp_main__``
+    re-import of ``target`` has ``get_ipython`` defined."""
     import multiprocessing.spawn as mp_spawn
 
     helper = os.path.normpath(os.path.abspath(__file__))
     wanted = os.path.normpath(target)
     spawns = [mp_spawn]
     try:
-        # datasets' Dataset.map(num_proc = N) uses the multiprocess package, a fork of
-        # multiprocessing with its own spawn module.
+        # datasets' Dataset.map(num_proc = N) uses multiprocess, with its own spawn module.
         import multiprocess.spawn as mpx_spawn
         spawns.append(mpx_spawn)
     except ImportError:
@@ -1387,8 +1336,7 @@ def _run_worker(launcher, target, rest, set_fsdp2):
     if set_fsdp2:
         os.environ.setdefault("UNSLOTH_FSDP2", "1")
     sys.argv = [target, *rest]
-    # Look like `python target.py`: the target's folder first on sys.path, and the
-    # launcher folder (put there by `python launcher.py`) gone.
+    # Look like `python target.py`.
     drop = {os.path.dirname(os.path.abspath(__file__)), os.path.dirname(launcher)}
     sys.path[:] = [p for p in sys.path if not (p and os.path.abspath(p) in drop)]
     sys.path.insert(0, os.path.dirname(target))
@@ -1396,9 +1344,7 @@ def _run_worker(launcher, target, rest, set_fsdp2):
     import builtins
     real_ipython = hasattr(builtins, "get_ipython")
     if set_fsdp2 or not real_ipython:
-        # A worker always uses the adapter, even where an IPython get_ipython exists:
-        # only the adapter runs shell steps once per node. A single process inside a real
-        # IPython session keeps IPython's own.
+        # Workers need the adapter even under IPython: only it runs shell steps once per node.
         init_globals["get_ipython"] = get_ipython
     if not real_ipython:
         # IPython has its own __main__, which spawn children never re-import.
@@ -1450,13 +1396,10 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
 
     mode = _worker_mode()
     if mode == "stale":
-        # LOCAL_RANK alone, without WORLD_SIZE / LOCAL_WORLD_SIZE, is not a launcher.
         _log(f"LOCAL_RANK={os.environ['LOCAL_RANK']} is set without WORLD_SIZE / LOCAL_WORLD_SIZE; "
              f"treating it as left over in the shell and ignoring it")
         os.environ.pop("LOCAL_RANK")
     elif mode == "worker":
-        # Already a launcher's worker (ours, the user's torchrun, deepspeed, ...): never
-        # launch again. With one local process the shell steps simply run here.
         if pinned and _env_int("WORLD_SIZE", "LOCAL_WORLD_SIZE", default = 1) > 1:
             _fail(f"{why}. Run it with one process, or set UNSLOTH_FSDP2_FORCE=1 to run it on "
                   f"every rank anyway.")
@@ -1469,8 +1412,7 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
         _run_worker(launcher, target, rest, set_fsdp2 = True)
         return 0
 
-    # Not a worker. Checked before any launch choice: with one GPU per task, or for a
-    # single-process script, every task would otherwise run its own copy of the script.
+    # Before any launch choice: even single-GPU / single-process tasks would each run a copy.
     problem = _launcher_env_problem()
     if problem:
         _fail(f"this looks like one of several SLURM / MPI tasks ({problem}); running here would "
@@ -1530,9 +1472,8 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
         sys.stdout.flush()
         sys.stderr.flush()
         if _IS_WINDOWS or _real_ipython_active():
-            # %run from IPython / Jupyter: replacing the kernel process would kill it.
-            # Windows: os.execv starts a detached process with unquoted arguments (paths
-            # with spaces split) and exits at once with code 0, so wait on a child instead.
+            # execv would kill a Jupyter kernel; on Windows it detaches, splits spaced paths
+            # and exits 0 at once.
             env = dict(os.environ)
             env.setdefault("UNSLOTH_FSDP2", "1")
             env[_RUN_ID_ENV] = uuid.uuid4().hex
@@ -1541,7 +1482,6 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
                 raise SystemExit(code)
             return 0
         os.environ.setdefault("UNSLOTH_FSDP2", "1")
-        # Unique per launch: names the workers' marker folder (FSDP2Shell._markers).
         os.environ[_RUN_ID_ENV] = uuid.uuid4().hex
         os.execv(sys.executable, command)
         return 0  # only reached when os.execv is replaced, as in the tests
@@ -1566,8 +1506,7 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
 
 
 if __name__ == "__mp_main__" and os.environ.get(_MP_TARGET_ENV):
-    # A multiprocessing spawn / forkserver child of a worker (see _patch_spawn): re-run the
-    # script as __mp_main__ the way multiprocessing would, with get_ipython defined.
+    # Spawn / forkserver child of a worker (see _patch_spawn).
     _SHELL = FSDP2Shell(mp_child = True)
     globals().update(runpy.run_path(
         os.environ[_MP_TARGET_ENV], init_globals = {"get_ipython": get_ipython}, run_name = "__mp_main__",
