@@ -5,3 +5,4 @@ __pycache__/
 unsloth_compiled_cache/
 /.claude
 /.codex
+/.fsdp2_scripts.staging-*

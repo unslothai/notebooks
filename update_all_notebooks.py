@@ -30,6 +30,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import csv
 import hashlib
 from datetime import datetime, timezone
@@ -7102,6 +7103,357 @@ def _assert_amd_script_count(notebook_folder="nb", script_folder="python_scripts
         )
 
 
+
+FSDP2_HELPER_SOURCE = os.path.join("scripts", "fsdp2_launch.py")
+FSDP2_HELPER_NAME = "unsloth_fsdp2_launch.py"
+FSDP2_README_NAME = "README.md"
+# Unsafe on several ranks, keyed by base name (variants share the entry); guarded by
+# tests/test_fsdp2_scripts_mirror.py.
+FSDP2_SINGLE_PROCESS = {
+    "NeMo-Gym-Sudoku.py": "clones and installs NeMo-Gym through Python subprocess calls",
+    "NeMo-Gym-Multi-Environment.py": "clones and installs NeMo-Gym through Python subprocess calls",
+    "Meta-Synthetic-Data-Llama3.1_(8B).py": "starts a vLLM server on fixed port 8000 from Python",
+    "Meta_Synthetic_Data_Llama3_2_(3B).py": "starts a vLLM server on fixed port 8000 through SyntheticDataKit",
+    "Synthetic_Data_Hackathon.py": "ranks would write the same temporary shard files",
+    "Deepseek_OCR_(3B)-Evaluation.py": "ranks would share and delete the same temporary image files",
+    "Llama3_(8B)-Ollama.py": "starts an Ollama server on its fixed port from Python",
+    "Gemma3N_(2B)-Inference.py": "starts a server on fixed port 8000 from Python",
+    "Oute_TTS_(1B).py": "patches one shared OuteTTS checkout with os.remove calls",
+    # OmniVoice.from_pretrained builds the outer model, so export fails on DTensors.
+    "OmniVoice_(0.6B)-TTS.py": "merges and saves an OmniVoice model outside Unsloth's collective FSDP2 export",
+    "Llasa_TTS_(1B).py": "every process would rewrite the same preprocessed memmap and shape files",
+    "Llasa_TTS_(3B).py": "every process would rewrite the same preprocessed memmap and shape files",
+    "EmbeddingGemma2_(300M)-Audio.py": "every process would rewrite the same audio files it then reads",
+    "EmbeddingGemma2_(300M)-Image_Text.py": "every process would rewrite the same image files it then reads",
+    "EmbeddingGemma2_(300M)-Multimodal_Search.py": "every process would write the same audio and video files it then reads",
+    # A half-written JPEG makes DeepSeek-OCR's loader fail with AttributeError.
+    "Deepseek_OCR_(3B).py": "every process would rewrite your_image.jpg while another reads it for model.infer",
+    "Deepseek_OCR_(3B)-Eval.py": "every process would rewrite your_image.jpg while another reads it for model.infer",
+    "Deepseek_OCR_2_(3B).py": "every process would rewrite your_image.jpg while another reads it for model.infer",
+    # Later ranks fail to bind but pass the health check against rank 0's server.
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py": "every process would start an OpenEnv server on the same seeded port and share one game",
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py": "every process would start an OpenEnv server on the same seeded port and share one game",
+    "Llama3.2_(1B)-RAFT.py": "every process would write its own generated dataset to the same raft_train.jsonl",
+    "Sesame_CSM_(1B)-TTS.py": "every process would write its own generated audio to the same WAV files",
+    # generate is collective under native FSDP2: every process must call it equally often.
+    "Spark_TTS_(0_5B).py": "samples speech again after a codec shape error on one process only, and every process would write the same WAV file",
+    "gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py": "its sampled Minesweeper games end on each process's own moves, so processes would make different numbers of collective generate calls",
+    "Openenv_wordle_grpo.py": "its Wordle turns end when each process's own game does, so processes would make different numbers of collective generate calls",
+    "Qwen3_(4B)-Tool_Calling.py": "its sampled tool-calling loop ends when one process's reply has no tool call, so processes would make different numbers of collective generate calls",
+    "Qwen3_(4B)-GRPO-Tool_Use.py": "its sampled tool-calling loop ends when one process's reply has no tool call, so processes would make different numbers of collective generate calls",
+}
+_FSDP2_VARIANT_PREFIXES = ("AMD-", "Kaggle-", "HuggingFace Course-")
+
+
+def _fsdp2_base_name(script_name):
+    """``script_name`` without its AMD- / Kaggle- / HuggingFace Course- prefixes."""
+    stripped = True
+    while stripped:
+        stripped = False
+        for prefix in _FSDP2_VARIANT_PREFIXES:
+            if script_name.startswith(prefix):
+                script_name = script_name[len(prefix):]
+                stripped = True
+    return script_name
+
+
+def fsdp2_single_process_reason(script_name):
+    """Why ``script_name`` must run single process, or None."""
+    return FSDP2_SINGLE_PROCESS.get(_fsdp2_base_name(script_name))
+
+
+_FSDP2_FORBIDDEN_NAME_CHARS = frozenset("/\\\n\r\x00")
+
+
+def _fsdp2_shell_path(path):
+    """Quote a path for the usage comments the way a user would type it."""
+    if any(ch in path for ch in '"$`\\!'):
+        return shlex.quote(path)
+    return f'"{path}"'
+
+
+def render_fsdp2_launcher(script_name):
+    """Return the text of fsdp2_scripts/<script_name> for python_scripts/<script_name>."""
+    if not isinstance(script_name, str) or not script_name.endswith(".py"):
+        raise ValueError(f"fsdp2 launcher needs a .py script name, got {script_name!r}")
+    if script_name == FSDP2_HELPER_NAME:
+        raise ValueError(f"{script_name!r} collides with the fsdp2_scripts helper module")
+    if any(ch in _FSDP2_FORBIDDEN_NAME_CHARS for ch in script_name) or not script_name.isprintable():
+        raise ValueError(f"fsdp2 launcher cannot carry script name {script_name!r}")
+    shown = _fsdp2_shell_path(f"fsdp2_scripts/{script_name}")
+    reason = fsdp2_single_process_reason(script_name)
+    call = f"    main(__file__, {script_name!r})"
+    if reason:
+        call = f"    main(__file__, {script_name!r}, single_process=True, reason={reason!r})"
+    lines = [
+        "#!/usr/bin/env python",
+        f"# Generated by update_all_notebooks.py from python_scripts/{script_name}: do not edit.",
+    ]
+    if reason:
+        lines += [
+            f"# Runs single process: {reason}.",
+            f"#   python {shown}",
+            f"#   UNSLOTH_FSDP2_FORCE=1 python {shown} --nproc-per-node 2   (several processes anyway)",
+        ]
+    else:
+        lines += [
+            "# Multi-GPU with Unsloth native FSDP2 on every visible GPU:",
+            f"#   python {shown}",
+            f"#   CUDA_VISIBLE_DEVICES=0,1 python {shown}   (pick GPUs)",
+            f"#   python {shown} --nproc-per-node 4",
+            f"#   UNSLOTH_TP_SIZE=2 python {shown}   (tensor parallel x FSDP2; Unsloth validates the layout)",
+        ]
+    lines += [
+        "import os",
+        "import sys",
+        "sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))",
+        "from unsloth_fsdp2_launch import main",
+        'if __name__ == "__main__":',
+        call,
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def render_fsdp2_readme():
+    """Return the text of fsdp2_scripts/README.md."""
+    return """# fsdp2_scripts
+
+Generated by `update_all_notebooks.py`: do not edit files in this folder by hand.
+The launcher helper `unsloth_fsdp2_launch.py` is a copy of `scripts/fsdp2_launch.py`.
+
+Every file here is a short launcher for the script of the same name in `python_scripts/`.
+It runs that script unchanged on every visible GPU with Unsloth's native FSDP2.
+
+## Usage
+
+```bash
+python "fsdp2_scripts/Qwen3_(4B)-GRPO.py"                          # every visible GPU
+CUDA_VISIBLE_DEVICES=0,1 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" # pick GPUs
+python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --nproc-per-node 4       # pick a process count
+python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the command only
+```
+
+- With 2 or more GPUs the launcher starts `python -m torch.distributed.run --standalone`
+  with one process per GPU, and each process runs `python_scripts/<name>`.
+- With 1 GPU, or none, it runs the script in a single process, like
+  `python "python_scripts/<name>"`.
+- Asking for more processes than there are visible GPUs is refused.
+- Arguments other than the launcher flags are passed through to the script.
+- A launcher started under your own `torchrun` (for example multi-node) detects the
+  torchrun environment and does not launch a second time. So does one started with
+  `LOCAL_RANK` plus `WORLD_SIZE` or `LOCAL_WORLD_SIZE` set by another launcher. A lone
+  `LOCAL_RANK` left over in the shell is ignored.
+- Started as one of several SLURM / MPI tasks (`srun`, `mpirun`) without those variables,
+  the launcher stops with an error instead of starting one `torchrun` per task. It does
+  so with one GPU per task and for single-process scripts too, where every task would
+  otherwise run its own copy of the script.
+- From IPython or Jupyter (`%run "fsdp2_scripts/<name>"`), `torchrun` runs as a child
+  process so the kernel survives.
+- The working directory is not changed, so outputs such as `outputs/` and `lora_model/`
+  land where they would for `python_scripts/<name>`.
+
+## Environment variables
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `UNSLOTH_NPROC_PER_NODE` | number of visible GPUs | Processes per node when `--nproc-per-node` is not given. |
+| `UNSLOTH_FSDP2` | `1` | Set by the launcher only when unset. `UNSLOTH_FSDP2=0` launches plain data parallel instead. |
+| `UNSLOTH_FSDP2_RUN_INSTALLS` | unset | Unset: skip an install command only when everything it asks for is already installed, else run it once per node. `1`: always run them (once per node). `0`: always skip them. |
+| `UNSLOTH_FSDP2_FORCE` | unset | Set to `1` to run a single-process script (see below) on several processes anyway. |
+| `UNSLOTH_FSDP2_WAIT_TIMEOUT` | `21600` (6 hours) | Seconds the other processes on a node wait for a shell step on the first one before failing with an error. |
+| `UNSLOTH_TP_SIZE` | unset | Tensor parallel size, combined with FSDP2 over the remaining ranks. |
+| `UNSLOTH_FSDP2_SHARDED_LOAD` | unset | Read by Unsloth, not set by the launchers. `1`: under native FSDP2 each process reads only its own slice of the `nn.Linear` weights while `from_pretrained` loads the model (the output head and other weights are read whole), instead of every process loading the full model first. Use it for a 16-bit model larger than the smallest GPU. Unsloth refuses 4-bit / 8-bit loads with it, so a script with `load_in_4bit = True` needs that changed, and it cannot be combined with `UNSLOTH_TP_SIZE`. |
+
+## Things to know
+
+- **The effective batch size grows with the number of data parallel ranks.** Every rank
+  runs the script's `per_device_train_batch_size` and `gradient_accumulation_steps`, so
+  the global batch is that product times the number of data parallel ranks (GPUs divided
+  by `UNSLOTH_TP_SIZE`). Lower `gradient_accumulation_steps` to match a single-GPU run
+  step for step.
+- **Package installs run only when something is missing.** A shell line in the script
+  that installs packages (`pip install`, `uv pip install`, `python -m pip install`,
+  `apt-get install`, the ollama installer, `unsloth install-kernels`) is skipped, with
+  one message, when everything it asks for is already there: every requested package
+  installed at a version that matches its pin (a `git+` URL counts by its package name),
+  or the `apt-get` / ollama program already on `PATH`. Otherwise it runs on one process
+  per node while the others wait. Installs into another environment (`--python`,
+  `--target`, `--prefix`, `--root`, after `uv venv`, `--system` from a virtual
+  environment, or the same set through `PIP_TARGET`, `PIP_PREFIX`, `PIP_ROOT`,
+  `PIP_PYTHON`, `UV_PYTHON` or `UV_SYSTEM_PYTHON`) always run, and so does any install that
+  may land elsewhere: `uv pip` from a Python outside a virtual environment (uv then picks
+  `VIRTUAL_ENV`, `CONDA_PREFIX` or a `.venv`), a command line that sets variables or runs
+  `export`, `cd`, `source`, `sudo`, `env` or `conda`, and a pip or python named by version
+  or another path. Shell steps use the Python
+  that runs the launcher: `python` and `python3` are that Python, `pip` / `pip3` its
+  `-m pip` and `unsloth` its `unsloth` command, whatever is on `PATH`, and from a virtual
+  environment `VIRTUAL_ENV` names it for `uv pip`, so an install goes where the check
+  looked. Flags such as
+  `--upgrade` or `--force-reinstall` do not force a run: set
+  `UNSLOTH_FSDP2_RUN_INSTALLS=1` for that, or `0` to skip every install. Other shell
+  lines (`git clone`, `wget`, `mkdir`) run once per node.
+- **Shell steps run once per node, in order.** `!cmd`, `x = !cmd`, `%%bash` and `%%file`
+  run on the first process of each node; the others get its exit code, output and any
+  error. Processes that reach different shell steps stop with an error. Shell steps need
+  bash (on Windows, Git Bash; WSL's `bash.exe` is refused). Messages name a step by its
+  text before `{...}` expansion, with credentials masked.
+- **Some scripts run single process.** Scripts that start a server on a fixed or seeded
+  port, clone or install through Python `subprocess` calls, have every process write,
+  remove or move the same files (or write a file and read it back, or write generated audio
+  or images to a fixed path), or call `generate` in a loop that stops on each process's own
+  output (so processes would make different numbers of collective `generate` calls) are
+  listed in `FSDP2_SINGLE_PROCESS` in `update_all_notebooks.py`, with
+  the reason. Their launchers say so in a comment, run the script in one process with a
+  note naming the reason, and refuse `--nproc-per-node` above 1 unless
+  `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
+  Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
+  Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
+  Gemma3N_(2B)-Inference, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS, Llasa_TTS_(1B),
+  Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
+  EmbeddingGemma2_(300M)-Multimodal_Search, Deepseek_OCR_(3B), Deepseek_OCR_(3B)-Eval,
+  Deepseek_OCR_2_(3B), OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game,
+  OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16, Llama3.2_(1B)-RAFT,
+  Sesame_CSM_(1B)-TTS, Spark_TTS_(0_5B),
+  gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16, Openenv_wordle_grpo,
+  Qwen3_(4B)-Tool_Calling and Qwen3_(4B)-GRPO-Tool_Use, with their AMD- / Kaggle- /
+  HuggingFace Course- variants.
+- **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
+  runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
+  every sharded unit onto every process until `generate` returns (every process
+  generates). A model that only fits when sharded, for example one loaded with
+  `UNSLOTH_FSDP2_SHARDED_LOAD=1`, can train and save its adapter and still run out of
+  memory on a smaller GPU in the generation cells that follow training.
+- **Unsloth decides what is supported.** The launcher does not check models, trainers or
+  parallel layouts. Unsloth itself refuses layouts it cannot run (for example an invalid
+  `UNSLOTH_TP_SIZE`) with an error that names the problem. Nothing in this folder claims
+  that a given script has been verified on multiple GPUs.
+- **The scripts are not modified.** Each launcher runs `python_scripts/<name>` as it is,
+  so a fix to a script belongs in its notebook template, not here.
+"""
+
+
+def _fsdp2_scoped(names, include_prefix):
+    return sorted(n for n in names if not include_prefix or n.startswith(include_prefix))
+
+
+def _fsdp2_launcher_names(output_folder, include_prefix=None):
+    """Launcher file names in output_folder (the helper module excluded)."""
+    if not os.path.isdir(output_folder):
+        return []
+    return _fsdp2_scoped(
+        (
+            f for f in os.listdir(output_folder)
+            if f.endswith(".py") and f != FSDP2_HELPER_NAME
+            and os.path.isfile(os.path.join(output_folder, f))
+        ),
+        include_prefix,
+    )
+
+
+def _fsdp2_script_names(script_folder, include_prefix=None):
+    return _fsdp2_scoped(
+        (
+            f for f in os.listdir(script_folder)
+            if f.endswith(".py") and os.path.isfile(os.path.join(script_folder, f))
+        ),
+        include_prefix,
+    )
+
+
+def _fsdp2_robust(func, *paths):
+    """``func(*paths)``, retrying once after clearing a Windows read-only bit."""
+    try:
+        return func(*paths)
+    except PermissionError:
+        for path in paths:
+            if os.path.exists(path):
+                os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+        return func(*paths)
+
+
+def generate_fsdp2_scripts(
+    script_folder="python_scripts",
+    output_folder="fsdp2_scripts",
+    include_prefix=None,
+    helper_path=None,
+):
+    """Mirror ``script_folder`` into ``output_folder`` as FSDP2 launchers + README + helper copy.
+
+    Staged in a temp dir first so a render failure leaves ``output_folder`` untouched; only
+    changed files are replaced, orphans removed, both scoped to ``include_prefix``.
+    Returns ``{"written": [...], "removed": [...]}``.
+    """
+    if helper_path is None:
+        repo_root = os.path.dirname(os.path.abspath(script_folder))
+        helper_path = os.path.join(repo_root, FSDP2_HELPER_SOURCE)
+    if not os.path.isfile(helper_path):
+        raise FileNotFoundError(f"fsdp2 launcher helper not found: {helper_path}")
+
+    names = _fsdp2_script_names(script_folder, include_prefix)
+    rendered = {name: render_fsdp2_launcher(name).encode("utf-8") for name in names}
+    with open(helper_path, "rb") as f:
+        rendered[FSDP2_HELPER_NAME] = f.read()
+    rendered[FSDP2_README_NAME] = render_fsdp2_readme().encode("utf-8")
+
+    os.makedirs(output_folder, exist_ok=True)
+    staging = tempfile.mkdtemp(
+        prefix=".fsdp2_scripts.staging-",
+        dir=os.path.dirname(os.path.abspath(output_folder)),
+    )
+    written, removed = [], []
+    try:
+        for filename in sorted(rendered):
+            staged = os.path.join(staging, filename)
+            with open(staged, "wb") as f:
+                f.write(rendered[filename])
+            _set_file_permissions(staged)
+        for filename in _progress_iter(sorted(rendered), total=len(rendered), desc="FSDP2 launchers"):
+            destination = os.path.join(output_folder, filename)
+            if os.path.isfile(destination):
+                with open(destination, "rb") as f:
+                    unchanged = f.read() == rendered[filename]
+                if unchanged:
+                    _set_file_permissions(destination)
+                    continue
+            _fsdp2_robust(os.replace, os.path.join(staging, filename), destination)
+            written.append(filename)
+    finally:
+        _rmtree_robust(staging)
+
+    keep = set(names)
+    for filename in _fsdp2_launcher_names(output_folder, include_prefix):
+        if filename not in keep:
+            _fsdp2_robust(os.remove, os.path.join(output_folder, filename))
+            removed.append(filename)
+
+    print(
+        f"fsdp2_scripts: {len(names)} launchers from {script_folder}, "
+        f"{len(written)} written, {len(removed)} removed"
+    )
+    return {"written": written, "removed": removed}
+
+
+def _assert_fsdp2_mirror(script_folder="python_scripts", output_folder="fsdp2_scripts", include_prefix=None):
+    """Raise unless output_folder holds exactly one launcher per script_folder/*.py."""
+    scripts = set(_fsdp2_script_names(script_folder, include_prefix))
+    launchers = set(_fsdp2_launcher_names(output_folder, include_prefix))
+    missing = sorted(scripts - launchers)
+    orphaned = sorted(launchers - scripts)
+    problems = []
+    if missing:
+        problems.append(f"{len(missing)} scripts have no launcher: {missing[:10]}")
+    if orphaned:
+        problems.append(f"{len(orphaned)} launchers have no script: {orphaned[:10]}")
+    for required in (FSDP2_HELPER_NAME, FSDP2_README_NAME):
+        if not os.path.isfile(os.path.join(output_folder, required)):
+            problems.append(f"{required} is missing")
+    if problems:
+        raise RuntimeError(
+            f"fsdp2_scripts mismatch between {script_folder} and {output_folder}: "
+            + "; ".join(problems)
+        )
+
+
 def _ensure_memory_stats_hidden(nb_path):
     """Ensure memory stats cells have cellView='form' metadata so they are collapsed."""
     memory_markers = ["Show current memory stats", "Show final memory"]
@@ -7184,8 +7536,8 @@ def _summarize_git_diff():
         other_changes = []
 
         for filepath in changed_files:
-            basename = os.path.basename(filepath)
-            if basename == "README.md":
+            # Root README only; generated folder READMEs are ordinary changes.
+            if filepath == "README.md":
                 readme_changes.append(filepath)
                 continue
 
@@ -7447,6 +7799,8 @@ if __name__ == "__main__":
                 clean_output_folder=False,
             )
             _assert_amd_script_count()
+            generate_fsdp2_scripts(include_prefix="AMD-")
+            _assert_fsdp2_mirror(include_prefix="AMD-")
 
         _summarize_git_diff()
         exit(0)
@@ -7569,5 +7923,7 @@ if __name__ == "__main__":
             max_workers=args.workers,
             executor_type=args.executor,
         )
+        generate_fsdp2_scripts()
+        _assert_fsdp2_mirror()
 
     _summarize_git_diff()

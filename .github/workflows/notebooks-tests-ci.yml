@@ -12,12 +12,17 @@
 #      tests/test_notebook_vllm_pin.py
 #      tests/test_python_scripts_regen_parity.py  (live nbconvert)
 #      tests/test_python_scripts_keep_standby_env.py
+#      tests/test_fsdp2_scripts_mirror.py  (fsdp2_scripts/ launcher mirror)
+#      tests/test_fsdp2_adapter_covers_scripts.py
 #      tests/test_python_scripts_no_live_install_magic.py
 #
 #   2. api-drift (HARD GATE on cell 1, informational on cell 3, ~3-5min)
 #      tests/test_notebook_api_drift.py against three (transformers, trl)
 #      combos: HF=4.57.6 + TRL<1, HF=default + TRL=default, HF=latest +
 #      TRL=latest.
+#
+#   3. fsdp2-launch (HARD GATE, ~2 min, CPU torch only)
+#      tests/test_fsdp2_launch.py (fsdp2_scripts/ launcher helper).
 #
 # Mirrors the policy on unslothai/unsloth-zoo PR #637 and
 # unslothai/unsloth PR #5414: drift detector failures fire pytest.fail
@@ -33,6 +38,7 @@ on:
       - 'nb/**'
       - 'kaggle/**'
       - 'python_scripts/**'
+      - 'fsdp2_scripts/**'
       - 'update_all_notebooks.py'
       - 'replace_text.py'
       - 'update_max_seq_length.py'
@@ -281,6 +287,14 @@ jobs:
         run: |
           python -m pytest tests/test_python_scripts_keep_standby_env.py -q --tb=short
 
+      - name: tests/test_fsdp2_scripts_mirror.py
+        # fsdp2_scripts/ must equal what update_all_notebooks.py renders today.
+        run: |
+          python -m pytest tests/test_fsdp2_scripts_mirror.py -q --tb=short
+
+      - name: tests/test_fsdp2_adapter_covers_scripts.py
+        run: |
+          python -m pytest tests/test_fsdp2_adapter_covers_scripts.py -q --tb=short
       - name: tests/test_python_scripts_no_live_install_magic.py
         # No mirror may leave its install cells executable: get_ipython is
         # undefined under plain python. Exceptions are listed in the test.
@@ -421,6 +435,37 @@ jobs:
       - name: tests/test_notebook_api_drift.py
         run: |
           python -m pytest tests/test_notebook_api_drift.py -v --tb=short
+
+  fsdp2-launch:
+    # CPU torch only (real 2-rank gloo run), so once here, not per api-drift cell.
+    name: tests/test_fsdp2_launch.py (HARD GATE)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner (audit)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install pytest + CPU torch
+        run: |
+          set -euxo pipefail
+          python -m pip install --upgrade pip
+          pip install pytest packaging
+          pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.4,<2.11'
+
+      - name: tests/test_fsdp2_launch.py
+        run: |
+          python -m pytest tests/test_fsdp2_launch.py -q --tb=short
 
   security-tests:
     name: tests/security (HARD GATE)
