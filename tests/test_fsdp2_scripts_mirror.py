@@ -473,12 +473,16 @@ _UNSAFE = re.compile(
     r"subprocess\.Popen|os\.system\(|vllm serve|[\"']--port[\"']|--port\b"
     # Library calls that start a server themselves (unsloth/dataprep/synthetic.py).
     r"|SyntheticDataKit\.from_pretrained\("
+    # unsloth_zoo's launch_openenv Popens a uvicorn server on a port drawn from the seeded RNG.
+    r"|launch_openenv\("
     # Outer models built outside Unsloth: their merge / save skip the collective export.
     r"|OmniVoice\.from_pretrained\("
     # A memmap every process opens for writing at the same path.
     r"|np\.memmap\([^)]*['\"]w\+"
     # A file every process truncates and rewrites at the same path, then reads back.
     r"|open\([^)]*['\"]wb['\"]\)\.write\("
+    # An image saved to a fixed path (PIL .save("x.jpg")); in-memory buffers do not match.
+    r"|\.save\(\s*['\"][^'\"]+\.(?:jpe?g|png|webp|bmp|gif|tiff?)['\"]"
     r"|os\.remove\(|os\.unlink\(|shutil\.rmtree\(|shutil\.move\(|os\.rename\("
 )
 
@@ -546,6 +550,100 @@ def test_scripts_that_start_servers_or_processes_are_single_process():
     )
 
 
+# Plain-Python writes to a literal path that the same run reads back (the literal shows up
+# again later, e.g. image_file = "your_image.jpg"). Every rank runs them, so one rank can
+# read a file another rank is still truncating or writing. Unsloth's own saves are left
+# out: save_pretrained / save_pretrained_merged / save_lora are collective under FSDP2
+# (rank 0 writes) and the GGUF / torchao exports refuse an FSDP2 model on every rank.
+# tokenizer / processor .save_pretrained (plain transformers) do run on every rank, but
+# write the same bytes and no script reloads them in the same run; this check would flag
+# one that did only through a literal path, which is how the notebooks write them.
+_PATH_WRITERS = {
+    "save", "to_json", "to_csv", "to_parquet", "save_to_disk", "imwrite", "savez", "tofile",
+    "write_text", "write_bytes", "extractall", "copy", "copy2", "copyfile", "copytree", "move",
+    "urlretrieve",
+}
+# .write(path, ...) of a module (soundfile, scipy wavfile, ...), not file.write(data).
+_PATH_WRITE_MODULES = {"sf", "soundfile", "wavfile", "torchaudio", "imageio", "iio", "cv2"}
+
+
+def _dead(node, parents):
+    while node in parents:
+        node = parents[node]
+        if isinstance(node, ast.If) and isinstance(node.test, ast.Constant) and not node.test.value:
+            return True
+    return False
+
+
+def _written_path(call):
+    """The literal path ``call`` writes to, or None."""
+    func = call.func
+    name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+    first = call.args[0] if call.args else None
+    if name == "open":
+        mode = call.args[1] if len(call.args) > 1 else next(
+            (k.value for k in call.keywords if k.arg == "mode"), None)
+        if not (isinstance(mode, ast.Constant) and isinstance(mode.value, str)
+                and set(mode.value) & set("wax+")):
+            return None
+    elif name == "write":
+        if not (isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name)
+                and func.value.id in _PATH_WRITE_MODULES):
+            return None
+    elif name not in _PATH_WRITERS:
+        return None
+    if name in ("copy", "copy2", "copyfile", "copytree", "move") and len(call.args) > 1:
+        first = call.args[1]
+    if isinstance(first, ast.Constant) and isinstance(first.value, str) and first.value:
+        return first.value
+    return None
+
+
+def _write_then_read(text):
+    """(line, path) of each literal path written in live code and named again later."""
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        tree = ast.parse(text)
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    live = [n for n in ast.walk(tree) if not _dead(n, parents)]
+    writes = [(node, _written_path(node)) for node in live if isinstance(node, ast.Call)]
+    writes = [(node, path) for node, path in writes if path is not None]
+    # Rewriting the same path again is not reading it back.
+    written = {id(n) for node, _ in writes for n in ast.walk(node)}
+    hits = []
+    for node, path in writes:
+        if any(isinstance(n, ast.Constant) and n.value == path and id(n) not in written
+               and n.lineno >= node.lineno for n in live):
+            hits.append((node.lineno, path))
+    return hits
+
+
+def test_write_then_read_scan(tmp_path):
+    assert _write_then_read('img.save("a.jpg")\nimage_file = "a.jpg"\n') == [(1, "a.jpg")]
+    assert _write_then_read('open("x.json", "w").write(s)\ndata = open("x.json").read()\n') == [(1, "x.json")]
+    assert _write_then_read('sf.write("o.wav", a, 16000)\nAudio("o.wav")\n') == [(1, "o.wav")]
+    # Written and never named again, behind if False, Unsloth saves, file.write(data), buffers.
+    assert _write_then_read('sf.write("o.wav", a, 16000)\nsf.write("o.wav", b, 16000)\n') == []
+    assert _write_then_read('if False:\n    img.save("a.jpg")\n    f = "a.jpg"\n') == []
+    assert _write_then_read('model.save_lora("l")\nmodel.load_lora("l")\n') == []
+    assert _write_then_read('f.write("cfg")\nx = "cfg"\nimg.save(buf, format = "JPEG")\n') == []
+
+
+def test_scripts_that_write_then_read_a_shared_path_are_single_process():
+    missing = {}
+    for path in sorted(SCRIPTS.glob("*.py")):
+        hits = _write_then_read(path.read_text(encoding="utf-8"))
+        if hits and _GEN.fsdp2_single_process_reason(path.name) is None:
+            missing[path.name] = hits[:3]
+    assert not missing, (
+        "These python_scripts write a file from Python and read it back in the same run, so on "
+        "several ranks one process can read what another is still writing. Add their base name "
+        "to FSDP2_SINGLE_PROCESS in update_all_notebooks.py with a reason (or give each rank "
+        f"its own path): {missing}"
+    )
+
+
 def test_single_process_list_names_real_scripts():
     bases = {_GEN._fsdp2_base_name(name) for name in _script_names()}
     stale = sorted(set(_GEN.FSDP2_SINGLE_PROCESS) - bases)
@@ -578,6 +676,17 @@ def test_single_process_list_names_real_scripts():
     "Kaggle-EmbeddingGemma2_(300M)-Multimodal_Search.py",
     "EmbeddingGemma2_(300M)-Audio.py",
     "EmbeddingGemma2_(300M)-Image_Text.py",
+    "Deepseek_OCR_(3B).py",
+    "AMD-Deepseek_OCR_(3B).py",
+    "Kaggle-Deepseek_OCR_(3B).py",
+    "Deepseek_OCR_(3B)-Eval.py",
+    "Kaggle-Deepseek_OCR_(3B)-Eval.py",
+    "Deepseek_OCR_2_(3B).py",
+    "AMD-Deepseek_OCR_2_(3B).py",
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py",
+    "AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py",
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py",
+    "AMD-OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py",
 ])
 def test_single_process_launchers_say_so(name):
     assert (SCRIPTS / name).is_file()

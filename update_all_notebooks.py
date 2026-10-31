@@ -7144,6 +7144,17 @@ FSDP2_SINGLE_PROCESS = {
     "EmbeddingGemma2_(300M)-Audio.py": "every process would rewrite the same audio files it then reads",
     "EmbeddingGemma2_(300M)-Image_Text.py": "every process would rewrite the same image files it then reads",
     "EmbeddingGemma2_(300M)-Multimodal_Search.py": "every process would write the same audio and video files it then reads",
+    # Each process saves a dataset image to your_image.jpg, then model.infer opens that path
+    # (and writes its results to one output_path); a process can open a JPEG another one is
+    # still truncating, and DeepSeek-OCR's loader then fails with AttributeError.
+    "Deepseek_OCR_(3B).py": "every process would rewrite your_image.jpg while another reads it for model.infer",
+    "Deepseek_OCR_(3B)-Eval.py": "every process would rewrite your_image.jpg while another reads it for model.infer",
+    "Deepseek_OCR_2_(3B).py": "every process would rewrite your_image.jpg while another reads it for model.infer",
+    # launch_openenv (unsloth_zoo) Popens a uvicorn OpenEnv server on a random port. The seed
+    # is the same on every rank, so all ranks pick the same port; the later ones fail to bind,
+    # pass the health check against the first rank's server and play its one 2048 game.
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py": "every process would start an OpenEnv server on the same seeded port and share one game",
+    "OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16.py": "every process would start an OpenEnv server on the same seeded port and share one game",
 }
 _FSDP2_VARIANT_PREFIXES = ("AMD-", "Kaggle-", "HuggingFace Course-")
 
@@ -7301,17 +7312,20 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   error. Processes that reach different shell steps stop with an error. Shell steps need
   bash (on Windows, Git Bash; WSL's `bash.exe` is refused). Messages name a step by its
   text before `{...}` expansion, with credentials masked.
-- **Some scripts run single process.** Scripts that start a server on a fixed port, clone
-  or install through Python `subprocess` calls, or have every process write, remove or
-  move the same files are listed in `FSDP2_SINGLE_PROCESS` in `update_all_notebooks.py`, with
+- **Some scripts run single process.** Scripts that start a server on a fixed or seeded
+  port, clone or install through Python `subprocess` calls, or have every process write,
+  remove or move the same files (or write a file and read it back) are listed in `FSDP2_SINGLE_PROCESS` in `update_all_notebooks.py`, with
   the reason. Their launchers say so in a comment, run the script in one process with a
   note naming the reason, and refuse `--nproc-per-node` above 1 unless
   `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
   Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
   Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
   Gemma3N_(2B)-Inference, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS, Llasa_TTS_(1B),
-  Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text and
-  EmbeddingGemma2_(300M)-Multimodal_Search, with their AMD- / Kaggle- variants.
+  Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
+  EmbeddingGemma2_(300M)-Multimodal_Search, Deepseek_OCR_(3B), Deepseek_OCR_(3B)-Eval,
+  Deepseek_OCR_2_(3B), OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game and
+  OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16, with their AMD- / Kaggle-
+  variants.
 - **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
   runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
   every sharded unit onto every process until `generate` returns (every process
