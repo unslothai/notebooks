@@ -562,7 +562,12 @@ def install_decision(command):
 # if $UNSLOTH_FSDP2_PYTHON is a bash wrapper that runs `python3` by name, the exported
 # function would otherwise call the wrapper again without end.
 # ${...:-} so a step running under `set -u` (nounset) does not stop on the unset guard.
-_PIN_GUARD = '[ -n "${_UNSLOTH_FSDP2_PINNED:-}" ] && { command %s "$@"; return; }; '
+# A step that activates another environment (VIRTUAL_ENV or CONDA_PREFIX no longer the
+# launcher's) means that environment's commands, so the names fall back to PATH there too.
+_PIN_GUARD = (
+    '{ [ -n "${_UNSLOTH_FSDP2_PINNED:-}" ] || [ "${VIRTUAL_ENV:-}" != "${_UNSLOTH_FSDP2_VENV:-}" ] '
+    '|| [ "${CONDA_PREFIX:-}" != "${_UNSLOTH_FSDP2_CONDA:-}" ]; } && { command %s "$@"; return; }; '
+)
 _SHELL_PREAMBLE = (
     'python() { ' + _PIN_GUARD % "python" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
     'python3() { ' + _PIN_GUARD % "python3" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
@@ -589,6 +594,8 @@ def _shell_env():
     env.pop("_UNSLOTH_FSDP2_PINNED", None)
     if _in_venv():
         env["VIRTUAL_ENV"] = sys.prefix
+    env["_UNSLOTH_FSDP2_VENV"] = env.get("VIRTUAL_ENV", "")
+    env["_UNSLOTH_FSDP2_CONDA"] = env.get("CONDA_PREFIX", "")
     return env
 
 

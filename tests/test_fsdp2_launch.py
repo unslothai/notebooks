@@ -782,6 +782,24 @@ def test_pinned_commands_work_under_nounset(fl):
     assert shell.getoutput("set -u; bash -c 'set -u; python3 -c \"print(5)\"'") == ["5"]
 
 
+def test_an_activated_environment_gets_its_own_python_and_pip(fl, tmp_path):
+    """A step that activates another environment (virtualenv or conda) runs that
+    environment's python / pip, in the step and in a bash it starts, not the launcher's."""
+    other = tmp_path / "other env" / "bin"
+    other.mkdir(parents = True)
+    for name in ("python", "python3", "pip", "pip3"):
+        (other / name).write_text(f"#!/bin/sh\necho other-{name}\n")
+        (other / name).chmod(0o755)
+    (other / "activate").write_text(f'export VIRTUAL_ENV="{other.parent}"\nexport PATH="{other}:$PATH"\n')
+    shell = fl.FSDP2Shell()
+    step = f'source "{other}/activate"; python -V; pip --version; bash -c "python3 -V; pip3 -V"'
+    assert shell.getoutput(step) == ["other-python", "other-pip", "other-python3", "other-pip3"]
+    conda = f'export CONDA_PREFIX="{other.parent}"; export PATH="{other}:$PATH"; python -V'
+    assert shell.getoutput(conda) == ["other-python"]
+    # Without an activation the launcher's interpreter still answers.
+    assert shell.getoutput(f'export PATH="{other}:$PATH"; python -c "print(6 * 7)"') == ["42"]
+
+
 @pytest.mark.parametrize("in_venv", [True, False])
 def test_virtual_env_names_this_interpreter_for_uv(fl, monkeypatch, in_venv):
     monkeypatch.setenv("VIRTUAL_ENV", "/some/other/venv")
