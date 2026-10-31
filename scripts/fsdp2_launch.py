@@ -500,7 +500,8 @@ def install_decision(command):
 # Below the pinned interpreter (_UNSLOTH_FSDP2_PINNED set) the names fall back to PATH:
 # if $UNSLOTH_FSDP2_PYTHON is a bash wrapper that runs `python3` by name, the exported
 # function would otherwise call the wrapper again without end.
-_PIN_GUARD = '[ -n "$_UNSLOTH_FSDP2_PINNED" ] && { command %s "$@"; return; }; '
+# ${...:-} so a step running under `set -u` (nounset) does not stop on the unset guard.
+_PIN_GUARD = '[ -n "${_UNSLOTH_FSDP2_PINNED:-}" ] && { command %s "$@"; return; }; '
 _SHELL_PREAMBLE = (
     'python() { ' + _PIN_GUARD % "python" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '
     'python3() { ' + _PIN_GUARD % "python3" + '_UNSLOTH_FSDP2_PINNED=1 "$UNSLOTH_FSDP2_PYTHON" "$@"; }; '

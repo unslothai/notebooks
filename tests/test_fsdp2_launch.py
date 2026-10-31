@@ -741,6 +741,15 @@ def test_wrapper_interpreter_does_not_recurse(fl, tmp_path, monkeypatch):
     assert shell.getoutput("pip --version; echo rc=$?") == ["real-pip --version depth=1", "rc=0"]
 
 
+def test_pinned_commands_work_under_nounset(fl):
+    """A %%bash cell or !cmd that runs `set -u` (nounset) still reaches the pinned
+    python / pip: the recursion guard variable is unset there."""
+    shell = fl.FSDP2Shell()
+    assert shell.getoutput("set -u; python -c 'print(6 * 7)'; echo rc=$?") == ["42", "rc=0"]
+    assert shell.getoutput("set -euo pipefail; pip --version >/dev/null; echo rc=$?") == ["rc=0"]
+    assert shell.getoutput("set -u; bash -c 'set -u; python3 -c \"print(5)\"'") == ["5"]
+
+
 @pytest.mark.parametrize("in_venv", [True, False])
 def test_virtual_env_names_this_interpreter_for_uv(fl, monkeypatch, in_venv):
     monkeypatch.setenv("VIRTUAL_ENV", "/some/other/venv")
