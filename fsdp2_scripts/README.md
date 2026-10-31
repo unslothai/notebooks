@@ -90,9 +90,9 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   Gemma3N_(2B)-Inference, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS, Llasa_TTS_(1B),
   Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
   EmbeddingGemma2_(300M)-Multimodal_Search, Deepseek_OCR_(3B), Deepseek_OCR_(3B)-Eval,
-  Deepseek_OCR_2_(3B), OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game and
-  OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16, with their AMD- / Kaggle-
-  variants.
+  Deepseek_OCR_2_(3B), OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game,
+  OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16 and Llama3.2_(1B)-RAFT, with
+  their AMD- / Kaggle- variants.
 - **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
   runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
   every sharded unit onto every process until `generate` returns (every process

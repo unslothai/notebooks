@@ -481,6 +481,8 @@ _UNSAFE = re.compile(
     r"|np\.memmap\([^)]*['\"]w\+"
     # A file every process truncates and rewrites at the same path, then reads back.
     r"|open\([^)]*['\"]wb['\"]\)\.write\("
+    # A dataset export to a fixed path; each process may hold a different dataset.
+    r"|\.to_json\(['\"]|\.to_csv\(['\"]"
     # An image saved to a fixed path (PIL .save("x.jpg")); in-memory buffers do not match.
     r"|\.save\(\s*['\"][^'\"]+\.(?:jpe?g|png|webp|bmp|gif|tiff?)['\"]"
     r"|os\.remove\(|os\.unlink\(|shutil\.rmtree\(|shutil\.move\(|os\.rename\("
@@ -676,6 +678,8 @@ def test_single_process_list_names_real_scripts():
     "Kaggle-EmbeddingGemma2_(300M)-Multimodal_Search.py",
     "EmbeddingGemma2_(300M)-Audio.py",
     "EmbeddingGemma2_(300M)-Image_Text.py",
+    "Llama3.2_(1B)-RAFT.py",
+    "Kaggle-Llama3.2_(1B)-RAFT.py",
     "Deepseek_OCR_(3B).py",
     "AMD-Deepseek_OCR_(3B).py",
     "Kaggle-Deepseek_OCR_(3B).py",
