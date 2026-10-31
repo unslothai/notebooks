@@ -477,6 +477,8 @@ _UNSAFE = re.compile(
     r"|OmniVoice\.from_pretrained\("
     # A memmap every process opens for writing at the same path.
     r"|np\.memmap\([^)]*['\"]w\+"
+    # A file every process truncates and rewrites at the same path, then reads back.
+    r"|open\([^)]*['\"]wb['\"]\)\.write\("
     r"|os\.remove\(|os\.unlink\(|shutil\.rmtree\(|shutil\.move\(|os\.rename\("
 )
 
@@ -572,6 +574,10 @@ def test_single_process_list_names_real_scripts():
     "Llasa_TTS_(1B).py",
     "AMD-Llasa_TTS_(3B).py",
     "Kaggle-Llasa_TTS_(1B).py",
+    "EmbeddingGemma2_(300M)-Multimodal_Search.py",
+    "Kaggle-EmbeddingGemma2_(300M)-Multimodal_Search.py",
+    "EmbeddingGemma2_(300M)-Audio.py",
+    "EmbeddingGemma2_(300M)-Image_Text.py",
 ])
 def test_single_process_launchers_say_so(name):
     assert (SCRIPTS / name).is_file()

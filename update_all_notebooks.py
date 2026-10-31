@@ -7139,6 +7139,11 @@ FSDP2_SINGLE_PROCESS = {
     # rewrites input_ids_shape.npy per example; ranks would truncate each other's files.
     "Llasa_TTS_(1B).py": "every process would rewrite the same preprocessed memmap and shape files",
     "Llasa_TTS_(3B).py": "every process would rewrite the same preprocessed memmap and shape files",
+    # Each process writes the same media files with open(path, "wb").write(...) and later
+    # reads them back, so one process can read a file another is still truncating or writing.
+    "EmbeddingGemma2_(300M)-Audio.py": "every process would rewrite the same audio files it then reads",
+    "EmbeddingGemma2_(300M)-Image_Text.py": "every process would rewrite the same image files it then reads",
+    "EmbeddingGemma2_(300M)-Multimodal_Search.py": "every process would write the same audio and video files it then reads",
 }
 _FSDP2_VARIANT_PREFIXES = ("AMD-", "Kaggle-", "HuggingFace Course-")
 
@@ -7302,8 +7307,9 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
   Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
   Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
-  Gemma3N_(2B)-Inference, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS, Llasa_TTS_(1B) and
-  Llasa_TTS_(3B), with their AMD- / Kaggle- variants.
+  Gemma3N_(2B)-Inference, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS, Llasa_TTS_(1B),
+  Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text and
+  EmbeddingGemma2_(300M)-Multimodal_Search, with their AMD- / Kaggle- variants.
 - **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
   runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
   every sharded unit onto every process until `generate` returns (every process
