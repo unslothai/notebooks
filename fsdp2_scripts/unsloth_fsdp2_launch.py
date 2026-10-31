@@ -695,7 +695,10 @@ def _env_int(*names, default):
 
 
 def _local_world_size():
-    return _env_int("LOCAL_WORLD_SIZE", "WORLD_SIZE", default = 1)
+    # Processes on this node: torchrun's LOCAL_WORLD_SIZE, DeepSpeed's LOCAL_SIZE, Open MPI's
+    # and MPICH's local counts; the global WORLD_SIZE only when none of them is set.
+    return _env_int("LOCAL_WORLD_SIZE", "LOCAL_SIZE", "OMPI_COMM_WORLD_LOCAL_SIZE", "MPI_LOCALNRANKS",
+                    "WORLD_SIZE", default = 1)
 
 
 def _pid_alive(pid):
@@ -1293,20 +1296,29 @@ def _patch_spawn(target):
     """
     import multiprocessing.spawn as mp_spawn
 
-    original = mp_spawn.get_preparation_data
-    if getattr(original, "_unsloth_fsdp2", False):
-        return
     helper = os.path.normpath(os.path.abspath(__file__))
     wanted = os.path.normpath(target)
+    spawns = [mp_spawn]
+    try:
+        # datasets' Dataset.map(num_proc = N) uses the multiprocess package, a fork of
+        # multiprocessing with its own spawn module.
+        import multiprocess.spawn as mpx_spawn
+        spawns.append(mpx_spawn)
+    except ImportError:
+        pass
+    for module in spawns:
+        original = module.get_preparation_data
+        if getattr(original, "_unsloth_fsdp2", False):
+            continue
 
-    def get_preparation_data(name):
-        data = original(name)
-        if os.path.normpath(data.get("init_main_from_path") or "") == wanted:
-            data["init_main_from_path"] = helper
-        return data
+        def get_preparation_data(name, original = original):
+            data = original(name)
+            if os.path.normpath(data.get("init_main_from_path") or "") == wanted:
+                data["init_main_from_path"] = helper
+            return data
 
-    get_preparation_data._unsloth_fsdp2 = True
-    mp_spawn.get_preparation_data = get_preparation_data
+        get_preparation_data._unsloth_fsdp2 = True
+        module.get_preparation_data = get_preparation_data
     os.environ[_MP_TARGET_ENV] = wanted
 
 

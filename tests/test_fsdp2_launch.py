@@ -67,7 +67,8 @@ _LAUNCH_ENV = (
     "LOCAL_RANK", "TORCHELASTIC_RUN_ID", "UNSLOTH_FSDP2", "UNSLOTH_NPROC_PER_NODE",
     "UNSLOTH_FSDP2_RUN_INSTALLS", "UNSLOTH_FSDP2_RUN_ID", "UNSLOTH_FSDP2_MP_TARGET",
     "UNSLOTH_FSDP2_WAIT_TIMEOUT", "WORLD_SIZE", "LOCAL_WORLD_SIZE", "RANK", "MASTER_PORT",
-    "SLURM_STEP_NUM_TASKS", "OMPI_COMM_WORLD_SIZE", "PMI_SIZE",
+    "SLURM_STEP_NUM_TASKS", "OMPI_COMM_WORLD_SIZE", "PMI_SIZE", "LOCAL_SIZE",
+    "OMPI_COMM_WORLD_LOCAL_SIZE", "MPI_LOCALNRANKS",
 )
 
 
@@ -1116,6 +1117,50 @@ _MP_TARGET = textwrap.dedent('''\
         with open(os.environ["OUT"], "w") as f:
             json.dump(results, f)
 ''')
+
+
+_MULTIPROCESS_TARGET = textwrap.dedent('''\
+    import json, multiprocess as mp, os
+    def square(x):
+        return x * x
+    get_ipython().system("echo top-level >> " + os.environ["FAKE_LOG"])
+    if __name__ == "__main__":
+        with mp.get_context("spawn").Pool(2) as pool:
+            result = pool.map(square, [1, 2, 3])
+        with open(os.environ["OUT"], "w") as f:
+            json.dump(result, f)
+''')
+
+
+@pytest.mark.skipif(importlib.util.find_spec("multiprocess") is None, reason = "needs multiprocess")
+def test_multiprocess_spawn_children_see_get_ipython(tmp_path):
+    # datasets' Dataset.map(num_proc = N) uses the multiprocess package, not multiprocessing.
+    (tmp_path / "target.py").write_text(_MULTIPROCESS_TARGET)
+    log, out = tmp_path / "shell.log", tmp_path / "out.json"
+    env = _clean_env(FAKE_LOG = str(log), OUT = str(out), UNSLOTH_NPROC_PER_NODE = "1")
+    result = subprocess.run(
+        [sys.executable, str(LAUNCH_PATH), str(tmp_path / "target.py")],
+        cwd = tmp_path, env = env, capture_output = True, text = True, timeout = 180,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(out.read_text()) == [1, 4, 9]
+    assert log.read_text().splitlines() == ["top-level"]
+
+
+@pytest.mark.parametrize("env, expected", [
+    ({"LOCAL_WORLD_SIZE": "2", "WORLD_SIZE": "4"}, 2),
+    ({"LOCAL_SIZE": "1", "WORLD_SIZE": "2"}, 1),  # DeepSpeed's launcher
+    ({"OMPI_COMM_WORLD_LOCAL_SIZE": "2", "WORLD_SIZE": "8"}, 2),
+    ({"MPI_LOCALNRANKS": "3", "WORLD_SIZE": "6"}, 3),
+    ({"WORLD_SIZE": "2"}, 2),
+    ({}, 1),
+])
+def test_local_world_size_prefers_node_local_counts(fl, monkeypatch, env, expected):
+    for name in ("LOCAL_WORLD_SIZE", "LOCAL_SIZE", "OMPI_COMM_WORLD_LOCAL_SIZE", "MPI_LOCALNRANKS", "WORLD_SIZE"):
+        monkeypatch.delenv(name, raising = False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    assert fl._local_world_size() == expected
 
 
 def test_spawn_and_forkserver_children_see_get_ipython(tmp_path):
