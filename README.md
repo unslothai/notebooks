@@ -758,6 +758,14 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 
 </details>
 
+# Intel GPU Notebooks
+These notebooks target Intel GPUs (XPU) and are not available in Colab. View / download them directly from GitHub:
+
+| Model | Type | Notebook |
+| --- | --- | --- |
+| **Qwen3 5 MoE** | MoE | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/Intel-Qwen3_5_MoE.ipynb) |
+| **Qwen3** **(4B)** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/Intel-Qwen3_(4B)-GRPO.ipynb) |
+
 
 <!-- End of Notebook Links -->
 
