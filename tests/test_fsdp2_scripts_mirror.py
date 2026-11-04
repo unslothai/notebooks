@@ -467,7 +467,7 @@ _UNSAFE = re.compile(
     r"|SyntheticDataKit\.from_pretrained\("
     # unsloth_zoo's launch_openenv Popens a uvicorn server on a port drawn from the seeded RNG.
     r"|launch_openenv\("
-    # Unsloth Studio's colab start() serves the Studio UI on its fixed port.
+    # Studio's colab start() serves on fixed port 8888.
     r"|\bcolab\.start\(|\bfrom colab import\b.*\bstart\b"
     # Outer models built outside Unsloth: their merge / save skip the collective export.
     r"|OmniVoice\.from_pretrained\("
