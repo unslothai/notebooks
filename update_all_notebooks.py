@@ -7118,6 +7118,7 @@ FSDP2_SINGLE_PROCESS = {
     "Deepseek_OCR_(3B)-Evaluation.py": "ranks would share and delete the same temporary image files",
     "Llama3_(8B)-Ollama.py": "starts an Ollama server on its fixed port from Python",
     "Gemma3N_(2B)-Inference.py": "starts a server on fixed port 8000 from Python",
+    "Unsloth_Studio.py": "starts the Studio server on fixed port 8888 from Python",
     "Oute_TTS_(1B).py": "patches one shared OuteTTS checkout with os.remove calls",
     # OmniVoice.from_pretrained builds the outer model, so export fails on DTensors.
     "OmniVoice_(0.6B)-TTS.py": "merges and saves an OmniVoice model outside Unsloth's collective FSDP2 export",
@@ -7308,8 +7309,8 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
   Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
   Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
-  Gemma3N_(2B)-Inference, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS, Llasa_TTS_(1B),
-  Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
+  Gemma3N_(2B)-Inference, Unsloth_Studio, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS,
+  Llasa_TTS_(1B), Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
   EmbeddingGemma2_(300M)-Multimodal_Search, Deepseek_OCR_(3B), Deepseek_OCR_(3B)-Eval,
   Deepseek_OCR_2_(3B), OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game,
   OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16, Llama3.2_(1B)-RAFT,
