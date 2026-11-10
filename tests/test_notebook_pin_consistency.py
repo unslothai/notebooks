@@ -24,6 +24,7 @@ caught by test_notebook_template_regeneration on demand.
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -124,3 +125,36 @@ def test_notebook_pip_pins_match_generator_canonical_or_override(path: Path) -> 
             f"Either update update_all_notebooks.py to mention the new "
             f"version, or regenerate the notebook from the template."
         )
+
+
+_DATASETS_SPEC = re.compile(r"""["']?\bdatasets((?:\s*,?\s*(?:==|!=|<=|>=|~=|<|>)\s*[0-9][0-9A-Za-z.*]*)+)""")
+_DATASETS_PROBES = [f"{a}.{b}.{c}" for a in range(2, 6) for b in range(25) for c in range(8)]
+
+
+def _datasets_specs(src: str) -> list[str]:
+    out = []
+    for line in src.splitlines():
+        if re.match(r"\s*!(?:uv )?pip install\b", line):
+            out += [m.group(1).replace(" ", "") for m in _DATASETS_SPEC.finditer(line)]
+    return out
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted((REPO_ROOT / "nb").glob("Kaggle-*.ipynb")),
+    ids=lambda p: p.name,
+)
+def test_kaggle_install_cell_never_pins_two_disjoint_datasets_specs(path: Path) -> None:
+    # The Kaggle install cell is one straight-line run of pip calls, so a later
+    # datasets spec that excludes an earlier one makes pip install one version
+    # only to replace it a few lines down.
+    from packaging.specifiers import SpecifierSet
+
+    for cell_idx, src in ni.iter_code_cells(path):
+        specs = _datasets_specs(src)
+        for i, a in enumerate(specs):
+            for b in specs[i + 1:]:
+                both = SpecifierSet(a) & SpecifierSet(b)
+                assert any(both.contains(v) for v in _DATASETS_PROBES), (
+                    f"{path.name} cell {cell_idx}: datasets{a} then datasets{b}"
+                )
