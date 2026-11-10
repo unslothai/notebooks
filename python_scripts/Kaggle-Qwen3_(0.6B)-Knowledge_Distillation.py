@@ -56,12 +56,14 @@
 # | config | weights | measured |
 # | --- | --- | --- |
 # | `qwen3` | 1.2 + 3.4 GB | PASS on one free T4: loss 0.367, 392/392 adapters, 3.36 GB |
-# | `gemma-4` | 8.1 + 10.9 GB | PASS on a Kaggle 2x T4: loss 0.079, 410/410 adapters, 14.3 GB |
-# | `muse-glimmer` | 22.2 GB | self-distillation, OOM by 208 MiB at seq 384 |
+# | `gemma-4` | 8.1 + 10.9 GB | OOM on a Kaggle 2x T4, at seq 1024 and at 512 |
+# | `muse-glimmer` | 22.2 GB | self-distillation, OOM on 2x T4, 208 MiB short at seq 384 |
 # | `qwen3.8` | 22.3 GB | self-distillation, blocked on a dtype mismatch |
 # 
-# Only `qwen3` has been re-measured since the chunked loss landed, which is why it
-# now fits one card. The others predate it and are pessimistic.
+# Only `qwen3` runs on free hardware. Unsloth trains on one GPU, so a second T4
+# holds the teacher but not the student's activations, and the two large configs
+# exhaust the 14.56 GiB training card whatever the sequence length. They need a
+# single bigger card, not more cards.
 # 
 # `unsloth/gemma-4-26B-A4B-it` needs an A100 or better, so add it yourself.
 
