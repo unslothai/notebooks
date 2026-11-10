@@ -352,7 +352,6 @@ installation_content = update_or_append_pip_install(
 installation_kaggle_content = """%%capture
 import os
 
-!pip install pip3-autoremove
 !pip install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu128
 !pip install unsloth
 !pip install --no-deps --upgrade "torchao>=0.16.0"
