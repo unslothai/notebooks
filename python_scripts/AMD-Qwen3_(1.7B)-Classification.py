@@ -51,38 +51,45 @@
 # # 
 # # Here we put a **classification head** on the model instead: one output per class, trained with cross-entropy. The class names never go through the tokenizer, so the same code works for 77, 400 or thousands of labels. Change `num_labels` and the label mapping, and nothing else.
 # 
-# # <a name="Data"></a>
-# # ### Data Prep
-# # Banking77 has about 10,000 training and 3,000 test questions, each labeled with one of 77 intents such as `card_arrival` or `lost_or_stolen_card`. The `label` column is already an integer, and the names live in the dataset's features.
+# # ### Unsloth
+# We load the data first, because the number of classes sets the size of the model's classification head.
+
+# <a name="Data"></a>
+# ### Data Prep
+# Banking77 has about 10,000 training and 3,000 test questions, each labeled with one of 77 intents such as `card_arrival` or `lost_or_stolen_card`. The `label` column is already an integer, and the names live in the dataset's features.
+
+# In[ ]:
+
+
+from datasets import load_dataset
+
+dataset = load_dataset("PolyAI/banking77")
+label_names = dataset["train"].features["label"].names
+num_labels = len(label_names)
+
+id2label = {i: name for i, name in enumerate(label_names)}
+label2id = {name: i for i, name in enumerate(label_names)}
+
+print(f"{num_labels} classes")
+print(dataset["train"][0])
+
+
+# **Using your own data?** Your labels only need to become integers `0 ... num_labels - 1`. If your label column holds strings (for example `"refund_request"` or `"category 317"`), `class_encode_column` builds the mapping for you. Encode the train split and reuse its mapping for the test split, so the ids still match when a class never shows up in the test file:
 # 
-# # In[ ]:
+# ```python
+# dataset = load_dataset("csv", data_files = {"train": "train.csv", "test": "test.csv"})
+# dataset["train"] = dataset["train"].class_encode_column("label")   # strings -> integer ids
+# dataset["test"] = dataset["test"].cast_column("label", dataset["train"].features["label"])
 # 
-# 
-# from datasets import load_dataset
-# 
-# dataset = load_dataset("PolyAI/banking77")
 # label_names = dataset["train"].features["label"].names
 # num_labels = len(label_names)
-# 
 # id2label = {i: name for i, name in enumerate(label_names)}
 # label2id = {name: i for i, name in enumerate(label_names)}
+# ```
 # 
-# print(f"{num_labels} classes")
-# print(dataset["train"][0])
-# 
-# 
-# # **Using your own data?** Your labels only need to become integers `0 ... num_labels - 1`. If your label column holds strings (for example `"refund_request"` or `"category 317"`), `class_encode_column` builds the mapping for you:
-# # 
-# # ```python
-# # dataset = load_dataset("csv", data_files = {"train": "train.csv", "test": "test.csv"})
-# # dataset = dataset.class_encode_column("label")   # strings -> integer ids, names kept in features
-# # label_names = dataset["train"].features["label"].names
-# # ```
-# # 
-# # Everything below then works unchanged, whether you have 10 classes or 400.
-# 
-# # ### Unsloth
-# 
+# Everything below then works unchanged, whether you have 10 classes or 400.
+
+# ### Load the model
 # Passing `num_labels` loads the model with a sequence-classification head (`AutoModelForSequenceClassification`) instead of the language-model head. The new head reads the hidden state of the last real token and outputs one score per class. `id2label` and `label2id` are saved in the config, so predictions come back as names.
 
 # In[ ]:
@@ -108,7 +115,7 @@ if tokenizer.pad_token is None:
 model.config.pad_token_id = tokenizer.pad_token_id
 
 
-# We now add LoRA adapters so we only need to update a small amount of parameters! Unsloth sees the classification head and makes it fully trainable alongside the adapters, since it starts from random weights.
+# We now add LoRA adapters so we only need to update a small amount of parameters! The classification head starts from random weights, so it is trained in full alongside the adapters.
 
 # In[ ]:
 
@@ -124,6 +131,21 @@ model = FastLanguageModel.get_peft_model(
     use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
     random_state = 3407,
 )
+
+
+# Let's check the head really is trainable. Some older Unsloth versions left it frozen, and a frozen random head means the model never learns the classes, so we unfreeze it if needed.
+
+# In[ ]:
+
+
+head = {name: param for name, param in model.named_parameters() if ".modules_to_save." in name}
+assert head, "No classification head found. Did you pass num_labels to from_pretrained?"
+for name, param in head.items():
+    if not param.requires_grad:
+        print(f"Unfreezing {name}")
+        param.data = param.data.float() # Train the head in float32, like Unsloth does.
+        param.requires_grad_(True)
+model.print_trainable_parameters()
 
 
 # We tokenize the text and rename `label` to `labels`, the name the Hugging Face `Trainer` expects. Padding is done per batch by the data collator.
@@ -276,17 +298,48 @@ for question, guesses in zip(questions, classify(questions)):
 
 # <a name="Save"></a>
 # ### Saving finetuned models
-# To save the final model, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save. The LoRA adapters are saved together with the trained classification head.
+# To save the final model, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save. The LoRA adapters are saved together with the trained classification head. The adapter files do not store the label names, so we save them next to it in `labels.json`.
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters and the head, and not the full model.
 
 # In[ ]:
 
 
+import json
+
 model.save_pretrained("qwen_lora")  # Local saving
 tokenizer.save_pretrained("qwen_lora")
+with open("qwen_lora/labels.json", "w") as f:
+    json.dump(label_names, f)
 # model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 # tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+
+
+# Now if you want to load the classifier we just saved, change `False` to `True`. Passing the saved labels rebuilds the head with the same classes, so `classify` works as before.
+
+# In[ ]:
+
+
+if False:
+    import json
+    from unsloth import FastLanguageModel
+    with open("qwen_lora/labels.json") as f:
+        label_names = json.load(f)
+    id2label = {i: name for i, name in enumerate(label_names)}
+    label2id = {name: i for i, name in enumerate(label_names)}
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name = "qwen_lora",
+        max_seq_length = max_seq_length,
+        load_in_4bit = True,
+        num_labels = len(label_names),
+        id2label = id2label,
+        label2id = label2id,
+    )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model.eval()
+    print(classify(questions))
 
 
 # And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/unsloth) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
