@@ -179,12 +179,12 @@ def convert_to_conversation(sample):
 pass
 
 
-# Let's convert the dataset into the "correct" format for finetuning:
+# We don't convert the whole dataset up front, since a list of converted examples would keep every decoded image in memory. Instead, `UnslothVisionDataCollator` calls `convert_to_conversation` on each batch during training (see `formatting_func` below). Let's convert one example to check the format:
 
 # In[10]:
 
 
-converted_dataset = [convert_to_conversation(sample) for sample in dataset]
+converted_example = convert_to_conversation(dataset[0])
 
 
 # The first example is now structured like below:
@@ -192,7 +192,7 @@ converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 # In[11]:
 
 
-converted_dataset[0]
+converted_example
 
 
 # Lets take the Gemma 3 instruction chat template and use it in our base model
@@ -257,9 +257,9 @@ FastVisionModel.for_training(model) # Enable for training!
 
 trainer = SFTTrainer(
     model = model,
-    train_dataset = converted_dataset,
+    train_dataset = dataset,
     processing_class = processor.tokenizer,
-    data_collator = UnslothVisionDataCollator(model, processor),
+    data_collator = UnslothVisionDataCollator(model, processor, formatting_func = convert_to_conversation),
     args = SFTConfig(
         per_device_train_batch_size = 1,
         gradient_accumulation_steps = 4,

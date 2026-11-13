@@ -164,12 +164,12 @@ def convert_to_conversation(sample):
 pass
 
 
-# Let's convert the dataset into the "correct" format for finetuning:
+# We don't convert the whole dataset up front, since a list of converted examples would keep every decoded image in memory. Instead, `UnslothVisionDataCollator` calls `convert_to_conversation` on each batch during training (see `formatting_func` below). Let's convert one example to check the format:
 
 # In[ ]:
 
 
-converted_dataset = [convert_to_conversation(sample) for sample in dataset]
+converted_example = convert_to_conversation(dataset[0])
 
 
 # The first example is now structured like below:
@@ -177,7 +177,7 @@ converted_dataset = [convert_to_conversation(sample) for sample in dataset]
 # In[ ]:
 
 
-converted_dataset[0]
+converted_example
 
 
 # Before we do any finetuning, maybe the vision model already knows how to analyse the images? Let's check if this is the case!
@@ -227,8 +227,8 @@ FastVisionModel.for_training(model) # Enable for training!
 trainer = SFTTrainer(
     model = model,
     tokenizer = tokenizer,
-    data_collator = UnslothVisionDataCollator(model, tokenizer), # Must use!
-    train_dataset = converted_dataset,
+    data_collator = UnslothVisionDataCollator(model, tokenizer, formatting_func = convert_to_conversation), # Must use!
+    train_dataset = dataset,
     args = SFTConfig(
         per_device_train_batch_size = 2,
         gradient_accumulation_steps = 4,
