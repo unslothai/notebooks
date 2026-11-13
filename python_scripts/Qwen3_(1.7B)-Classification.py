@@ -72,7 +72,9 @@ print(dataset["train"][0])
 # ```python
 # dataset = load_dataset("csv", data_files = {"train": "train.csv", "test": "test.csv"})
 # dataset["train"] = dataset["train"].class_encode_column("label")   # strings -> integer ids
-# dataset["test"] = dataset["test"].cast_column("label", dataset["train"].features["label"])
+# label_feature = dataset["train"].features["label"]
+# dataset["test"] = dataset["test"].map(lambda row: {"label": label_feature.str2int(str(row["label"]))})
+# dataset["test"] = dataset["test"].cast_column("label", label_feature)
 # 
 # label_names = dataset["train"].features["label"].names
 # num_labels = len(label_names)
@@ -271,7 +273,7 @@ def classify(texts, top_k = 3):
                        max_length = max_seq_length, return_tensors = "pt").to(model.device)
     with torch.no_grad():
         probs = torch.softmax(model(**inputs).logits.float(), dim = -1)
-    top = probs.topk(top_k, dim = -1)
+    top = probs.topk(min(top_k, probs.size(-1)), dim = -1)
     return [
         [(id2label[i.item()], round(p.item(), 3)) for p, i in zip(ps, ids)]
         for ps, ids in zip(top.values, top.indices)
