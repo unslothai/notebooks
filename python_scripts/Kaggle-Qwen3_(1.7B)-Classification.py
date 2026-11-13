@@ -291,7 +291,7 @@ for question, guesses in zip(questions, classify(questions)):
 
 # <a name="Save"></a>
 # ### Saving finetuned models
-# To save the final model, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save. The LoRA adapters are saved together with the trained classification head. The adapter files do not store the label names, so we save them next to it in `labels.json`.
+# To save the final model, either use Hugging Face's `push_to_hub` for an online save or `save_pretrained` for a local save. The LoRA adapters are saved together with the trained classification head. The adapter files do not store the label names, so we save them next to it in `labels.json`. If you push to the Hub, upload `labels.json` too with `upload_file`, so the label names travel with the adapter.
 # 
 # **[NOTE]** This ONLY saves the LoRA adapters and the head, and not the full model.
 
@@ -306,6 +306,9 @@ with open("qwen_lora/labels.json", "w") as f:
     json.dump(label_names, f)
 # model.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 # tokenizer.push_to_hub("your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
+# from huggingface_hub import upload_file
+# upload_file(path_or_fileobj = "qwen_lora/labels.json", path_in_repo = "labels.json",
+#             repo_id = "your_name/qwen_lora", token = "YOUR_HF_TOKEN") # Online saving
 
 
 # Now if you want to load the classifier we just saved, change `False` to `True`. Passing the saved labels rebuilds the head with the same classes, so `classify` works as before.
