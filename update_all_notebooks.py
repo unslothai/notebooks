@@ -5339,8 +5339,15 @@ def update_notebook_sections(
                                 )
 
                         notebook_content["cells"][i + 1]["source"] = new_install_text
+                        kept_extras_outputs = []
                         if is_vendor_gpu_notebook:
                             for cell_index, _source_text in reversed(amd_followup_install_cells):
+                                # Re-running the default pass over an Intel- notebook must not drop its outputs.
+                                if (
+                                    is_intel_notebook and amd_extras_cell_text
+                                    and _cell_source_text(notebook_content["cells"][cell_index]).strip() == amd_extras_cell_text.strip()
+                                ):
+                                    kept_extras_outputs = notebook_content["cells"][cell_index].get("outputs", [])
                                 del notebook_content["cells"][cell_index]
                         # Insert/replace the AMD extras cell directly after the
                         # canonical install cell so per-variant tweaks and
@@ -5351,7 +5358,7 @@ def update_notebook_sections(
                                 "metadata": {},
                                 "source": amd_extras_cell_text,
                                 "execution_count": None,
-                                "outputs": [],
+                                "outputs": kept_extras_outputs,
                             }
                             notebook_content["cells"].insert(i + 2, extras_cell)
                         updated = True
@@ -7853,7 +7860,7 @@ def _compose_intel_installation(notebook_path, source_install_texts):
 
     variant_header = _extract_variant_header(variant_extras)
     merged_groups = {}
-    seen_keys = set()
+    spec_locations = {}
     setup_lines = []
     for text in source_install_texts:
         if not text:
@@ -7867,9 +7874,15 @@ def _compose_intel_installation(notebook_path, source_install_texts):
         for flags, specs in _extract_install_package_groups(text):
             for spec in specs:
                 key = _package_key_from_install_token(spec)
-                if not key or key in ignore or key in seen_keys:
+                if not key or key in ignore:
                     continue
-                seen_keys.add(key)
+                # A later `trl==0.22.2` must beat an earlier bare `trl`, as in the AMD composer.
+                if key in spec_locations:
+                    old_flags, old_spec = spec_locations[key]
+                    if _install_spec_preference(old_spec) >= _install_spec_preference(spec):
+                        continue
+                    merged_groups[old_flags].remove(old_spec)
+                spec_locations[key] = (flags, spec)
                 merged_groups.setdefault(flags, []).append(spec)
 
     blocks = []
@@ -8255,7 +8268,10 @@ if __name__ == "__main__":
             installation_kaggle_content,
             new_announcement,
         )
-        main(max_workers=args.workers, executor_type=args.executor, notebook_files=intel_paths)
+        # A default run passes over nb/Intel-* again; two passes reach its fixed point
+        # (update_old_unsloth collapses the "!!" its own DPOTrainer rewrite leaves).
+        for _ in range(2):
+            main(max_workers=args.workers, executor_type=args.executor, notebook_files=intel_paths)
         _assert_intel_notebooks(intel_paths)
         _postprocess_generated_notebooks(intel_paths, args.workers, args.executor)
         if not args.disable_convert_to_script:

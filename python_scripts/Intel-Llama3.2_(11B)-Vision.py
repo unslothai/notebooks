@@ -43,7 +43,7 @@
 # get_ipython().run_line_magic('env', 'PYTORCH_ALLOC_CONF=expandable_segments:False')
 # 
 # get_ipython().system('uv pip install -qqq sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer "transformers==4.57.6"')
-# get_ipython().system('uv pip install -qqq --no-deps accelerate peft trl')
+# get_ipython().system('uv pip install -qqq --no-deps accelerate peft "trl==0.22.2"')
 # 
 # get_ipython().system('uv pip uninstall -qqq triton')
 # get_ipython().system('uv pip install -qqq --reinstall --no-deps "triton-xpu==3.7.2" --index-url https://download.pytorch.org/whl/xpu')
@@ -226,7 +226,7 @@ _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128,
 
 # <a name="Train"></a>
 # ### Train the model
-# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!!
+# Now let's train our model. We do 60 steps to speed things up, but you can set `num_train_epochs=1` for a full run, and turn off `max_steps=None`. We also support `DPOTrainer` and `GRPOTrainer` for reinforcement learning!
 # 
 # We use our new `UnslothVisionDataCollator` which will help in our vision finetuning setup.
 

@@ -74,8 +74,9 @@ def test_intel_notebooks_match_a_fresh_generation(gen, tmp_path, monkeypatch):
             str(template_dir), str(scratch), gen.general_announcement_content,
             gen.installation_content, gen.installation_kaggle_content, gen.new_announcement,
         )
-        for path in paths:
-            gen._process_single_notebook(path)
+        for _ in range(2):
+            for path in paths:
+                gen._process_single_notebook(path)
         gen._postprocess_generated_notebooks(paths)
     assert len(paths) == len(gen.INTEL_NOTEBOOKS)
     for path in paths:

@@ -763,8 +763,10 @@ These notebooks target Intel GPUs (XPU) and are not available in Colab. View / d
 
 | Model | Type | Notebook |
 | --- | --- | --- |
-| **Qwen3 5 MoE** | MoE | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/Intel-Qwen3_5_MoE.ipynb) |
+| **gpt oss** **(20B)** | Auto Kernel Creation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/Intel-gpt_oss_(20B)_GRPO_BF16.ipynb) |
 | **Qwen3** **(4B)** | DAPO Math + vLLM | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/Intel-Qwen3_(4B)-GRPO.ipynb) |
+| **Qwen3 5 MoE** | MoE | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/Intel-Qwen3_5_MoE.ipynb) |
+| **Llama3.2** **(11B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/Intel-Llama3.2_(11B)-Vision.ipynb) |
 
 
 <!-- End of Notebook Links -->

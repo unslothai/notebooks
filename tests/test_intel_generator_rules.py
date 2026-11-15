@@ -96,6 +96,14 @@ def test_keeps_source_pins_and_drops_cuda_packages(gen, moe_notebook):
     assert extras.index("!uv pip uninstall -qqq triton") > extras.index('"transformers==5.2.0"')
 
 
+def test_later_pin_beats_an_earlier_bare_name(gen, moe_notebook):
+    """Llama3.2_(11B)-Vision installs bare `trl` on Colab, then `trl==0.22.2` for everyone."""
+    source = "!pip install --no-deps accelerate peft trl\n!pip install --no-deps trl==0.22.2\n"
+    _install, extras = gen._compose_intel_installation(moe_notebook, [source])
+    assert '"trl==0.22.2"' in extras
+    assert " trl\n" not in extras and not extras.rstrip().endswith(" trl")
+
+
 def test_fast_inference_notebook_gets_the_vllm_recipe(gen, grpo_notebook):
     """The vLLM cell owns vLLM, torch and transformers, and vLLM's triton shim replaces the swap."""
     install, extras = gen._compose_intel_installation(grpo_notebook, [GRPO_INSTALL])
