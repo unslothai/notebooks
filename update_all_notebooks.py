@@ -7797,7 +7797,6 @@ installation_intel_extras_multi_gpu = """\
 %env PYTORCH_ALLOC_CONF=expandable_segments:False
 """
 
-# Sourced from original_template/, else nb/.
 INTEL_NOTEBOOKS = [
     "Qwen3_5_MoE.ipynb",
     "Qwen3_(4B)-GRPO.ipynb",
@@ -7909,8 +7908,7 @@ def _rewrite_cuda_to_xpu(source_text):
     return _RE_CUDA_DEVICE_LITERAL.sub(lambda m: f"{m.group(1)}xpu{m.group(2) or ''}{m.group(1)}", source_text)
 
 
-# The model-name argument line of a from_pretrained call
-# or  model_name = "unsloth/...",  -- device_map goes on the line after it.
+# from_pretrained's model-name line; device_map goes after it.
 _RE_MODEL_NAME_LINE = re.compile(
     r"""^(?P<indent>[ \t]+)(?:model_name\s*=\s*)?(["'])(?P<model>[^"']+)\2\s*,[^\n]*\n""",
     re.MULTILINE,
@@ -7994,7 +7992,6 @@ def copy_and_update_intel_notebooks(
     return intel_paths
 
 
-# CUDA-only content that must not be copied into an Intel- notebook.
 _INTEL_FORBIDDEN_MARKERS = (
     "torch.cuda.", '"cuda"', "'cuda'", "xformers", "causal_conv1d", "causal-conv1d",
     "nvidia-smi", "COLAB_", "unsloth install-kernels",
@@ -8244,8 +8241,7 @@ if __name__ == "__main__":
             installation_kaggle_content,
             new_announcement,
         )
-        # A default run passes over nb/Intel-* again; two passes reach its fixed point
-        # (update_old_unsloth collapses the "!!" its own DPOTrainer rewrite leaves).
+        # Two passes = the default run's fixed point (update_old_unsloth collapses its own "!!").
         for _ in range(2):
             main(max_workers=args.workers, executor_type=args.executor, notebook_files=intel_paths)
         _assert_intel_notebooks(intel_paths)
