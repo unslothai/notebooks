@@ -12,11 +12,16 @@ It runs that script unchanged on every visible GPU with Unsloth's native FSDP2.
 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py"                          # every visible GPU
 CUDA_VISIBLE_DEVICES=0,1 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" # pick GPUs
 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --nproc-per-node 4       # pick a process count
-python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the command only
+python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --mode ddp              # plain DDP (also fsdp2, tp, pp)
+python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the topology and command only
 ```
 
 - With 2 or more GPUs the launcher starts `python -m torch.distributed.run --standalone`
   with one process per GPU, and each process runs `python_scripts/<name>`.
+- `--mode ddp|fsdp2|tp|pp` picks the layout over all the processes and replaces any
+  `UNSLOTH_FSDP2`, `UNSLOTH_TP_SIZE`, `UNSLOTH_PP_SIZE`, `UNSLOTH_CP_SIZE` or
+  `UNSLOTH_PARALLEL` in the environment. Without it (`--mode auto`) the environment
+  decides, and native FSDP2 is the default.
 - With 1 GPU, or none, it runs the script in a single process, like
   `python "python_scripts/<name>"`.
 - Asking for more processes than there are visible GPUs is refused.
@@ -39,7 +44,8 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `UNSLOTH_NPROC_PER_NODE` | number of visible GPUs | Processes per node when `--nproc-per-node` is not given. |
-| `UNSLOTH_FSDP2` | `1` | Set by the launcher only when unset. `UNSLOTH_FSDP2=0` launches plain data parallel instead. |
+| `UNSLOTH_FSDP2` | `1` | Set by the launcher only when unset and `UNSLOTH_PARALLEL` does not choose FSDP2 or DDP itself (`fsdp=`, `dp_shard=`, `dp_replicate=`). `UNSLOTH_FSDP2=0` launches plain data parallel instead. |
+| `UNSLOTH_PARALLEL` | unset | Read by Unsloth: every axis in one line, for example `dp=2,fsdp=0` (DDP), `tp=2`, `pp=2`. |
 | `UNSLOTH_FSDP2_RUN_INSTALLS` | unset | Unset: skip an install command only when everything it asks for is already installed, else run it once per node. `1`: always run them (once per node). `0`: always skip them. |
 | `UNSLOTH_FSDP2_FORCE` | unset | Set to `1` to run a single-process script (see below) on several processes anyway. |
 | `UNSLOTH_FSDP2_WAIT_TIMEOUT` | `21600` (6 hours) | Seconds the other processes on a node wait for a shell step on the first one before failing with an error. |
