@@ -812,6 +812,14 @@ installation_gemma4_12b_content = installation_gemma4_content.replace(
     "transformers==5.5.0", "transformers==5.10.1"
 )
 
+# Gemma 4 notebooks that take the 5.10.1 install above (regexes for is_path_contains_any).
+# DPO: on transformers 5.5.0-5.5.1, unsloth_zoo carries E2B/E4B cross-layer shared K/V
+# in a module-scoped carrier. DPOTrainer's no-grad reference forward replaces and then
+# deletes that carrier between the policy forward and its backward, so the checkpointed
+# recompute traces a different graph and raises torch.utils.checkpoint.CheckpointError.
+# 5.5.2+ passes shared_kv_states natively and needs no carrier.
+GEMMA4_TRANSFORMERS_5_10_MARKERS = ["(12b)", "-dpo"]
+
 # DiffusionGemma: FastDiffusionModel shipped in unsloth 2026.6.5, so install the PyPI releases
 # instead of the git main branches (unsloth/models/diffusion.py is absent before 2026.6.5).
 # transformers 5.11.0 ships the diffusion_gemma architecture (model saved at 5.8.0.dev0).
@@ -916,6 +924,14 @@ installation_amd_extras_gemma4 = """\
 installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace("Gemma 4 requires", "Gemma 4 12B requires")
+
+# Gemma 4 DPO takes the 12B transformers floor (see GEMMA4_TRANSFORMERS_5_10_MARKERS).
+installation_amd_extras_gemma4_dpo = installation_amd_extras_gemma4.replace(
+    "transformers>=5.5.0", "transformers>=5.10.1"
+).replace(
+    "# Gemma 4 requires transformers >= 5.5.0",
+    "# Gemma 4 DPO requires transformers >= 5.5.2 (E2B/E4B shared K/V under DPOTrainer)",
+)
 
 # The cap cannot be applied on AMD (see below), so at least say so where the
 # person who hits it will be reading. Comment-only: variant_extras pip lines go
@@ -3752,6 +3768,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     if is_path_contains_any(lowered, ["gemma4"]):
         if is_path_contains_any(lowered, ["(12b)"]):
             variant_extras = installation_amd_extras_gemma4_12b
+        elif is_path_contains_any(lowered, ["-dpo"]):
+            variant_extras = installation_amd_extras_gemma4_dpo
         else:
             variant_extras = installation_amd_extras_gemma4
     elif _is_qwen3_moe_path(notebook_path):
@@ -5135,7 +5153,7 @@ def update_notebook_sections(
                         # Gemma4 INSTALLATION: preserve the custom
                         # transformers==5.5.0 --no-deps + torchcodec block.
                         if is_path_contains_any(notebook_path.lower(), ["gemma4"]):
-                            if is_path_contains_any(notebook_path.lower(), ["(12b)"]):
+                            if is_path_contains_any(notebook_path.lower(), GEMMA4_TRANSFORMERS_5_10_MARKERS):
                                 installation = installation_gemma4_12b_content
                             else:
                                 installation = installation_gemma4_content
