@@ -361,7 +361,7 @@ print(match_format)
 
 match_format.findall(
     "<think>Let me think!</think>"\
-    "\boxed\{2\}",
+    "\\boxed{2}",
 )
 
 
@@ -370,7 +370,7 @@ match_format.findall(
 
 match_format.findall(
     "<think>Let me think!</think>"\
-    "\boxed\{2\}  \n\n",
+    "\\boxed{2}  \n\n",
 )
 
 
@@ -462,8 +462,8 @@ match_numbers = re.compile(
     r".*?[\s]{0,}([-]?[\d\.\,]{1,})",
     flags = re.MULTILINE | re.DOTALL
 )
-print(match_numbers.findall("\boxed{0.34}"))
-print(match_numbers.findall("Answer is \(\boxed{44}\)."))
+print(match_numbers.findall("\\boxed{0.34}"))
+print(match_numbers.findall("Answer is \\(\\boxed{44}\\)."))
 print(match_numbers.findall("The answer is -0.234"))
 print(match_numbers.findall("17"))
 

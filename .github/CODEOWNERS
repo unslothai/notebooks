@@ -2,9 +2,11 @@
 # Mirrors unslothai/unsloth-zoo's CODEOWNERS shape, scoped to notebooks's
 # actual layout (template + generated notebooks + generator script).
 
-# Source-of-truth template notebooks. Generated content under nb/ and
-# python_scripts/ derives from these via update_all_notebooks.py, so
-# any review here governs the full downstream tree.
+# Source-of-truth template notebooks. Generated content under nb/,
+# python_scripts/ and fsdp2_scripts/ derives from these via
+# update_all_notebooks.py, so any review here governs the full downstream
+# tree. fsdp2_scripts/unsloth_fsdp2_launch.py is a generated copy of
+# scripts/fsdp2_launch.py, which /scripts/ below already covers.
 /original_template/ @danielhanchen
 /kaggle/ @danielhanchen
 /Template_Notebook.ipynb @danielhanchen

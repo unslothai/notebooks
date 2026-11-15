@@ -3,12 +3,12 @@
 
 # <h1 align='center'>Synthetic Data Generation and Unsloth Tutorial</h1>
 
-# ### Installation
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n')
+# # ### Installation
+# 
+# # In[ ]:
+# 
+# 
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n')
 
 
 # ## Synthetic Data Generation
