@@ -135,18 +135,14 @@ model = FastLanguageModel.get_peft_model(
 )
 
 
-# Let's check the head really is trainable. Some older Unsloth versions left it frozen, and a frozen random head means the model never learns the classes, so we unfreeze it if needed.
+# The classification head starts from random weights, so it must be trained alongside the adapters. Let's check it is, since a frozen random head never learns the classes.
 
 # In[ ]:
 
 
-head = {name: param for name, param in model.named_parameters() if ".modules_to_save." in name}
+head = [param for name, param in model.named_parameters() if ".modules_to_save." in name]
 assert head, "No classification head found. Did you pass num_labels to from_pretrained?"
-for name, param in head.items():
-    if not param.requires_grad:
-        print(f"Unfreezing {name}")
-        param.data = param.data.float() # Train the head in float32, like Unsloth does.
-        param.requires_grad_(True)
+assert all(param.requires_grad for param in head), "The classification head is frozen. Please update Unsloth."
 model.print_trainable_parameters()
 
 
