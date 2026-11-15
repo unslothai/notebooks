@@ -121,7 +121,6 @@ __all__ = ["main", "SUPPORTED_CALLS", "is_install_command", "install_decision"]
 _LAUNCHER_FLAGS = ("--nproc-per-node", "--nproc_per_node", "--mode", "--dry-run", "--help", "-h")
 _MODES = ("auto", "ddp", "fsdp2", "tp", "pp")
 _TOPOLOGY_ENV = ("UNSLOTH_FSDP2", "UNSLOTH_TP_SIZE", "UNSLOTH_PP_SIZE", "UNSLOTH_CP_SIZE", "UNSLOTH_PARALLEL")
-# UNSLOTH_PARALLEL keys (and aliases) that choose FSDP2 or DDP for the data parallel ranks.
 _PARALLEL_DP_KIND_KEYS = ("fsdp", "fsdp2", "fsdp_size", "dp_shard", "dp_replicate")
 _WAIT_NOTE_SECONDS = 60
 _POLL_SECONDS = 0.2
@@ -1272,8 +1271,7 @@ def _parallel_picks_dp_kind(raw):
 
 
 def _topology_updates(mode, nproc, environ):
-    """{variable: value, or None to unset}: --mode beats the environment, which beats the launcher
-    default (UNSLOTH_FSDP2=1, only when nothing chose the data parallel kind)."""
+    """Precedence: --mode, then environment, then UNSLOTH_FSDP2=1 only if nothing chose the DP kind."""
     if mode in (None, "auto"):
         if "UNSLOTH_FSDP2" in environ or _parallel_picks_dp_kind(environ.get("UNSLOTH_PARALLEL")):
             return {}
@@ -1288,7 +1286,6 @@ def _topology_updates(mode, nproc, environ):
 
 
 def _apply_topology(mode, nproc, environ, quiet = False):
-    """Write the resolved layout into ``environ`` (a dict or os.environ) and return it."""
     for name, value in _topology_updates(mode, nproc, environ).items():
         old = environ.get(name)
         if old is not None and old != value and not quiet:
