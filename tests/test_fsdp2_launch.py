@@ -305,7 +305,7 @@ def test_generic_cli_dry_run(tmp_path):
     ("command -v zstd >/dev/null 2>&1 || (apt-get -qq update && apt-get -qq install -y zstd)", True),
     ("curl -fsSL https://ollama.com/install.sh | sh", True),
     ("unsloth install-kernels mamba_ssm", True),
-    ("git clone https://github.com/meta-pytorch/OpenEnv.git", False),
+    ("git clone https://github.com/openenv/OpenEnv.git", False),
     ("wget -qqq https://example.com/a.mp3 -O audio.mp3", False),
     ("mkdir -p ../data", False),
     ("uv venv -q --allow-existing --python 3.12 litert_env", False),
