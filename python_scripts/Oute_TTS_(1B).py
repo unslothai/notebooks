@@ -35,7 +35,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n!pip install omegaconf einx\n!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS && git -C OuteTTS checkout --quiet f5eac6e70d792844c6a6959d900a47af2c061a5b\nimport os\nos.remove("OuteTTS/outetts/models/gguf_model.py")\nos.remove("OuteTTS/outetts/interface.py")\nos.remove("OuteTTS/outetts/__init__.py")\nimport importlib.metadata as _md\ntry: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])\nexcept Exception: _tv = (2, 11)\n_torchcodec = {(2, 11): "torchcodec>=0.11.0", (2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 12) else "torchcodec")\n!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy "{_torchcodec}" "datasets>=3.4.1,<4.0.0"\n!pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
+# get_ipython().run_cell_magic('capture', '', 'import os, re\nif "COLAB_" not in "".join(os.environ.keys()):\n    !pip install unsloth  # Do this in local & cloud setups\nelse:\n    !pip install sentencepiece protobuf "datasets==4.3.0" "huggingface_hub>=0.34.0" hf_transfer\n    !pip install --no-deps unsloth_zoo bitsandbytes accelerate peft trl triton unsloth\n    !unsloth install-kernels\n    !pip install --no-deps --upgrade "torchao>=0.16.0"\n!pip install transformers==4.57.6\n!pip install --no-deps trl==0.22.2\n!pip install omegaconf einx\n!rm -rf OuteTTS && git clone https://github.com/edwko/OuteTTS && git -C OuteTTS checkout --quiet f5eac6e70d792844c6a6959d900a47af2c061a5b\nimport os\nos.remove("OuteTTS/outetts/models/gguf_model.py")\nos.remove("OuteTTS/outetts/interface.py")\nos.remove("OuteTTS/outetts/__init__.py")\nimport importlib.metadata as _md\ntry: _tv = tuple(int(x) for x in _md.version("torch").split("+")[0].split(".")[:2])\nexcept Exception: _tv = (2, 11)\n_torchcodec = {(2, 11): "torchcodec>=0.11.0", (2, 10): "torchcodec==0.10.*", (2, 9): "torchcodec==0.9.*", (2, 8): "torchcodec==0.7.*", (2, 7): "torchcodec==0.5.*"}.get(_tv, "torchcodec>=0.12.0" if _tv >= (2, 12) else "torchcodec")\n!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy "{_torchcodec}" importlib_resources "datasets>=3.4.1,<4.0.0"\n!pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps\n%env UNSLOTH_DISABLE_FAST_GENERATION = 1\n')
 # 
 # 
 # # ### Unsloth
@@ -47,7 +47,7 @@
 # In[2]:
 
 
-from unsloth import FastModel
+from unsloth import FastLanguageModel
 import torch
 max_seq_length = 2048 # Choose any for long context!
 fourbit_models = [
@@ -66,7 +66,7 @@ fourbit_models = [
     "unsloth/Phi-4",
 ] # More models at https://huggingface.co/unsloth
 
-model, tokenizer = FastModel.from_pretrained(
+model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Llama-OuteTTS-1.0-1B",
     max_seq_length = max_seq_length,
     dtype = None, # Set to None for auto detection
@@ -80,7 +80,7 @@ model, tokenizer = FastModel.from_pretrained(
 # In[3]:
 
 
-model = FastModel.get_peft_model(
+model = FastLanguageModel.get_peft_model(
     model,
     r = 128, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     target_modules = ["q_proj", "v_proj",],
@@ -390,7 +390,7 @@ from transformers import LogitsProcessor
 import transformers.generation.utils as generation_utils
 from transformers import AutoModelForCausalLM
 import re
-FastModel.for_inference(model)
+FastLanguageModel.for_inference(model)
 
 def get_audio(tokens):
         decoded_output = tokenizer.batch_decode(tokens, skip_special_tokens = False)[0]
