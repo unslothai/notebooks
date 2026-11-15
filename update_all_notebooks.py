@@ -7723,7 +7723,8 @@ general_announcement_content_intel = general_announcement_content.replace(
 
 
 INTEL_XPU_INDEX_URL = "https://download.pytorch.org/whl/xpu"
-INTEL_TORCH_SPECS = ('"torch==2.13.0"', '"torchvision==0.28.0"')
+# +xpu: a bare ==2.13.0 is satisfied by an installed CPU / CUDA build, which uv then keeps.
+INTEL_TORCH_SPECS = ('"torch==2.13.0+xpu"', '"torchvision==0.28.0+xpu"')
 INTEL_TORCHAO_SPEC = '"torchao==0.18.0"'
 INTEL_TRITON_XPU_SPEC = '"triton-xpu==3.7.2"'
 # 0.50.0 is the first manylinux wheel that ships libbitsandbytes_xpu.so.

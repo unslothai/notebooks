@@ -83,6 +83,11 @@ def test_keeps_source_pins_and_drops_cuda_packages(gen, moe_notebook):
     assert extras.index("!uv pip uninstall -qqq triton") > extras.index('"transformers==5.2.0"')
 
 
+def test_torch_pins_require_the_xpu_build(gen):
+    for cell in (gen.installation_intel_cell, gen.installation_intel_vllm_cell):
+        assert '"torch==2.13.0+xpu"' in cell and '"torchvision==0.28.0+xpu"' in cell
+
+
 def test_later_pin_beats_an_earlier_bare_name(gen, moe_notebook):
     """Llama3.2_(11B)-Vision installs bare `trl` on Colab, then `trl==0.22.2` for everyone."""
     source = "!pip install --no-deps accelerate peft trl\n!pip install --no-deps trl==0.22.2\n"
