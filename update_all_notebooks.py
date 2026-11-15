@@ -812,6 +812,10 @@ installation_gemma4_12b_content = installation_gemma4_content.replace(
     "transformers==5.5.0", "transformers==5.10.1"
 )
 
+# Gemma 4 notebooks on the 5.10.1 install. DPO: on 5.5.0-5.5.1 the zoo shared-KV carrier made
+# DPOTrainer's first backward raise CheckpointError; 5.5.2+ passes shared_kv_states natively.
+GEMMA4_TRANSFORMERS_5_10_MARKERS = ["(12b)", "-dpo"]
+
 # DiffusionGemma: FastDiffusionModel shipped in unsloth 2026.6.5, so install the PyPI releases
 # instead of the git main branches (unsloth/models/diffusion.py is absent before 2026.6.5).
 # transformers 5.11.0 ships the diffusion_gemma architecture (model saved at 5.8.0.dev0).
@@ -916,6 +920,13 @@ installation_amd_extras_gemma4 = """\
 installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace("Gemma 4 requires", "Gemma 4 12B requires")
+
+installation_amd_extras_gemma4_dpo = installation_amd_extras_gemma4.replace(
+    "transformers>=5.5.0", "transformers>=5.10.1"
+).replace(
+    "# Gemma 4 requires transformers >= 5.5.0",
+    "# Gemma 4 DPO requires transformers >= 5.5.2 (E2B/E4B shared K/V under DPOTrainer)",
+)
 
 # The cap cannot be applied on AMD (see below), so at least say so where the
 # person who hits it will be reading. Comment-only: variant_extras pip lines go
@@ -3752,6 +3763,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     if is_path_contains_any(lowered, ["gemma4"]):
         if is_path_contains_any(lowered, ["(12b)"]):
             variant_extras = installation_amd_extras_gemma4_12b
+        elif is_path_contains_any(lowered, ["-dpo"]):
+            variant_extras = installation_amd_extras_gemma4_dpo
         else:
             variant_extras = installation_amd_extras_gemma4
     elif _is_qwen3_moe_path(notebook_path):
@@ -5140,7 +5153,7 @@ def update_notebook_sections(
                         # Gemma4 INSTALLATION: preserve the custom
                         # transformers==5.5.0 --no-deps + torchcodec block.
                         if is_path_contains_any(notebook_path.lower(), ["gemma4"]):
-                            if is_path_contains_any(notebook_path.lower(), ["(12b)"]):
+                            if is_path_contains_any(notebook_path.lower(), GEMMA4_TRANSFORMERS_5_10_MARKERS):
                                 installation = installation_gemma4_12b_content
                             else:
                                 installation = installation_gemma4_content
@@ -7179,6 +7192,7 @@ FSDP2_SINGLE_PROCESS = {
     "Deepseek_OCR_(3B)-Evaluation.py": "ranks would share and delete the same temporary image files",
     "Llama3_(8B)-Ollama.py": "starts an Ollama server on its fixed port from Python",
     "Gemma3N_(2B)-Inference.py": "starts a server on fixed port 8000 from Python",
+    "Unsloth_Studio.py": "starts the Studio server on fixed port 8888 from Python",
     "Oute_TTS_(1B).py": "patches one shared OuteTTS checkout with os.remove calls",
     # OmniVoice.from_pretrained builds the outer model, so export fails on DTensors.
     "OmniVoice_(0.6B)-TTS.py": "merges and saves an OmniVoice model outside Unsloth's collective FSDP2 export",
@@ -7369,8 +7383,8 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
   Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
   Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
-  Gemma3N_(2B)-Inference, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS, Llasa_TTS_(1B),
-  Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
+  Gemma3N_(2B)-Inference, Unsloth_Studio, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS,
+  Llasa_TTS_(1B), Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
   EmbeddingGemma2_(300M)-Multimodal_Search, Deepseek_OCR_(3B), Deepseek_OCR_(3B)-Eval,
   Deepseek_OCR_2_(3B), OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game,
   OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16, Llama3.2_(1B)-RAFT,
