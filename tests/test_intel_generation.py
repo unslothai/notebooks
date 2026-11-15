@@ -1,10 +1,4 @@
-"""Intel- notebooks match `--intel`, and the AMD code path behaviour is unchanged.
-
-Intel shares the AMD branches of `update_notebook_sections` through
-`is_vendor_gpu_notebook`. Every AMD notebook in nb/ must come out of another pass
-unchanged without reaching any Intel code, and every Intel- notebook in nb/ must
-be in the allowlist, `INTEL_NOTEBOOKS`, pass the validator and match a fresh `--intel` generation.
-"""
+"""nb/Intel-* match a fresh `--intel` run; AMD notebooks never reach the Intel branches."""
 from __future__ import annotations
 
 import contextlib
@@ -60,8 +54,7 @@ def test_no_intel_notebook_outside_the_allowlist(gen):
 
 
 def test_intel_notebooks_match_a_fresh_generation(gen, tmp_path, monkeypatch):
-    """The same steps as `update_all_notebooks.py --intel`, into a scratch nb/ holding only the
-    nb/-only sources, so no existing Intel- file is there to start from."""
+    """`--intel` into a scratch nb/ holding only the nb/-only sources."""
     monkeypatch.setattr(gen, "_unsloth_model_exists", lambda name: False)  # no network
     scratch = tmp_path / "nb"
     scratch.mkdir()
@@ -86,7 +79,6 @@ def test_intel_notebooks_match_a_fresh_generation(gen, tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("name", AMD_NOTEBOOKS)
 def test_amd_notebook_is_unchanged_and_never_reaches_intel_code(gen, tmp_path, monkeypatch, name):
-    """The AMD notebooks in nb/ come from the generator before Intel shared its branches."""
     def _intel_called(*args, **kwargs):
         raise AssertionError(f"Intel code ran for {name}")
     for intel_only in ("_compose_intel_installation", "_apply_intel_cell_rules", "_intel_stale_followup_cells"):

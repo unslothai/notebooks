@@ -6561,7 +6561,6 @@ def update_readme(
             for d in intel_entries:
                 gh_url = (github_blob_base + d["path"]).replace(" ", "%20")
                 display_model = d.get("model") or os.path.basename(d["path"]).replace(".ipynb", "")
-                # The section header already says Intel, as with AMD's rows.
                 display_model = display_model.removeprefix("Intel-").removeprefix("Intel ")
                 model_cell = f"**{display_model}** {d.get('size') or ''}".rstrip()
                 intel_section += f"| {model_cell} | {d.get('type', '')} | [GitHub]({gh_url}) |\n"
@@ -7664,7 +7663,6 @@ def _summarize_git_diff():
 
 
 def _postprocess_generated_notebooks(notebook_paths, max_workers=1, executor_type="process"):
-    """The clean-up passes of the --amd run, applied to the notebooks an --intel run generated."""
     _map_with_executor(
         _apply_global_fixes,
         notebook_paths,
@@ -7717,10 +7715,6 @@ def _postprocess_generated_notebooks(notebook_paths, max_workers=1, executor_typ
             pass
 
 
-# ---------------------------------------------------------------------------
-# Intel GPU (XPU) notebooks
-# ---------------------------------------------------------------------------
-
 general_announcement_content_intel = general_announcement_content.replace(
     "on a **free** Tesla T4 Google Colab instance!", "on your local **Intel GPU**!"
 ).replace(
@@ -7745,9 +7739,7 @@ installation_intel_cell = f"""%%capture
 !uv pip install -qqq --no-deps -U "{PIN_TOKENIZERS_SPEC}"
 """
 
-# vLLM notebooks (fast_inference = True). vLLM's XPU wheel must equal INTEL_TORCH_SPECS.
-# unsloth_zoo's XPU standby mode needs vLLM >= 0.23.0.
-# Bump these together, from vLLM's requirements/xpu.txt.
+# vLLM's XPU wheel pins INTEL_TORCH_SPECS exactly (requirements/xpu.txt); zoo's XPU standby needs vLLM >= 0.23.0.
 INTEL_VLLM_VERSION = "0.30.0"
 INTEL_VLLM_SPEC = f'"vllm=={INTEL_VLLM_VERSION}"'
 # vLLM 0.30 needs transformers >= 5.10.4, and 5.16+ needs tokenizers >= 0.23.1
@@ -7769,8 +7761,7 @@ installation_intel_vllm_cell = f"""%%capture
 !uv pip install -qqq --no-deps -U "{PIN_TOKENIZERS_SPEC}"
 """
 
-# Non-vLLM recipe only. unsloth_zoo depends on generic `triton`, which overwrites the
-# `triton` package directory owned by triton-xpu. Uninstall triton first, then reinstall triton-xpu
+# unsloth_zoo's generic `triton` dependency overwrites triton-xpu's package dir. Non-vLLM only.
 INTEL_XPU_FINALIZE = f"""\
 !uv pip uninstall -qqq triton
 !uv pip install -qqq --reinstall --no-deps {INTEL_TRITON_XPU_SPEC} --index-url {INTEL_XPU_INDEX_URL}
@@ -7778,10 +7769,7 @@ INTEL_XPU_FINALIZE = f"""\
 
 installation_intel_extras_default = ""
 
-# Notebooks that do not fit one 24 GB Intel GPU, so their first
-# from_pretrained call gets device_map = "balanced" and their extras cell
-# installation_intel_extras_multi_gpu. Remove a name once one Intel GPU fits it.
-# vLLM notebooks (fast_inference = True) must not be listed: vLLM places its own weights.
+# Too big for one 24 GB Intel GPU. Never list a fast_inference notebook: vLLM places its own weights.
 INTEL_MULTI_GPU_NOTEBOOKS = (
     "Qwen3_5_MoE.ipynb",
     "Llama3.2_(11B)-Vision.ipynb",
@@ -7793,8 +7781,7 @@ installation_intel_extras_multi_gpu = """\
 %env PYTORCH_ALLOC_CONF=expandable_segments:False
 """
 
-# Allowlist for notebooks that get an Intel- (XPU).
-# Sourced from original_template/ when it is there, else from nb/.
+# Sourced from original_template/, else nb/.
 INTEL_NOTEBOOKS = [
     "Qwen3_5_MoE.ipynb",
     "Qwen3_(4B)-GRPO.ipynb",
@@ -7803,23 +7790,15 @@ INTEL_NOTEBOOKS = [
 ]
 
 
-# What the Intel cell owns plus packages with no XPU build.
 _INTEL_INSTALL_PACKAGE_IGNORE = _AMD_INSTALL_PACKAGE_IGNORE | frozenset({
     "causal_conv1d", "mamba_ssm", "flash_attn", "vllm", "torchcodec",
-    # Owned by INTEL_XPU_FINALIZE. The generator runs update_notebook_sections twice,
-    # and the second pass reads the composed extras cell back as source.
+    # The second pass reads INTEL_XPU_FINALIZE back as source.
     "triton_xpu",
 })
 
 
 def _intel_stale_followup_cells(cells, last_idx, extras_text):
-    """Find leftover cells after the Intel install cell, so they can be deleted.
-
-    Two kinds of leftover:
-    - An unused ``# Placeholder`` cell from the template.
-    - A copy of the extras cell from the generator's first pass. The generator runs
-      twice, and without this the second pass would add the extras cell again.
-    """
+    """Cells after the install cell to delete: a template ``# Placeholder`` or a previous pass's extras cell."""
     stale = []
     matches = {"# Placeholder"}
     if extras_text and extras_text.strip():
@@ -7842,15 +7821,7 @@ def _format_intel_pip_call(flags, specs):
 
 
 def _compose_intel_installation(notebook_path, source_install_texts):
-    """Return the two Intel install cells: the shared install cell, and a second cell.
-
-    The second cell keeps the original notebook's own package versions (trl,
-    transformers, ...), leaving out the ones the Intel install handles, and ends
-    with the triton fix. It is None when there is nothing to put in it.
-
-    Notebooks that use vLLM (``fast_inference = True``) get the vLLM install cell
-    instead. vLLM sets its own transformers version and needs no triton fix.
-    """
+    """(install cell, extras cell or None): extras keeps the source's own pins, then the triton swap (not for vLLM)."""
     uses_vllm = notebook_uses_fast_inference(notebook_path)
     ignore = _INTEL_INSTALL_PACKAGE_IGNORE | ({"transformers"} if uses_vllm else set())
     if _is_intel_multi_gpu_notebook(notebook_path):
@@ -7913,13 +7884,11 @@ def _compose_intel_installation(notebook_path, source_install_texts):
     return install_cell, _prepend_missing_stdlib_imports("\n\n".join(blocks) + "\n")
 
 
-# regex for changing torch.cuda to torch.xpu equivalents
 _RE_TORCH_CUDA_NAMESPACE = re.compile(r"\btorch\.cuda\.")
 _RE_CUDA_DEVICE_LITERAL = re.compile(r"""(["'])cuda(:\d+)?\1""")
 
 
 def _rewrite_cuda_to_xpu(source_text):
-    """Change a code cell's hardcoded CUDA device to XPU."""
     source_text = _RE_TORCH_CUDA_NAMESPACE.sub("torch.xpu.", source_text)
     return _RE_CUDA_DEVICE_LITERAL.sub(lambda m: f"{m.group(1)}xpu{m.group(2) or ''}{m.group(1)}", source_text)
 
@@ -7934,17 +7903,11 @@ _INTEL_DEVICE_MAP_ARG = 'device_map = "balanced", # Split the model across every
 
 
 def _is_intel_multi_gpu_notebook(notebook_path):
-    """True for an Intel- notebook whose source is in INTEL_MULTI_GPU_NOTEBOOKS."""
     return os.path.basename(notebook_path).removeprefix("Intel-") in INTEL_MULTI_GPU_NOTEBOOKS
 
 
 def _add_intel_device_map(source_text):
-    """Add device_map after the model-name line of the cell's from_pretrained call.
-
-    The model-name line is searched for after `from_pretrained(`, so a list of model
-    names earlier in the cell is not mistaken for it. Raises an error when the call has
-    no model-name argument line the pattern covers.
-    """
+    """Add device_map after the model-name line, searched from `from_pretrained(` so a model list above is skipped."""
     if "device_map" in source_text:
         return source_text
     match = _RE_MODEL_NAME_LINE.search(source_text, source_text.index("from_pretrained("))
@@ -7957,7 +7920,6 @@ def _add_intel_device_map(source_text):
 
 
 def _apply_intel_cell_rules(notebook_path, cells):
-    """Code-cell edits for Intel- notebooks. Returns True when a cell changed."""
     changed = False
     needs_device_map = _is_intel_multi_gpu_notebook(notebook_path)
     for cell in cells:
@@ -7986,7 +7948,6 @@ def copy_and_update_intel_notebooks(
     installation_kaggle,
     new_announcement,
 ):
-    """Generate Intel- notebooks for INTEL_NOTEBOOKS into destination_dir."""
     os.makedirs(destination_dir, exist_ok=True)
     intel_paths = []
     for notebook_name in INTEL_NOTEBOOKS:
@@ -8025,7 +7986,6 @@ _INTEL_FORBIDDEN_MARKERS = (
 
 
 def _validate_intel_notebook(notebook_path):
-    """Return the issues found in one generated Intel- notebook."""
     with open(notebook_path, "r", encoding="utf-8") as f:
         cells = json.load(f)["cells"]
     code = "\n".join(_cell_source_text(c) for c in cells if c.get("cell_type") == "code")

@@ -1,16 +1,4 @@
-"""Intel- notebooks get an XPU install recipe, XPU devices and if listed, a multi-GPU device_map.
-
-The first install cell is the shared XPU cell, or the vLLM XPU cell when the
-notebook uses `fast_inference = True`. The second keeps the source notebook's own
-pins, drops what has no XPU build, and ends with the triton -> triton-xpu swap. The
-generator runs `update_notebook_sections` twice, so the composed cells must come out
-the same when the second pass reads them back as source.
-
-`_apply_intel_cell_rules` converts `torch.cuda.*` and `"cuda"` into their XPU
-equivalents and gives the first `from_pretrained` of each notebook in
-`INTEL_MULTI_GPU_NOTEBOOKS` a `device_map = "balanced"`. `_validate_intel_notebook`
-fails a generated notebook if those rules were missed.
-"""
+"""Intel install recipe, cuda -> xpu rewrite, multi-GPU device_map and the validator."""
 from __future__ import annotations
 
 import importlib.util
@@ -75,7 +63,6 @@ def _write_notebook(path, cells):
 
 @pytest.fixture
 def moe_notebook(tmp_path):
-    """The recipe depends on the notebook's code, so compose reads a file."""
     return _write_notebook(tmp_path / "Intel-Qwen3_5_MoE.ipynb", [_code(MOE_FROM_PRETRAINED)])
 
 
@@ -125,8 +112,7 @@ def test_second_pass_reads_its_own_cells_back_unchanged(gen, notebook, source, r
 
 
 def test_followup_drops_template_placeholder_and_previous_extras(gen):
-    """The vLLM extras cell has no pip line, so only this rule stops the second pass from
-    inserting it again; the template's second `# Placeholder` has no Intel use."""
+    """The vLLM extras cell has no pip line, so only this rule stops a second pass re-adding it."""
     extras = 'import os\nos.environ["UNSLOTH_VLLM_STANDBY"] = "1"\n'
     cells = [_code("# install"), _code(extras), _code("# Placeholder"), _code(GRPO_FROM_PRETRAINED)]
     assert [idx for idx, _ in gen._intel_stale_followup_cells(cells, 0, extras)] == [1, 2]
@@ -160,8 +146,7 @@ def test_device_map_goes_after_the_model_name_line(gen):
 
 
 def test_device_map_goes_to_listed_notebooks_only(gen):
-    """Listed by notebook, not model: whether one 24 GB card is enough depends on the
-    notebook's own settings (4-bit Llama 3.2 11B Vision still needs two cards to train)."""
+    """Listed by notebook, not model: 4-bit Llama 3.2 11B Vision still needs two cards to train."""
     cells = [_code('model, tokenizer = FastVisionModel.from_pretrained(\n'
                    '    model_name = "unsloth/Llama-3.2-11B-Vision-Instruct",\n    load_in_4bit = True,\n)\n')]
     assert gen._apply_intel_cell_rules("nb/Intel-Llama3.2_(11B)-Vision.ipynb", cells)
@@ -171,8 +156,6 @@ def test_device_map_goes_to_listed_notebooks_only(gen):
 
 
 def test_device_map_skips_model_lists_and_later_reloads(gen):
-    """Vision keeps a list of model names above the call, and reloads its saved adapters with
-    a second from_pretrained further down."""
     load = ('fourbit_models = [\n    "unsloth/Pixtral-12B-2409-bnb-4bit",\n]\n'
             'model, tokenizer = FastVisionModel.from_pretrained(\n'
             '    "unsloth/Llama-3.2-11B-Vision-Instruct",\n    load_in_4bit = True,\n)\n')
