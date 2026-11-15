@@ -47,7 +47,7 @@
 # In[2]:
 
 
-from unsloth import FastModel
+from unsloth import FastLanguageModel
 import torch
 max_seq_length = 2048 # Choose any for long context!
 fourbit_models = [
@@ -66,7 +66,7 @@ fourbit_models = [
     "unsloth/Phi-4",
 ] # More models at https://huggingface.co/unsloth
 
-model, tokenizer = FastModel.from_pretrained(
+model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Llama-OuteTTS-1.0-1B",
     max_seq_length = max_seq_length,
     dtype = None, # Set to None for auto detection
@@ -80,7 +80,7 @@ model, tokenizer = FastModel.from_pretrained(
 # In[3]:
 
 
-model = FastModel.get_peft_model(
+model = FastLanguageModel.get_peft_model(
     model,
     r = 128, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     target_modules = ["q_proj", "v_proj",],
@@ -390,7 +390,7 @@ from transformers import LogitsProcessor
 import transformers.generation.utils as generation_utils
 from transformers import AutoModelForCausalLM
 import re
-FastModel.for_inference(model)
+FastLanguageModel.for_inference(model)
 
 def get_audio(tokens):
         decoded_output = tokenizer.batch_decode(tokens, skip_special_tokens = False)[0]
