@@ -170,14 +170,16 @@ eval_dataset = tokenized["test"]
 
 
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
 
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
     preds = np.argmax(logits, axis = -1)
+    # Macro F1 over the classes seen in labels or predictions, same as scikit-learn's f1_score.
+    true_pos = np.bincount(labels[preds == labels], minlength = num_labels)
+    support = np.bincount(labels, minlength = num_labels) + np.bincount(preds, minlength = num_labels)
     return {
-        "accuracy": accuracy_score(labels, preds),
-        "macro_f1": f1_score(labels, preds, average = "macro"),
+        "accuracy": (preds == labels).mean(),
+        "macro_f1": (2 * true_pos[support > 0] / support[support > 0]).mean(),
     }
 
 
