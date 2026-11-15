@@ -6913,9 +6913,14 @@ def remove_unwanted_section(script_content):
 
 
 # Environment variables an install cell sets that the rest of the script relies on.
-_SCRIPT_KEPT_INSTALL_ENV = ("UNSLOTH_VLLM_STANDBY",)
+# PYTORCH_ALLOC_CONF: unsloth_zoo sets expandable_segments:True unless it is already set (Intel multi-GPU).
+_SCRIPT_KEPT_INSTALL_ENV = ("UNSLOTH_VLLM_STANDBY", "PYTORCH_ALLOC_CONF")
 _RE_KEPT_INSTALL_ENV = re.compile(
     r"""^(?:import os\s*;\s*)?(os\.environ\[\s*["'](%s)["']\s*\]\s*=\s*["'][^"']*["'])"""
+    % "|".join(map(re.escape, _SCRIPT_KEPT_INSTALL_ENV))
+)
+_RE_KEPT_INSTALL_ENV_MAGIC = re.compile(
+    r"""^get_ipython\(\)\.run_line_magic\(['"]env['"],\s*['"](%s)=([^'"]*)['"]\)$"""
     % "|".join(map(re.escape, _SCRIPT_KEPT_INSTALL_ENV))
 )
 
@@ -6943,9 +6948,15 @@ def _kept_install_env_lines(lines):
     kept, seen = [], set()
     for line in sources:
         m = _RE_KEPT_INSTALL_ENV.match(line)  # unindented only: not one set inside an if
-        if m and m.group(2) not in seen:
-            seen.add(m.group(2))
-            kept.append((m.group(2), m.group(1)))
+        if m:
+            key, stmt = m.group(2), m.group(1)
+        elif m := _RE_KEPT_INSTALL_ENV_MAGIC.match(line.rstrip()):
+            key, stmt = m.group(1), f'os.environ["{m.group(1)}"] = "{m.group(2)}"'
+        else:
+            continue
+        if key not in seen:
+            seen.add(key)
+            kept.append((key, stmt))
     return kept
 
 
@@ -7742,7 +7753,7 @@ installation_intel_cell = f"""%%capture
 
 # vLLM's XPU wheel pins INTEL_TORCH_SPECS exactly (requirements/xpu.txt); zoo's XPU standby needs vLLM >= 0.23.0.
 INTEL_VLLM_VERSION = "0.30.0"
-INTEL_VLLM_SPEC = f'"vllm=={INTEL_VLLM_VERSION}"'
+INTEL_VLLM_SPEC = f'"vllm=={INTEL_VLLM_VERSION}+xpu"'
 # vLLM 0.30 needs transformers >= 5.10.4, and 5.16+ needs tokenizers >= 0.23.1
 INTEL_VLLM_TRANSFORMERS_SPEC = '"transformers>=5.10.4,<5.16"'
 INTEL_VLLM_INDEX_ARGS = (

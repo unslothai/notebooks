@@ -88,6 +88,19 @@ def test_torch_pins_require_the_xpu_build(gen):
         assert '"torch==2.13.0+xpu"' in cell and '"torchvision==0.28.0+xpu"' in cell
 
 
+def test_vllm_pin_requires_the_xpu_build(gen):
+    assert '"vllm==0.30.0+xpu"' in gen.installation_intel_vllm_cell
+
+
+@pytest.mark.parametrize("name", ["Intel-Qwen3_5_MoE.py", "Intel-Llama3.2_(11B)-Vision.py", "Intel-gpt_oss_(20B)_GRPO_BF16.py"])
+def test_scripts_keep_the_allocator_override_live(name):
+    """unsloth_zoo turns expandable segments on unless PYTORCH_ALLOC_CONF is already set."""
+    lines = (REPO_ROOT / "python_scripts" / name).read_text(encoding="utf-8").splitlines()
+    live = 'os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:False"'
+    assert live in lines
+    assert lines.index(live) < next(i for i, l in enumerate(lines) if l.startswith("from unsloth import"))
+
+
 def test_later_pin_beats_an_earlier_bare_name(gen, moe_notebook):
     """Llama3.2_(11B)-Vision installs bare `trl` on Colab, then `trl==0.22.2` for everyone."""
     source = "!pip install --no-deps accelerate peft trl\n!pip install --no-deps trl==0.22.2\n"

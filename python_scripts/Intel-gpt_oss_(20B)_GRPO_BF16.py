@@ -50,6 +50,11 @@
 # get_ipython().system('uv pip install -qqq --reinstall --no-deps "triton-xpu==3.7.2" --index-url https://download.pytorch.org/whl/xpu')
 # 
 # 
+# Kept from the installation cell above, which is commented out in scripts.
+import os
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:False"
+
+
 # # ### Unsloth
 
 # # Goal: Make faster kernels with Reinforcement Learning
