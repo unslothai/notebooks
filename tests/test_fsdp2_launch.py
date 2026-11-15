@@ -69,6 +69,7 @@ _LAUNCH_ENV = (
     "UNSLOTH_FSDP2_WAIT_TIMEOUT", "WORLD_SIZE", "LOCAL_WORLD_SIZE", "RANK", "MASTER_PORT",
     "SLURM_STEP_NUM_TASKS", "OMPI_COMM_WORLD_SIZE", "PMI_SIZE", "LOCAL_SIZE",
     "OMPI_COMM_WORLD_LOCAL_SIZE", "MPI_LOCALNRANKS",
+    "UNSLOTH_PARALLEL", "UNSLOTH_TP_SIZE", "UNSLOTH_PP_SIZE", "UNSLOTH_CP_SIZE",
 )
 
 
@@ -218,6 +219,82 @@ def test_explicit_fsdp2_zero_is_kept(fl, layout, monkeypatch):
     assert os.environ["UNSLOTH_FSDP2"] == "0"
 
 
+@pytest.mark.parametrize("parallel", ["dp=2,fsdp=0", "dp_replicate=2", "fsdp=1", "dp_shard=2", "FSDP2=0"])
+@pytest.mark.parametrize("worker", [False, True])
+def test_unsloth_parallel_choosing_the_dp_kind_gets_no_fsdp2_default(fl, layout, monkeypatch, parallel, worker):
+    # The injected UNSLOTH_FSDP2=1 made Unsloth refuse UNSLOTH_PARALLEL="dp=2,fsdp=0" as a conflict.
+    tmp, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setenv("UNSLOTH_PARALLEL", parallel)
+    if worker:
+        monkeypatch.setenv("TORCHELASTIC_RUN_ID", "abc")
+        monkeypatch.setenv("WORLD_SIZE", "2")
+        ran = tmp / "ran.json"
+        monkeypatch.setenv("FAKE_RAN", str(ran))
+        assert fl.main(str(launcher), SCRIPT_NAME, []) == 0
+        assert json.loads(ran.read_text())["fsdp2"] is None
+    else:
+        with pytest.raises(_Exec):
+            fl.main(str(launcher), SCRIPT_NAME, [])
+        assert calls[0][1] == _expected(launcher, 2)
+        assert "UNSLOTH_FSDP2" not in os.environ
+
+
+def test_unsloth_parallel_without_a_dp_kind_keeps_the_fsdp2_default(fl, layout, monkeypatch):
+    _, launcher, _ = layout
+    _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setenv("UNSLOTH_PARALLEL", "tp=2")
+    with pytest.raises(_Exec):
+        fl.main(str(launcher), SCRIPT_NAME, [])
+    assert os.environ["UNSLOTH_FSDP2"] == "1"
+
+
+@pytest.mark.parametrize("mode, expected", [
+    ("ddp", {"UNSLOTH_FSDP2": "0"}),
+    ("fsdp2", {"UNSLOTH_FSDP2": "1"}),
+    ("tp", {"UNSLOTH_FSDP2": "0", "UNSLOTH_TP_SIZE": "2"}),
+    ("pp", {"UNSLOTH_FSDP2": "0", "UNSLOTH_PP_SIZE": "2"}),
+])
+def test_mode_flag_beats_the_environment(fl, layout, monkeypatch, capfd, mode, expected):
+    _, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setenv("UNSLOTH_PARALLEL", "pp=2")
+    monkeypatch.setenv("UNSLOTH_TP_SIZE", "2")
+    with pytest.raises(_Exec):
+        fl.main(str(launcher), SCRIPT_NAME, ["--mode", mode, "x"])
+    assert calls[0][1] == _expected(launcher, 2, "x")
+    got = {k: os.environ[k] for k in fl._TOPOLOGY_ENV if k in os.environ}
+    assert got == expected
+    assert "replaces UNSLOTH_PARALLEL=pp=2" in capfd.readouterr().err
+
+
+@pytest.mark.parametrize("args, env, line", [
+    ([], {}, "topology: 2 processes = dp 2 (native FSDP2)"),
+    (["--mode=ddp"], {}, "topology: 2 processes = dp 2 (DDP)"),
+    (["--mode", "tp"], {}, "topology: 2 processes = tp 2 x dp 1 (no data parallel)"),
+    (["--mode", "pp"], {}, "topology: 2 processes = pp 2 x dp 1 (no data parallel)"),
+    ([], {"UNSLOTH_PARALLEL": "dp=2,fsdp=0"}, "topology: 2 processes, UNSLOTH_PARALLEL=dp=2,fsdp=0 (Unsloth"),
+])
+def test_dry_run_prints_the_resolved_topology(fl, layout, monkeypatch, capsys, args, env, line):
+    _, launcher, _ = layout
+    _stub(fl, monkeypatch, visible = 2)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    before = dict(os.environ)
+    assert fl.main(str(launcher), SCRIPT_NAME, ["--dry-run", *args]) == 0
+    assert line in capsys.readouterr().out
+    assert dict(os.environ) == before
+
+
+def test_bad_mode_is_an_error(fl, layout, monkeypatch, capsys):
+    _, launcher, _ = layout
+    _stub(fl, monkeypatch, visible = 2)
+    with pytest.raises(SystemExit) as raised:
+        fl.main(str(launcher), SCRIPT_NAME, ["--mode", "zero3"])
+    assert raised.value.code == 2
+    assert "--mode must be one of" in capsys.readouterr().err
+
+
 def test_script_args_that_look_like_launcher_flags_ride_behind_a_separator(fl, layout, monkeypatch):
     _, launcher, _ = layout
     calls = _stub(fl, monkeypatch, visible = 2)
@@ -226,7 +303,7 @@ def test_script_args_that_look_like_launcher_flags_ride_behind_a_separator(fl, l
     assert calls[0][1] == _expected(launcher, 2, "--", "x", "--help", "--dry-run")
     # And the worker side reads them back as script args.
     assert fl._parse(["--", "x", "--help", "--dry-run"]) == (
-        {"nproc": None, "dry_run": False, "help": False}, ["x", "--help", "--dry-run"],
+        {"nproc": None, "mode": None, "dry_run": False, "help": False}, ["x", "--help", "--dry-run"],
     )
 
 
@@ -1447,7 +1524,7 @@ def test_windows_needs_a_real_bash(fl, monkeypatch):
 def test_double_separator_keeps_a_literal_separator(fl, layout, monkeypatch):
     _, launcher, _ = layout
     calls = _stub(fl, monkeypatch, visible = 2)
-    assert fl._parse(["--", "--"]) == ({"nproc": None, "dry_run": False, "help": False}, ["--"])
+    assert fl._parse(["--", "--"]) == ({"nproc": None, "mode": None, "dry_run": False, "help": False}, ["--"])
     with pytest.raises(_Exec):
         fl.main(str(launcher), SCRIPT_NAME, ["--", "--"])
     assert calls[0][1] == _expected(launcher, 2, "--", "--")

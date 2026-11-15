@@ -26,13 +26,20 @@ everything else goes to the script:
                          number of visible GPUs). A count above the visible GPUs is
                          refused. With no GPU visible the count is taken as given, which
                          is how the CPU (gloo) tests drive two ranks.
-    --dry-run            print the command and environment, then exit
+    --mode MODE          auto (default), ddp, fsdp2, tp or pp over all N processes. ddp /
+                         fsdp2 / tp / pp replace any UNSLOTH_FSDP2 / UNSLOTH_TP_SIZE /
+                         UNSLOTH_PP_SIZE / UNSLOTH_CP_SIZE / UNSLOTH_PARALLEL in the
+                         environment, with a note naming what was replaced.
+    --dry-run            print the resolved topology, command and environment, then exit
     --help               this text
 
 With 2+ processes this process is replaced by
-``python -m torch.distributed.run --standalone --nproc-per-node=N <launcher> [args]``
-with ``UNSLOTH_FSDP2=1`` unless the caller already set it (``UNSLOTH_FSDP2=0`` gives plain
-DDP). Under IPython / Jupyter (``%run``) torchrun runs as a child process instead. With
+``python -m torch.distributed.run --standalone --nproc-per-node=N <launcher> [args]``.
+The layout is decided in this order: ``--mode``, then the environment, then the launcher
+default. The default is ``UNSLOTH_FSDP2=1``, set only when ``UNSLOTH_FSDP2`` is unset and
+``UNSLOTH_PARALLEL`` does not choose the data parallel kind itself (``fsdp=``,
+``dp_shard=``, ``dp_replicate=``). ``UNSLOTH_FSDP2=0`` or
+``UNSLOTH_PARALLEL="dp=2,fsdp=0"`` gives plain DDP. Under IPython / Jupyter (``%run``) torchrun runs as a child process instead. With
 0 or 1 the script runs here, single process. Started as one of several SLURM / MPI tasks
 without ``LOCAL_RANK`` / ``WORLD_SIZE``, it refuses instead of starting one torchrun per
 task, whatever the GPU count and also for a single-process script (each task would
@@ -111,7 +118,10 @@ import uuid
 
 __all__ = ["main", "SUPPORTED_CALLS", "is_install_command", "install_decision"]
 
-_LAUNCHER_FLAGS = ("--nproc-per-node", "--nproc_per_node", "--dry-run", "--help", "-h")
+_LAUNCHER_FLAGS = ("--nproc-per-node", "--nproc_per_node", "--mode", "--dry-run", "--help", "-h")
+_MODES = ("auto", "ddp", "fsdp2", "tp", "pp")
+_TOPOLOGY_ENV = ("UNSLOTH_FSDP2", "UNSLOTH_TP_SIZE", "UNSLOTH_PP_SIZE", "UNSLOTH_CP_SIZE", "UNSLOTH_PARALLEL")
+_PARALLEL_DP_KIND_KEYS = ("fsdp", "fsdp2", "fsdp_size", "dp_shard", "dp_replicate")
 _WAIT_NOTE_SECONDS = 60
 _POLL_SECONDS = 0.2
 _DEFAULT_WAIT_TIMEOUT = 6 * 3600
@@ -1214,12 +1224,13 @@ def get_ipython():
 
 def _usage(launcher, script_name):
     shown = launcher if script_name else f"{launcher} <script.py>"
-    return f"usage: python {shown} [--nproc-per-node N] [--dry-run] [--help] [script args]\n\n{__doc__}"
+    return (f"usage: python {shown} [--nproc-per-node N] [--mode {'|'.join(_MODES)}] [--dry-run] [--help] "
+            f"[script args]\n\n{__doc__}")
 
 
 def _parse(argv):
     """Pull the launcher flags out of argv; everything else is the script's."""
-    options = {"nproc": None, "dry_run": False, "help": False}
+    options = {"nproc": None, "mode": None, "dry_run": False, "help": False}
     rest = []
     index = 0
     while index < len(argv):
@@ -1227,14 +1238,16 @@ def _parse(argv):
         if arg == "--":
             rest.extend(argv[index + 1:])
             break
-        if arg in ("--nproc-per-node", "--nproc_per_node"):
+        if arg in ("--nproc-per-node", "--nproc_per_node", "--mode"):
             if index + 1 >= len(argv):
                 raise ValueError(f"{arg} needs a value")
-            options["nproc"] = argv[index + 1]
+            options["mode" if arg == "--mode" else "nproc"] = argv[index + 1]
             index += 2
             continue
         if arg.startswith(("--nproc-per-node=", "--nproc_per_node=")):
             options["nproc"] = arg.split("=", 1)[1]
+        elif arg.startswith("--mode="):
+            options["mode"] = arg.split("=", 1)[1]
         elif arg == "--dry-run":
             options["dry_run"] = True
         elif arg in ("--help", "-h"):
@@ -1242,7 +1255,65 @@ def _parse(argv):
         else:
             rest.append(arg)
         index += 1
+    if options["mode"] is not None:
+        options["mode"] = options["mode"].strip().lower()
+        if options["mode"] not in _MODES:
+            raise ValueError(f"--mode must be one of {', '.join(_MODES)}, got {options['mode']!r}")
     return options, rest
+
+
+def _parallel_picks_dp_kind(raw):
+    """True when UNSLOTH_PARALLEL itself says whether the data parallel ranks use FSDP2 or DDP."""
+    for part in str(raw or "").replace(";", ",").split(","):
+        if part.split("=", 1)[0].strip().lower() in _PARALLEL_DP_KIND_KEYS:
+            return True
+    return False
+
+
+def _topology_updates(mode, nproc, environ):
+    """Precedence: --mode, then environment, then UNSLOTH_FSDP2=1 only if nothing chose the DP kind."""
+    if mode in (None, "auto"):
+        if "UNSLOTH_FSDP2" in environ or _parallel_picks_dp_kind(environ.get("UNSLOTH_PARALLEL")):
+            return {}
+        return {"UNSLOTH_FSDP2": "1"}
+    wanted = dict.fromkeys(_TOPOLOGY_ENV)
+    wanted["UNSLOTH_FSDP2"] = "1" if mode == "fsdp2" else "0"
+    if mode == "tp":
+        wanted["UNSLOTH_TP_SIZE"] = str(nproc)
+    elif mode == "pp":
+        wanted["UNSLOTH_PP_SIZE"] = str(nproc)
+    return wanted
+
+
+def _apply_topology(mode, nproc, environ, quiet = False):
+    for name, value in _topology_updates(mode, nproc, environ).items():
+        old = environ.get(name)
+        if old is not None and old != value and not quiet:
+            _log(f"--mode {mode} replaces {name}={old}")
+        if value is None:
+            environ.pop(name, None)
+        else:
+            environ[name] = value
+    return environ
+
+
+def _describe_topology(environ, nproc):
+    raw = environ.get("UNSLOTH_PARALLEL", "").strip()
+    if raw:
+        extra = f" with UNSLOTH_FSDP2={environ['UNSLOTH_FSDP2']}" if "UNSLOTH_FSDP2" in environ else ""
+        return f"topology: {nproc} processes, UNSLOTH_PARALLEL={raw}{extra} (Unsloth resolves it at import)"
+    sizes = {}
+    for axis in ("pp", "tp", "cp"):
+        try:
+            sizes[axis] = max(1, int(environ.get(f"UNSLOTH_{axis.upper()}_SIZE", "").strip() or "1"))
+        except ValueError:
+            sizes[axis] = 1
+    model = sizes["pp"] * sizes["tp"] * sizes["cp"]
+    dp = nproc // model if nproc % model == 0 else "?"
+    axes = [f"{axis} {size}" for axis, size in sizes.items() if size > 1]
+    fsdp2 = environ.get("UNSLOTH_FSDP2", "").strip().lower() in ("1", "true", "yes", "on", "native")
+    kind = "no data parallel" if dp == 1 and axes else "native FSDP2" if fsdp2 else "DDP"
+    return f"topology: {nproc} processes = {' x '.join(axes + [f'dp {dp} ({kind})'])}"
 
 
 def _count_visible_gpus():
@@ -1333,8 +1404,6 @@ def _real_ipython_active():
 
 
 def _run_worker(launcher, target, rest, set_fsdp2):
-    if set_fsdp2:
-        os.environ.setdefault("UNSLOTH_FSDP2", "1")
     sys.argv = [target, *rest]
     # Look like `python target.py`.
     drop = {os.path.dirname(os.path.abspath(__file__)), os.path.dirname(launcher)}
@@ -1405,10 +1474,14 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
                   f"every rank anyway.")
         if options["nproc"] is not None and os.environ.get("LOCAL_RANK", "0") == "0":
             _log("--nproc-per-node is ignored inside torchrun")
+        world = _env_int("WORLD_SIZE", default = 1)
         if options["dry_run"]:
+            resolved = _apply_topology(options["mode"], world, dict(os.environ), quiet = True)
             print(f"would run {target} {shlex.join(rest)} in this torchrun worker".rstrip())
+            print(_describe_topology(resolved, world))
             print(adapter)
             return 0
+        _apply_topology(options["mode"], world, os.environ, quiet = os.environ.get("RANK", "0") != "0")
         _run_worker(launcher, target, rest, set_fsdp2 = True)
         return 0
 
@@ -1455,17 +1528,21 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
                   f"(check CUDA_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES)")
 
     if nproc >= 2:
-        fsdp2 = os.environ.get("UNSLOTH_FSDP2", "1")
+        resolved = _apply_topology(options["mode"], nproc, dict(os.environ), quiet = options["dry_run"])
+        fsdp2 = resolved.get("UNSLOTH_FSDP2", "")
         command = [
             sys.executable, "-m", "torch.distributed.run", "--standalone",
             f"--nproc-per-node={nproc}", *_relaunch_args(launcher, script_name, target, rest),
         ]
         if visible == 0:
             _log(f"no GPU visible; starting {nproc} processes as requested")
-        if fsdp2 == "0":
+        if fsdp2 == "0" and options["mode"] in (None, "auto"):
             _log("UNSLOTH_FSDP2=0: launching plain DDP torchrun without FSDP2")
         if options["dry_run"]:
-            print(f"UNSLOTH_FSDP2={fsdp2}")
+            print(_describe_topology(resolved, nproc))
+            for name in _TOPOLOGY_ENV:
+                if name in resolved:
+                    print(f"{name}={resolved[name]}")
             print(adapter)
             print(shlex.join(command))
             return 0
@@ -1474,14 +1551,13 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
         if _IS_WINDOWS or _real_ipython_active():
             # execv would kill a Jupyter kernel; on Windows it detaches, splits spaced paths
             # and exits 0 at once.
-            env = dict(os.environ)
-            env.setdefault("UNSLOTH_FSDP2", "1")
+            env = resolved
             env[_RUN_ID_ENV] = uuid.uuid4().hex
             code = subprocess.run(command, env = env).returncode
             if code:
                 raise SystemExit(code)
             return 0
-        os.environ.setdefault("UNSLOTH_FSDP2", "1")
+        _apply_topology(options["mode"], nproc, os.environ, quiet = True)
         os.environ[_RUN_ID_ENV] = uuid.uuid4().hex
         os.execv(sys.executable, command)
         return 0  # only reached when os.execv is replaced, as in the tests
@@ -1495,6 +1571,8 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
         note = "1 GPU visible: running single-process, FSDP2 needs 2+ GPUs"
     else:
         note = "no GPU visible: running single-process"
+    if options["mode"] not in (None, "auto"):
+        note += f" (--mode {options['mode']} needs 2+ processes)"
     if options["dry_run"]:
         print(note)
         print(shlex.join([sys.executable, target, *rest]))
