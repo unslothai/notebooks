@@ -276,7 +276,9 @@ model.eval()
 def classify(texts, top_k = 3):
     inputs = tokenizer(texts, padding = True, truncation = True,
                        max_length = max_seq_length, return_tensors = "pt").to(model.device)
-    with torch.no_grad():
+    # A reloaded model keeps the head in float32 and has no Trainer autocast around it.
+    half = torch.bfloat16 if is_bfloat16_supported() else torch.float16
+    with torch.no_grad(), torch.autocast(device_type = model.device.type, dtype = half):
         probs = torch.softmax(model(**inputs).logits.float(), dim = -1)
     top = probs.topk(min(top_k, probs.size(-1)), dim = -1)
     return [
