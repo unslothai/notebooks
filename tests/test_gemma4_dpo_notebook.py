@@ -3,14 +3,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-"""Gemma 4 DPO notebooks must install transformers >= 5.5.2, not the 5.5.0 the other Gemma 4 notebooks pin.
-
-On 5.5.0-5.5.1, unsloth_zoo carries E2B/E4B cross-layer shared K/V in a module-scoped carrier.
-DPOTrainer's reference forward runs under no_grad between the policy forward and its backward, and
-replaces then deletes that carrier, so the checkpointed recompute traces a different graph and the
-first backward dies with `torch.utils.checkpoint.CheckpointError: Recomputed values for the following
-tensors have different metadata`. 5.5.2+ passes shared_kv_states natively and has no carrier.
-"""
+"""Gemma 4 DPO notebooks install transformers >= 5.5.2: on 5.5.0-5.5.1 DPOTrainer's first backward raised CheckpointError (unsloth_zoo shared-KV carrier)."""
 from __future__ import annotations
 
 import json
@@ -18,7 +11,6 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-# Colab / Kaggle pin `transformers==X.Y.Z`; the AMD extras cell sets a floor, `transformers>=X.Y.Z`.
 TRANSFORMERS_SPEC = re.compile(
     r"^\s*!(?:uv )?pip install\b.*?\btransformers(==|>=)(\d+)\.(\d+)\.(\d+)", re.MULTILINE
 )

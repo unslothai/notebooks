@@ -812,12 +812,8 @@ installation_gemma4_12b_content = installation_gemma4_content.replace(
     "transformers==5.5.0", "transformers==5.10.1"
 )
 
-# Gemma 4 notebooks that take the 5.10.1 install above (regexes for is_path_contains_any).
-# DPO: on transformers 5.5.0-5.5.1, unsloth_zoo carries E2B/E4B cross-layer shared K/V
-# in a module-scoped carrier. DPOTrainer's no-grad reference forward replaces and then
-# deletes that carrier between the policy forward and its backward, so the checkpointed
-# recompute traces a different graph and raises torch.utils.checkpoint.CheckpointError.
-# 5.5.2+ passes shared_kv_states natively and needs no carrier.
+# Gemma 4 notebooks on the 5.10.1 install. DPO: on 5.5.0-5.5.1 the zoo shared-KV carrier made
+# DPOTrainer's first backward raise CheckpointError; 5.5.2+ passes shared_kv_states natively.
 GEMMA4_TRANSFORMERS_5_10_MARKERS = ["(12b)", "-dpo"]
 
 # DiffusionGemma: FastDiffusionModel shipped in unsloth 2026.6.5, so install the PyPI releases
@@ -925,7 +921,6 @@ installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace("Gemma 4 requires", "Gemma 4 12B requires")
 
-# Gemma 4 DPO takes the 12B transformers floor (see GEMMA4_TRANSFORMERS_5_10_MARKERS).
 installation_amd_extras_gemma4_dpo = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace(
