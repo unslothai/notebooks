@@ -322,6 +322,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Qwen3 Embedding** **(4B)** | Embeddings | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_Embedding_(4B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3 Embedding** **(0 6B)** | Embeddings | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_Embedding_(0_6B).ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen3** **(14B)** | Alpaca | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(14B)-Alpaca.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
+| **Qwen3** **(1.7B)** | Classification | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen3_(1.7B)-Classification.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Qwen2** **(7B)** | Alpaca | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Qwen2_(7B)-Alpaca.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **TinyQwen3 MoE**  | MoE | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/TinyQwen3_MoE.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 
@@ -576,6 +577,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 | **Qwen3 Embedding** **(4B)** | Embeddings | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_Embedding_(4B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3 Embedding** **(0 6B)** | Embeddings | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_Embedding_(0_6B).ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen3** **(14B)** | Alpaca | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(14B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
+| **Qwen3** **(1.7B)** | Classification | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen3_(1.7B)-Classification.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Qwen2** **(7B)** | Alpaca | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Qwen2_(7B)-Alpaca.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 
 ### Text Completion / Continued Pretraining Notebooks
@@ -732,6 +734,7 @@ These notebooks target AMD ROCm GPUs and are not available in Colab. View / down
 | **ERNIE 4 5 21B A3B PT** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-ERNIE_4_5_21B_A3B_PT-Conversational.ipynb) |
 | **Granite4.0** **(3B)** | Conversational | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Granite4.0.ipynb) |
 | **Qwen3** **(14B)** | Alpaca | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(14B)-Alpaca.ipynb) |
+| **Qwen3** **(1.7B)** | Classification | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Qwen3_(1.7B)-Classification.ipynb) |
 | **LFM2.5** **(1.2B)** | Translation | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Translation.ipynb) |
 | **LFM2.5** **(1.2B)** | Text Completion | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-LFM2.5_(1.2B)-Text_Completion.ipynb) |
 | **Gemma3N** **(4B)** | Vision | [GitHub](https://github.com/unslothai/notebooks/blob/main/nb/AMD-Gemma3N_(4B)-Vision.ipynb) |
