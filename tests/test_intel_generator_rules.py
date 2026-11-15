@@ -88,6 +88,11 @@ def test_torch_pins_require_the_xpu_build(gen):
         assert '"torch==2.13.0+xpu"' in cell and '"torchvision==0.28.0+xpu"' in cell
 
 
+def test_uv_targets_the_kernel_interpreter(gen):
+    for cell in (gen.installation_intel_cell, gen.installation_intel_vllm_cell):
+        assert cell.splitlines()[2] == 'import os, sys; os.environ["UV_PYTHON"] = sys.executable'
+
+
 def test_vllm_pin_requires_the_xpu_build(gen):
     assert '"vllm==0.30.0+xpu"' in gen.installation_intel_vllm_cell
 

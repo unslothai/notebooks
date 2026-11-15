@@ -33,7 +33,7 @@
 # # In[1]:
 # 
 # 
-# get_ipython().run_cell_magic('capture', '', '# Torch comes from the PyTorch XPU index. A plain `pip install unsloth` would pull CUDA torch.\n!pip install --upgrade -qqq uv\n!uv pip install -qqq "torch==2.13.0+xpu" "torchvision==0.28.0+xpu" --index-url https://download.pytorch.org/whl/xpu\n# torch is already satisfied, so uv keeps the +xpu wheel.\n!uv pip install -qqq "bitsandbytes>=0.50.0" unsloth unsloth_zoo\n!uv pip install -qqq --no-deps "torchao==0.18.0" --index-url https://download.pytorch.org/whl/xpu\n!uv pip install -qqq --no-deps -U "tokenizers>=0.22.0,<=0.23.0"\n')
+# get_ipython().run_cell_magic('capture', '', '# uv targets this kernel even when its environment is not activated.\nimport os, sys; os.environ["UV_PYTHON"] = sys.executable\n# Torch comes from the PyTorch XPU index. A plain `pip install unsloth` would pull CUDA torch.\n!pip install --upgrade -qqq uv\n!uv pip install -qqq "torch==2.13.0+xpu" "torchvision==0.28.0+xpu" --index-url https://download.pytorch.org/whl/xpu\n# torch is already satisfied, so uv keeps the +xpu wheel.\n!uv pip install -qqq "bitsandbytes>=0.50.0" unsloth unsloth_zoo\n!uv pip install -qqq --no-deps "torchao==0.18.0" --index-url https://download.pytorch.org/whl/xpu\n!uv pip install -qqq --no-deps -U "tokenizers>=0.22.0,<=0.23.0"\n')
 # 
 # 
 # # In[ ]:

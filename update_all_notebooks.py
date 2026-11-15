@@ -7742,6 +7742,8 @@ INTEL_TRITON_XPU_SPEC = '"triton-xpu==3.7.2"'
 INTEL_BITSANDBYTES_SPEC = '"bitsandbytes>=0.50.0"'
 
 installation_intel_cell = f"""%%capture
+# uv targets this kernel even when its environment is not activated.
+import os, sys; os.environ["UV_PYTHON"] = sys.executable
 # Torch comes from the PyTorch XPU index. A plain `pip install unsloth` would pull CUDA torch.
 !pip install --upgrade -qqq uv
 !uv pip install -qqq {" ".join(INTEL_TORCH_SPECS)} --index-url {INTEL_XPU_INDEX_URL}
@@ -7763,6 +7765,8 @@ INTEL_VLLM_INDEX_ARGS = (
 )
 
 installation_intel_vllm_cell = f"""%%capture
+# uv targets this kernel even when its environment is not activated.
+import os, sys; os.environ["UV_PYTHON"] = sys.executable
 # vLLM's XPU wheel requires one exact torch, so it goes first and brings that torch.
 !pip install --upgrade -qqq uv
 !uv pip install -qqq {INTEL_VLLM_SPEC} {" ".join(INTEL_TORCH_SPECS)} {INTEL_VLLM_TRANSFORMERS_SPEC} {INTEL_VLLM_INDEX_ARGS}
