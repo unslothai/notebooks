@@ -647,7 +647,7 @@ import os
 os.remove("OuteTTS/outetts/models/gguf_model.py")
 os.remove("OuteTTS/outetts/interface.py")
 os.remove("OuteTTS/outetts/__init__.py")
-!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
+!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec importlib_resources \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
@@ -657,7 +657,7 @@ import os
 os.remove("OuteTTS/outetts/models/gguf_model.py")
 os.remove("OuteTTS/outetts/interface.py")
 os.remove("OuteTTS/outetts/__init__.py")
-!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
+!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec importlib_resources \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
