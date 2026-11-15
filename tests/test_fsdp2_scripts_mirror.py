@@ -467,6 +467,8 @@ _UNSAFE = re.compile(
     r"|SyntheticDataKit\.from_pretrained\("
     # unsloth_zoo's launch_openenv Popens a uvicorn server on a port drawn from the seeded RNG.
     r"|launch_openenv\("
+    # Studio's colab start() serves on fixed port 8888.
+    r"|\bcolab\.start\(|\bfrom colab import\b.*\bstart\b"
     # Outer models built outside Unsloth: their merge / save skip the collective export.
     r"|OmniVoice\.from_pretrained\("
     # A memmap every process opens for writing at the same path.
@@ -526,6 +528,12 @@ def test_scan_reads_live_capture_bodies_and_skips_comments(tmp_path):
     commented = tmp_path / "commented.py"
     commented.write_text("# os.remove('X/a.py')\n# shutil.rmtree('X')\nprint(1)\n", encoding="utf-8")
     assert _unsafe_lines(commented) == []
+    studio = tmp_path / "studio.py"
+    studio.write_text("from colab import start\nstart()\n", encoding="utf-8")
+    assert _unsafe_lines(studio)
+    studio_attr = tmp_path / "studio_attr.py"
+    studio_attr.write_text("import colab\ncolab.start(cloudflare = False)\n", encoding="utf-8")
+    assert _unsafe_lines(studio_attr)
     top = tmp_path / "top.py"
     top.write_text("import shutil\nshutil.rmtree('outputs')\n", encoding="utf-8")
     assert _unsafe_lines(top)
