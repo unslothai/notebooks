@@ -1286,6 +1286,9 @@ def _topology_updates(mode, nproc, environ):
             return {}
         return {"UNSLOTH_FSDP2": "1"}
     wanted = dict.fromkeys(_TOPOLOGY_ENV)
+    if mode == "split":
+        # One process, no torchrun: drop every inherited layout so Unsloth does not resolve one.
+        return wanted
     wanted["UNSLOTH_FSDP2"] = "1" if mode == "fsdp2" else "0"
     if mode == "tp":
         wanted["UNSLOTH_TP_SIZE"] = str(nproc)
@@ -1557,11 +1560,15 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
             note += "; --mode fsdp2 / ddp, UNSLOTH_PARALLEL or --nproc-per-node 2 launches several processes"
         if options["dry_run"]:
             print(note)
+            for name in _TOPOLOGY_ENV:
+                if os.environ.get(name) is not None:
+                    print(f"would unset {name}={os.environ[name]}")
             print("topology: 1 process, every visible GPU (device_map split, no torchrun)")
             print(shlex.join([sys.executable, target, *rest]))
             print(adapter)
             return 0
         _log(note)
+        _apply_topology("split", 1, os.environ)
         _run_worker(launcher, target, rest, set_fsdp2 = False)
         return 0
     if pinned:

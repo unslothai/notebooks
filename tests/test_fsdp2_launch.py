@@ -1699,3 +1699,43 @@ def test_ddp_default_keeps_its_mode_with_an_explicit_process_count(fl, layout, m
         fl.main(str(launcher), SCRIPT_NAME, ["--nproc-per-node", "2"], default_mode = "ddp", reason = "x")
     assert calls[0][1] == _expected(launcher, 2)
     assert os.environ["UNSLOTH_FSDP2"] == "0"
+
+
+@pytest.mark.parametrize("env", [
+    {"UNSLOTH_PARALLEL": "dp=2,fsdp=0"},
+    {"UNSLOTH_FSDP2": "1"},
+    {"UNSLOTH_FSDP2": "0", "UNSLOTH_TP_SIZE": "2"},
+    {"UNSLOTH_PP_SIZE": "2", "UNSLOTH_CP_SIZE": "2"},
+])
+def test_mode_split_clears_inherited_topology(fl, layout, monkeypatch, capfd, env):
+    tmp, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    ran = tmp / "ran.json"
+    monkeypatch.setenv("FAKE_RAN", str(ran))
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    assert fl.main(str(launcher), SCRIPT_NAME, ["--mode", "split"]) == 0
+    assert calls == [] and ran.exists()
+    assert not [k for k in fl._TOPOLOGY_ENV if k in os.environ]
+    err = capfd.readouterr().err
+    for key, value in env.items():
+        assert f"--mode split replaces {key}={value}" in err
+
+
+def test_mode_split_dry_run_names_what_it_would_unset(fl, layout, monkeypatch, capsys):
+    _, launcher, _ = layout
+    _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setenv("UNSLOTH_PARALLEL", "dp=2,fsdp=0")
+    before = dict(os.environ)
+    assert fl.main(str(launcher), SCRIPT_NAME, ["--mode", "split", "--dry-run"]) == 0
+    assert "would unset UNSLOTH_PARALLEL=dp=2,fsdp=0" in capsys.readouterr().out
+    assert dict(os.environ) == before
+
+
+def test_split_default_with_an_empty_topology_variable_still_clears_it(fl, layout, monkeypatch):
+    tmp, launcher, _ = layout
+    calls = _stub(fl, monkeypatch, visible = 2)
+    monkeypatch.setenv("FAKE_RAN", str(tmp / "ran.json"))
+    monkeypatch.setenv("UNSLOTH_FSDP2", "")
+    assert fl.main(str(launcher), SCRIPT_NAME, [], default_mode = "split", reason = "big") == 0
+    assert calls == [] and "UNSLOTH_FSDP2" not in os.environ
