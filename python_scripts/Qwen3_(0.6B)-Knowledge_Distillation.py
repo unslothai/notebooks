@@ -53,15 +53,18 @@
 # against 9.9 GB for TRL's dense loss (`UNSLOTH_GKD_CHUNKED=0`), same loss to 2e-5,
 # about 30% slower at batch 1 and not at larger batches.
 # 
-# | config | weights | measured |
+# | config | weights | measured, 30 steps at seq 1024 |
 # | --- | --- | --- |
-# | `qwen3` | 1.2 + 3.4 GB | PASS on one free T4: loss 0.367, 392/392 adapters, 3.36 GB |
-# | `gemma-4` | 8.1 + 10.9 GB | PASS on a Kaggle 2x T4: loss 0.079, 410/410 adapters, 14.3 GB |
-# | `muse-glimmer` | 22.2 GB | self-distillation, OOM by 208 MiB at seq 384 |
-# | `qwen3.8` | 22.3 GB | self-distillation, blocked on a dtype mismatch |
+# | `qwen3` | 1.2 + 3.4 GB | PASS on one free T4: loss 0.367, 392/392 adapters, 3.0 GB |
+# | `gemma-4` | 8.1 + 10.9 GB | PASS on a Kaggle 2x T4: loss 0.256, 410/410 adapters, 12.5 + 8.2 GB |
+# | `muse-glimmer` | 22.2 GB | self-distillation, PASS on a Kaggle 2x T4: 832/832 adapters, 13.9 + 13.0 GB |
+# | `qwen3.8` | 22.3 GB | self-distillation, PASS on a Kaggle 2x T4: 512/512 adapters, 12.4 + 12.5 GB |
 # 
-# Only `qwen3` has been re-measured since the chunked loss landed, which is why it
-# now fits one card. The others predate it and are pessimistic.
+# Unsloth trains on the first GPU. A separate teacher may spread over the others;
+# with unslothai/unsloth#17876 Unsloth moves a frozen teacher off the training card
+# onto the freest other GPU, which takes `gemma-4`'s training card from 12.5 to
+# 9.5 GB. The two self-distillation configs are larger than one T4, so their weights
+# span both cards, and they need that change too.
 # 
 # `unsloth/gemma-4-26B-A4B-it` needs an A100 or better, so add it yourself.
 
@@ -92,16 +95,13 @@ student_name = CONFIGS[CONFIG]["student"]
 teacher_name = CONFIGS[CONFIG]["teacher"]
 
 
-# Three notes.
+# Two notes.
 # 
 # **`qwen3.8` and `muse-glimmer` self-distil**, having no smaller sibling, which
 # only helps from an adapter you already trained: a fresh one equals its own base.
 # 
 # **gemma-4 needs `torch.compile` off on T4-class cards**, where the
 # gradient-checkpoint recompute disagrees with the forward about tensor rank.
-# 
-# **qwen3.8 is blocked on T4-class cards** by a `BFloat16 != Half` mismatch in
-# the gated delta net. It does not reproduce where bfloat16 is native.
 
 # In[ ]:
 
@@ -214,7 +214,8 @@ print(f"{len(trainable)} trainable tensors")
 # `teacher = None` uses the frozen base for free, but the adapters must be
 # disabled explicitly: `GKDTrainer` only calls `self.teacher_model(...)`, so the
 # student passed directly gives two identical forwards. The wrapper keeps the
-# student out of its submodules, since the trainer calls `teacher.eval()` each step.
+# student out of its submodules, since the trainer calls `teacher.eval()` each step,
+# and exposes the student's output head so the chunked loss applies here too.
 # 
 # A separate teacher needs a device-map budget, or the planner takes the whole card
 # and leaves nothing for the load's own buffers.
@@ -231,6 +232,9 @@ class FrozenBaseTeacher(torch.nn.Module):
     @property
     def config(self):
         return self.student.config
+
+    def get_output_embeddings(self):
+        return self.student.get_output_embeddings()
 
     def forward(self, *args, **kwargs):
         with self.student.disable_adapter():
