@@ -26,17 +26,25 @@ everything else goes to the script:
                          number of visible GPUs). A count above the visible GPUs is
                          refused. With no GPU visible the count is taken as given, which
                          is how the CPU (gloo) tests drive two ranks.
-    --mode MODE          auto (default), ddp, fsdp2, tp or pp over all N processes. ddp /
-                         fsdp2 / tp / pp replace any UNSLOTH_FSDP2 / UNSLOTH_TP_SIZE /
-                         UNSLOTH_PP_SIZE / UNSLOTH_CP_SIZE / UNSLOTH_PARALLEL in the
-                         environment, with a note naming what was replaced.
+    --mode MODE          auto (default), split, ddp, fsdp2, tp or pp. ddp / fsdp2 / tp /
+                         pp lay out all N processes and replace any UNSLOTH_FSDP2 /
+                         UNSLOTH_TP_SIZE / UNSLOTH_PP_SIZE / UNSLOTH_CP_SIZE /
+                         UNSLOTH_PARALLEL in the environment, with a note naming what was
+                         replaced. split runs one process that sees every visible GPU, so
+                         the model is placed over them by ``device_map`` (the notebook's
+                         own multi-GPU path). auto uses the environment, else the
+                         script's default mode, else native FSDP2.
     --dry-run            print the resolved topology, command and environment, then exit
     --help               this text
 
 With 2+ processes this process is replaced by
 ``python -m torch.distributed.run --standalone --nproc-per-node=N <launcher> [args]``.
-The layout is decided in this order: ``--mode``, then the environment, then the launcher
-default. The default is ``UNSLOTH_FSDP2=1``, set only when ``UNSLOTH_FSDP2`` is unset and
+The layout is decided in this order: ``--mode``, then the environment, then the script's
+default mode, then the launcher default. A launcher generated with ``default_mode`` (from
+``MULTI_GPU_MODE`` in ``update_all_notebooks.py``, chosen from a measured multi-GPU sweep)
+uses that mode under ``--mode auto`` unless the environment sets ``UNSLOTH_FSDP2``,
+``UNSLOTH_PARALLEL``, ``UNSLOTH_TP_SIZE``, ``UNSLOTH_PP_SIZE`` or ``UNSLOTH_CP_SIZE``; a
+``split`` default also yields to a process count above 1. The launcher default is ``UNSLOTH_FSDP2=1``, set only when ``UNSLOTH_FSDP2`` is unset and
 ``UNSLOTH_PARALLEL`` does not choose the data parallel kind itself (``fsdp=``,
 ``dp_shard=``, ``dp_replicate=``). ``UNSLOTH_FSDP2=0`` or
 ``UNSLOTH_PARALLEL="dp=2,fsdp=0"`` gives plain DDP. Under IPython / Jupyter (``%run``) torchrun runs as a child process instead. With
@@ -119,7 +127,8 @@ import uuid
 __all__ = ["main", "SUPPORTED_CALLS", "is_install_command", "install_decision"]
 
 _LAUNCHER_FLAGS = ("--nproc-per-node", "--nproc_per_node", "--mode", "--dry-run", "--help", "-h")
-_MODES = ("auto", "ddp", "fsdp2", "tp", "pp")
+_MODES = ("auto", "split", "ddp", "fsdp2", "tp", "pp")
+_DEFAULT_MODES = ("split", "ddp", "fsdp2", "tp", "pp")
 _TOPOLOGY_ENV = ("UNSLOTH_FSDP2", "UNSLOTH_TP_SIZE", "UNSLOTH_PP_SIZE", "UNSLOTH_CP_SIZE", "UNSLOTH_PARALLEL")
 _PARALLEL_DP_KIND_KEYS = ("fsdp", "fsdp2", "fsdp_size", "dp_shard", "dp_replicate")
 _WAIT_NOTE_SECONDS = 60
@@ -1277,6 +1286,9 @@ def _topology_updates(mode, nproc, environ):
             return {}
         return {"UNSLOTH_FSDP2": "1"}
     wanted = dict.fromkeys(_TOPOLOGY_ENV)
+    if mode == "split":
+        # One process, no torchrun: drop every inherited layout so Unsloth does not resolve one.
+        return wanted
     wanted["UNSLOTH_FSDP2"] = "1" if mode == "fsdp2" else "0"
     if mode == "tp":
         wanted["UNSLOTH_TP_SIZE"] = str(nproc)
@@ -1441,14 +1453,27 @@ def _worker_mode():
     return None
 
 
-def main(launcher_path, script_name, argv = None, single_process = False, reason = None):
+def _environment_picks_topology(environ):
+    """The first topology variable set in ``environ``, or None."""
+    for name in _TOPOLOGY_ENV:
+        if environ.get(name, "").strip():
+            return name
+    return None
+
+
+def main(launcher_path, script_name, argv = None, single_process = False, reason = None, default_mode = None):
     """Launch ``python_scripts/<script_name>`` next to ``launcher_path`` with FSDP2.
 
     ``script_name=None`` is the generic form: the first script argument is the target.
     ``single_process=True`` marks a script that is not safe to run on several ranks
     (``reason`` says why): it runs single process, and asking for more processes is
     refused unless ``UNSLOTH_FSDP2_FORCE=1``.
+    ``default_mode`` (split, ddp, fsdp2, tp or pp, with ``reason``) is what ``--mode auto``
+    runs when the environment does not choose a layout (a ``split`` default also yields to a
+    process count above 1).
     """
+    if default_mode is not None and default_mode not in _DEFAULT_MODES:
+        raise ValueError(f"default_mode must be one of {', '.join(_DEFAULT_MODES)}, got {default_mode!r}")
     launcher = os.path.abspath(launcher_path)
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
@@ -1475,6 +1500,12 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
         if options["nproc"] is not None and os.environ.get("LOCAL_RANK", "0") == "0":
             _log("--nproc-per-node is ignored inside torchrun")
         world = _env_int("WORLD_SIZE", default = 1)
+        if (options["mode"] in (None, "auto") and default_mode not in (None, "split")
+                and not _environment_picks_topology(os.environ)):
+            options["mode"] = default_mode
+        if options["mode"] == "split":
+            _fail("--mode split runs one process; it cannot run inside torchrun with WORLD_SIZE="
+                  f"{world}. Start the launcher with plain python instead.")
         if options["dry_run"]:
             resolved = _apply_topology(options["mode"], world, dict(os.environ), quiet = True)
             print(f"would run {target} {shlex.join(rest)} in this torchrun worker".rstrip())
@@ -1505,6 +1536,41 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
             _fail(f"{source} must be an integer, got {requested!r}")
         if requested < 0:
             _fail(f"{source} must be >= 0, got {requested}")
+    if options["mode"] == "split" and requested is not None and requested > 1:
+        _fail(f"--mode split runs one process over every visible GPU; {source}={requested} asks for "
+              f"{requested}. Drop one of them.")
+    picked = None
+    if options["mode"] in (None, "auto") and default_mode is not None and not pinned:
+        env_name = _environment_picks_topology(os.environ)
+        if env_name:
+            _log(f"{env_name} is set, so it decides the layout instead of this script's default "
+                 f"mode {default_mode} ({reason or 'see its launcher'})")
+        elif default_mode == "split" and requested is not None and requested > 1:
+            _log(f"{source}={requested} asks for {requested} processes, so this script's default "
+                 f"mode {default_mode} ({reason or 'see its launcher'}) is not used")
+        else:
+            picked = default_mode
+            options["mode"] = default_mode
+    if options["mode"] == "split":
+        why_split = (f"default mode for {os.path.basename(target)}: {reason}" if picked == "split" and reason
+                     else "--mode split")
+        note = (f"running one process over every visible GPU, the model placed over them by "
+                f"device_map ({why_split})")
+        if picked == "split":
+            note += "; --mode fsdp2 / ddp, UNSLOTH_PARALLEL or --nproc-per-node 2 launches several processes"
+        if options["dry_run"]:
+            print(note)
+            for name in _TOPOLOGY_ENV:
+                if os.environ.get(name) is not None:
+                    print(f"would unset {name}={os.environ[name]}")
+            print("topology: 1 process, every visible GPU (device_map split, no torchrun)")
+            print(shlex.join([sys.executable, target, *rest]))
+            print(adapter)
+            return 0
+        _log(note)
+        _apply_topology("split", 1, os.environ)
+        _run_worker(launcher, target, rest, set_fsdp2 = False)
+        return 0
     if pinned:
         if requested is not None and requested > 1:
             _fail(f"{source}={requested} refused: {why}. Set UNSLOTH_FSDP2_FORCE=1 to launch it "
@@ -1538,7 +1604,12 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
             _log(f"no GPU visible; starting {nproc} processes as requested")
         if fsdp2 == "0" and options["mode"] in (None, "auto"):
             _log("UNSLOTH_FSDP2=0: launching plain DDP torchrun without FSDP2")
+        if picked is not None and not options["dry_run"]:
+            _log(f"default mode for {os.path.basename(target)}: {picked} ({reason or 'see its launcher'}); "
+                 f"--mode or UNSLOTH_PARALLEL overrides")
         if options["dry_run"]:
+            if picked is not None:
+                print(f"default mode for {os.path.basename(target)}: {picked} ({reason or 'see its launcher'})")
             print(_describe_topology(resolved, nproc))
             for name in _TOPOLOGY_ENV:
                 if name in resolved:
@@ -1571,7 +1642,7 @@ def main(launcher_path, script_name, argv = None, single_process = False, reason
         note = "1 GPU visible: running single-process, FSDP2 needs 2+ GPUs"
     else:
         note = "no GPU visible: running single-process"
-    if options["mode"] not in (None, "auto"):
+    if options["mode"] not in (None, "auto") and picked is None:
         note += f" (--mode {options['mode']} needs 2+ processes)"
     if options["dry_run"]:
         print(note)

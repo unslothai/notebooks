@@ -939,3 +939,43 @@ def test_assert_mirror_requires_readme_and_helper(tmp_path):
     (out / HELPER_NAME).unlink()
     with pytest.raises(RuntimeError, match=HELPER_NAME):
         _GEN._assert_fsdp2_mirror(str(scripts), str(out))
+
+
+def test_default_mode_table_names_real_scripts_and_valid_modes():
+    bases = {_GEN._fsdp2_base_name(name) for name in _script_names()}
+    stale = sorted(set(_GEN.MULTI_GPU_MODE) - bases)
+    assert not stale, f"MULTI_GPU_MODE names scripts that no longer exist: {stale}"
+    assert not set(_GEN.MULTI_GPU_MODE) & set(_GEN.FSDP2_SINGLE_PROCESS)
+    for mode, reason in _GEN.MULTI_GPU_MODE.values():
+        assert mode in ("split", "ddp", "fsdp2", "tp", "pp") and reason
+    readme = (LAUNCHERS / "README.md").read_text(encoding="utf-8")
+    for base in _GEN.MULTI_GPU_MODE:
+        assert f"| `{base}` |" in readme
+
+
+def test_sweep_table_names_real_scripts():
+    names = set(_script_names())
+    stale = sorted(set(_GEN.MULTI_GPU_SWEEP) - names)
+    assert not stale, f"MULTI_GPU_SWEEP names scripts that no longer exist: {stale}"
+    for cells in _GEN.MULTI_GPU_SWEEP.values():
+        assert len(cells) == len(_GEN.MULTI_GPU_SWEEP_COLUMNS)
+
+
+@pytest.mark.parametrize("name, mode", [
+    ("Kaggle-Qwen3.8_(27B)-Conversational.py", "split"),
+    ("Qwen3.8_(27B)-Conversational.py", "split"),
+    ("Kaggle-Qwen3.8_(27B)-GRPO.py", "split"),
+    ("Kaggle-Muse_Glimmer_(30B)-Conversational.py", "split"),
+    ("Muse_Glimmer_(30B)-Vision.py", "split"),
+    ("HuggingFace Course-Muse_Glimmer_(30B)-GRPO.py", "split"),
+    ("Kaggle-Muse_Glimmer_(30B)-Multimodal.py", "split"),
+    ("Mistral_Nemo_(12B)-Alpaca.py", "ddp"),
+    ("AMD-Mistral_Nemo_(12B)-Alpaca.py", "ddp"),
+])
+def test_default_mode_launchers_carry_their_mode(name, mode):
+    assert (SCRIPTS / name).is_file()
+    tree = ast.parse((LAUNCHERS / name).read_text(encoding="utf-8"))
+    call = next(node for node in ast.walk(tree)
+                if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "main")
+    keywords = {k.arg: ast.literal_eval(k.value) for k in call.keywords}
+    assert keywords == {"default_mode": mode, "reason": _GEN.multi_gpu_default_mode(name)[1]}

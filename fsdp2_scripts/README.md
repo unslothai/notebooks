@@ -12,7 +12,7 @@ It runs that script unchanged on every visible GPU with Unsloth's native FSDP2.
 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py"                          # every visible GPU
 CUDA_VISIBLE_DEVICES=0,1 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" # pick GPUs
 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --nproc-per-node 4       # pick a process count
-python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --mode ddp              # plain DDP (also fsdp2, tp, pp)
+python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --mode ddp              # plain DDP (also fsdp2, tp, pp, split)
 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the topology and command only
 ```
 
@@ -20,8 +20,10 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the t
   with one process per GPU, and each process runs `python_scripts/<name>`.
 - `--mode ddp|fsdp2|tp|pp` picks the layout over all the processes and replaces any
   `UNSLOTH_FSDP2`, `UNSLOTH_TP_SIZE`, `UNSLOTH_PP_SIZE`, `UNSLOTH_CP_SIZE` or
-  `UNSLOTH_PARALLEL` in the environment. Without it (`--mode auto`) the environment
-  decides, and native FSDP2 is the default.
+  `UNSLOTH_PARALLEL` in the environment. `--mode split` runs one process that sees every
+  visible GPU, so the model is placed over them by `device_map`. Without a mode
+  (`--mode auto`) the environment decides, then the script's default mode (see
+  "Default modes" below), and native FSDP2 is the default.
 - With 1 GPU, or none, it runs the script in a single process, like
   `python "python_scripts/<name>"`.
 - Asking for more processes than there are visible GPUs is refused.
@@ -104,7 +106,9 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the t
   Sesame_CSM_(1B)-TTS, Spark_TTS_(0_5B),
   gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16, Openenv_wordle_grpo,
   Qwen3_(4B)-Tool_Calling and Qwen3_(4B)-GRPO-Tool_Use, with their AMD- / Kaggle- /
-  HuggingFace Course- variants.
+  HuggingFace Course- variants. Forced onto 2 processes on a Kaggle 2x T4,
+  OmniVoice_(0.6B)-TTS fails saving after training and Qwen3_(4B)-GRPO-Tool_Use hangs in
+  its first GRPO step.
 - **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
   runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
   every sharded unit onto every process until `generate` returns (every process
@@ -113,7 +117,144 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the t
   memory on a smaller GPU in the generation cells that follow training.
 - **Unsloth decides what is supported.** The launcher does not check models, trainers or
   parallel layouts. Unsloth itself refuses layouts it cannot run (for example an invalid
-  `UNSLOTH_TP_SIZE`) with an error that names the problem. Nothing in this folder claims
-  that a given script has been verified on multiple GPUs.
+  `UNSLOTH_TP_SIZE`) with an error that names the problem. Beyond the one sweep in
+  "Multi-GPU status" below, nothing in this folder claims that a given script has been
+  verified on multiple GPUs.
 - **The scripts are not modified.** Each launcher runs `python_scripts/<name>` as it is,
   so a fix to a script belongs in its notebook template, not here.
+
+## Default modes
+
+These scripts run another mode than native FSDP2 when neither `--mode` nor the
+environment (`UNSLOTH_FSDP2`, `UNSLOTH_PARALLEL`, `UNSLOTH_TP_SIZE`, `UNSLOTH_PP_SIZE`,
+`UNSLOTH_CP_SIZE`) asks for one; `split` also yields to `--nproc-per-node` above 1
+(or `UNSLOTH_NPROC_PER_NODE`), which starts native FSDP2. They are listed in
+`MULTI_GPU_MODE` in `update_all_notebooks.py`, with their AMD- / Kaggle- /
+HuggingFace Course- variants. `split` is one process over every visible GPU, the model
+placed over them by `device_map`, as the notebook does on its own.
+
+| Script | Mode | Why |
+| --- | --- | --- |
+| `Mistral_Nemo_(12B)-Alpaca.py` | ddp | native FSDP2 trains, then runs out of memory gathering the whole 12B model for generate on 16 GB GPUs; DDP fits one copy per GPU and passes |
+| `Muse_Glimmer_(30B)-Conversational.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
+| `Muse_Glimmer_(30B)-GRPO.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
+| `Muse_Glimmer_(30B)-Multimodal.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
+| `Muse_Glimmer_(30B)-Vision.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
+| `Qwen3.8_(27B)-Conversational.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
+| `Qwen3.8_(27B)-GRPO.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
+
+## Multi-GPU status
+
+One Kaggle 2x T4 sweep of `python_scripts/`, rendered from `MULTI_GPU_SWEEP` in
+`update_all_notebooks.py`: notebooks d8da2d22, unsloth 87e154a, unsloth-zoo f1f2f2c,
+torch 2.14.1, transformers 5.17.0, TRL 1.15.0. Install cells were not run, so a
+notebook's own pins were not applied, and training was cut to a few steps. Models
+larger than one T4 were replaced by tiny copies of the same architecture, except
+Qwen3.8_(27B) and Muse_Glimmer_(30B), which ran at full size in 4-bit. `split` is one
+process over both GPUs; `forced 2 ranks` is a single-process script run with
+`UNSLOTH_FSDP2_FORCE=1 --nproc-per-node 2`. An empty cell was not run; scripts with
+no run are left out. `Launcher` is what `python fsdp2_scripts/<name>` runs today.
+
+| Script | Launcher | 1 GPU | split | DDP | FSDP2 | forced 2 ranks |
+| --- | --- | --- | --- | --- | --- | --- |
+| `Advanced_Llama3_1_(3B)_GRPO_LoRA.py` | fsdp2 |  |  | not valid: test harness | not valid: test harness |  |
+| `Advanced_Llama3_2_(3B)_GRPO_LoRA.py` | fsdp2 |  |  | PASS | PASS |  |
+| `All_MiniLM_L6_v2.py` | fsdp2 |  |  | PASS | PASS |  |
+| `BGE_M3.py` | fsdp2 |  |  | PASS | PASS |  |
+| `CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.py` | fsdp2 |  |  | PASS | PASS |  |
+| `CodeGemma_(7B)-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `DeepSeek_R1_0528_Qwen3_(8B)_GRPO.py` | fsdp2 |  |  | needs vllm-bnb-plugin | needs vllm-bnb-plugin |  |
+| `Deepseek_OCR_(3B).py` | single process |  |  |  |  | missing easydict (install cell not run) |
+| `EmbeddingGemma2_(300M)-Image_Text.py` | single process |  |  |  |  | transformers too old |
+| `EmbeddingGemma2_(300M).py` | fsdp2 |  |  | transformers too old | transformers too old |  |
+| `Falcon_H1-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Falcon_H1_(0.5B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `FunctionGemma_(270M)-LMStudio.py` | fsdp2 |  |  | PASS | PASS |  |
+| `FunctionGemma_(270M)-Mobile-Actions.py` | fsdp2 | PASS |  | PASS | PASS |  |
+| `FunctionGemma_(270M)-Multi-Turn-Tool-Calling.py` | fsdp2 |  |  | PASS (no training step) | PASS (no training step) |  |
+| `FunctionGemma_(270M).py` | fsdp2 |  |  | PASS | PASS |  |
+| `GPT_OSS_BNB_(20B)-Inference.py` | fsdp2 |  |  | PASS (no training step) | PASS (no training step) |  |
+| `GPT_OSS_MXFP4_(20B)-Inference.py` | fsdp2 |  |  | PASS (no training step) | PASS (no training step) |  |
+| `Gemma2_(2B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma2_(9B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma3_(270M)_Phone_Deployment.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma3_(4B).py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma4_(12B)_Audio.py` | fsdp2 |  |  | not valid: test harness | not valid: test harness |  |
+| `Gemma4_(12B)_Text.py` | fsdp2 |  |  | not valid: test harness | not valid: test harness |  |
+| `Gemma4_(12B)_Vision.py` | fsdp2 | PASS |  | PASS | PASS |  |
+| `Gemma4_(26B_A4B)-Text.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma4_(26B_A4B)-Vision.py` | fsdp2 | PASS |  | PASS | PASS |  |
+| `Gemma4_(31B)-Text.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma4_(31B)-Vision.py` | fsdp2 | PASS |  | PASS | PASS |  |
+| `Gemma4_(E2B)_Reinforcement_Learning_2048_Game.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma4_(E4B)-Audio.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Gemma4_(E4B)-Vision.py` | fsdp2 |  |  | PASS | trains, loss drifts after fp16 overflow skips |  |
+| `Granite4.0.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Granite4.0_350M.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Kaggle-Muse_Glimmer_(30B)-Conversational.py` | split |  | PASS |  | out of memory at load |  |
+| `Kaggle-Muse_Glimmer_(30B)-GRPO.py` | split |  | PASS |  | out of memory at load |  |
+| `Kaggle-Muse_Glimmer_(30B)-Multimodal.py` | split |  | dataset gone from the Hub |  | out of memory at load |  |
+| `Kaggle-Muse_Glimmer_(30B)-Vision.py` | split |  | PASS |  | out of memory at load |  |
+| `Kaggle-Qwen3.8_(27B)-Conversational.py` | split |  | PASS |  | out of memory at load |  |
+| `Kaggle-Qwen3.8_(27B)-GRPO.py` | split |  | PASS |  | out of memory at load |  |
+| `LFM2.5_(1.2B)-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `LFM2.5_(1.2B)-GRPO.py` | fsdp2 | missing vllm (install cell not run) |  | missing vllm (install cell not run) | missing vllm (install cell not run) |  |
+| `LFM2.5_(1.2B)-Text_Completion.py` | fsdp2 | PASS |  | PASS | PASS |  |
+| `LFM2.5_(1.2B)-Translation.py` | fsdp2 | PASS |  | PASS | PASS |  |
+| `Liquid_LFM2-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Liquid_LFM2_(1.2B)-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Llama3.1_(8B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Llama3.1_(8B)-GRPO.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Llama3.2_(11B)-Vision.py` | fsdp2 |  |  | PASS | trains, loss drifts after fp16 overflow skips |  |
+| `Llama3.2_(1B)-RAFT.py` | single process |  |  |  |  | missing llama_index.packs (install cell not run) |
+| `Llama3_(8B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Llama3_(8B)-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Llama3_(8B)-ORPO.py` | fsdp2 |  |  | no ORPOConfig in TRL 1.x | no ORPOConfig in TRL 1.x |  |
+| `Llasa_TTS_(1B).py` | single process |  |  |  |  | missing xcodec2 (install cell not run) |
+| `Ministral_3_VL_(3B)_Vision.py` | fsdp2 |  |  | PASS | trains, loss drifts after fp16 overflow skips |  |
+| `Mistral_(7B)-Text_Completion.py` | fsdp2 |  |  | backward fails with trainable embeddings | PASS |  |
+| `Mistral_Nemo_(12B)-Alpaca.py` | ddp |  |  | PASS | out of memory gathering the model for generate |  |
+| `Mistral_Small_(22B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Mistral_v0.3_(7B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Mistral_v0.3_(7B)-CPT.py` | fsdp2 | PASS |  | backward fails with trainable embeddings | PASS |  |
+| `Mistral_v0.3_(7B)-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Mistral_v0.3_(7B)-GRPO.py` | fsdp2 |  |  | needs vllm-bnb-plugin | needs vllm-bnb-plugin |  |
+| `ModernBert.py` | fsdp2 |  |  | PASS | PASS |  |
+| `OmniVoice_(0.6B)-TTS.py` | single process |  |  |  |  | export fails: mixed fp32 / fp16 parameters |
+| `Openenv_wordle_grpo.py` | single process |  |  |  |  | missing fastmcp (install cell not run) |
+| `Oute_TTS_(1B).py` | single process |  |  |  |  | missing outetts (install cell not run) |
+| `Phi_3.5_Mini-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Phi_3_Medium-Conversational.py` | fsdp2 | PASS |  | PASS | PASS |  |
+| `Phi_4-Conversational.py` | fsdp2 | not valid: test harness |  | not valid: test harness | not valid: test harness |  |
+| `Phi_4_(14B)-GRPO.py` | fsdp2 |  |  | needs vllm-bnb-plugin | needs vllm-bnb-plugin |  |
+| `Pixtral_(12B)-Vision.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen2.5_(7B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen2.5_Coder_(1.5B)-Tool_Calling.py` | fsdp2 | missing transformers_cfg (install cell not run) |  | missing transformers_cfg (install cell not run) | missing transformers_cfg (install cell not run) |  |
+| `Qwen2.5_Coder_(14B)-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen2.5_VL_(7B)-Vision.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen2_(7B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen2_5_7B_VL_GRPO.py` | fsdp2 |  |  | needs vllm-bnb-plugin | needs vllm-bnb-plugin |  |
+| `Qwen2_VL_(7B)-Vision.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_(14B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_(14B)-Reasoning-Conversational.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_(14B).py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_(4B)-GRPO-Tool_Use.py` | single process |  |  |  |  | hangs in the first GRPO step |
+| `Qwen3_(4B)-Instruct.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_(4B)-Thinking.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_(4B)-Tool_Calling.py` | single process |  |  |  |  | PASS |
+| `Qwen3_(4B)_Instruct-QAT.py` | fsdp2 | torchao reload error (1 GPU too) |  | torchao reload error (1 GPU too) | refuses torchao export: host RAM |  |
+| `Qwen3_5_(2B)_Vision.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_5_(4B)_Vision.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_6_MoE.py` | fsdp2 | PASS |  | PASS | PASS |  |
+| `Qwen3_Embedding_(0_6B).py` | fsdp2 |  |  | out of memory in training | out of memory in training |  |
+| `Qwen3_Embedding_(4B).py` | fsdp2 |  |  | PASS | trains, loss drifts after fp16 overflow skips |  |
+| `Qwen3_MoE.py` | fsdp2 | generate shape error (1 GPU too) |  | generate shape error (1 GPU too) | generate shape error (1 GPU too) |  |
+| `Qwen3_VL_(8B)-Vision-GRPO.py` | fsdp2 |  |  | PASS | PASS |  |
+| `Qwen3_VL_(8B)-Vision.py` | fsdp2 | PASS |  | trains, loss drifts after fp16 overflow skips | trains, loss drifts after fp16 overflow skips |  |
+| `Sesame_CSM_(1B)-TTS.py` | single process |  |  |  |  | PASS |
+| `Spark_TTS_(0_5B).py` | single process |  |  |  |  | missing sparktts (install cell not run) |
+| `TinyLlama_(1.1B)-Alpaca.py` | fsdp2 |  |  | PASS | PASS |  |
+| `gpt_oss_(20B)_500K_Context_Fine_tuning.py` | fsdp2 |  |  | not valid: ranks saw identical first batches | not valid: ranks saw identical first batches |  |
+| `gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py` | fsdp2 |  |  | PASS | PASS |  |
