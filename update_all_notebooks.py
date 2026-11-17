@@ -7194,8 +7194,7 @@ FSDP2_SINGLE_PROCESS = {
     "Gemma3N_(2B)-Inference.py": "starts a server on fixed port 8000 from Python",
     "Unsloth_Studio.py": "starts the Studio server on fixed port 8888 from Python",
     "Oute_TTS_(1B).py": "patches one shared OuteTTS checkout with os.remove calls",
-    # OmniVoice.from_pretrained builds the outer model, so export fails on DTensors. Forced onto
-    # 2 ranks on a Kaggle 2x T4 it trains, then fails saving: FSDP expects uniform parameter dtypes.
+    # Export fails on DTensors; forced onto 2 ranks it trains, then FSDP rejects mixed dtypes on save.
     "OmniVoice_(0.6B)-TTS.py": "merges and saves an OmniVoice model outside Unsloth's collective FSDP2 export, which fails on its mixed fp32 / fp16 parameters",
     "Llasa_TTS_(1B).py": "every process would rewrite the same preprocessed memmap and shape files",
     "Llasa_TTS_(3B).py": "every process would rewrite the same preprocessed memmap and shape files",
@@ -7220,11 +7219,8 @@ FSDP2_SINGLE_PROCESS = {
     "Qwen3_(4B)-GRPO-Tool_Use.py": "its sampled tool-calling loop ends when one process's reply has no tool call, so processes would make different numbers of collective generate calls",
 }
 
-# Mode the launcher runs under --mode auto when the environment does not choose one, keyed
-# by base name like FSDP2_SINGLE_PROCESS. Unlisted scripts keep native FSDP2 over every GPU.
-# "split" runs one process that sees every GPU, so the 4-bit model is placed over them by
-# device_map ("sequential"), the notebook's own multi-GPU path; --mode / UNSLOTH_PARALLEL /
-# --nproc-per-node 2 still launch several processes. Chosen from MULTI_GPU_SWEEP below.
+# --mode auto default per script when the environment picks none (unlisted = native FSDP2).
+# "split" = one process placing the 4-bit model over every GPU via device_map. From MULTI_GPU_SWEEP.
 _SPLIT_BIG_4BIT = (
     "every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on "
     "2x 16 GB; one process placing it over both GPUs trains"
@@ -7243,11 +7239,9 @@ MULTI_GPU_MODE = {
     ),
 }
 
-# Kaggle 2x T4 sweep of python_scripts/ (notebooks d8da2d22, unsloth 87e154a, unsloth-zoo
-# f1f2f2c, torch 2.14.1, transformers 5.17.0, TRL 1.15.0; install cells not run, steps cut,
-# models over one T4 swapped for tiny copies except the Qwen3.8 / Muse Glimmer rows).
-# Columns: 1 GPU, one process over 2 GPUs (split), DDP, FSDP2, FSDP2 forced onto 2 ranks for a
-# FSDP2_SINGLE_PROCESS script. Rendered into fsdp2_scripts/README.md.
+# Kaggle 2x T4 sweep (notebooks d8da2d22, unsloth 87e154a, zoo f1f2f2c, torch 2.14.1, transformers
+# 5.17.0, TRL 1.15.0; steps cut, tiny models except Qwen3.8 / Muse Glimmer). Columns: 1 GPU, split,
+# DDP, FSDP2, forced 2-rank FSDP2 for FSDP2_SINGLE_PROCESS. Rendered into fsdp2_scripts/README.md.
 MULTI_GPU_SWEEP_COLUMNS = ("1 GPU", "split", "DDP", "FSDP2", "forced 2 ranks")
 MULTI_GPU_SWEEP = {
     'Advanced_Llama3_1_(3B)_GRPO_LoRA.py': ('', '', 'not valid: test harness', 'not valid: test harness', ''),
