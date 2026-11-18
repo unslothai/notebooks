@@ -502,6 +502,162 @@ if False: # Change to True to upload finetune
     )
 
 
+# ### LiteRT-LM: run the finetune on a phone
+# 
+# [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM) runs `.litertlm` files on Android phones and other devices. The cells below turn the merged 16-bit model from `save_pretrained_merged` (above) into `gemma-4-finetune.litertlm`: text only, int4 weights, a 2048-token context, about 2.6 GB.
+# 
+# They run on the CPU in a separate Python environment, so the training packages stay as they are. The export needs about **30 GB of RAM**, so run these cells on a runtime with at least 30 GB (a Kaggle "GPU T4 x2" session has 30 GiB). They only read the `gemma-4-finetune` folder: you can restart the runtime after saving it, to free the memory training used.
+# 
+# Set `export_litertlm = True` to run them.
+
+# In[ ]:
+
+
+export_litertlm = False # Change to True to make a .litertlm file
+model_dir     = "gemma-4-finetune"          # The merged 16-bit model (save_pretrained_merged)
+litertlm_file = "gemma-4-finetune.litertlm" # The file for LiteRT-LM
+work_dir      = "/tmp/litertlm"             # The tools, their Python environment and the intermediate file
+
+if export_litertlm:
+    import os, subprocess, sys
+
+    def run(command, show = True, env = None):
+        # Run a command, print its output as it comes (show = True), return (exit code, its last lines)
+        process = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, text = True, env = env)
+        tail = []
+        for line in process.stdout:
+            if show: print(line, end = "")
+            tail = (tail + [line])[-40:]
+        return process.wait(), "".join(tail)
+
+    def ram_gib():
+        # The machine's memory, or this container's memory limit when that is lower
+        with open("/proc/meminfo") as f:
+            ram = int(next(line for line in f if line.startswith("MemTotal:")).split()[1]) * 1024
+        for limit in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+            if os.path.isfile(limit):
+                value = open(limit).read().strip()
+                if value.isdigit(): ram = min(ram, int(value))
+        return ram / 2**30
+
+    if ram_gib() < 20:
+        raise RuntimeError(f"This runtime has {ram_gib():.1f} GiB of RAM. The export needs about 30 GB: "
+                           "use a runtime with more RAM.")
+    if ram_gib() < 29:
+        print(f"This runtime has {ram_gib():.1f} GiB of RAM. The export peaked at about 28 GiB in our test, "
+              "so it may run out of memory here.")
+    if not os.path.isfile(os.path.join(model_dir, "config.json")):
+        if "model" not in globals():
+            raise RuntimeError(f"There is no merged model in {model_dir}. Train the model above, then run this "
+                               "cell again: it saves the model with save_pretrained_merged.")
+        model.save_pretrained_merged(model_dir, tokenizer)
+    os.makedirs(work_dir, exist_ok = True)
+
+
+# We fetch the export tools at a fixed commit, check them against their sha256, and install the versions they were tested with (litert-torch, LiteRT-LM and a CPU build of torch) into their own environment in `work_dir`. This takes a few minutes the first time.
+
+# In[ ]:
+
+
+if export_litertlm:
+    import hashlib, urllib.request
+    if sys.version_info[:2] not in ((3, 12), (3, 13)):
+        raise RuntimeError(f"The export environment needs Python 3.12 or 3.13 (its pinned packages have wheels for "
+                           f"those); this runtime has Python {sys.version.split()[0]}.")
+    kit_url = "https://raw.githubusercontent.com/john-rocky/hf-to-litertlm/836ef8f6a9964f4136ac4773a8981b20223a256e/notebooks/unsloth_gemma4_e2b/" # The export tools at a fixed commit
+    kit = {
+        "requirements.txt"      : "1098d968b54a947060347b6830fbb5d693910f50255e32679e620ed55738ac55",
+        "gemma4_to_litertlm.py" : "8f80f48e0ab726080b1cd7e9c93bdd2fa3a9f321761353e02d92c7e6ac318567",
+        "bf16to32.py"           : "36a9e861eb290337fff8caf8f5ea42a35748f908731fdafb7d30eaa32cda0882",
+    }
+    kit_dir = os.path.join(work_dir, "kit")
+    os.makedirs(kit_dir, exist_ok = True)
+    file_sha256 = lambda path: hashlib.sha256(open(path, "rb").read()).hexdigest()
+    for name, digest in kit.items():
+        path = os.path.join(kit_dir, name)
+        if not os.path.isfile(path) or file_sha256(path) != digest:
+            urllib.request.urlretrieve(kit_url + name, path)
+        if file_sha256(path) != digest:
+            raise RuntimeError(f"{kit_url + name} does not have the sha256 this notebook expects.")
+    tool = os.path.join(kit_dir, "gemma4_to_litertlm.py")
+    requirements = os.path.join(kit_dir, "requirements.txt")
+
+    # A separate environment, so the torch and transformers of the training stay as they are
+    python = os.path.join(work_dir, "venv", "bin", "python")
+    if not os.path.isfile(python):
+        code, tail = run([sys.executable, "-m", "venv", "--without-pip", os.path.join(work_dir, "venv")], show = False)
+        if code != 0:
+            raise RuntimeError(f"Could not make a Python environment in {work_dir}:\n{tail}")
+    if run([python, tool, "versions", requirements], show = False)[0] != 0:
+        torch_line = next(line.strip() for line in open(requirements) if line.startswith("torch=="))
+        pip = [sys.executable, "-m", "pip", "--python", python, "install", "--only-binary=:all:"]
+        for args in (["--index-url", "https://download.pytorch.org/whl/cpu", torch_line], ["-r", requirements]):
+            code, tail = run(pip + args, show = False)
+            if code != 0:
+                raise RuntimeError(f"pip could not install the export environment:\n{tail}")
+    if run([python, tool, "versions", requirements])[0] != 0:
+        raise RuntimeError("The export environment does not have the versions requirements.txt pins (see above).")
+
+
+# Now the export itself. It first checks that LiteRT-LM renders the model's chat template as transformers does, and edits the template where it does not. Then litert-torch reads the merged model in bfloat16 and writes int4 weights, prefill signatures for 1024 and 128 tokens and a 2048-token KV cache. It takes about 13 minutes on Kaggle's 4 CPUs and most of the RAM.
+
+# In[ ]:
+
+
+if export_litertlm:
+    import resource, time
+    bf16_file = os.path.join(work_dir, "model_bf16.litertlm")
+    env = dict(os.environ, PYTHONHASHSEED = "0", HF_HUB_OFFLINE = "1", TMPDIR = os.path.join(work_dir, "tmp"))
+    os.makedirs(env["TMPDIR"], exist_ok = True)
+    start = time.time()
+    code, _ = run([python, tool, "export", model_dir, bf16_file, "--work", work_dir], env = env)
+    peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 2**20 # GiB (Linux reports KiB)
+    if code == -9:
+        raise RuntimeError(f"The export was killed after {time.time() - start:.0f} s at {peak:.1f} GiB, most likely "
+                           f"because it ran out of memory ({ram_gib():.1f} GiB here). It needs about 30 GB of RAM.")
+    if code != 0:
+        raise RuntimeError(f"The export failed with exit code {code} (see the lines above).")
+    print(f"Exported in {time.time() - start:.0f} s, peak memory {peak:.1f} GiB")
+
+
+# Reading the model in bfloat16 leaves some BFLOAT16 tensors in the graph (the KV cache among them), and LiteRT-LM's GPU path does not take those. This step rewrites them as FLOAT32 and checks the result against the export. It takes about half a minute.
+
+# In[ ]:
+
+
+if export_litertlm:
+    code, _ = run([python, tool, "fix", bf16_file, litertlm_file])
+    if code != 0:
+        raise RuntimeError(f"Rewriting {bf16_file} failed with exit code {code} (see the lines above).")
+
+
+# Let's load `gemma-4-finetune.litertlm` with LiteRT-LM on the CPU here and ask it one question, to see that it answers before you copy it to a phone.
+
+# In[ ]:
+
+
+if export_litertlm:
+    code, _ = run([python, tool, "ask", litertlm_file, "What is 17 + 25?"])
+    if code != 0:
+        raise RuntimeError(f"LiteRT-LM could not run {litertlm_file} (see the lines above).")
+
+
+# Download `gemma-4-finetune.litertlm`, or set `if False` to `if True` below to upload it to your Hugging Face account. Then run it on the phone with LiteRT-LM: for example load it in the [Google AI Edge Gallery](https://github.com/google-ai-edge/gallery) app, which can load your own models, or from your own app with LiteRT-LM's [Kotlin API](https://ai.google.dev/edge/litert-lm/android).
+
+# In[ ]:
+
+
+if False: # Change to True to upload the .litertlm file
+    from huggingface_hub import HfApi
+    api = HfApi(token = "YOUR_HF_TOKEN")
+    api.create_repo("HF_ACCOUNT/gemma-4-finetune-litertlm", exist_ok = True)
+    api.upload_file(
+        path_or_fileobj = litertlm_file,
+        path_in_repo = litertlm_file,
+        repo_id = "HF_ACCOUNT/gemma-4-finetune-litertlm",
+    )
+
+
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now for all models! For now, you can convert easily to `Q8_0, F16 or BF16` precision. `Q4_K_M` for 4bit will come later!
 
