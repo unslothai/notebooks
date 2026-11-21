@@ -51,6 +51,7 @@
 #     except: _numpy = "numpy"; _pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
+#     get_ipython().system('echo "numba>=0.61.2" > /tmp/unsloth_vllm_overrides.txt # vLLM pins numba==0.61.2 (numpy<2.3), Colab ships a newer numpy')
 #     _triton = 'triton'
 #     if is_t4:
 #         # Keep the machine's torch: upgrading it can pull a CUDA build the driver cannot load
@@ -61,7 +62,7 @@
 #             _torch, _tv = 'torch', 'torchvision'
 #         get_ipython().system('uv pip install -qqq {_numpy} {_pil} {_torch} {_tv} bitsandbytes xformers unsloth')
 #     else:
-#         get_ipython().system('uv pip install -qqq --upgrade vllm==0.19.1 {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
+#         get_ipython().system('uv pip install -qqq --upgrade --override /tmp/unsloth_vllm_overrides.txt vllm==0.19.1 {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
 #     get_ipython().system('uv pip install -qqq {_triton}')
 #     try:
 #         import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])
