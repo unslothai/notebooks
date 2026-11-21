@@ -350,6 +350,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 ### Other Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **Inkling 2 Mini** **(26B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Inkling_2_Mini_(26B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Muse Glimmer** **(30B)** | Conversational | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Muse_Glimmer_(30B)-Conversational.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Muse Glimmer** **(30B)** | Vision | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Muse_Glimmer_(30B)-Vision.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
 | **Muse Glimmer** **(30B)** |  | <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Muse_Glimmer_(30B)-Multimodal.ipynb" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> |
@@ -592,6 +593,7 @@ Below are Colab notebooks, organized by model. You can also view all [notebooks 
 ### Other Notebooks
 | Model | Type | Notebook Link |
 | --- | --- | --- |
+| **Inkling 2 Mini** **(26B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Inkling_2_Mini_(26B)-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Muse Glimmer** **(30B)** | Vision | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Muse_Glimmer_(30B)-Vision.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Muse Glimmer** **(30B)** | Conversational | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Muse_Glimmer_(30B)-Conversational.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
 | **Muse Glimmer** **(30B)** |  | <a href="https://www.kaggle.com/notebooks/welcome?src=https://github.com/unslothai/notebooks/blob/main/nb/Kaggle-Muse_Glimmer_(30B)-Multimodal.ipynb&accelerator=nvidiaTeslaT4" target="_blank" rel="noopener noreferrer"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open in Kaggle"></a> |
