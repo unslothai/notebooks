@@ -433,8 +433,9 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
+    !echo "numba>=0.61.2" > /tmp/unsloth_vllm_overrides.txt # vLLM pins numba==0.61.2 (numpy<2.3), Colab ships a newer numpy
     _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
-    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+    !uv pip install -qqq --upgrade --override /tmp/unsloth_vllm_overrides.txt {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
 """ + build_vllm_torchao_spec_block("    ") + """
     !uv pip install -qqq --no-deps --upgrade "{_torchao}"
@@ -496,9 +497,11 @@ TOOL_USE_UNSLOTH_MAIN = (
     '"unsloth @ git+https://github.com/unslothai/unsloth"'
 )
 def _tool_use_installation(content, indent):
+    # The Colab block carries the numba override (see installation_extra_grpo_content); Kaggle does not.
+    _vllm_override = "--override /tmp/unsloth_vllm_overrides.txt " if indent else ""
     old = (
         f"{indent}_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
-        f"{indent}!uv pip install -qqq --upgrade {{_vllm}} {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+        f"{indent}!uv pip install -qqq --upgrade {_vllm_override}{{_vllm}} {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
     )
     new = (
         f"{indent}_triton = 'triton'\n"
@@ -511,7 +514,7 @@ def _tool_use_installation(content, indent):
         f"{indent}        _torch, _tv = 'torch', 'torchvision'\n"
         f"{indent}    !uv pip install -qqq {{_numpy}} {{_pil}} {{_torch}} {{_tv}} bitsandbytes xformers unsloth\n"
         f"{indent}else:\n"
-        f"{indent}    !uv pip install -qqq --upgrade vllm==0.19.1 {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+        f"{indent}    !uv pip install -qqq --upgrade {_vllm_override}vllm==0.19.1 {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
     )
     assert old in content, "GRPO install layout moved; update _tool_use_installation"
     content = content.replace(old, new)
@@ -534,8 +537,9 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
+    !echo "numba>=0.61.2" > /tmp/unsloth_vllm_overrides.txt # vLLM pins numba==0.61.2 (numpy<2.3), Colab ships a newer numpy
     _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
-    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+    !uv pip install -qqq --upgrade --override /tmp/unsloth_vllm_overrides.txt {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
     !uv pip install synthetic-data-kit==0.0.3
 """ + build_vllm_torchao_spec_block("    ") + """
@@ -647,7 +651,7 @@ import os
 os.remove("OuteTTS/outetts/models/gguf_model.py")
 os.remove("OuteTTS/outetts/interface.py")
 os.remove("OuteTTS/outetts/__init__.py")
-!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
+!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec importlib_resources \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
@@ -657,7 +661,7 @@ import os
 os.remove("OuteTTS/outetts/models/gguf_model.py")
 os.remove("OuteTTS/outetts/interface.py")
 os.remove("OuteTTS/outetts/__init__.py")
-!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec \"datasets>=3.4.1,<4.0.0\"
+!pip install pyloudnorm openai-whisper uroman MeCab loguru flatten_dict ffmpy randomname argbind tiktoken ftfy torchcodec importlib_resources \"datasets>=3.4.1,<4.0.0\"
 !pip install descript-audio-codec descript-audiotools julius openai-whisper --no-deps
 %env UNSLOTH_DISABLE_FAST_GENERATION = 1"""
 
@@ -812,6 +816,10 @@ installation_gemma4_12b_content = installation_gemma4_content.replace(
     "transformers==5.5.0", "transformers==5.10.1"
 )
 
+# Gemma 4 notebooks on the 5.10.1 install. DPO: on 5.5.0-5.5.1 the zoo shared-KV carrier made
+# DPOTrainer's first backward raise CheckpointError; 5.5.2+ passes shared_kv_states natively.
+GEMMA4_TRANSFORMERS_5_10_MARKERS = ["(12b)", "-dpo"]
+
 # DiffusionGemma: FastDiffusionModel shipped in unsloth 2026.6.5, so install the PyPI releases
 # instead of the git main branches (unsloth/models/diffusion.py is absent before 2026.6.5).
 # transformers 5.11.0 ships the diffusion_gemma architecture (model saved at 5.8.0.dev0).
@@ -916,6 +924,13 @@ installation_amd_extras_gemma4 = """\
 installation_amd_extras_gemma4_12b = installation_amd_extras_gemma4.replace(
     "transformers>=5.5.0", "transformers>=5.10.1"
 ).replace("Gemma 4 requires", "Gemma 4 12B requires")
+
+installation_amd_extras_gemma4_dpo = installation_amd_extras_gemma4.replace(
+    "transformers>=5.5.0", "transformers>=5.10.1"
+).replace(
+    "# Gemma 4 requires transformers >= 5.5.0",
+    "# Gemma 4 DPO requires transformers >= 5.5.2 (E2B/E4B shared K/V under DPOTrainer)",
+)
 
 # The cap cannot be applied on AMD (see below), so at least say so where the
 # person who hits it will be reading. Comment-only: variant_extras pip lines go
@@ -2685,7 +2700,7 @@ def _assert_amd_install_runtime(notebook_files, max_workers=1, executor_type="pr
 def _get_base_name_from_filename(filename):
     """Extract a base name from the notebook filename for dynamic model naming."""
     name = os.path.splitext(os.path.basename(filename))[0]
-    for prefix in ("Kaggle-", "HuggingFace Course-", "AMD-"):
+    for prefix in ("Kaggle-", "HuggingFace Course-", "AMD-", "Intel-"):
         if name.startswith(prefix):
             name = name[len(prefix):]
             break
@@ -3752,6 +3767,8 @@ def _compose_amd_installation(notebook_path, source_install_texts):
     if is_path_contains_any(lowered, ["gemma4"]):
         if is_path_contains_any(lowered, ["(12b)"]):
             variant_extras = installation_amd_extras_gemma4_12b
+        elif is_path_contains_any(lowered, ["-dpo"]):
+            variant_extras = installation_amd_extras_gemma4_dpo
         else:
             variant_extras = installation_amd_extras_gemma4
     elif _is_qwen3_moe_path(notebook_path):
@@ -4834,6 +4851,8 @@ def update_notebook_sections(
 
         updated = False
         is_amd_notebook = is_path_contains_any(notebook_path, ["AMD-"])
+        is_intel_notebook = is_path_contains_any(notebook_path, ["Intel-"])
+        is_vendor_gpu_notebook = is_amd_notebook or is_intel_notebook
 
         first_markdown_index = -1
         news_markdown_index = -1
@@ -4875,12 +4894,15 @@ def update_notebook_sections(
             general_announcement = general_announcement.replace(
                 "on a **free** Tesla T4 Google Colab instance!", "on your L4 Google Colab Pro instance!")
 
+        if is_intel_notebook:
+            general_announcement = general_announcement_content_intel
+
         # Update the general announcement section
         if first_markdown_index != -1:
             first_markdown_source = "".join(
                 notebook_content["cells"][first_markdown_index]["source"]
             ).strip()
-            if is_amd_notebook and _is_stale_amd_announcement(first_markdown_source):
+            if is_vendor_gpu_notebook and _is_stale_amd_announcement(first_markdown_source):
                 notebook_content["cells"][first_markdown_index]["source"] = _source_lines(general_announcement)
                 updated = True
             elif news_markdown_index == first_markdown_index:
@@ -4906,7 +4928,7 @@ def update_notebook_sections(
                 notebook_content["cells"][first_markdown_index]["source"] = _source_lines(general_announcement)
                 updated = True
 
-        if is_amd_notebook:
+        if is_vendor_gpu_notebook:
             stale_announcement_indices = []
             for cell_index, cell in enumerate(notebook_content["cells"]):
                 if cell_index == first_markdown_index or cell.get("cell_type") != "markdown":
@@ -4925,7 +4947,7 @@ def update_notebook_sections(
                     news_markdown_index -= removed_before_news
                 updated = True
 
-        i = 0 if (is_amd_notebook or news_markdown_index == -1) else news_markdown_index
+        i = 0 if (is_vendor_gpu_notebook or news_markdown_index == -1) else news_markdown_index
 
         is_gguf = False
         is_ollama = False
@@ -4955,7 +4977,7 @@ def update_notebook_sections(
                         notebook_content["cells"][i + 1]["source"] = _source_lines(announcement)
                         updated = True
                         i += 1
-                elif _is_installation_heading(source_str, is_amd_notebook):
+                elif _is_installation_heading(source_str, is_vendor_gpu_notebook):
                     if (
                         i + 1 < len(notebook_content["cells"])
                         and notebook_content["cells"][i + 1]["cell_type"] == "code"
@@ -4965,7 +4987,7 @@ def update_notebook_sections(
                         old_install_src = _cell_source_text(notebook_content["cells"][i + 1])
                         source_install_texts.append(old_install_src)
                         amd_followup_install_cells = []
-                        if is_amd_notebook:
+                        if is_vendor_gpu_notebook:
                             amd_followup_install_cells = _adjacent_install_like_code_cells(
                                 notebook_content["cells"], i + 1
                             )
@@ -5003,7 +5025,7 @@ def update_notebook_sections(
                                 # Kaggle will delete the second cell instead -> Need to check
                                 if i + 2 < len(notebook_content["cells"]):
                                     del notebook_content["cells"][i + 2]
-                            elif is_amd_notebook:
+                            elif is_vendor_gpu_notebook:
                                 installation = installation_grpo_content
                             else:
                                 installation = installation_grpo_content
@@ -5029,7 +5051,7 @@ def update_notebook_sections(
                                 # Kaggle will delete the second cell instead -> Need to check
                                 if i + 2 < len(notebook_content["cells"]):
                                     del notebook_content["cells"][i + 2]
-                            elif is_amd_notebook:
+                            elif is_vendor_gpu_notebook:
                                 installation = installation_synthetic_data_content
                             else:
                                 installation = installation_synthetic_data_content
@@ -5135,7 +5157,7 @@ def update_notebook_sections(
                         # Gemma4 INSTALLATION: preserve the custom
                         # transformers==5.5.0 --no-deps + torchcodec block.
                         if is_path_contains_any(notebook_path.lower(), ["gemma4"]):
-                            if is_path_contains_any(notebook_path.lower(), ["(12b)"]):
+                            if is_path_contains_any(notebook_path.lower(), GEMMA4_TRANSFORMERS_5_10_MARKERS):
                                 installation = installation_gemma4_12b_content
                             else:
                                 installation = installation_gemma4_content
@@ -5289,6 +5311,17 @@ def update_notebook_sections(
                             installation, amd_extras_cell_text = _compose_amd_installation(
                                 notebook_path, source_install_texts
                             )
+                        elif is_intel_notebook:
+                            selected_install_text = "".join(installation) if isinstance(installation, list) else installation
+                            source_install_texts.insert(0, selected_install_text)
+                            installation, amd_extras_cell_text = _compose_intel_installation(
+                                notebook_path, source_install_texts
+                            )
+                            amd_followup_install_cells += _intel_stale_followup_cells(
+                                notebook_content["cells"],
+                                max([i + 1] + [idx for idx, _ in amd_followup_install_cells]),
+                                amd_extras_cell_text,
+                            )
 
                         # Guard: warn if the replacement drops packages
                         old_install_src = notebook_content["cells"][i + 1].get("source", "")
@@ -5300,7 +5333,7 @@ def update_notebook_sections(
                             new_install_text = installation
                         if not is_path_contains_any(notebook_path.lower(), ["qwen3_5"]):
                             new_install_text = _preserve_transformers_v5_pin(old_install_src, new_install_text)
-                        if not is_amd_notebook:
+                        if not is_vendor_gpu_notebook:
                             new_install_text = pin_torchcodec_to_torch(new_install_text)
                             _warn_dropped_packages(notebook_path, old_install_src, new_install_text)
 
@@ -5311,7 +5344,7 @@ def update_notebook_sections(
                         # fail to register: `operator torchvision::nms does not
                         # exist`. AMD composes everything into one cell, so it
                         # has no before/after to get wrong.
-                        if extra_grpo_install_idx is not None and not is_amd_notebook:
+                        if extra_grpo_install_idx is not None and not is_vendor_gpu_notebook:
                             new_install_text, relocated_torch_lines = (
                                 _defer_torch_imports_past_downgrade(new_install_text)
                             )
@@ -5323,32 +5356,39 @@ def update_notebook_sections(
                                 )
 
                         notebook_content["cells"][i + 1]["source"] = new_install_text
-                        if is_amd_notebook:
+                        kept_extras_outputs = []
+                        if is_vendor_gpu_notebook:
                             for cell_index, _source_text in reversed(amd_followup_install_cells):
+                                # Re-running the default pass over an Intel- notebook must not drop its outputs.
+                                if (
+                                    is_intel_notebook and amd_extras_cell_text
+                                    and _cell_source_text(notebook_content["cells"][cell_index]).strip() == amd_extras_cell_text.strip()
+                                ):
+                                    kept_extras_outputs = notebook_content["cells"][cell_index].get("outputs", [])
                                 del notebook_content["cells"][cell_index]
                         # Insert/replace the AMD extras cell directly after the
                         # canonical install cell so per-variant tweaks and
                         # notebook-specific extras run after the bash setup.
-                        if is_amd_notebook and amd_extras_cell_text and amd_extras_cell_text.strip():
+                        if is_vendor_gpu_notebook and amd_extras_cell_text and amd_extras_cell_text.strip():
                             extras_cell = {
                                 "cell_type": "code",
                                 "metadata": {},
                                 "source": amd_extras_cell_text,
                                 "execution_count": None,
-                                "outputs": [],
+                                "outputs": kept_extras_outputs,
                             }
                             notebook_content["cells"].insert(i + 2, extras_cell)
                         updated = True
                         # TODO: Remove after GRPO numpy bug fixed!
                         # Error: ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
-                        if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["kaggle"]) and not is_path_contains_any(notebook_path, ["AMD-"]):
+                        if is_path_contains_any(notebook_path.lower(), ["grpo"]) and not is_path_contains_any(notebook_path.lower(), ["kaggle"]) and not is_vendor_gpu_notebook:
                             i += 2
                         else:
                             i += 1
 
             i += 1
 
-        if is_amd_notebook and is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
+        if is_vendor_gpu_notebook and is_path_contains_any(notebook_path.lower(), ["qwen3_6"]):
             remove_indices = set()
             for cell_index, cell in enumerate(notebook_content["cells"]):
                 source_text = _cell_source_text(cell)
@@ -5369,7 +5409,7 @@ def update_notebook_sections(
                     del notebook_content["cells"][cell_index]
                 updated = True
 
-        if is_amd_notebook and not install_section_updated:
+        if is_vendor_gpu_notebook and not install_section_updated:
             notebook_code = "\n".join(
                 _cell_source_text(cell)
                 for cell in notebook_content["cells"]
@@ -5381,7 +5421,10 @@ def update_notebook_sections(
                     if is_path_contains_any(notebook_path.lower(), ["synthetic_data"])
                     else installation_content
                 ]
-                installation, amd_extras_cell_text = _compose_amd_installation(
+                compose_installation = (
+                    _compose_intel_installation if is_intel_notebook else _compose_amd_installation
+                )
+                installation, amd_extras_cell_text = compose_installation(
                     notebook_path, source_install_texts
                 )
                 install_cells = [
@@ -5412,7 +5455,7 @@ def update_notebook_sections(
                 notebook_content["cells"][insert_at:insert_at] = install_cells
                 updated = True
 
-        if is_amd_notebook:
+        if is_vendor_gpu_notebook:
             remove_indices = set()
             for cell_index, cell in enumerate(notebook_content["cells"]):
                 cell_type = cell.get("cell_type")
@@ -5525,6 +5568,9 @@ def update_notebook_sections(
             if notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"].get("state") != {}:
                 notebook_content["metadata"]["widgets"]["application/vnd.jupyter.widget-state+json"]["state"] = {}
                 updated = True
+
+        if is_intel_notebook and _apply_intel_cell_rules(notebook_path, notebook_content["cells"]):
+            updated = True
 
         if updated:
             _write_notebook(notebook_path, notebook_content)
@@ -5976,7 +6022,7 @@ def update_readme(
         # it keeps size/name extraction clean (a "AMD-(OpenEnv)-..." prefix would
         # otherwise be misread as the model size).
         platform_prefix = next(
-            (p for p in ("Kaggle-", "AMD-") if notebook_name.startswith(p)), ""
+            (p for p in ("Kaggle-", "AMD-", "Intel-") if notebook_name.startswith(p)), ""
         )
         bare_basename = notebook_name[len(platform_prefix):]
         if bare_basename in FIRST_MAPPING_NAME:
@@ -6178,6 +6224,7 @@ def update_readme(
                 "created_at_key": created_at_key,
                 "is_grpo_trainer": is_grpo_trainer,
                 "is_amd": is_amd_notebook,
+                "is_intel": os.path.basename(path).startswith("Intel-"),
             }
         )
 
@@ -6200,6 +6247,8 @@ def update_readme(
         # AMD notebooks are rendered in their own section at the end, not
         # in any per-architecture / cross-cutting table.
         if data.get("is_amd"):
+            continue
+        if data.get("is_intel"):
             continue
         model_prefix = "(A100) " if data.get('requires_a100', False) else ""
         platform = "Kaggle" if "kaggle" in data['link'].lower() else "Colab"
@@ -6428,6 +6477,11 @@ def update_readme(
         # at 6); the rest folds into a Kaggle-style collapsible.
         amd_entries = [d for d in notebook_data if d.get("is_amd")]
         amd_section = ""
+        github_blob_base = "https://github.com/unslothai/notebooks/blob/main/"
+        amd_table_header = (
+            "| Model | Type | Notebook |\n"
+            "| --- | --- | --- |\n"
+        )
         if amd_entries:
             import urllib.parse as _urlparse
 
@@ -6477,12 +6531,6 @@ def update_readme(
                 reverse=True,
             )
 
-            github_blob_base = "https://github.com/unslothai/notebooks/blob/main/"
-            amd_table_header = (
-                "| Model | Type | Notebook |\n"
-                "| --- | --- | --- |\n"
-            )
-
             def _render_amd_row(d):
                 gh_url = (github_blob_base + d["path"]).replace(" ", "%20")
                 display_model = d.get("model") or os.path.basename(d["path"]).replace(".ipynb", "")
@@ -6518,6 +6566,23 @@ def update_readme(
                     amd_section += _render_amd_row(d)
                 amd_section += "\n</details>\n\n"
 
+        intel_entries = [d for d in notebook_data if d.get("is_intel")]
+        intel_section = ""
+        if intel_entries:
+            intel_section = (
+                "# Intel GPU Notebooks\n"
+                "These notebooks target Intel GPUs (XPU) and are not available in Colab. "
+                "View / download them directly from GitHub:\n\n"
+                + amd_table_header
+            )
+            for d in intel_entries:
+                gh_url = (github_blob_base + d["path"]).replace(" ", "%20")
+                display_model = d.get("model") or os.path.basename(d["path"]).replace(".ipynb", "")
+                display_model = display_model.removeprefix("Intel-").removeprefix("Intel ")
+                model_cell = f"**{display_model}** {d.get('size') or ''}".rstrip()
+                intel_section += f"| {model_cell} | {d.get('type', '')} | [GitHub]({gh_url}) |\n"
+            intel_section += "\n"
+
         now = datetime.now()
         timestamp = f"\n"
 
@@ -6526,6 +6591,7 @@ def update_readme(
             + colab_updated_notebooks_links
             + kaggle_updated_notebooks_links
             + amd_section
+            + intel_section
             + timestamp
             + content_after
         )
@@ -6548,6 +6614,7 @@ def update_readme(
                 + colab_updated_notebooks_links
                 + kaggle_updated_notebooks_links
                 + amd_section
+                + intel_section
                 + timestamp
                 + content_after
              )
@@ -6804,7 +6871,7 @@ def missing_files(nb: str | os.PathLike, original_template: str | os.PathLike) -
     files_in_nb = {f for f in os.listdir(nb_abs) if os.path.isfile(os.path.join(nb_abs, f))}
     files_in_original_template = {f for f in os.listdir(original_template_abs) if os.path.isfile(os.path.join(original_template_abs, f))}
 
-    files_in_nb = {f for f in files_in_nb if not (f.startswith("Kaggle") or f.startswith("HuggingFace Course") or f.startswith("AMD-"))}
+    files_in_nb = {f for f in files_in_nb if not (f.startswith("Kaggle") or f.startswith("HuggingFace Course") or f.startswith("AMD-") or f.startswith("Intel-"))}
     files_in_original_template = {f for f in files_in_original_template if not f.startswith("Kaggle")}
 
     only_in_nb = files_in_nb - files_in_original_template
@@ -6863,9 +6930,14 @@ def remove_unwanted_section(script_content):
 
 
 # Environment variables an install cell sets that the rest of the script relies on.
-_SCRIPT_KEPT_INSTALL_ENV = ("UNSLOTH_VLLM_STANDBY",)
+# PYTORCH_ALLOC_CONF: unsloth_zoo sets expandable_segments:True unless it is already set (Intel multi-GPU).
+_SCRIPT_KEPT_INSTALL_ENV = ("UNSLOTH_VLLM_STANDBY", "PYTORCH_ALLOC_CONF")
 _RE_KEPT_INSTALL_ENV = re.compile(
     r"""^(?:import os\s*;\s*)?(os\.environ\[\s*["'](%s)["']\s*\]\s*=\s*["'][^"']*["'])"""
+    % "|".join(map(re.escape, _SCRIPT_KEPT_INSTALL_ENV))
+)
+_RE_KEPT_INSTALL_ENV_MAGIC = re.compile(
+    r"""^get_ipython\(\)\.run_line_magic\(['"]env['"],\s*['"](%s)=([^'"]*)['"]\)$"""
     % "|".join(map(re.escape, _SCRIPT_KEPT_INSTALL_ENV))
 )
 
@@ -6893,9 +6965,15 @@ def _kept_install_env_lines(lines):
     kept, seen = [], set()
     for line in sources:
         m = _RE_KEPT_INSTALL_ENV.match(line)  # unindented only: not one set inside an if
-        if m and m.group(2) not in seen:
-            seen.add(m.group(2))
-            kept.append((m.group(2), m.group(1)))
+        if m:
+            key, stmt = m.group(2), m.group(1)
+        elif m := _RE_KEPT_INSTALL_ENV_MAGIC.match(line.rstrip()):
+            key, stmt = m.group(1), f'os.environ["{m.group(1)}"] = "{m.group(2)}"'
+        else:
+            continue
+        if key not in seen:
+            seen.add(key)
+            kept.append((key, stmt))
     return kept
 
 
@@ -7118,9 +7196,10 @@ FSDP2_SINGLE_PROCESS = {
     "Deepseek_OCR_(3B)-Evaluation.py": "ranks would share and delete the same temporary image files",
     "Llama3_(8B)-Ollama.py": "starts an Ollama server on its fixed port from Python",
     "Gemma3N_(2B)-Inference.py": "starts a server on fixed port 8000 from Python",
+    "Unsloth_Studio.py": "starts the Studio server on fixed port 8888 from Python",
     "Oute_TTS_(1B).py": "patches one shared OuteTTS checkout with os.remove calls",
-    # OmniVoice.from_pretrained builds the outer model, so export fails on DTensors.
-    "OmniVoice_(0.6B)-TTS.py": "merges and saves an OmniVoice model outside Unsloth's collective FSDP2 export",
+    # Export fails on DTensors; forced onto 2 ranks it trains, then FSDP rejects mixed dtypes on save.
+    "OmniVoice_(0.6B)-TTS.py": "merges and saves an OmniVoice model outside Unsloth's collective FSDP2 export, which fails on its mixed fp32 / fp16 parameters",
     "Llasa_TTS_(1B).py": "every process would rewrite the same preprocessed memmap and shape files",
     "Llasa_TTS_(3B).py": "every process would rewrite the same preprocessed memmap and shape files",
     "EmbeddingGemma2_(300M)-Audio.py": "every process would rewrite the same audio files it then reads",
@@ -7140,13 +7219,148 @@ FSDP2_SINGLE_PROCESS = {
     "gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16.py": "its sampled Minesweeper games end on each process's own moves, so processes would make different numbers of collective generate calls",
     "Openenv_wordle_grpo.py": "its Wordle turns end when each process's own game does, so processes would make different numbers of collective generate calls",
     "Qwen3_(4B)-Tool_Calling.py": "its sampled tool-calling loop ends when one process's reply has no tool call, so processes would make different numbers of collective generate calls",
+    # Forced onto 2 ranks on a Kaggle 2x T4 both ranks hang in the first GRPO step.
     "Qwen3_(4B)-GRPO-Tool_Use.py": "its sampled tool-calling loop ends when one process's reply has no tool call, so processes would make different numbers of collective generate calls",
 }
-_FSDP2_VARIANT_PREFIXES = ("AMD-", "Kaggle-", "HuggingFace Course-")
+
+# --mode auto default per script when the environment picks none (unlisted = native FSDP2).
+# "split" = one process placing the 4-bit model over every GPU via device_map. From MULTI_GPU_SWEEP.
+_SPLIT_BIG_4BIT = (
+    "every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on "
+    "2x 16 GB; one process placing it over both GPUs trains"
+)
+MULTI_GPU_MODE = {
+    "Qwen3.8_(27B)-Conversational.py": ("split", _SPLIT_BIG_4BIT),
+    "Qwen3.8_(27B)-GRPO.py": ("split", _SPLIT_BIG_4BIT),
+    "Muse_Glimmer_(30B)-Conversational.py": ("split", _SPLIT_BIG_4BIT),
+    "Muse_Glimmer_(30B)-Vision.py": ("split", _SPLIT_BIG_4BIT),
+    "Muse_Glimmer_(30B)-GRPO.py": ("split", _SPLIT_BIG_4BIT),
+    "Muse_Glimmer_(30B)-Multimodal.py": ("split", _SPLIT_BIG_4BIT),
+    "Mistral_Nemo_(12B)-Alpaca.py": (
+        "ddp",
+        "native FSDP2 trains, then runs out of memory gathering the whole 12B model for generate "
+        "on 16 GB GPUs; DDP fits one copy per GPU and passes",
+    ),
+}
+
+# Kaggle 2x T4 sweep (notebooks d8da2d22, unsloth 87e154a, zoo f1f2f2c, torch 2.14.1, transformers
+# 5.17.0, TRL 1.15.0; steps cut, tiny models except Qwen3.8 / Muse Glimmer). Columns: 1 GPU, split,
+# DDP, FSDP2, forced 2-rank FSDP2 for FSDP2_SINGLE_PROCESS. Rendered into fsdp2_scripts/README.md.
+MULTI_GPU_SWEEP_COLUMNS = ("1 GPU", "split", "DDP", "FSDP2", "forced 2 ranks")
+MULTI_GPU_SWEEP = {
+    'Advanced_Llama3_1_(3B)_GRPO_LoRA.py': ('', '', 'not valid: test harness', 'not valid: test harness', ''),
+    'Advanced_Llama3_2_(3B)_GRPO_LoRA.py': ('', '', 'PASS', 'PASS', ''),
+    'All_MiniLM_L6_v2.py': ('', '', 'PASS', 'PASS', ''),
+    'BGE_M3.py': ('', '', 'PASS', 'PASS', ''),
+    'CodeForces-cot-Finetune_for_Reasoning_on_CodeForces.py': ('', '', 'PASS', 'PASS', ''),
+    'CodeGemma_(7B)-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'DeepSeek_R1_0528_Qwen3_(8B)_GRPO.py': ('', '', 'needs vllm-bnb-plugin', 'needs vllm-bnb-plugin', ''),
+    'Deepseek_OCR_(3B).py': ('', '', '', '', 'missing easydict (install cell not run)'),
+    'EmbeddingGemma2_(300M)-Image_Text.py': ('', '', '', '', 'transformers too old'),
+    'EmbeddingGemma2_(300M).py': ('', '', 'transformers too old', 'transformers too old', ''),
+    'Falcon_H1-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Falcon_H1_(0.5B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'FunctionGemma_(270M)-LMStudio.py': ('', '', 'PASS', 'PASS', ''),
+    'FunctionGemma_(270M)-Mobile-Actions.py': ('PASS', '', 'PASS', 'PASS', ''),
+    'FunctionGemma_(270M)-Multi-Turn-Tool-Calling.py': ('', '', 'PASS (no training step)', 'PASS (no training step)', ''),
+    'FunctionGemma_(270M).py': ('', '', 'PASS', 'PASS', ''),
+    'GPT_OSS_BNB_(20B)-Inference.py': ('', '', 'PASS (no training step)', 'PASS (no training step)', ''),
+    'GPT_OSS_MXFP4_(20B)-Inference.py': ('', '', 'PASS (no training step)', 'PASS (no training step)', ''),
+    'Gemma2_(2B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma2_(9B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma3_(270M)_Phone_Deployment.py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma3_(4B).py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma4_(12B)_Audio.py': ('', '', 'not valid: test harness', 'not valid: test harness', ''),
+    'Gemma4_(12B)_Text.py': ('', '', 'not valid: test harness', 'not valid: test harness', ''),
+    'Gemma4_(12B)_Vision.py': ('PASS', '', 'PASS', 'PASS', ''),
+    'Gemma4_(26B_A4B)-Text.py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma4_(26B_A4B)-Vision.py': ('PASS', '', 'PASS', 'PASS', ''),
+    'Gemma4_(31B)-Text.py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma4_(31B)-Vision.py': ('PASS', '', 'PASS', 'PASS', ''),
+    'Gemma4_(E2B)_Reinforcement_Learning_2048_Game.py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma4_(E2B)_Reinforcement_Learning_Sudoku_Game.py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma4_(E4B)-Audio.py': ('', '', 'PASS', 'PASS', ''),
+    'Gemma4_(E4B)-Vision.py': ('', '', 'PASS', 'trains, loss drifts after fp16 overflow skips', ''),
+    'Granite4.0.py': ('', '', 'PASS', 'PASS', ''),
+    'Granite4.0_350M.py': ('', '', 'PASS', 'PASS', ''),
+    'Kaggle-Muse_Glimmer_(30B)-Conversational.py': ('', 'PASS', '', 'out of memory at load', ''),
+    'Kaggle-Muse_Glimmer_(30B)-GRPO.py': ('', 'PASS', '', 'out of memory at load', ''),
+    'Kaggle-Muse_Glimmer_(30B)-Multimodal.py': ('', 'dataset gone from the Hub', '', 'out of memory at load', ''),
+    'Kaggle-Muse_Glimmer_(30B)-Vision.py': ('', 'PASS', '', 'out of memory at load', ''),
+    'Kaggle-Qwen3.8_(27B)-Conversational.py': ('', 'PASS', '', 'out of memory at load', ''),
+    'Kaggle-Qwen3.8_(27B)-GRPO.py': ('', 'PASS', '', 'out of memory at load', ''),
+    'LFM2.5_(1.2B)-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'LFM2.5_(1.2B)-GRPO.py': ('missing vllm (install cell not run)', '', 'missing vllm (install cell not run)', 'missing vllm (install cell not run)', ''),
+    'LFM2.5_(1.2B)-Text_Completion.py': ('PASS', '', 'PASS', 'PASS', ''),
+    'LFM2.5_(1.2B)-Translation.py': ('PASS', '', 'PASS', 'PASS', ''),
+    'Liquid_LFM2-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'Liquid_LFM2_(1.2B)-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'Llama3.1_(8B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Llama3.1_(8B)-GRPO.py': ('', '', 'PASS', 'PASS', ''),
+    'Llama3.2_(11B)-Vision.py': ('', '', 'PASS', 'trains, loss drifts after fp16 overflow skips', ''),
+    'Llama3.2_(1B)-RAFT.py': ('', '', '', '', 'missing llama_index.packs (install cell not run)'),
+    'Llama3_(8B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Llama3_(8B)-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'Llama3_(8B)-ORPO.py': ('', '', 'no ORPOConfig in TRL 1.x', 'no ORPOConfig in TRL 1.x', ''),
+    'Llasa_TTS_(1B).py': ('', '', '', '', 'missing xcodec2 (install cell not run)'),
+    'Ministral_3_VL_(3B)_Vision.py': ('', '', 'PASS', 'trains, loss drifts after fp16 overflow skips', ''),
+    'Mistral_(7B)-Text_Completion.py': ('', '', 'backward fails with trainable embeddings', 'PASS', ''),
+    'Mistral_Nemo_(12B)-Alpaca.py': ('', '', 'PASS', 'out of memory gathering the model for generate', ''),
+    'Mistral_Small_(22B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Mistral_v0.3_(7B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Mistral_v0.3_(7B)-CPT.py': ('PASS', '', 'backward fails with trainable embeddings', 'PASS', ''),
+    'Mistral_v0.3_(7B)-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'Mistral_v0.3_(7B)-GRPO.py': ('', '', 'needs vllm-bnb-plugin', 'needs vllm-bnb-plugin', ''),
+    'ModernBert.py': ('', '', 'PASS', 'PASS', ''),
+    'OmniVoice_(0.6B)-TTS.py': ('', '', '', '', 'export fails: mixed fp32 / fp16 parameters'),
+    'Openenv_wordle_grpo.py': ('', '', '', '', 'missing fastmcp (install cell not run)'),
+    'Oute_TTS_(1B).py': ('', '', '', '', 'missing outetts (install cell not run)'),
+    'Phi_3.5_Mini-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'Phi_3_Medium-Conversational.py': ('PASS', '', 'PASS', 'PASS', ''),
+    'Phi_4-Conversational.py': ('not valid: test harness', '', 'not valid: test harness', 'not valid: test harness', ''),
+    'Phi_4_(14B)-GRPO.py': ('', '', 'needs vllm-bnb-plugin', 'needs vllm-bnb-plugin', ''),
+    'Pixtral_(12B)-Vision.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen2.5_(7B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen2.5_Coder_(1.5B)-Tool_Calling.py': ('missing transformers_cfg (install cell not run)', '', 'missing transformers_cfg (install cell not run)', 'missing transformers_cfg (install cell not run)', ''),
+    'Qwen2.5_Coder_(14B)-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen2.5_VL_(7B)-Vision.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen2_(7B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen2_5_7B_VL_GRPO.py': ('', '', 'needs vllm-bnb-plugin', 'needs vllm-bnb-plugin', ''),
+    'Qwen2_VL_(7B)-Vision.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_(0.6B)-Reasoning-Conversational-ExecuTorch.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_(14B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_(14B)-Reasoning-Conversational.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_(14B).py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_(4B)-GRPO-Tool_Use.py': ('', '', '', '', 'hangs in the first GRPO step'),
+    'Qwen3_(4B)-Instruct.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_(4B)-Thinking.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_(4B)-Tool_Calling.py': ('', '', '', '', 'PASS'),
+    'Qwen3_(4B)_Instruct-QAT.py': ('torchao reload error (1 GPU too)', '', 'torchao reload error (1 GPU too)', 'refuses torchao export: host RAM', ''),
+    'Qwen3_5_(2B)_Vision.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_5_(4B)_Vision.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_6_MoE.py': ('PASS', '', 'PASS', 'PASS', ''),
+    'Qwen3_Embedding_(0_6B).py': ('', '', 'out of memory in training', 'out of memory in training', ''),
+    'Qwen3_Embedding_(4B).py': ('', '', 'PASS', 'trains, loss drifts after fp16 overflow skips', ''),
+    'Qwen3_MoE.py': ('generate shape error (1 GPU too)', '', 'generate shape error (1 GPU too)', 'generate shape error (1 GPU too)', ''),
+    'Qwen3_VL_(8B)-Vision-GRPO.py': ('', '', 'PASS', 'PASS', ''),
+    'Qwen3_VL_(8B)-Vision.py': ('PASS', '', 'trains, loss drifts after fp16 overflow skips', 'trains, loss drifts after fp16 overflow skips', ''),
+    'Sesame_CSM_(1B)-TTS.py': ('', '', '', '', 'PASS'),
+    'Spark_TTS_(0_5B).py': ('', '', '', '', 'missing sparktts (install cell not run)'),
+    'TinyLlama_(1.1B)-Alpaca.py': ('', '', 'PASS', 'PASS', ''),
+    'gpt_oss_(20B)_500K_Context_Fine_tuning.py': ('', '', 'not valid: ranks saw identical first batches', 'not valid: ranks saw identical first batches', ''),
+    'gpt_oss_(20B)_Reinforcement_Learning_2048_Game.py': ('', '', 'PASS', 'PASS', ''),
+}
+
+
+def multi_gpu_default_mode(script_name):
+    """``(mode, reason)`` the launcher of ``script_name`` runs by default, or None for native FSDP2."""
+    return MULTI_GPU_MODE.get(_fsdp2_base_name(script_name))
+
+_FSDP2_VARIANT_PREFIXES = ("AMD-", "Kaggle-", "HuggingFace Course-", "Intel-")
 
 
 def _fsdp2_base_name(script_name):
-    """``script_name`` without its AMD- / Kaggle- / HuggingFace Course- prefixes."""
+    """``script_name`` without its AMD- / Kaggle- / HuggingFace Course- / Intel- prefixes."""
     stripped = True
     while stripped:
         stripped = False
@@ -7182,9 +7396,12 @@ def render_fsdp2_launcher(script_name):
         raise ValueError(f"fsdp2 launcher cannot carry script name {script_name!r}")
     shown = _fsdp2_shell_path(f"fsdp2_scripts/{script_name}")
     reason = fsdp2_single_process_reason(script_name)
+    default = None if reason else multi_gpu_default_mode(script_name)
     call = f"    main(__file__, {script_name!r})"
     if reason:
         call = f"    main(__file__, {script_name!r}, single_process=True, reason={reason!r})"
+    elif default:
+        call = f"    main(__file__, {script_name!r}, default_mode={default[0]!r}, reason={default[1]!r})"
     lines = [
         "#!/usr/bin/env python",
         f"# Generated by update_all_notebooks.py from python_scripts/{script_name}: do not edit.",
@@ -7194,6 +7411,18 @@ def render_fsdp2_launcher(script_name):
             f"# Runs single process: {reason}.",
             f"#   python {shown}",
             f"#   UNSLOTH_FSDP2_FORCE=1 python {shown} --nproc-per-node 2   (several processes anyway)",
+        ]
+    elif default and default[0] == "split":
+        lines += [
+            f"# Runs one process over every visible GPU (device_map split): {default[1]}.",
+            f"#   python {shown}",
+            f"#   python {shown} --mode fsdp2   (several processes anyway; also ddp, tp, pp)",
+        ]
+    elif default:
+        lines += [
+            f"# Runs {default[0]} on every visible GPU by default: {default[1]}.",
+            f"#   python {shown}",
+            f"#   python {shown} --mode fsdp2   (native FSDP2 instead; also split, tp, pp)",
         ]
     else:
         lines += [
@@ -7230,11 +7459,18 @@ It runs that script unchanged on every visible GPU with Unsloth's native FSDP2.
 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py"                          # every visible GPU
 CUDA_VISIBLE_DEVICES=0,1 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" # pick GPUs
 python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --nproc-per-node 4       # pick a process count
-python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the command only
+python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --mode ddp              # plain DDP (also fsdp2, tp, pp, split)
+python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the topology and command only
 ```
 
 - With 2 or more GPUs the launcher starts `python -m torch.distributed.run --standalone`
   with one process per GPU, and each process runs `python_scripts/<name>`.
+- `--mode ddp|fsdp2|tp|pp` picks the layout over all the processes and replaces any
+  `UNSLOTH_FSDP2`, `UNSLOTH_TP_SIZE`, `UNSLOTH_PP_SIZE`, `UNSLOTH_CP_SIZE` or
+  `UNSLOTH_PARALLEL` in the environment. `--mode split` runs one process that sees every
+  visible GPU, so the model is placed over them by `device_map`. Without a mode
+  (`--mode auto`) the environment decides, then the script's default mode (see
+  "Default modes" below), and native FSDP2 is the default.
 - With 1 GPU, or none, it runs the script in a single process, like
   `python "python_scripts/<name>"`.
 - Asking for more processes than there are visible GPUs is refused.
@@ -7257,7 +7493,8 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `UNSLOTH_NPROC_PER_NODE` | number of visible GPUs | Processes per node when `--nproc-per-node` is not given. |
-| `UNSLOTH_FSDP2` | `1` | Set by the launcher only when unset. `UNSLOTH_FSDP2=0` launches plain data parallel instead. |
+| `UNSLOTH_FSDP2` | `1` | Set by the launcher only when unset and `UNSLOTH_PARALLEL` does not choose FSDP2 or DDP itself (`fsdp=`, `dp_shard=`, `dp_replicate=`). `UNSLOTH_FSDP2=0` launches plain data parallel instead. |
+| `UNSLOTH_PARALLEL` | unset | Read by Unsloth: every axis in one line, for example `dp=2,fsdp=0` (DDP), `tp=2`, `pp=2`. |
 | `UNSLOTH_FSDP2_RUN_INSTALLS` | unset | Unset: skip an install command only when everything it asks for is already installed, else run it once per node. `1`: always run them (once per node). `0`: always skip them. |
 | `UNSLOTH_FSDP2_FORCE` | unset | Set to `1` to run a single-process script (see below) on several processes anyway. |
 | `UNSLOTH_FSDP2_WAIT_TIMEOUT` | `21600` (6 hours) | Seconds the other processes on a node wait for a shell step on the first one before failing with an error. |
@@ -7308,15 +7545,17 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   `UNSLOTH_FSDP2_FORCE=1`. Today that is NeMo-Gym-Sudoku, NeMo-Gym-Multi-Environment,
   Meta-Synthetic-Data-Llama3.1_(8B), Meta_Synthetic_Data_Llama3_2_(3B),
   Synthetic_Data_Hackathon, Deepseek_OCR_(3B)-Evaluation, Llama3_(8B)-Ollama,
-  Gemma3N_(2B)-Inference, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS, Llasa_TTS_(1B),
-  Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
+  Gemma3N_(2B)-Inference, Unsloth_Studio, Oute_TTS_(1B), OmniVoice_(0.6B)-TTS,
+  Llasa_TTS_(1B), Llasa_TTS_(3B), EmbeddingGemma2_(300M)-Audio, EmbeddingGemma2_(300M)-Image_Text,
   EmbeddingGemma2_(300M)-Multimodal_Search, Deepseek_OCR_(3B), Deepseek_OCR_(3B)-Eval,
   Deepseek_OCR_2_(3B), OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game,
   OpenEnv_gpt_oss_(20B)_Reinforcement_Learning_2048_Game_BF16, Llama3.2_(1B)-RAFT,
   Sesame_CSM_(1B)-TTS, Spark_TTS_(0_5B),
   gpt_oss_(20B)_Reinforcement_Learning_GRPO_Minesweeper_Game_BF16, Openenv_wordle_grpo,
   Qwen3_(4B)-Tool_Calling and Qwen3_(4B)-GRPO-Tool_Use, with their AMD- / Kaggle- /
-  HuggingFace Course- variants.
+  HuggingFace Course- variants. Forced onto 2 processes on a Kaggle 2x T4,
+  OmniVoice_(0.6B)-TTS fails saving after training and Qwen3_(4B)-GRPO-Tool_Use hangs in
+  its first GRPO step.
 - **`model.generate` gathers the whole model on every GPU.** Under native FSDP2 Unsloth
   runs `generate` inside `native_fsdp2_unsharded`, which all-gathers the full weights of
   every sharded unit onto every process until `generate` returns (every process
@@ -7325,11 +7564,64 @@ python "fsdp2_scripts/Qwen3_(4B)-GRPO.py" --dry-run                # print the c
   memory on a smaller GPU in the generation cells that follow training.
 - **Unsloth decides what is supported.** The launcher does not check models, trainers or
   parallel layouts. Unsloth itself refuses layouts it cannot run (for example an invalid
-  `UNSLOTH_TP_SIZE`) with an error that names the problem. Nothing in this folder claims
-  that a given script has been verified on multiple GPUs.
+  `UNSLOTH_TP_SIZE`) with an error that names the problem. Beyond the one sweep in
+  "Multi-GPU status" below, nothing in this folder claims that a given script has been
+  verified on multiple GPUs.
 - **The scripts are not modified.** Each launcher runs `python_scripts/<name>` as it is,
   so a fix to a script belongs in its notebook template, not here.
-"""
+""" + _render_multi_gpu_modes() + _render_multi_gpu_sweep()
+
+
+def _render_multi_gpu_modes():
+    lines = [
+        "",
+        "## Default modes",
+        "",
+        "These scripts run another mode than native FSDP2 when neither `--mode` nor the",
+        "environment (`UNSLOTH_FSDP2`, `UNSLOTH_PARALLEL`, `UNSLOTH_TP_SIZE`, `UNSLOTH_PP_SIZE`,",
+        "`UNSLOTH_CP_SIZE`) asks for one; `split` also yields to `--nproc-per-node` above 1",
+        "(or `UNSLOTH_NPROC_PER_NODE`), which starts native FSDP2. They are listed in",
+        "`MULTI_GPU_MODE` in `update_all_notebooks.py`, with their AMD- / Kaggle- /",
+        "HuggingFace Course- variants. `split` is one process over every visible GPU, the model",
+        "placed over them by `device_map`, as the notebook does on its own.",
+        "",
+        "| Script | Mode | Why |",
+        "| --- | --- | --- |",
+    ]
+    for name, (mode, why) in sorted(MULTI_GPU_MODE.items()):
+        lines.append(f"| `{name}` | {mode} | {why} |")
+    return "\n".join(lines) + "\n"
+
+
+def _launcher_default_label(script_name):
+    if fsdp2_single_process_reason(script_name):
+        return "single process"
+    default = multi_gpu_default_mode(script_name)
+    return default[0] if default else "fsdp2"
+
+
+def _render_multi_gpu_sweep():
+    lines = [
+        "",
+        "## Multi-GPU status",
+        "",
+        "One Kaggle 2x T4 sweep of `python_scripts/`, rendered from `MULTI_GPU_SWEEP` in",
+        "`update_all_notebooks.py`: notebooks d8da2d22, unsloth 87e154a, unsloth-zoo f1f2f2c,",
+        "torch 2.14.1, transformers 5.17.0, TRL 1.15.0. Install cells were not run, so a",
+        "notebook's own pins were not applied, and training was cut to a few steps. Models",
+        "larger than one T4 were replaced by tiny copies of the same architecture, except",
+        "Qwen3.8_(27B) and Muse_Glimmer_(30B), which ran at full size in 4-bit. `split` is one",
+        "process over both GPUs; `forced 2 ranks` is a single-process script run with",
+        "`UNSLOTH_FSDP2_FORCE=1 --nproc-per-node 2`. An empty cell was not run; scripts with",
+        "no run are left out. `Launcher` is what `python fsdp2_scripts/<name>` runs today.",
+        "",
+        "| Script | Launcher | " + " | ".join(MULTI_GPU_SWEEP_COLUMNS) + " |",
+        "| --- | --- | " + " | ".join("---" for _ in MULTI_GPU_SWEEP_COLUMNS) + " |",
+    ]
+    for name, cells in sorted(MULTI_GPU_SWEEP.items()):
+        shown = name.replace("|", "\\|")
+        lines.append(f"| `{shown}` | {_launcher_default_label(name)} | " + " | ".join(cells) + " |")
+    return "\n".join(lines) + "\n"
 
 
 def _fsdp2_scoped(names, include_prefix):
@@ -7612,6 +7904,367 @@ def _summarize_git_diff():
         print(f"\n=== Git Diff Summary: error ({e}) ===")
 
 
+def _postprocess_generated_notebooks(notebook_paths, max_workers=1, executor_type="process"):
+    _map_with_executor(
+        _apply_global_fixes,
+        notebook_paths,
+        max_workers=max_workers,
+        executor_type=executor_type,
+        progress_desc="Global notebook fixes",
+    )
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Hide memory stats"):
+        _ensure_memory_stats_hidden(nb_path)
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Normalize LGPL"):
+        _normalize_lgpl_blank_line(nb_path)
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Normalize sources"):
+        try:
+            with open(nb_path, "r", encoding="utf-8", newline="") as f:
+                nb_data = json.load(f)
+            changed = False
+            for cell in nb_data.get("cells", []):
+                source = cell.get("source", [])
+                if isinstance(source, list):
+                    while source and source[-1] == "":
+                        source.pop()
+                        changed = True
+                    if source and source[-1].endswith("\n"):
+                        source[-1] = source[-1][:-1]
+                        changed = True
+            if changed:
+                _write_notebook(nb_path, nb_data)
+        except Exception:
+            pass
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Restore outputs"):
+        _restore_original_outputs(nb_path)
+
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+    from fix_html_tags import fix_outputs as _fix_html_outputs
+    from fix_html_tags import fix_comments as _fix_html_comments
+
+    for nb_path in _progress_iter(notebook_paths, total=len(notebook_paths), desc="Fix HTML tags"):
+        try:
+            with open(nb_path, "r", encoding="utf-8", newline="") as f:
+                nb_data = json.load(f)
+            output_fixes = _fix_html_outputs(nb_data)
+            comment_fixes = _fix_html_comments(nb_data)
+            if output_fixes + comment_fixes > 0:
+                _write_notebook(nb_path, nb_data)
+        except Exception:
+            pass
+
+
+general_announcement_content_intel = general_announcement_content.replace(
+    "on a **free** Tesla T4 Google Colab instance!", "on your local **Intel GPU**!"
+).replace(
+    'press "*Runtime*" and press "*Run all*"', 'press "*Run*" and press "*Run All*"'
+)
+
+
+INTEL_XPU_INDEX_URL = "https://download.pytorch.org/whl/xpu"
+# +xpu: a bare ==2.13.0 is satisfied by an installed CPU / CUDA build, which uv then keeps.
+INTEL_TORCH_SPECS = ('"torch==2.13.0+xpu"', '"torchvision==0.28.0+xpu"')
+INTEL_TORCHAO_SPEC = '"torchao==0.18.0"'
+INTEL_TRITON_XPU_SPEC = '"triton-xpu==3.7.2"'
+# 0.50.0 is the first manylinux wheel that ships libbitsandbytes_xpu.so.
+INTEL_BITSANDBYTES_SPEC = '"bitsandbytes>=0.50.0"'
+
+installation_intel_cell = f"""%%capture
+# uv targets this kernel even when its environment is not activated.
+import os, sys; os.environ["UV_PYTHON"] = sys.executable
+# Torch comes from the PyTorch XPU index. A plain `pip install unsloth` would pull CUDA torch.
+!pip install --upgrade -qqq uv
+!uv pip install -qqq {" ".join(INTEL_TORCH_SPECS)} --index-url {INTEL_XPU_INDEX_URL}
+# torch is already satisfied, so uv keeps the +xpu wheel.
+!uv pip install -qqq {INTEL_BITSANDBYTES_SPEC} unsloth unsloth_zoo
+!uv pip install -qqq --no-deps {INTEL_TORCHAO_SPEC} --index-url {INTEL_XPU_INDEX_URL}
+!uv pip install -qqq --no-deps -U "{PIN_TOKENIZERS_SPEC}"
+"""
+
+# vLLM's XPU wheel pins INTEL_TORCH_SPECS exactly (requirements/xpu.txt); zoo's XPU standby needs vLLM >= 0.23.0.
+INTEL_VLLM_VERSION = "0.30.0"
+INTEL_VLLM_SPEC = f'"vllm=={INTEL_VLLM_VERSION}+xpu"'
+# vLLM 0.30 needs transformers >= 5.10.4, and 5.16+ needs tokenizers >= 0.23.1
+INTEL_VLLM_TRANSFORMERS_SPEC = '"transformers>=5.10.4,<5.16"'
+INTEL_VLLM_INDEX_ARGS = (
+    f"--extra-index-url https://wheels.vllm.ai/{INTEL_VLLM_VERSION}/xpu "
+    f"--extra-index-url https://wheels.vllm.ai/xpu "
+    f"--extra-index-url {INTEL_XPU_INDEX_URL} --index-strategy=unsafe-best-match"
+)
+
+installation_intel_vllm_cell = f"""%%capture
+# uv targets this kernel even when its environment is not activated.
+import os, sys; os.environ["UV_PYTHON"] = sys.executable
+# vLLM's XPU wheel requires one exact torch, so it goes first and brings that torch.
+!pip install --upgrade -qqq uv
+!uv pip install -qqq {INTEL_VLLM_SPEC} {" ".join(INTEL_TORCH_SPECS)} {INTEL_VLLM_TRANSFORMERS_SPEC} {INTEL_VLLM_INDEX_ARGS}
+# torch and triton are already satisfied, so uv keeps the XPU builds.
+!uv pip install -qqq {INTEL_BITSANDBYTES_SPEC} unsloth unsloth_zoo
+{build_vllm_torchao_spec_block()}
+!uv pip install -qqq --no-deps --index-url {INTEL_XPU_INDEX_URL} "{{_torchao}}"
+!uv pip install -qqq --no-deps -U "{PIN_TOKENIZERS_SPEC}"
+"""
+
+# unsloth_zoo's generic `triton` dependency overwrites triton-xpu's package dir. Non-vLLM only.
+INTEL_XPU_FINALIZE = f"""\
+!uv pip uninstall -qqq triton
+!uv pip install -qqq --reinstall --no-deps {INTEL_TRITON_XPU_SPEC} --index-url {INTEL_XPU_INDEX_URL}
+"""
+
+installation_intel_extras_default = ""
+
+# Too big for one 24 GB Intel GPU. Never list a fast_inference notebook: vLLM places its own weights.
+INTEL_MULTI_GPU_NOTEBOOKS = (
+    "Qwen3_5_MoE.ipynb",
+    "Llama3.2_(11B)-Vision.ipynb",
+    "gpt_oss_(20B)_GRPO_BF16.ipynb",
+)
+
+installation_intel_extras_multi_gpu = """\
+# Disable expandable segments for PyTorch memory allocator on Intel XPU to enable multi-device workload
+%env PYTORCH_ALLOC_CONF=expandable_segments:False
+"""
+
+INTEL_NOTEBOOKS = [
+    "Qwen3_5_MoE.ipynb",
+    "Qwen3_(4B)-GRPO.ipynb",
+    "gpt_oss_(20B)_GRPO_BF16.ipynb",
+    "Llama3.2_(11B)-Vision.ipynb",
+]
+
+
+_INTEL_INSTALL_PACKAGE_IGNORE = _AMD_INSTALL_PACKAGE_IGNORE | frozenset({
+    "causal_conv1d", "mamba_ssm", "flash_attn", "vllm", "torchcodec",
+    # The second pass reads INTEL_XPU_FINALIZE back as source.
+    "triton_xpu",
+})
+
+
+def _intel_stale_followup_cells(cells, last_idx, extras_text):
+    """Cells after the install cell to delete: a template ``# Placeholder`` or a previous pass's extras cell."""
+    stale = []
+    matches = {"# Placeholder"}
+    if extras_text and extras_text.strip():
+        matches.add(extras_text.strip())
+    idx = last_idx + 1
+    while idx < len(cells) and cells[idx].get("cell_type") == "code":
+        text = _cell_source_text(cells[idx])
+        if text.strip() not in matches:
+            break
+        stale.append((idx, text))
+        idx += 1
+    return stale
+
+
+def _format_intel_pip_call(flags, specs):
+    parts = ["!uv pip install -qqq"]
+    parts.extend(flags)
+    parts.extend(_amd_shell_quote_spec(spec) for spec in specs)
+    return " ".join(parts)
+
+
+def _compose_intel_installation(notebook_path, source_install_texts):
+    """(install cell, extras cell or None): extras keeps the source's own pins, then the triton swap (not for vLLM)."""
+    uses_vllm = notebook_uses_fast_inference(notebook_path)
+    ignore = _INTEL_INSTALL_PACKAGE_IGNORE | ({"transformers"} if uses_vllm else set())
+    if _is_intel_multi_gpu_notebook(notebook_path):
+        variant_extras = installation_intel_extras_multi_gpu
+    else:
+        variant_extras = installation_intel_extras_default
+
+    variant_header = _extract_variant_header(variant_extras)
+    merged_groups = {}
+    spec_locations = {}
+    setup_lines = []
+    for text in source_install_texts:
+        if not text:
+            continue
+        for line in _extract_preserved_setup_lines(text):
+            # _extract_preserved_setup_lines adds AMD's --system to uninstall lines.
+            line = line.replace("!uv pip uninstall --system", "!uv pip uninstall", 1)
+            # The second pass sees the header's %env line again as a setup line.
+            if line not in setup_lines and line not in variant_header:
+                setup_lines.append(line)
+        for flags, specs in _extract_install_package_groups(text):
+            for spec in specs:
+                key = _package_key_from_install_token(spec)
+                if not key or key in ignore:
+                    continue
+                # A later `trl==0.22.2` must beat an earlier bare `trl`, as in the AMD composer.
+                if key in spec_locations:
+                    old_flags, old_spec = spec_locations[key]
+                    if _install_spec_preference(old_spec) >= _install_spec_preference(spec):
+                        continue
+                    merged_groups[old_flags].remove(old_spec)
+                spec_locations[key] = (flags, spec)
+                merged_groups.setdefault(flags, []).append(spec)
+
+    blocks = []
+    if variant_header:
+        blocks.append("\n".join(variant_header))
+    if setup_lines:
+        blocks.append("\n".join(setup_lines))
+    replace_specs = _extract_git_main_unsloth_specs(source_install_texts)
+    if not replace_specs:
+        replace_specs = _extract_forced_unsloth_release_specs(source_install_texts)
+    pip_lines = []
+    if replace_specs:
+        pip_lines.append(
+            _format_intel_pip_call(("--upgrade", "--force-reinstall", "--no-deps"), replace_specs)
+        )
+    for flags, specs in merged_groups.items():
+        if specs:
+            pip_lines.append(_format_intel_pip_call(flags, specs))
+    if pip_lines:
+        blocks.append("\n".join(pip_lines))
+    if uses_vllm:
+        install_cell = installation_intel_vllm_cell
+    else:
+        blocks.append(INTEL_XPU_FINALIZE.rstrip("\n"))
+        install_cell = installation_intel_cell
+    if not blocks:
+        return install_cell, None
+    return install_cell, _prepend_missing_stdlib_imports("\n\n".join(blocks) + "\n")
+
+
+_RE_TORCH_CUDA_NAMESPACE = re.compile(r"\btorch\.cuda\.")
+_RE_CUDA_DEVICE_LITERAL = re.compile(r"""(["'])cuda(:\d+)?\1""")
+
+
+def _rewrite_cuda_to_xpu(source_text):
+    source_text = _RE_TORCH_CUDA_NAMESPACE.sub("torch.xpu.", source_text)
+    return _RE_CUDA_DEVICE_LITERAL.sub(lambda m: f"{m.group(1)}xpu{m.group(2) or ''}{m.group(1)}", source_text)
+
+
+# from_pretrained's model-name line; device_map goes after it.
+_RE_MODEL_NAME_LINE = re.compile(
+    r"""^(?P<indent>[ \t]+)(?:model_name\s*=\s*)?(["'])(?P<model>[^"']+)\2\s*,[^\n]*\n""",
+    re.MULTILINE,
+)
+_INTEL_DEVICE_MAP_ARG = 'device_map = "balanced", # Split the model across every Intel GPU'
+
+
+def _is_intel_multi_gpu_notebook(notebook_path):
+    return os.path.basename(notebook_path).removeprefix("Intel-") in INTEL_MULTI_GPU_NOTEBOOKS
+
+
+def _add_intel_device_map(source_text):
+    """Add device_map after the model-name line, searched from `from_pretrained(` so a model list above is skipped."""
+    if "device_map" in source_text:
+        return source_text
+    match = _RE_MODEL_NAME_LINE.search(source_text, source_text.index("from_pretrained("))
+    if match is None:
+        raise RuntimeError(
+            "from_pretrained has no model-name argument line for device_map; update _RE_MODEL_NAME_LINE"
+        )
+    insert = f"{match.group('indent')}{_INTEL_DEVICE_MAP_ARG}\n"
+    return source_text[:match.end()] + insert + source_text[match.end():]
+
+
+def _apply_intel_cell_rules(notebook_path, cells):
+    changed = False
+    needs_device_map = _is_intel_multi_gpu_notebook(notebook_path)
+    for cell in cells:
+        if cell.get("cell_type") != "code":
+            continue
+        source_text = _cell_source_text(cell)
+        new_text = _rewrite_cuda_to_xpu(source_text)
+        # Only the first load: later from_pretrained calls reload the saved adapters.
+        if needs_device_map and "from_pretrained(" in new_text:
+            try:
+                new_text = _add_intel_device_map(new_text)
+            except RuntimeError as e:
+                raise RuntimeError(f"{notebook_path}: {e}") from None
+            needs_device_map = False
+        if new_text != source_text:
+            cell["source"] = _source_lines(new_text)
+            changed = True
+    return changed
+
+
+def copy_and_update_intel_notebooks(
+    template_dir,
+    destination_dir,
+    general_announcement,
+    installation,
+    installation_kaggle,
+    new_announcement,
+):
+    os.makedirs(destination_dir, exist_ok=True)
+    intel_paths = []
+    for notebook_name in INTEL_NOTEBOOKS:
+        template_path = os.path.join(template_dir, notebook_name)
+        nb_path = os.path.join(destination_dir, notebook_name)
+        if notebook_name in DONT_UPDATE_EXCEPTIONS or not os.path.isfile(template_path):
+            source_path = nb_path
+        else:
+            source_path = template_path
+        if not os.path.isfile(source_path):
+            raise FileNotFoundError(f"INTEL_NOTEBOOKS lists {notebook_name}, but neither {template_path} nor {nb_path} exists")
+        intel_path = os.path.join(destination_dir, "Intel-" + notebook_name)
+        _cache_original_outputs(intel_path)
+        shutil.copyfile(source_path, intel_path)
+        _set_file_permissions(intel_path)
+        _cache_notebook_format(intel_path)
+        if source_path != template_path:
+            _restore_news_section(intel_path, template_path, new_announcement)
+        update_notebook_sections(
+            intel_path,
+            general_announcement,
+            installation,
+            installation_kaggle,
+            new_announcement,
+        )
+        intel_paths.append(intel_path)
+        print(f"Copied 'Intel-{notebook_name}' to '{destination_dir}'")
+    return intel_paths
+
+
+_INTEL_FORBIDDEN_MARKERS = (
+    "torch.cuda.", '"cuda"', "'cuda'", "xformers", "causal_conv1d", "causal-conv1d",
+    "nvidia-smi", "COLAB_", "unsloth install-kernels",
+)
+
+
+def _validate_intel_notebook(notebook_path):
+    with open(notebook_path, "r", encoding="utf-8") as f:
+        cells = json.load(f)["cells"]
+    code = "\n".join(_cell_source_text(c) for c in cells if c.get("cell_type") == "code")
+    issues = [f"contains {marker!r}" for marker in _INTEL_FORBIDDEN_MARKERS if marker in code]
+    if INTEL_XPU_INDEX_URL not in code:
+        issues.append("has no Intel XPU install cell")
+    if _RE_FAST_INFERENCE_TRUE.search(code):
+        if INTEL_VLLM_SPEC not in code or f"wheels.vllm.ai/{INTEL_VLLM_VERSION}/xpu" not in code:
+            issues.append("uses fast_inference = True but has no Intel vLLM install")
+    elif "triton-xpu" not in code:
+        issues.append("is missing the INTEL_XPU_FINALIZE triton swap")
+
+    if _is_intel_multi_gpu_notebook(notebook_path):
+        if 'device_map = "balanced"' not in code:
+            issues.append('is missing device_map = "balanced"')
+        if _RE_FAST_INFERENCE_TRUE.search(code):
+            issues.append("is in INTEL_MULTI_GPU_NOTEBOOKS but uses fast_inference = True; vLLM places its own weights")
+    return issues
+
+
+def _assert_intel_notebooks(notebook_paths):
+    failures = {}
+    for path in notebook_paths:
+        issues = _validate_intel_notebook(path)
+        if issues:
+            failures[path] = issues
+    if not failures:
+        return
+    print("\nERROR: Intel notebooks failed validation:")
+    for path, issues in sorted(failures.items()):
+        for issue in issues:
+            print(f"  {os.path.basename(path)} {issue}")
+    raise RuntimeError("Intel notebook validation failed")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -7666,6 +8319,11 @@ if __name__ == "__main__":
         "--no-progress",
         action="store_true",
         help="Disable tqdm progress bars.",
+    )
+    parser.add_argument(
+        "--intel",
+        action="store_true",
+        help="Only regenerate Intel GPU (XPU) notebooks and their python scripts.",
     )
     args = parser.parse_args()
 
@@ -7802,6 +8460,34 @@ if __name__ == "__main__":
             generate_fsdp2_scripts(include_prefix="AMD-")
             _assert_fsdp2_mirror(include_prefix="AMD-")
 
+        _summarize_git_diff()
+        exit(0)
+
+    if args.intel:
+        intel_paths = copy_and_update_intel_notebooks(
+            "original_template",
+            "nb",
+            general_announcement_content,
+            installation_content,
+            installation_kaggle_content,
+            new_announcement,
+        )
+        # Two passes = the default run's fixed point (update_old_unsloth collapses its own "!!").
+        for _ in range(2):
+            main(max_workers=args.workers, executor_type=args.executor, notebook_files=intel_paths)
+        _assert_intel_notebooks(intel_paths)
+        _postprocess_generated_notebooks(intel_paths, args.workers, args.executor)
+        if not args.disable_convert_to_script:
+            convert_folder(
+                "nb",
+                "python_scripts",
+                max_workers=args.workers,
+                executor_type=args.executor,
+                include_prefix="Intel-",
+                clean_output_folder=False,
+            )
+            generate_fsdp2_scripts(include_prefix="Intel-")
+            _assert_fsdp2_mirror(include_prefix="Intel-")
         _summarize_git_diff()
         exit(0)
 

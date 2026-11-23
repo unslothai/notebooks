@@ -367,10 +367,13 @@ def test_the_main_pass_calls_the_generator_after_both_conversions():
         gen = [c for c in after if c.startswith("generate_fsdp2_scripts(")]
         check = [c for c in after if c.startswith("_assert_fsdp2_mirror(")]
         assert gen and check, f"no fsdp2 generation after {calls[converts[0]][:60]}"
-        prefixed = "include_prefix='AMD-'" in calls[converts[0]]
-        assert prefixed == ("include_prefix='AMD-'" in gen[0]) == ("include_prefix='AMD-'" in check[0])
-        found.append(prefixed)
-    assert sorted(found) == [False, True], f"expected the full and the AMD-only pass, got {found}"
+        prefix = re.search(r"include_prefix='([^']*)'", calls[converts[0]])
+        prefix = prefix.group(1) if prefix else ""
+        assert all((f"include_prefix='{prefix}'" in c) == bool(prefix) for c in (gen[0], check[0])), (
+            f"the {prefix or 'full'} pass generates or checks a different prefix than it converted"
+        )
+        found.append(prefix)
+    assert sorted(found) == ["", "AMD-", "Intel-"], f"expected the full, AMD-only and Intel-only passes, got {found}"
 
 
 def test_unchanged_launchers_get_their_permissions_reset(tmp_path):
@@ -467,6 +470,8 @@ _UNSAFE = re.compile(
     r"|SyntheticDataKit\.from_pretrained\("
     # unsloth_zoo's launch_openenv Popens a uvicorn server on a port drawn from the seeded RNG.
     r"|launch_openenv\("
+    # Studio's colab start() serves on fixed port 8888.
+    r"|\bcolab\.start\(|\bfrom colab import\b.*\bstart\b"
     # Outer models built outside Unsloth: their merge / save skip the collective export.
     r"|OmniVoice\.from_pretrained\("
     # A memmap every process opens for writing at the same path.
@@ -526,6 +531,12 @@ def test_scan_reads_live_capture_bodies_and_skips_comments(tmp_path):
     commented = tmp_path / "commented.py"
     commented.write_text("# os.remove('X/a.py')\n# shutil.rmtree('X')\nprint(1)\n", encoding="utf-8")
     assert _unsafe_lines(commented) == []
+    studio = tmp_path / "studio.py"
+    studio.write_text("from colab import start\nstart()\n", encoding="utf-8")
+    assert _unsafe_lines(studio)
+    studio_attr = tmp_path / "studio_attr.py"
+    studio_attr.write_text("import colab\ncolab.start(cloudflare = False)\n", encoding="utf-8")
+    assert _unsafe_lines(studio_attr)
     top = tmp_path / "top.py"
     top.write_text("import shutil\nshutil.rmtree('outputs')\n", encoding="utf-8")
     assert _unsafe_lines(top)
@@ -928,3 +939,43 @@ def test_assert_mirror_requires_readme_and_helper(tmp_path):
     (out / HELPER_NAME).unlink()
     with pytest.raises(RuntimeError, match=HELPER_NAME):
         _GEN._assert_fsdp2_mirror(str(scripts), str(out))
+
+
+def test_default_mode_table_names_real_scripts_and_valid_modes():
+    bases = {_GEN._fsdp2_base_name(name) for name in _script_names()}
+    stale = sorted(set(_GEN.MULTI_GPU_MODE) - bases)
+    assert not stale, f"MULTI_GPU_MODE names scripts that no longer exist: {stale}"
+    assert not set(_GEN.MULTI_GPU_MODE) & set(_GEN.FSDP2_SINGLE_PROCESS)
+    for mode, reason in _GEN.MULTI_GPU_MODE.values():
+        assert mode in ("split", "ddp", "fsdp2", "tp", "pp") and reason
+    readme = (LAUNCHERS / "README.md").read_text(encoding="utf-8")
+    for base in _GEN.MULTI_GPU_MODE:
+        assert f"| `{base}` |" in readme
+
+
+def test_sweep_table_names_real_scripts():
+    names = set(_script_names())
+    stale = sorted(set(_GEN.MULTI_GPU_SWEEP) - names)
+    assert not stale, f"MULTI_GPU_SWEEP names scripts that no longer exist: {stale}"
+    for cells in _GEN.MULTI_GPU_SWEEP.values():
+        assert len(cells) == len(_GEN.MULTI_GPU_SWEEP_COLUMNS)
+
+
+@pytest.mark.parametrize("name, mode", [
+    ("Kaggle-Qwen3.8_(27B)-Conversational.py", "split"),
+    ("Qwen3.8_(27B)-Conversational.py", "split"),
+    ("Kaggle-Qwen3.8_(27B)-GRPO.py", "split"),
+    ("Kaggle-Muse_Glimmer_(30B)-Conversational.py", "split"),
+    ("Muse_Glimmer_(30B)-Vision.py", "split"),
+    ("HuggingFace Course-Muse_Glimmer_(30B)-GRPO.py", "split"),
+    ("Kaggle-Muse_Glimmer_(30B)-Multimodal.py", "split"),
+    ("Mistral_Nemo_(12B)-Alpaca.py", "ddp"),
+    ("AMD-Mistral_Nemo_(12B)-Alpaca.py", "ddp"),
+])
+def test_default_mode_launchers_carry_their_mode(name, mode):
+    assert (SCRIPTS / name).is_file()
+    tree = ast.parse((LAUNCHERS / name).read_text(encoding="utf-8"))
+    call = next(node for node in ast.walk(tree)
+                if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "main")
+    keywords = {k.arg: ast.literal_eval(k.value) for k in call.keywords}
+    assert keywords == {"default_mode": mode, "reason": _GEN.multi_gpu_default_mode(name)[1]}

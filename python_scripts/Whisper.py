@@ -161,6 +161,7 @@ def compute_metrics(pred):
 @dataclass
 class DataCollatorSpeechSeq2SeqWithPadding:
     processor: Any
+    decoder_start_token_id: int
 
     def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
 
@@ -172,7 +173,8 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 
         labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
 
-        if (labels[:, 0] == self.processor.tokenizer.bos_token_id).all().cpu().item():
+        # The tokenizer already prepends <|startoftranscript|>; the model adds it again when shifting labels right
+        if (labels[:, 0] == self.decoder_start_token_id).all().cpu().item():
             labels = labels[:, 1:]
 
         batch["labels"] = labels
@@ -192,7 +194,10 @@ from unsloth import is_bf16_supported
 trainer = Seq2SeqTrainer(
     model = model,
     train_dataset = train_dataset,
-    data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor = tokenizer),
+    data_collator = DataCollatorSpeechSeq2SeqWithPadding(
+        processor = tokenizer,
+        decoder_start_token_id = model.config.decoder_start_token_id,
+    ),
     eval_dataset = test_dataset,
     processing_class = tokenizer.feature_extractor,
     compute_metrics = compute_metrics,
