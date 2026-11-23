@@ -135,6 +135,7 @@ placed over them by `device_map`, as the notebook does on its own.
 
 | Script | Mode | Why |
 | --- | --- | --- |
+| `Inkling_2_Mini_(26B)-Conversational.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
 | `Mistral_Nemo_(12B)-Alpaca.py` | ddp | native FSDP2 trains, then runs out of memory gathering the whole 12B model for generate on 16 GB GPUs; DDP fits one copy per GPU and passes |
 | `Muse_Glimmer_(30B)-Conversational.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
 | `Muse_Glimmer_(30B)-GRPO.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
