@@ -304,7 +304,7 @@ for i in range(torch.cuda.device_count()):
           f"({used / total * 100:.1f} %), {used - start_gpu_memory[i]:.3f} GB for training.")
 
 
-# On Kaggle's two T4s this peaks at about 12.3 GB on the first card and 13.5 GB on the second, about 28 s per
+# On Kaggle's two T4s this peaks at about 12.1 GB on the first card and 11.9 GB on the second, about 27 s per
 # step. If you are close to the limit, lower `max_seq_length` or set `finetune_mlp_modules = False`.
 
 # <a name="Inference"></a>
