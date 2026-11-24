@@ -387,7 +387,7 @@ def _execute_strategy(strategy : Callable, game : GameBoard):
 
     steps = 0
     while game.state() == "ongoing":
-        action = strategy(list(game.board()))
+        action = strategy([list(row) for row in game.board()])
         steps += 1
         if type(action) is not str:
             return steps, "failed"
