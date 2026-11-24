@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# To run this, press "*Runtime*" and press "*Run all*" on a **free** Tesla T4 Google Colab instance!
+# To run this, press "*Runtime*" and press "*Run all*" on your A100 Google Colab Pro instance!
 # <div class="align-center">
 # <a href="https://unsloth.ai/"><img src="https://github.com/unslothai/unsloth/raw/main/images/unsloth%20new%20logo.png" width="115"></a>
 # <a href="https://discord.gg/unsloth"><img src="https://github.com/unslothai/unsloth/raw/main/images/Discord button.png" width="145"></a>
@@ -46,7 +46,7 @@
 # times, 128 experts per layer and a vision tower. It needs transformers 5.24.0. Unsloth quantizes the released
 # NVFP4 / MXFP8 experts to 4-bit while loading.
 # 
-# **Two Tesla T4s, not one.** The 4-bit weights are about 14.4 GB, so use Kaggle's GPU T4 x2. Do not pass
+# **Two Tesla T4s or one A100, not one T4.** The 4-bit weights are about 14.4 GB, so use Kaggle's GPU T4 x2 or a Colab A100. Do not pass
 # `device_map`: Unsloth's `"sequential"` default fills one card, then the other.
 
 # In[ ]:
