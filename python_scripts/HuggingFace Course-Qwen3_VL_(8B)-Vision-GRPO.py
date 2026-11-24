@@ -53,8 +53,9 @@
 #     except: _numpy = "numpy"; _pil = "pillow"
 #     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
 #     except: is_t4 = False
+#     get_ipython().system('echo "numba>=0.61.2" > /tmp/unsloth_vllm_overrides.txt # vLLM pins numba==0.61.2 (numpy<2.3), Colab ships a newer numpy')
 #     _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
-#     get_ipython().system('uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
+#     get_ipython().system('uv pip install -qqq --upgrade --override /tmp/unsloth_vllm_overrides.txt {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth')
 #     get_ipython().system('uv pip install -qqq {_triton}')
 #     try:
 #         import importlib.metadata as _md; _torch_v = tuple(int(_p) for _p in _md.version("torch").split("+")[0].split(".")[:2])

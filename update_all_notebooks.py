@@ -433,8 +433,9 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
+    !echo "numba>=0.61.2" > /tmp/unsloth_vllm_overrides.txt # vLLM pins numba==0.61.2 (numpy<2.3), Colab ships a newer numpy
     _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
-    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+    !uv pip install -qqq --upgrade --override /tmp/unsloth_vllm_overrides.txt {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
 """ + build_vllm_torchao_spec_block("    ") + """
     !uv pip install -qqq --no-deps --upgrade "{_torchao}"
@@ -496,9 +497,11 @@ TOOL_USE_UNSLOTH_MAIN = (
     '"unsloth @ git+https://github.com/unslothai/unsloth"'
 )
 def _tool_use_installation(content, indent):
+    # The Colab block carries the numba override (see installation_extra_grpo_content); Kaggle does not.
+    _vllm_override = "--override /tmp/unsloth_vllm_overrides.txt " if indent else ""
     old = (
         f"{indent}_vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')\n"
-        f"{indent}!uv pip install -qqq --upgrade {{_vllm}} {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+        f"{indent}!uv pip install -qqq --upgrade {_vllm_override}{{_vllm}} {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
     )
     new = (
         f"{indent}_triton = 'triton'\n"
@@ -511,7 +514,7 @@ def _tool_use_installation(content, indent):
         f"{indent}        _torch, _tv = 'torch', 'torchvision'\n"
         f"{indent}    !uv pip install -qqq {{_numpy}} {{_pil}} {{_torch}} {{_tv}} bitsandbytes xformers unsloth\n"
         f"{indent}else:\n"
-        f"{indent}    !uv pip install -qqq --upgrade vllm==0.19.1 {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
+        f"{indent}    !uv pip install -qqq --upgrade {_vllm_override}vllm==0.19.1 {{_numpy}} {{_pil}} torchvision bitsandbytes xformers unsloth\n"
     )
     assert old in content, "GRPO install layout moved; update _tool_use_installation"
     content = content.replace(old, new)
@@ -534,8 +537,9 @@ else:
     except: _numpy = "numpy"; _pil = "pillow"
     try: import subprocess; is_t4 = "Tesla T4" in str(subprocess.check_output(["nvidia-smi"]))
     except: is_t4 = False
+    !echo "numba>=0.61.2" > /tmp/unsloth_vllm_overrides.txt # vLLM pins numba==0.61.2 (numpy<2.3), Colab ships a newer numpy
     _vllm, _triton = ('vllm==0.11.2', 'triton') if is_t4 else ('vllm==0.15.1', 'triton')
-    !uv pip install -qqq --upgrade {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
+    !uv pip install -qqq --upgrade --override /tmp/unsloth_vllm_overrides.txt {_vllm} {_numpy} {_pil} torchvision bitsandbytes xformers unsloth
     !uv pip install -qqq {_triton}
     !uv pip install synthetic-data-kit==0.0.3
 """ + build_vllm_torchao_spec_block("    ") + """
@@ -1097,6 +1101,54 @@ except Exception:
 !uv pip install -qqq --no-deps --upgrade "torchao>=0.16.0"
 !uv pip install -qqq transformers==5.15.1
 !uv pip install -qqq --no-deps trl==0.22.2"""
+
+# Inkling 2 (Thinking Machines) is an `inkling2_loop` (Mini) / `inkling2` (Small)
+# checkpoint, and both landed in transformers 5.24.0. The Kaggle block is the
+# Qwen3.8 one with that pin: it leaves Kaggle's torch alone for the same reason.
+# trl 1.15.0 rather than 0.22.2: it is the newest unsloth_zoo allows and the
+# version the notebook was run against on 2x T4. Unsloth's Inkling 2 support
+# (unsloth#18812, unsloth-zoo#2657) is newer than the last release, so both
+# install from main until the next one.
+installation_inkling2_content = update_or_append_pip_install(
+    installation_content,
+    "transformers",
+    "!pip install transformers==5.24.0",
+)
+installation_inkling2_content = update_or_append_pip_install(
+    installation_inkling2_content,
+    "trl",
+    "!pip install --no-deps trl==1.15.0",
+)
+installation_inkling2_kaggle_content = installation_qwen3_8_kaggle_content.replace(
+    "!uv pip install -qqq transformers==5.15.1",
+    "!uv pip install -qqq transformers==5.24.0",
+).replace(
+    "!uv pip install -qqq --no-deps trl==0.22.2",
+    "!uv pip install -qqq --no-deps trl==1.15.0",
+)
+# trl 1.15.0 needs datasets >= 4.7.0; unsloth_zoo keeps it below 5.
+installation_inkling2_content = installation_inkling2_content.replace(
+    '"datasets==4.3.0"', '"datasets>=4.7.0,<5.0.0"'
+)
+installation_inkling2_kaggle_content = installation_inkling2_kaggle_content.replace(
+    '"datasets==4.3.0"', '"datasets>=4.7.0,<5.0.0"'
+)
+INKLING2_UNSLOTH_MAIN = (
+    '"unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo" '
+    '"unsloth @ git+https://github.com/unslothai/unsloth"'
+)
+installation_inkling2_content = (
+    installation_inkling2_content.rstrip("\n")
+    + "\n!pip install --no-deps --force-reinstall " + INKLING2_UNSLOTH_MAIN + "\n"
+)
+installation_inkling2_kaggle_content = (
+    installation_inkling2_kaggle_content.rstrip("\n")
+    + "\n!uv pip install -qqq --no-deps --force-reinstall " + INKLING2_UNSLOTH_MAIN + "\n"
+)
+assert '"datasets>=4.7.0,<5.0.0"' in installation_inkling2_content
+assert "transformers==5.24.0" in installation_inkling2_kaggle_content
+assert "trl==1.15.0" in installation_inkling2_kaggle_content
+assert '"datasets>=4.7.0,<5.0.0"' in installation_inkling2_kaggle_content
 
 # KNOWLEDGE DISTILLATION INSTALLATION.
 #
@@ -5242,6 +5294,13 @@ def update_notebook_sections(
                             else:
                                 installation = installation_qwen3_8_content
 
+                        # Inkling 2 INSTALLATION
+                        if is_path_contains_any(notebook_path.lower(), ["inkling_2"]):
+                            if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
+                                installation = installation_inkling2_kaggle_content
+                            else:
+                                installation = installation_inkling2_content
+
                         # KNOWLEDGE DISTILLATION INSTALLATION. Must come after
                         # the Qwen3 rules above: the notebook is named for its
                         # default student (Qwen3 0.6B) but its other configs are
@@ -7232,6 +7291,7 @@ MULTI_GPU_MODE = {
     "Muse_Glimmer_(30B)-Vision.py": ("split", _SPLIT_BIG_4BIT),
     "Muse_Glimmer_(30B)-GRPO.py": ("split", _SPLIT_BIG_4BIT),
     "Muse_Glimmer_(30B)-Multimodal.py": ("split", _SPLIT_BIG_4BIT),
+    "Inkling_2_Mini_(26B)-Conversational.py": ("split", _SPLIT_BIG_4BIT),
     "Mistral_Nemo_(12B)-Alpaca.py": (
         "ddp",
         "native FSDP2 trains, then runs out of memory gathering the whole 12B model for generate "
