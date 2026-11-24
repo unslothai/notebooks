@@ -52,7 +52,7 @@
 # In[ ]:
 
 
-MODEL_NAME = "thinkingmachines/Inkling-2-Mini"
+MODEL_NAME = "unsloth/Inkling-2-Mini"
 
 
 # In[ ]:
@@ -73,7 +73,7 @@ assert total_gb >= 28, (
 
 from unsloth import FastModel
 
-max_seq_length = 1024  # Inkling-2-Mini goes to 1M tokens, but 1024 is what two T4s train on
+max_seq_length = 1024  # Inkling-2-Mini goes to 1M tokens. 2048 also fits two T4s; 1024 keeps steps short
 
 model, tokenizer = FastModel.from_pretrained(
     model_name        = MODEL_NAME,
