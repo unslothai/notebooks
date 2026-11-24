@@ -52,12 +52,6 @@
 # In[ ]:
 
 
-MODEL_NAME = "unsloth/Inkling-2-Mini"
-
-
-# In[ ]:
-
-
 import torch
 
 # About 14.4 GB of 4-bit weights plus training: two 16 GB cards (Kaggle GPU T4 x2) or one 40 GB card (A100).
@@ -76,7 +70,7 @@ from unsloth import FastModel
 max_seq_length = 1024  # Inkling-2-Mini goes to 1M tokens. 2048 also fits two T4s; 1024 keeps steps short
 
 model, tokenizer = FastModel.from_pretrained(
-    model_name        = MODEL_NAME,
+    model_name        = "unsloth/Inkling-2-Mini",
     max_seq_length    = max_seq_length,
     load_in_4bit      = True,
     full_finetuning   = False,
