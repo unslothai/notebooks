@@ -143,6 +143,7 @@ placed over them by `device_map`, as the notebook does on its own.
 | `Muse_Glimmer_(30B)-Vision.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
 | `Qwen3.8_(27B)-Conversational.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
 | `Qwen3.8_(27B)-GRPO.py` | split | every FSDP2 process loads the whole 4-bit model onto its own GPU, which runs out of memory on 2x 16 GB; one process placing it over both GPUs trains |
+| `Qwen3.8_Flash_Next_(125B-A6B)-Conversational.py` | split | the 4-bit model is about 75 GB, so every FSDP2 process loading a whole copy needs an 80 GB GPU each; one process placing it over every GPU needs only the sum |
 
 ## Multi-GPU status
 

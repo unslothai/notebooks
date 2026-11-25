@@ -1712,9 +1712,11 @@ AMD_SKIP_NOTEBOOKS = [
     "Unsloth_Studio.ipynb",
 ]
 
-# No Kaggle counterpart: Studio's launcher is Colab-only.
+# No Kaggle counterpart: Studio's launcher is Colab-only. Qwen3.8-Flash-Next needs one
+# 80 GB GPU and 195 GB of disk for its 186 GB FP8 checkpoint; Kaggle's GPUs are 16 GB.
 KAGGLE_SKIP_NOTEBOOKS = [
     "Unsloth_Studio.ipynb",
+    "Qwen3.8_Flash_Next_(125B-A6B)-Conversational.ipynb",
 ]
 
 # Notebooks that live ONLY under nb/ (not original_template/) but for which we
@@ -5294,6 +5296,11 @@ def update_notebook_sections(
                             else:
                                 installation = installation_qwen3_8_content
 
+                        # Qwen3.8-Flash-Next is `qwen4_exp` (transformers >= 5.22), not the 5.15.1
+                        # `qwen3_5` block its name also matches above: use the Inkling 2 block.
+                        if is_path_contains_any(notebook_path.lower(), [r"qwen3\.8_flash_next"]):
+                            installation = installation_inkling2_content
+
                         # Inkling 2 INSTALLATION
                         if is_path_contains_any(notebook_path.lower(), ["inkling_2"]):
                             if is_path_contains_any(notebook_path.lower(), ["kaggle"]):
@@ -7292,6 +7299,11 @@ MULTI_GPU_MODE = {
     "Muse_Glimmer_(30B)-GRPO.py": ("split", _SPLIT_BIG_4BIT),
     "Muse_Glimmer_(30B)-Multimodal.py": ("split", _SPLIT_BIG_4BIT),
     "Inkling_2_Mini_(26B)-Conversational.py": ("split", _SPLIT_BIG_4BIT),
+    "Qwen3.8_Flash_Next_(125B-A6B)-Conversational.py": (
+        "split",
+        "the 4-bit model is about 75 GB, so every FSDP2 process loading a whole copy needs an 80 GB GPU "
+        "each; one process placing it over every GPU needs only the sum",
+    ),
     "Mistral_Nemo_(12B)-Alpaca.py": (
         "ddp",
         "native FSDP2 trains, then runs out of memory gathering the whole 12B model for generate "
