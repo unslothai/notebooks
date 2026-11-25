@@ -5296,11 +5296,8 @@ def update_notebook_sections(
                             else:
                                 installation = installation_qwen3_8_content
 
-                        # Qwen3.8-Flash-Next is `qwen4_exp`, which transformers has from
-                        # 5.22, not the `qwen3_5` that the 5.15.1 Qwen3.8 block loads. It
-                        # takes the Inkling 2 block (transformers 5.24.0, trl 1.15.0,
-                        # unsloth + zoo from main). Kept after the Qwen3.8 rule, which its
-                        # name also matches.
+                        # Qwen3.8-Flash-Next is `qwen4_exp` (transformers >= 5.22), not the 5.15.1
+                        # `qwen3_5` block its name also matches above: use the Inkling 2 block.
                         if is_path_contains_any(notebook_path.lower(), [r"qwen3\.8_flash_next"]):
                             installation = installation_inkling2_content
 
