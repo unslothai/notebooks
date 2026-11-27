@@ -42,43 +42,19 @@
 
 # ### What you are about to load
 # 
-# Qwen3.8-Flash-Next is Qwen's preview of the Qwen4 architecture: a 125B parameter MoE (6B active) with 512 experts
-# per layer, plus a 51B parameter n-gram embedding table. We load the FP8 upload, 186 GB on disk instead of 360 GB
-# in bfloat16, and Unsloth quantizes the experts to 4-bit while loading.
-# 
-# The n-gram table never enters GPU memory. Unsloth memory maps it from the checkpoint on disk and reads only the
-# rows each batch needs, so it costs disk space, not VRAM.
-# 
-# **One A100 80GB (High-RAM) or one RTX PRO 6000 (96 GB), and about 200 GB of free disk.** On Colab the A100 High-RAM
-# runtime has a 375 GB local NVMe at `/mnt/local-scratch`, so the next cell downloads the model there.
+# Qwen3.8-Flash-Next is a 125B parameter MoE (6B active). We load the 186 GB FP8 upload and Unsloth quantizes the
+# experts to 4-bit while loading. It needs one A100 80GB (High-RAM) or one RTX PRO 6000 (96 GB).
 
 # In[ ]:
 
 
-import os, shutil, torch
-
-# The FP8 checkpoint is 186 GB. Colab's A100 High-RAM has a 375 GB NVMe disk at /mnt/local-scratch: download there.
-if os.path.isdir("/mnt/local-scratch") and "HF_HOME" not in os.environ:
-    os.environ["HF_HOME"] = "/mnt/local-scratch/huggingface"
-hf_home = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
-os.makedirs(hf_home, exist_ok = True)
-
-# A checkpoint already in the cache (a rerun) counts as disk in hand.
-blobs = os.path.join(hf_home, "hub", "models--unsloth--Qwen3.8-Flash-Next-FP8", "blobs")
-cached = sum(e.stat().st_size for e in os.scandir(blobs)) if os.path.isdir(blobs) else 0
-free_disk = (shutil.disk_usage(hf_home).free + cached) / 1e9
-# Summed over every GPU: Unsloth places the model over several cards when one is too small.
-total_vram = sum(torch.cuda.get_device_properties(i).total_memory for i in range(torch.cuda.device_count())) / 2**30
-print(f"{torch.cuda.device_count()} x {torch.cuda.get_device_name(0)}: {total_vram:.1f} GB VRAM. "
-      f"{free_disk:.0f} GB of disk for the model at {hf_home}")
-assert total_vram >= 75, "Qwen3.8-Flash-Next in 4-bit needs about 80 GB of GPU memory: an A100 80GB, an RTX PRO 6000, or GPUs that add up to it."
-assert free_disk >= 195, "The FP8 checkpoint is 186 GB: pick the A100 High-RAM runtime, which has a 375 GB disk."
-
-
-# In[ ]:
-
+import os
+if os.path.isdir("/mnt/local-scratch"):  # Colab A100 High-RAM: download to its 375 GB local NVMe
+    os.environ.setdefault("HF_HOME", "/mnt/local-scratch/huggingface")
+os.environ["UNSLOTH_DATASET_NUM_PROC"] = "0"  # Prepare data in this process: forking it after loading can hang
 
 from unsloth import FastModel
+import torch
 
 max_seq_length = 2048  # Qwen3.8-Flash-Next goes to 256K tokens
 
@@ -90,26 +66,9 @@ model, tokenizer = FastModel.from_pretrained(
 )
 
 
-# Unsloth chose where the n-gram table lives: `disk` or `ram` reads rows from the memory mapped checkpoint (`ram`
-# also warms the page cache when there is room), `gpu` only for small tables.
-
-# In[ ]:
-
-
-from unsloth_zoo.frozen_table_store import iter_frozen_table_modules
-for name, table in iter_frozen_table_modules(model):
-    print(name, table.frozen_table_store)
-print(f"GPU memory after loading: {torch.cuda.memory_allocated() / 2**30:.1f} GB")
-
-
 # We now add LoRA adapters so we only need to update a small amount of parameters.
 # 
-# Unsloth maps the usual names onto the attention layers, the 512 routed experts and the n-gram projections of every
-# layer: about 1.4B trainable parameters. The QSA indexer gets no gradient from the loss, so it is left out, and the
-# n-gram table and the vision tower stay frozen.
-# 
-# `offload_layers = "auto"` keeps as few decoder layers in host RAM as the training step needs and streams them in
-# during each step. On an 80 GB A100 that is a few layers; on a 96 GB RTX PRO 6000 it may be none.
+# `offload_layers = "auto"` keeps a few decoder layers in host RAM when the GPU is short and streams them in.
 
 # In[ ]:
 
@@ -172,8 +131,7 @@ dataset = standardize_sharegpt(dataset)
 dataset[100]["conversations"]
 
 
-# Qwen3.8-Flash-Next ships its own chat template, so we apply the tokenizer's template directly. It renders ChatML:
-# `<|im_start|>role\n ... <|im_end|>`, with a `<think>` block opening every assistant turn.
+# Qwen3.8-Flash-Next ships its own chat template, so we apply the tokenizer's template directly.
 
 # In[ ]:
 
@@ -201,9 +159,7 @@ dataset[100]["text"]
 
 # ### Controlling how much the model thinks
 # 
-# The template writes a reasoning effort into the system block, `xhigh` by default. Pass `reasoning_effort` to
-# `apply_chat_template`: `"low"`, `"medium"` or `"xhigh"`. Pass `enable_thinking = False` to skip thinking.
-# Reasoning tokens count against `max_new_tokens`.
+# Pass `reasoning_effort` (`"low"`, `"medium"` or `"xhigh"`, the default) to `apply_chat_template`.
 
 # In[ ]:
 
@@ -256,7 +212,7 @@ trainer = SFTTrainer(
 
 
 # We also use Unsloth's `train_on_responses_only` method to only train on the assistant outputs and ignore the loss
-# on the user's inputs. Qwen3.8 turns start with `<|im_start|>user\n` and `<|im_start|>assistant\n`.
+# on the user's inputs.
 
 # In[ ]:
 
@@ -270,8 +226,7 @@ trainer = train_on_responses_only(
 )
 
 
-# Let's verify masking the instruction part is done. Row 100, then the same row with everything the model is not
-# trained on blanked out - you should see only the answer.
+# Let's verify masking the instruction part is done. You should see only the answer below the line.
 
 # In[ ]:
 
@@ -321,10 +276,8 @@ print(f"Peak reserved memory % of max memory = {used_percentage} %.")
 print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
 
 
-# `offload_layers = "auto"` keeps 6 of the 48 layers in host RAM on Colab's RTX PRO 6000 (G4): training peaks at about
-# 81 GB reserved and takes about 44 s per step. On an A100 80GB (High-RAM) it keeps 22 layers there, peaks at about
-# 78 GB and takes about 140 s per step, mostly copying the swapped experts in. `finetune_mlp_modules = False` trains only
-# the attention layers, which needs far less memory.
+# On Colab's RTX PRO 6000 (G4) this peaks at about 81 GB reserved and 44 s per step; on an A100 80GB (High-RAM) at
+# about 78 GB and 140 s per step.
 
 # <a name="Inference"></a>
 # ### Inference
@@ -370,8 +323,7 @@ tokenizer.save_pretrained("qwen_lora")
 # tokenizer.push_to_hub("HF_ACCOUNT/qwen_lora") # Online saving
 
 
-# The adapters are small, and they do not contain the n-gram table: loading them needs the base model's checkpoint
-# again. Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
+# Now if you want to load the LoRA adapters we just saved for inference, set `False` to `True`:
 
 # In[ ]:
 
@@ -387,8 +339,7 @@ if False:
 
 # ### Saving to float16
 # 
-# A merged 16-bit Qwen3.8-Flash-Next is about 360 GB (the experts in bfloat16 plus the decoded n-gram table), more than
-# a Colab disk has next to the 186 GB checkpoint. On a machine with about 600 GB of free disk, set `False` to `True`:
+# A merged 16-bit model is about 360 GB, so this needs about 600 GB of free disk. Set `False` to `True` to run it:
 
 # In[ ]:
 
