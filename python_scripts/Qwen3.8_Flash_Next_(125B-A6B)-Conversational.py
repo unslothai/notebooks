@@ -51,6 +51,7 @@
 import os
 if os.path.isdir("/mnt/local-scratch"):  # Colab A100 High-RAM: download to its 375 GB local NVMe
     os.environ.setdefault("HF_HOME", "/mnt/local-scratch/huggingface")
+os.environ["UNSLOTH_DATASET_NUM_PROC"] = "0"  # Prepare data in this process: forking it after loading can hang
 
 from unsloth import FastModel
 import torch
