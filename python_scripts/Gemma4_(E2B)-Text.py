@@ -502,6 +502,22 @@ if False: # Change to True to upload finetune
     )
 
 
+# ### LiteRT-LM (`.litertlm`) for Android
+# 
+# To run the finetune on a phone with Google's [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM) runtime, the cell below uses [hf-to-litertlm](https://pypi.org/project/hf-to-litertlm/0.1.3/) from PyPI to make a text-only int4 `.litertlm` file of about 2.6GB.
+# 
+# The export needs a Linux x86-64 machine with at least 22GiB of available RAM. With less RAM, it stops before downloading any weights, with one line that says what to do next. On Colab, choose a T4 runtime with High-RAM before training. On that runtime the cell took about 18 minutes.
+# 
+# Copy `out/gemma_4_lora/gemma_4_lora_int4.litertlm` to your phone and run it with LiteRT-LM. The tested build was LiteRT-LM v0.20.0-dev for Android, at commit 3c2837c on its main branch.
+
+# In[ ]:
+
+
+if False: # Change to True to export to LiteRT-LM (.litertlm) for phones
+    get_ipython().system('pip install -q uv')
+    get_ipython().system('uvx hf-to-litertlm==0.1.3 gemma_4_lora')
+
+
 # ### GGUF / llama.cpp Conversion
 # To save to `GGUF` / `llama.cpp`, we support it natively now for all models! For now, you can convert easily to `Q8_0, F16 or BF16` precision. `Q4_K_M` for 4bit will come later!
 
