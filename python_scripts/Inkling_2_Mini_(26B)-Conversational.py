@@ -416,8 +416,8 @@ if False: # Change to True to upload the GGUF
     )
 
 
-# Now run the GGUF with the llama.cpp Unsloth installed. We free the GPU memory first in case your llama.cpp build
-# offloads to the GPU.
+# Now run the GGUF with the llama.cpp Unsloth installed. We free the GPU memory first: on a GPU machine llama.cpp puts as
+# many layers on the GPU as fit and runs the rest on the CPU.
 
 # In[ ]:
 
@@ -434,7 +434,7 @@ if False: # Change to True to run the GGUF in llama.cpp
     )
     run = subprocess.run(
         [os.path.join(llama_cpp, "llama-completion"), "-m", gguf_file, "-p", prompt,
-         "-n", "256", "-c", "4096", "-ngl", "99", "--temp", "1.0", "-no-cnv"],
+         "-n", "256", "-c", "4096", "--temp", "1.0", "-no-cnv"],  # no -ngl: llama.cpp fits the layers to the GPU
         capture_output = True, text = True,
     )
     print(run.stdout)
