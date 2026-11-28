@@ -40,18 +40,11 @@
 # 
 # `FastModel` supports loading nearly any model now! This includes Vision and Text models!
 
-# ### What you are about to load
-# 
-# Qwen3.8-Flash-Next is a 125B parameter MoE (6B active). We load the 186 GB FP8 upload and Unsloth quantizes the
-# experts to 4-bit while loading. It needs one A100 80GB (High-RAM) or one RTX PRO 6000 (96 GB).
+# Qwen3.8-Flash-Next is a 125B MoE (6B active). We load the FP8 upload and Unsloth quantizes the experts to
+# 4-bit while loading, so it fits one A100 80GB (High-RAM) or one RTX PRO 6000 (96 GB).
 
 # In[ ]:
 
-
-import os
-if os.path.isdir("/mnt/local-scratch"):  # Colab A100 High-RAM: download to its 375 GB local NVMe
-    os.environ.setdefault("HF_HOME", "/mnt/local-scratch/huggingface")
-os.environ["UNSLOTH_DATASET_NUM_PROC"] = "0"  # Prepare data in this process: forking it after loading can hang
 
 from unsloth import FastModel
 import torch
@@ -157,25 +150,6 @@ dataset = dataset.map(formatting_prompts_func, batched = True)
 dataset[100]["text"]
 
 
-# ### Controlling how much the model thinks
-# 
-# Pass `reasoning_effort` (`"low"`, `"medium"` or `"xhigh"`, the default) to `apply_chat_template`.
-
-# In[ ]:
-
-
-reasoning_effort = "low"  # low, medium, xhigh. The template default is xhigh.
-
-messages = [{"role": "user", "content": "What is 2 + 2? Reply with just the number."}]
-text = tokenizer.apply_chat_template(
-    messages,
-    add_generation_prompt = True,
-    tokenize = False,
-    reasoning_effort = reasoning_effort,
-)
-print(text)
-
-
 # <a name="Train"></a>
 # ### Train the model
 # 
@@ -211,32 +185,22 @@ trainer = SFTTrainer(
 )
 
 
-# We also use Unsloth's `train_on_responses_only` method to only train on the assistant outputs and ignore the loss
-# on the user's inputs.
+# We also use Unsloth's `train_on_responses_only` method to only train on the assistant outputs. It detects the
+# instruction and response parts from the chat template.
 
 # In[ ]:
 
 
 from unsloth.chat_templates import train_on_responses_only
-
-trainer = train_on_responses_only(
-    trainer,
-    instruction_part = "<|im_start|>user\n",
-    response_part = "<|im_start|>assistant\n",
-)
+trainer = train_on_responses_only(trainer)
 
 
-# Let's verify masking the instruction part is done. You should see only the answer below the line.
+# Let's verify masking the instruction part is done. You should see only the answer:
 
 # In[ ]:
 
 
-text_tokenizer = getattr(tokenizer, "tokenizer", tokenizer)
-space = text_tokenizer(" ", add_special_tokens = False).input_ids[0]
-print(tokenizer.decode(trainer.train_dataset[100]["input_ids"]))
-print("=" * 30)
-print(tokenizer.decode([space if x == -100 else x
-                        for x in trainer.train_dataset[100]["labels"]]))
+tokenizer.decode([x for x in trainer.train_dataset[100]["labels"] if x != -100])
 
 
 # In[ ]:
@@ -295,7 +259,7 @@ inputs = tokenizer.apply_chat_template(
     return_tensors = "pt",
     tokenize = True,
     return_dict = True,
-    reasoning_effort = "low",
+    reasoning_effort = "low", # low, medium or xhigh (the default)
 ).to("cuda")
 
 from transformers import TextStreamer
